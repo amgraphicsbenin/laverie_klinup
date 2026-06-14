@@ -281,6 +281,14 @@ export default function MobileView() {
     return new Date(order.due_date) < new Date();
   };
 
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const datePart = d.toLocaleDateString('fr-FR');
+    const timePart = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return `${datePart} à ${timePart}`;
+  };
+
   // --- STATS DYNAMIQUE ---
   const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule').length;
   const completedOrdersCount = orders.filter(o => o.statut === 'restitue').length;
@@ -560,8 +568,8 @@ export default function MobileView() {
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', background: 'var(--bg-app)', padding: '0.3rem 0.5rem', borderRadius: '8px' }}>
-                        <span>Dépôt: {new Date(order.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</span>
-                        <span>Échéance: {new Date(order.due_date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        <span>Dépôt: {formatDateTime(order.created_at)}</span>
+                        <span>Échéance: {formatDateTime(order.due_date)}</span>
                       </div>
 
                       {/* Action buttons to progress order status */}
@@ -739,7 +747,7 @@ export default function MobileView() {
                         <div>
                           <strong style={{ fontSize: '0.78rem', color: 'var(--primary)' }}>{order.identifiant_unique_marquage}</strong>
                           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                            {new Date(order.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
+                            {formatDateTime(order.created_at)}
                           </span>
                         </div>
                         <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.58rem', padding: '0.1rem 0.35rem' }}>
@@ -1321,13 +1329,13 @@ export default function MobileView() {
               <div><strong>Linge :</strong> {createdOrder.type_article} ({serviceLabels[createdOrder.type_service]})</div>
               <div><strong>Urgence :</strong> {createdOrder.niveau_urgence}</div>
               <div><strong>Mode règlement :</strong> {createdOrder.mode_reglement}</div>
-              <div><strong>Dépôt :</strong> {new Date(createdOrder.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
-              <div><strong>Échéance :</strong> {new Date(createdOrder.due_date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+              <div><strong>Dépôt :</strong> {formatDateTime(createdOrder.created_at)}</div>
+              <div><strong>Échéance :</strong> {formatDateTime(createdOrder.due_date)}</div>
               {createdOrder.acompte_paid_at && (
-                <div><strong>Règlement Acompte :</strong> {new Date(createdOrder.acompte_paid_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                <div><strong>Règlement Acompte :</strong> {formatDateTime(createdOrder.acompte_paid_at)}</div>
               )}
               {createdOrder.solde_paid_at && (
-                <div><strong>Règlement Solde :</strong> {new Date(createdOrder.solde_paid_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                <div><strong>Règlement Solde :</strong> {formatDateTime(createdOrder.solde_paid_at)}</div>
               )}
             </div>
 
