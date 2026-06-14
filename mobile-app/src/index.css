@@ -1,0 +1,668 @@
+/* ========================================================
+   DESIGN SYSTEM PREMIUM & AESTHETICS - KLIN UP (MOBILE)
+   ======================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Police */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-title: 'Outfit', sans-serif;
+
+  /* Palette de couleurs HSL - Mode Clair */
+  --primary: hsl(215, 90%, 52%);
+  --primary-hover: hsl(215, 90%, 45%);
+  --primary-light: hsl(215, 100%, 96%);
+  
+  --secondary: hsl(174, 85%, 40%);
+  --secondary-hover: hsl(174, 85%, 33%);
+  --secondary-light: hsl(174, 100%, 95%);
+
+  --accent: hsl(255, 85%, 62%);
+  
+  /* Statuts */
+  --status-pending: hsl(38, 95%, 52%);
+  --status-pending-light: hsl(38, 100%, 95%);
+  
+  --status-washing: hsl(200, 95%, 50%);
+  --status-washing-light: hsl(200, 100%, 95%);
+  
+  --status-ready: hsl(145, 80%, 42%);
+  --status-ready-light: hsl(145, 100%, 94%);
+  
+  --status-delivered: hsl(220, 15%, 40%);
+  --status-delivered-light: hsl(220, 20%, 93%);
+  
+  --status-late: hsl(0, 85%, 55%);
+  --status-late-light: hsl(0, 100%, 96%);
+
+  /* Neutres */
+  --bg-app: linear-gradient(135deg, hsl(210, 60%, 98%) 0%, hsl(180, 40%, 96%) 100%);
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-sidebar: linear-gradient(180deg, hsl(222, 47%, 15%) 0%, hsl(222, 47%, 9%) 100%);
+  --text-primary: hsl(222, 47%, 15%);
+  --text-secondary: hsl(220, 15%, 45%);
+  --text-muted: hsl(220, 10%, 65%);
+  --text-on-dark: hsl(210, 40%, 98%);
+  --border-color: rgba(215, 222, 235, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06);
+  
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 16px -8px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
+
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+}
+
+/* Version sombre globale par défaut */
+body.dark-mode {
+  --primary: hsl(215, 90%, 60%);
+  --primary-hover: hsl(215, 90%, 68%);
+  --primary-light: hsl(215, 30%, 15%);
+
+  --secondary: hsl(174, 80%, 46%);
+  --secondary-hover: hsl(174, 80%, 54%);
+  --secondary-light: hsl(174, 30%, 14%);
+  
+  --bg-app: linear-gradient(135deg, hsl(222, 47%, 9%) 0%, hsl(224, 45%, 5%) 100%);
+  --bg-card: rgba(20, 24, 38, 0.7);
+  --bg-sidebar: linear-gradient(180deg, hsl(222, 47%, 7%) 0%, hsl(222, 47%, 3%) 100%);
+  --text-primary: hsl(210, 40%, 98%);
+  --text-secondary: hsl(215, 20%, 75%);
+  --text-muted: hsl(215, 15%, 50%);
+  --border-color: rgba(45, 55, 80, 0.6);
+  --glass-border: rgba(20, 24, 38, 0.3);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Réglages globaux */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+}
+
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background 0.3s ease, color 0.3s ease;
+  line-height: 1.5;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Animations */
+@keyframes spin-laundry {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(255, 99, 132, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 99, 132, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 99, 132, 0); }
+}
+
+.spin-washing {
+  animation: spin-laundry 3s linear infinite;
+}
+
+.pulse-express {
+  animation: pulse-glow 2s infinite;
+  border: 1.5px solid hsl(0, 85%, 60%) !important;
+}
+
+/* Layout Principal */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Zone de contenu principale */
+.main-content {
+  flex-grow: 1;
+  padding: 2.5rem 3rem;
+  overflow-y: auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Topbar */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-title h1 {
+  font-family: var(--font-title);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.page-title p {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* Mode Sombre Switcher */
+.theme-toggle {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 0.6rem;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.theme-toggle:hover {
+  transform: scale(1.05);
+  border-color: var(--primary);
+}
+
+/* Cartes */
+.card {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-md);
+  padding: 1.75rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06);
+}
+
+/* Boutons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--secondary-light);
+  color: var(--secondary);
+  border: 1px solid rgba(20, 184, 166, 0.15);
+}
+
+.btn-secondary:hover {
+  background: var(--secondary);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-outline:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* Badges de Statut */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 50px;
+  text-transform: uppercase;
+}
+
+.badge-en_attente {
+  background: var(--status-pending-light);
+  color: var(--status-pending);
+}
+.badge-en_cours_lavage {
+  background: var(--status-washing-light);
+  color: var(--status-washing);
+}
+.badge-pret {
+  background: var(--status-ready-light);
+  color: var(--status-ready);
+}
+.badge-restitue {
+  background: var(--status-delivered-light);
+  color: var(--status-delivered);
+}
+.badge-en_retard {
+  background: var(--status-late-light);
+  color: var(--status-late);
+}
+.badge-annule {
+  background: var(--status-delivered-light);
+  color: var(--status-delivered);
+  text-decoration: line-through;
+}
+
+/* Formulaires */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.input-control {
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.input-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+
+/* Widget RBAC Flottant */
+.rbac-widget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: hsl(222, 47%, 12%);
+  color: #fff;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 999;
+  width: 250px;
+}
+
+.rbac-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 0.5rem;
+}
+
+.rbac-role-select {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.rbac-role-select option {
+  background: hsl(222, 47%, 12%);
+  color: #fff;
+}
+
+/* Interface Mobile Simulation Container - Smartphone Mockup (Clean View without borders) */
+.mobile-simulator {
+  width: 380px;
+  height: 800px;
+  margin: 0 auto;
+  background: var(--bg-app);
+  border-radius: 24px;
+  border: none;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+/* Simulated Status Bar & Notch - HIDDEN to remove outer hardware frame */
+.phone-status-bar {
+  display: none !important;
+}
+
+.phone-status-bar-icons {
+  display: none !important;
+}
+
+.phone-notch {
+  display: none !important;
+}
+
+.mobile-content {
+  flex-grow: 1;
+  padding: 1.25rem 1.25rem 85px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: var(--bg-app);
+  
+  /* Hide scrollbar for Firefox and IE/Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-content::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome, Safari, Opera */
+}
+
+/* Bottom navigation bar inside simulator */
+.mobile-footer-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 72px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  z-index: 80;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
+}
+
+body.dark-mode .mobile-footer-nav {
+  background: rgba(15, 18, 30, 0.75);
+}
+
+.mobile-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  background: none;
+  border: none;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 100%;
+}
+
+.mobile-nav-btn.active {
+  color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.mobile-nav-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.mobile-nav-btn.active svg {
+  transform: scale(1.15);
+}
+
+/* iPhone Home Indicator Line */
+.phone-home-indicator {
+  display: none !important;
+}
+
+/* Premium Dashboard and Custom elements */
+.mobile-welcome-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.mobile-welcome-text h2 {
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+}
+
+.mobile-welcome-text p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.dashboard-main-card {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 20px;
+  padding: 1.25rem;
+  box-shadow: 0 10px 25px rgba(2, 132, 199, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-main-card::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  right: -10%;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 70%);
+  border-radius: 50%;
+}
+
+.dashboard-main-card-header {
+  font-size: 0.78rem;
+  opacity: 0.85;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+
+.dashboard-main-card-value {
+  font-family: var(--font-title);
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.activity-svg-container {
+  height: 100px;
+  margin-top: 0.5rem;
+  position: relative;
+}
+
+.activity-svg-container svg {
+  width: 100%;
+  height: 100%;
+}
+
+.dashboard-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.metric-mini-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.metric-mini-card h5 {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin: 0;
+}
+
+.metric-mini-card p {
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* Premium Orders Row */
+.mobile-order-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 0.8rem;
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease;
+}
+
+.mobile-order-row:hover {
+  transform: translateY(-1px);
+}
+
+.mobile-order-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-order-info {
+  flex-grow: 1;
+  margin-left: 0.75rem;
+}
+
+.mobile-order-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mobile-order-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.mobile-order-right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.mobile-order-price {
+  font-family: var(--font-title);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .main-content {
+    padding: 1.5rem 1rem;
+  }
+}
+
+
+/* Responsive Overrides for Real Mobile Screens */
+@media (max-width: 500px) {
+  body {
+    padding: 0 !important;
+  }
+  .app-container {
+    padding: 0 !important;
+  }
+  .rbac-widget, .theme-toggle {
+    display: none !important;
+  }
+  .mobile-simulator {
+    width: 100vw !important;
+    height: 100vh !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .phone-notch {
+    display: none !important;
+  }
+  .phone-status-bar {
+    padding: 0.5rem 1rem 0.25rem !important;
+  }
+}
+
