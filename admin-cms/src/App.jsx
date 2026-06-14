@@ -13,7 +13,9 @@ import {
   Bell,
   Mail,
   HelpCircle,
-  Settings
+  Settings,
+  ShoppingBag,
+  Users
 } from 'lucide-react';
 
 function App() {
@@ -95,6 +97,20 @@ function App() {
                 Vue d'Ensemble
               </li>
               <li 
+                className={`menu-item ${adminMenu === 'orders_management' ? 'active' : ''}`}
+                onClick={() => setAdminMenu('orders_management')}
+              >
+                <ShoppingBag size={18} />
+                Gestion Commandes
+              </li>
+              <li 
+                className={`menu-item ${adminMenu === 'crm_management' ? 'active' : ''}`}
+                onClick={() => setAdminMenu('crm_management')}
+              >
+                <Users size={18} />
+                Clients CRM
+              </li>
+              <li 
                 className={`menu-item ${adminMenu === 'catalog' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('catalog')}
               >
@@ -150,12 +166,16 @@ function App() {
             <h1>
               {!hasAdminAccess && "Accès non autorisé"}
               {hasAdminAccess && adminMenu === 'dashboard' && "Tableau de Bord"}
+              {hasAdminAccess && adminMenu === 'orders_management' && "Gestion des Commandes"}
+              {hasAdminAccess && adminMenu === 'crm_management' && "Clients CRM"}
               {hasAdminAccess && adminMenu === 'catalog' && "Catalogue Tarifs"}
               {hasAdminAccess && adminMenu === 'logs' && "Journal d'Audit"}
             </h1>
             <p style={{ marginTop: '0.15rem' }}>
               {!hasAdminAccess && "Cet espace est restreint aux administrateurs."}
               {hasAdminAccess && adminMenu === 'dashboard' && "Suivi des indicateurs clés et productivité de la laverie."}
+              {hasAdminAccess && adminMenu === 'orders_management' && "Enregistrement, suivi d'atelier et facturation des commandes."}
+              {hasAdminAccess && adminMenu === 'crm_management' && "Fiches clients, encours financiers et fidélité."}
               {hasAdminAccess && adminMenu === 'catalog' && "Gestion de la grille de prix de traitement de laverie B2B."}
               {hasAdminAccess && adminMenu === 'logs' && "Traçabilité des actions et sécurité des transactions."}
             </p>
