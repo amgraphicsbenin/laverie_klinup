@@ -59,7 +59,9 @@ const DEFAULT_ORDERS = [
     prix_total: 10500,
     identifiant_unique_marquage: 'KLIN-092813',
     created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-    due_date: new Date(Date.now() + 3600000 * 4).toISOString()
+    due_date: new Date(Date.now() + 3600000 * 4).toISOString(),
+    acompte_paid_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    solde_paid_at: null
   },
   {
     id: 'o2',
@@ -73,7 +75,9 @@ const DEFAULT_ORDERS = [
     prix_total: 1000,
     identifiant_unique_marquage: 'KLIN-482015',
     created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-    due_date: new Date(Date.now() - 3600000 * 2).toISOString()
+    due_date: new Date(Date.now() - 3600000 * 2).toISOString(),
+    acompte_paid_at: new Date(Date.now() - 3600000 * 24).toISOString(),
+    solde_paid_at: new Date(Date.now() - 3600000 * 24).toISOString()
   },
   {
     id: 'o3',
@@ -87,7 +91,9 @@ const DEFAULT_ORDERS = [
     prix_total: 5000,
     identifiant_unique_marquage: 'KLIN-392810',
     created_at: new Date(Date.now() - 3600000 * 72).toISOString(),
-    due_date: new Date(Date.now() - 3600000 * 24).toISOString()
+    due_date: new Date(Date.now() - 3600000 * 24).toISOString(),
+    acompte_paid_at: new Date(Date.now() - 3600000 * 72).toISOString(),
+    solde_paid_at: new Date(Date.now() - 3600000 * 72).toISOString()
   }
 ];
 
@@ -237,6 +243,7 @@ export const db = {
     const codeMarquage = 'KLIN-' + Math.floor(100000 + Math.random() * 900000).toString();
     const hoursToAdd = orderData.niveau_urgence === 'Express' ? 6 : 48;
     const dueDate = new Date(Date.now() + 3600000 * hoursToAdd).toISOString();
+    const nowStr = new Date().toISOString();
 
     const newOrder = {
       id: 'o_' + Math.random().toString(36).substr(2, 9),
@@ -249,8 +256,10 @@ export const db = {
       avance_payee: advancePaid,
       prix_total: totalPrice,
       identifiant_unique_marquage: codeMarquage,
-      created_at: new Date().toISOString(),
+      created_at: nowStr,
       due_date: dueDate,
+      acompte_paid_at: advancePaid > 0 ? nowStr : null,
+      solde_paid_at: unpaidBalance <= 0 ? nowStr : null,
       items: orderData.items || []
     };
 
@@ -270,6 +279,7 @@ export const db = {
     order.statut = newStatus;
 
     if (newStatus === 'restitue') {
+      order.solde_paid_at = new Date().toISOString();
       const customers = db.getCustomers();
       const customer = customers.find(c => c.id === order.customer_id);
       if (customer) {
@@ -299,6 +309,7 @@ export const db = {
     order.mode_reglement = paymentMethod;
     
     order.avance_payee = Number(order.avance_payee) + Number(amountPaid);
+    order.solde_paid_at = new Date().toISOString();
 
     const customers = db.getCustomers();
     const customer = customers.find(c => c.id === order.customer_id);

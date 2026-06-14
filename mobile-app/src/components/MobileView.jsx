@@ -560,8 +560,8 @@ export default function MobileView() {
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', background: 'var(--bg-app)', padding: '0.3rem 0.5rem', borderRadius: '8px' }}>
-                        <span>Dépôt: {new Date(order.created_at).toLocaleDateString()}</span>
-                        <span>Échéance: {new Date(order.due_date).toLocaleDateString()}</span>
+                        <span>Dépôt: {new Date(order.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        <span>Échéance: {new Date(order.due_date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</span>
                       </div>
 
                       {/* Action buttons to progress order status */}
@@ -739,7 +739,7 @@ export default function MobileView() {
                         <div>
                           <strong style={{ fontSize: '0.78rem', color: 'var(--primary)' }}>{order.identifiant_unique_marquage}</strong>
                           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                            {new Date(order.created_at).toLocaleDateString()}
+                            {new Date(order.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
                           </span>
                         </div>
                         <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.58rem', padding: '0.1rem 0.35rem' }}>
@@ -1321,8 +1321,14 @@ export default function MobileView() {
               <div><strong>Linge :</strong> {createdOrder.type_article} ({serviceLabels[createdOrder.type_service]})</div>
               <div><strong>Urgence :</strong> {createdOrder.niveau_urgence}</div>
               <div><strong>Mode règlement :</strong> {createdOrder.mode_reglement}</div>
-              <div><strong>Dépôt :</strong> {new Date(createdOrder.created_at).toLocaleString()}</div>
-              <div><strong>Échéance :</strong> {new Date(createdOrder.due_date).toLocaleString()}</div>
+              <div><strong>Dépôt :</strong> {new Date(createdOrder.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+              <div><strong>Échéance :</strong> {new Date(createdOrder.due_date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+              {createdOrder.acompte_paid_at && (
+                <div><strong>Règlement Acompte :</strong> {new Date(createdOrder.acompte_paid_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+              )}
+              {createdOrder.solde_paid_at && (
+                <div><strong>Règlement Solde :</strong> {new Date(createdOrder.solde_paid_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+              )}
             </div>
 
             <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1rem', color: '#000' }}>
