@@ -445,6 +445,35 @@ export const db = {
     return order;
   },
 
+  deliverOrderWithPayment: (orderId, amountPaid, paymentMethod) => {
+    const orders = db.getOrders();
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const oldStatus = order.statut;
+    order.statut = 'restitue';
+    order.mode_reglement = paymentMethod;
+    
+    order.avance_payee = Number(order.avance_payee) + Number(amountPaid);
+
+    const customers = db.getCustomers();
+    const customer = customers.find(c => c.id === order.customer_id);
+    if (customer && amountPaid > 0) {
+      customer.solde_dette = Math.max(0, Number(customer.solde_dette) - Number(amountPaid));
+      const newPoints = Math.floor(amountPaid / 1000) * 1;
+      customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
+      saveData(STORAGE_KEYS.CUSTOMERS, customers);
+    }
+
+    saveData(STORAGE_KEYS.ORDERS, orders);
+    db.logAction(
+      'PAIEMENT_FINAL', 
+      `Livraison commande ${order.identifiant_unique_marquage}. Paiement reçu : ${amountPaid} FCFA (Méthode: ${paymentMethod === 'especes' ? 'Espèces' : 'Mobile Money'})`
+    );
+    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage} passée de '${oldStatus}' à 'restitue'`);
+    return order;
+  },
+
   cancelOrder: (orderId) => {
     const orders = db.getOrders();
     const order = orders.find(o => o.id === orderId);

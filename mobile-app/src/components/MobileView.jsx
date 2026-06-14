@@ -42,6 +42,12 @@ export default function MobileView() {
   const [modeReglement, setModeReglement] = useState('especes');
   const [avancePayee, setAvancePayee] = useState('');
 
+  // Flow de Livraison / Paiement Final
+  const [showDeliveryPaymentModal, setShowDeliveryPaymentModal] = useState(false);
+  const [delivOrder, setDelivOrder] = useState(null);
+  const [delivPaymentMethod, setDelivPaymentMethod] = useState('especes');
+  const [delivAmountPaid, setDelivAmountPaid] = useState('');
+
   const handleUpdateQty = (cloth, delta) => {
     setArticleQuantities(prev => {
       const current = prev[cloth] || 0;
@@ -52,6 +58,31 @@ export default function MobileView() {
 
   const handleUpdateService = (cloth, service) => {
     setArticleServices(prev => ({ ...prev, [cloth]: service }));
+  };
+
+  const handleStartDelivery = (order) => {
+    const remainingToPay = order.prix_total - order.avance_payee;
+    if (remainingToPay <= 0) {
+      if (confirm(`Confirmer la livraison de la commande ${order.identifiant_unique_marquage} ?`)) {
+        db.updateOrderStatus(order.id, 'restitue');
+        refreshData();
+      }
+    } else {
+      setDelivOrder(order);
+      setDelivPaymentMethod('especes');
+      setDelivAmountPaid(remainingToPay.toString());
+      setShowDeliveryPaymentModal(true);
+    }
+  };
+
+  const handleConfirmDelivery = (e) => {
+    e.preventDefault();
+    if (!delivOrder) return;
+    
+    db.deliverOrderWithPayment(delivOrder.id, Number(delivAmountPaid || 0), delivPaymentMethod);
+    refreshData();
+    setShowDeliveryPaymentModal(false);
+    setDelivOrder(null);
   };
   
   // Nouveau Client
@@ -526,7 +557,7 @@ export default function MobileView() {
                           <button 
                             className="btn btn-primary" 
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--status-ready)', color: '#fff' }}
-                            onClick={() => handleStatusChange(order.id, 'restitue')}
+                            onClick={() => handleStartDelivery(order)}
                           >
                             <DollarSign size={12} /> Livrer
                           </button>
@@ -1169,6 +1200,60 @@ export default function MobileView() {
               </div>
               <button type="submit" className="btn btn-primary" style={{ padding: '0.45rem', fontSize: '0.78rem', borderRadius: '8px' }}>
                 Encaisser
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL RÈGLEMENT LIVRAISON ================= */}
+      {showDeliveryPaymentModal && delivOrder && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '320px', background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+              <h3 style={{ fontSize: '0.95rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0 }}>Règlement Solde Livraison</h3>
+              <X size={15} style={{ cursor: 'pointer' }} onClick={() => setShowDeliveryPaymentModal(false)} />
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.75rem', marginBottom: '0.75rem', padding: '0.5rem', background: 'var(--bg-app)', borderRadius: '8px' }}>
+              <div>Client : <strong>{customers.find(c => c.id === delivOrder.customer_id)?.prenom} {customers.find(c => c.id === delivOrder.customer_id)?.nom}</strong></div>
+              <div>Commande : <strong>{delivOrder.identifiant_unique_marquage}</strong></div>
+              <div style={{ borderTop: '1px dashed var(--border-color)', marginTop: '0.35rem', paddingTop: '0.35rem' }}>Total commande : <strong>{delivOrder.prix_total} F</strong></div>
+              <div>Acompte déjà payé : <strong style={{ color: 'var(--status-ready)' }}>{delivOrder.avance_payee} F</strong></div>
+              <div style={{ fontSize: '0.82rem', color: 'var(--status-late)', marginTop: '0.15rem' }}>
+                Reste à payer : <strong>{delivOrder.prix_total - delivOrder.avance_payee} FCFA</strong>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmDelivery} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.7rem' }}>Mode de règlement</label>
+                <select 
+                  className="input-control" 
+                  style={{ padding: '0.45rem', fontSize: '0.78rem' }}
+                  value={delivPaymentMethod} 
+                  onChange={(e) => setDelivPaymentMethod(e.target.value)}
+                >
+                  <option value="especes">Espèces</option>
+                  <option value="mobile_money">Mobile Money</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.7rem' }}>Montant Reçu (FCFA)</label>
+                <input 
+                  type="number" 
+                  className="input-control" 
+                  style={{ padding: '0.45rem', fontSize: '0.78rem' }}
+                  max={delivOrder.prix_total - delivOrder.avance_payee}
+                  required
+                  value={delivAmountPaid} 
+                  onChange={(e) => setDelivAmountPaid(e.target.value)} 
+                />
+              </div>
+
+              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.4rem', padding: '0.55rem', fontSize: '0.78rem', borderRadius: '8px', background: 'var(--status-ready)', color: '#fff', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}>
+                Encaisser & Livrer
               </button>
             </form>
           </div>
