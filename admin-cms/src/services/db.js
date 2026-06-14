@@ -354,14 +354,23 @@ export const db = {
   createOrder: (orderData) => {
     const orders = db.getOrders();
     const customers = db.getCustomers();
-
     const catalog = db.getCatalog();
-    const catalogItem = catalog.find(item => item.article === orderData.type_article && item.service === orderData.type_service);
-    const basePrice = catalogItem ? catalogItem.prix : 1500;
 
-    let totalPrice = basePrice;
+    let totalPrice = 0;
+    if (orderData.items && orderData.items.length > 0) {
+      orderData.items.forEach(item => {
+        const catalogItem = catalog.find(c => c.article === item.article && c.service === item.service);
+        const itemPrice = catalogItem ? catalogItem.prix : 1500;
+        totalPrice += itemPrice * item.quantite;
+      });
+    } else {
+      const catalogItem = catalog.find(item => item.article === orderData.type_article && item.service === orderData.type_service);
+      const basePrice = catalogItem ? catalogItem.prix : 1500;
+      totalPrice = basePrice;
+    }
+
     if (orderData.niveau_urgence === 'Express') {
-      totalPrice = Math.round(basePrice * 1.5);
+      totalPrice = Math.round(totalPrice * 1.5);
     }
 
     const customer = customers.find(c => c.id === orderData.customer_id);
@@ -397,7 +406,8 @@ export const db = {
       prix_total: totalPrice,
       identifiant_unique_marquage: codeMarquage,
       created_at: new Date().toISOString(),
-      due_date: dueDate
+      due_date: dueDate,
+      items: orderData.items || []
     };
 
     orders.push(newOrder);

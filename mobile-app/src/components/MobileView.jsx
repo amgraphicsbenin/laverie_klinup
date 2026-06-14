@@ -36,11 +36,23 @@ export default function MobileView() {
 
   // Formulaire Caisse
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [typeArticle, setTypeArticle] = useState('Chemise');
-  const [typeService, setTypeService] = useState('lavage_simple');
+  const [articleQuantities, setArticleQuantities] = useState({});
+  const [articleServices, setArticleServices] = useState({});
   const [niveauUrgence, setNiveauUrgence] = useState('Normal');
   const [modeReglement, setModeReglement] = useState('especes');
   const [avancePayee, setAvancePayee] = useState('');
+
+  const handleUpdateQty = (cloth, delta) => {
+    setArticleQuantities(prev => {
+      const current = prev[cloth] || 0;
+      const next = Math.max(0, current + delta);
+      return { ...prev, [cloth]: next };
+    });
+  };
+
+  const handleUpdateService = (cloth, service) => {
+    setArticleServices(prev => ({ ...prev, [cloth]: service }));
+  };
   
   // Nouveau Client
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
@@ -89,27 +101,19 @@ export default function MobileView() {
     ? [...new Set(catalog.filter(c => c.categorie !== 'abonnement').map(c => c.article))] 
     : ['Chemise', 'Pantalon', 'Robe', 'Combinaison', 'Jupe', 'Pull', 'Culotte', 'T-shirt', 'Polo', 'Blouson', 'Veste', 'Costume', 'Jeans'];
 
-  // Extract services available for selected clothing item
-  const availableServices = catalog.length > 0 
-    ? catalog.filter(c => c.categorie !== 'abonnement' && c.article === typeArticle) 
-    : [
-        { service: 'lavage_simple', prix: 1500 },
-        { service: 'nettoyage_a_sec', prix: 3000 },
-        { service: 'repassage', prix: 1000 }
-      ];
-
-  // If selected typeService is not available in the new clothing selection, fallback to first available
-  useEffect(() => {
-    if (availableServices.length > 0 && !availableServices.find(s => s.service === typeService)) {
-      setTypeService(availableServices[0].service);
-    }
-  }, [typeArticle]);
-
   // --- LOGIQUE DE CALCUL DU PRIX ---
   const getCalculatedPrice = () => {
-    const item = catalog.find(c => c.article === typeArticle && c.service === typeService);
-    const base = item ? item.prix : 1500;
-    return niveauUrgence === 'Express' ? Math.round(base * 1.5) : base;
+    let total = 0;
+    Object.keys(articleQuantities).forEach(cloth => {
+      const qty = articleQuantities[cloth];
+      if (qty > 0) {
+        const svc = articleServices[cloth] || 'lavage_simple';
+        const item = catalog.find(c => c.article === cloth && c.service === svc);
+        const price = item ? item.prix : 1500;
+        total += price * qty;
+      }
+    });
+    return niveauUrgence === 'Express' ? Math.round(total * 1.5) : total;
   };
 
   const handleCreateCustomer = (e) => {
@@ -138,19 +142,41 @@ export default function MobileView() {
       return;
     }
 
+    const selectedItems = [];
+    Object.keys(articleQuantities).forEach(cloth => {
+      const qty = articleQuantities[cloth];
+      if (qty > 0) {
+        selectedItems.push({
+          article: cloth,
+          quantite: qty,
+          service: articleServices[cloth] || 'lavage_simple'
+        });
+      }
+    });
+
+    if (selectedItems.length === 0) {
+      alert("Veuillez sélectionner au moins un article avec une quantité supérieure à 0");
+      return;
+    }
+
+    const typeArticleSummary = selectedItems.map(item => `${item.quantite}x ${item.article}`).join(', ');
+    const primaryService = selectedItems[0].service;
+
     const orderData = {
       customer_id: selectedCustomerId,
-      type_article: typeArticle,
-      type_service: typeService,
+      type_article: typeArticleSummary,
+      type_service: primaryService,
       niveau_urgence: niveauUrgence,
       mode_reglement: modeReglement,
-      avance_payee: Number(avancePayee || 0)
+      avance_payee: Number(avancePayee || 0),
+      items: selectedItems
     };
 
     const newOrder = db.createOrder(orderData);
     refreshData();
     setCreatedOrder(newOrder);
     setAvancePayee('');
+    setArticleQuantities({});
   };
 
   const handlePayDebt = (e) => {
@@ -644,31 +670,136 @@ export default function MobileView() {
                 {/* Main Order Form */}
                 <form onSubmit={handleCreateOrder} className="card" style={{ padding: '1rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.75rem' }}>Type de Linge</label>
-                    <select 
-                      className="input-control" 
-                      style={{ padding: '0.5rem', fontSize: '0.8rem' }}
-                      value={typeArticle} 
-                      onChange={(e) => setTypeArticle(e.target.value)}
-                    >
-                      {catalogClothes.map(cloth => (
-                        <option key={cloth} value={cloth}>{cloth}</option>
-                      ))}
-                    </select>
-                  </div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Type de Linge & Services</label>
+                    <div style={{ 
+                      maxHeight: '220px', 
+                      overflowY: 'auto', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: '12px', 
+                      padding: '0.5rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      background: 'var(--bg-app)'
+                    }}>
+                      {catalogClothes.map(cloth => {
+                        const qty = articleQuantities[cloth] || 0;
+                        const selectedSvc = articleServices[cloth] || 'lavage_simple';
+                        
+                        // Get services for this clothing item
+                        const servicesForCloth = catalog.filter(c => c.categorie !== 'abonnement' && c.article === cloth);
+                        const activeServices = servicesForCloth.length > 0 ? servicesForCloth : [
+                          { service: 'lavage_simple', prix: 1500 },
+                          { service: 'nettoyage_a_sec', prix: 3000 },
+                          { service: 'repassage', prix: 1000 }
+                        ];
 
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.75rem' }}>Type de Service</label>
-                    <select 
-                      className="input-control" 
-                      style={{ padding: '0.5rem', fontSize: '0.8rem' }}
-                      value={typeService} 
-                      onChange={(e) => setTypeService(e.target.value)}
-                    >
-                      {availableServices.map(s => (
-                        <option key={s.service} value={s.service}>{serviceLabels[s.service]} ({s.prix} F)</option>
-                      ))}
-                    </select>
+                        // Find active service price
+                        const activeServiceObj = activeServices.find(s => s.service === selectedSvc) || activeServices[0];
+                        const unitPrice = activeServiceObj ? activeServiceObj.prix : 1500;
+                        
+                        return (
+                          <div key={cloth} style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '0.35rem', 
+                            padding: '0.5rem 0.65rem', 
+                            background: qty > 0 ? 'var(--primary-light)' : 'var(--bg-card)', 
+                            borderRadius: '10px',
+                            border: qty > 0 ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                            transition: 'all 0.15s ease'
+                          }}>
+                            {/* Line: Item Name & Counter */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: qty > 0 ? 800 : 600, color: 'var(--text-primary)' }}>{cloth}</span>
+                              
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                                <button 
+                                  type="button" 
+                                  style={{ 
+                                    width: '24px', 
+                                    height: '24px', 
+                                    borderRadius: '50%', 
+                                    border: '1px solid var(--border-color)', 
+                                    background: 'var(--bg-card)', 
+                                    color: 'var(--text-primary)', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    cursor: qty === 0 ? 'not-allowed' : 'pointer', 
+                                    opacity: qty === 0 ? 0.35 : 1,
+                                    fontSize: '0.9rem',
+                                    fontWeight: 'bold',
+                                    padding: 0
+                                  }}
+                                  disabled={qty === 0}
+                                  onClick={() => handleUpdateQty(cloth, -1)}
+                                >
+                                  -
+                                </button>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 800, minWidth: '14px', textAlign: 'center' }}>{qty}</span>
+                                <button 
+                                  type="button" 
+                                  style={{ 
+                                    width: '24px', 
+                                    height: '24px', 
+                                    borderRadius: '50%', 
+                                    border: '1px solid var(--primary)', 
+                                    background: 'var(--primary-light)', 
+                                    color: 'var(--primary)', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    cursor: 'pointer',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 'bold',
+                                    padding: 0
+                                  }}
+                                  onClick={() => handleUpdateQty(cloth, 1)}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Service and Subtotal if qty > 0 */}
+                            {qty > 0 && (
+                              <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center', 
+                                gap: '0.5rem', 
+                                borderTop: '1px dashed rgba(2, 132, 199, 0.2)', 
+                                paddingTop: '0.3rem', 
+                                marginTop: '0.1rem' 
+                              }}>
+                                <select 
+                                  style={{ 
+                                    padding: '0.2rem 0.35rem', 
+                                    fontSize: '0.7rem', 
+                                    border: '1px solid var(--border-color)', 
+                                    borderRadius: '6px', 
+                                    width: '60%', 
+                                    background: 'var(--bg-card)', 
+                                    color: 'var(--text-primary)',
+                                    outline: 'none'
+                                  }}
+                                  value={selectedSvc}
+                                  onChange={(e) => handleUpdateService(cloth, e.target.value)}
+                                >
+                                  {activeServices.map(s => (
+                                    <option key={s.service} value={s.service}>{serviceLabels[s.service]} ({s.prix} F)</option>
+                                  ))}
+                                </select>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)' }}>
+                                  {(unitPrice * qty).toLocaleString()} F
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
