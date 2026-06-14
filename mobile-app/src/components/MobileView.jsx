@@ -31,9 +31,6 @@ export default function MobileView() {
   const [orders, setOrders] = useState([]);
   const [catalog, setCatalog] = useState([]);
 
-  // Sub-tabs
-  const [facturationSubTab, setFacturationSubTab] = useState('caisse'); // caisse or crm
-
   // Formulaire Caisse
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [articleQuantities, setArticleQuantities] = useState({});
@@ -47,6 +44,32 @@ export default function MobileView() {
   const [delivOrder, setDelivOrder] = useState(null);
   const [delivPaymentMethod, setDelivPaymentMethod] = useState('especes');
   const [delivAmountPaid, setDelivAmountPaid] = useState('');
+
+  // Modale de création de commande
+  const [showOrderRegistrationModal, setShowOrderRegistrationModal] = useState(false);
+
+  // Filtres Historique
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyFilterStatus, setHistoryFilterStatus] = useState('all');
+
+  // Filtered orders list for the history tab
+  const filteredHistoryOrders = orders.filter(o => {
+    // Filter by status
+    if (historyFilterStatus !== 'all' && o.statut !== historyFilterStatus) return false;
+
+    // Filter by search query
+    if (historySearchQuery) {
+      const q = historySearchQuery.toLowerCase();
+      const client = customers.find(c => c.id === o.customer_id);
+      const clientName = client ? `${client.prenom} ${client.nom}`.toLowerCase() : '';
+      return (
+        o.identifiant_unique_marquage.toLowerCase().includes(q) ||
+        o.type_article.toLowerCase().includes(q) ||
+        clientName.includes(q)
+      );
+    }
+    return true;
+  });
 
   const handleUpdateQty = (cloth, delta) => {
     setArticleQuantities(prev => {
@@ -208,6 +231,7 @@ export default function MobileView() {
     setCreatedOrder(newOrder);
     setAvancePayee('');
     setArticleQuantities({});
+    setShowOrderRegistrationModal(false);
   };
 
   const handlePayDebt = (e) => {
@@ -334,10 +358,7 @@ export default function MobileView() {
               <button 
                 className="btn btn-primary" 
                 style={{ width: '36px', height: '36px', borderRadius: '50%', padding: 0 }}
-                onClick={() => {
-                  setActiveTab('facturation');
-                  setFacturationSubTab('caisse');
-                }}
+                onClick={() => setShowOrderRegistrationModal(true)}
               >
                 <Plus size={18} />
               </button>
@@ -455,9 +476,19 @@ export default function MobileView() {
            ======================================================== */}
         {activeTab === 'gestion' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div className="mobile-welcome-text">
-              <h2>Gestion Atelier</h2>
-              <p>Cycles de lavage & Suivi</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="mobile-welcome-text">
+                <h2>Gestion de commandes</h2>
+                <p>Suivi et traitement</p>
+              </div>
+              <button 
+                type="button"
+                className="btn btn-primary" 
+                style={{ padding: '0.45rem 0.8rem', fontSize: '0.75rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                onClick={() => setShowOrderRegistrationModal(true)}
+              >
+                <Plus size={14} /> Nouvelle commande
+              </button>
             </div>
 
             {/* Atelier sub-filters */}
@@ -631,371 +662,136 @@ export default function MobileView() {
         {/* ========================================================
            ONGLET : FACTURATION (CAISSE & CRM CLIENTS)
            ======================================================== */}
-        {activeTab === 'facturation' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {activeTab === 'historique' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="mobile-welcome-text">
-              <h2>Facturation</h2>
-              <p>Enregistrement de commandes & Encaissements</p>
+              <h2>Historique</h2>
+              <p>Suivi et archives des commandes</p>
             </div>
 
-            {/* Facturation sub-navigation (Caisse / CRM) */}
-            <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              <button 
-                className={`btn ${facturationSubTab === 'caisse' ? 'btn-primary' : 'btn-outline'}`}
-                style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                onClick={() => setFacturationSubTab('caisse')}
-              >
-                Caisse Enregistrement
-              </button>
-              <button 
-                className={`btn ${facturationSubTab === 'crm' ? 'btn-primary' : 'btn-outline'}`}
-                style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                onClick={() => setFacturationSubTab('crm')}
-              >
-                Clients CRM
-              </button>
-            </div>
-
-            {/* --- CAISSE SUB TAB --- */}
-            {facturationSubTab === 'caisse' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {/* Client selection block */}
-                <div className="card" style={{ padding: '1rem', borderRadius: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <h5 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Sélection du Client</h5>
-                    <button 
-                      className="btn btn-secondary" 
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.65rem', borderRadius: '6px' }}
-                      onClick={() => setShowNewCustomerModal(true)}
-                    >
-                      + Nouveau
-                    </button>
-                  </div>
-                  <select 
-                    className="input-control" 
-                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }}
-                    value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  >
-                    <option value="">-- Choisir un client --</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>{c.prenom} {c.nom} ({c.telephone})</option>
-                    ))}
-                  </select>
-
-                  {activeCustomer && (
-                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'var(--primary-light)', borderRadius: '8px', fontSize: '0.72rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Préférence : <strong>{activeCustomer.preferences_pliage}</strong></span>
-                        <span style={{ color: 'var(--secondary)' }}>Points: <strong>{activeCustomer.points_fidelite} pts</strong></span>
-                      </div>
-                      {activeCustomer.solde_dette > 0 && (
-                        <div style={{ color: 'var(--status-late)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <TriangleAlert size={10} /> Dette encours: {activeCustomer.solde_dette} FCFA
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Main Order Form */}
-                <form onSubmit={handleCreateOrder} className="card" style={{ padding: '1rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Type de Linge & Services</label>
-                    <div style={{ 
-                      maxHeight: '220px', 
-                      overflowY: 'auto', 
-                      border: '1px solid var(--border-color)', 
-                      borderRadius: '12px', 
-                      padding: '0.5rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.5rem',
-                      background: 'var(--bg-app)'
-                    }}>
-                      {catalogClothes.map(cloth => {
-                        const qty = articleQuantities[cloth] || 0;
-                        const selectedSvc = articleServices[cloth] || 'lavage_simple';
-                        
-                        // Get services for this clothing item
-                        const servicesForCloth = catalog.filter(c => c.categorie !== 'abonnement' && c.article === cloth);
-                        const activeServices = servicesForCloth.length > 0 ? servicesForCloth : [
-                          { service: 'lavage_simple', prix: 1500 },
-                          { service: 'nettoyage_a_sec', prix: 3000 },
-                          { service: 'repassage', prix: 1000 }
-                        ];
-
-                        // Find active service price
-                        const activeServiceObj = activeServices.find(s => s.service === selectedSvc) || activeServices[0];
-                        const unitPrice = activeServiceObj ? activeServiceObj.prix : 1500;
-                        
-                        return (
-                          <div key={cloth} style={{ 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            gap: '0.35rem', 
-                            padding: '0.5rem 0.65rem', 
-                            background: qty > 0 ? 'var(--primary-light)' : 'var(--bg-card)', 
-                            borderRadius: '10px',
-                            border: qty > 0 ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                            transition: 'all 0.15s ease'
-                          }}>
-                            {/* Line: Item Name & Counter */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.8rem', fontWeight: qty > 0 ? 800 : 600, color: 'var(--text-primary)' }}>{cloth}</span>
-                              
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                                <button 
-                                  type="button" 
-                                  style={{ 
-                                    width: '24px', 
-                                    height: '24px', 
-                                    borderRadius: '50%', 
-                                    border: '1px solid var(--border-color)', 
-                                    background: 'var(--bg-card)', 
-                                    color: 'var(--text-primary)', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    cursor: qty === 0 ? 'not-allowed' : 'pointer', 
-                                    opacity: qty === 0 ? 0.35 : 1,
-                                    fontSize: '0.9rem',
-                                    fontWeight: 'bold',
-                                    padding: 0
-                                  }}
-                                  disabled={qty === 0}
-                                  onClick={() => handleUpdateQty(cloth, -1)}
-                                >
-                                  -
-                                </button>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 800, minWidth: '14px', textAlign: 'center' }}>{qty}</span>
-                                <button 
-                                  type="button" 
-                                  style={{ 
-                                    width: '24px', 
-                                    height: '24px', 
-                                    borderRadius: '50%', 
-                                    border: '1px solid var(--primary)', 
-                                    background: 'var(--primary-light)', 
-                                    color: 'var(--primary)', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    cursor: 'pointer',
-                                    fontSize: '0.9rem',
-                                    fontWeight: 'bold',
-                                    padding: 0
-                                  }}
-                                  onClick={() => handleUpdateQty(cloth, 1)}
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Service and Subtotal if qty > 0 */}
-                            {qty > 0 && (
-                              <div style={{ 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
-                                alignItems: 'center', 
-                                gap: '0.5rem', 
-                                borderTop: '1px dashed rgba(2, 132, 199, 0.2)', 
-                                paddingTop: '0.3rem', 
-                                marginTop: '0.1rem' 
-                              }}>
-                                <select 
-                                  style={{ 
-                                    padding: '0.2rem 0.35rem', 
-                                    fontSize: '0.7rem', 
-                                    border: '1px solid var(--border-color)', 
-                                    borderRadius: '6px', 
-                                    width: '60%', 
-                                    background: 'var(--bg-card)', 
-                                    color: 'var(--text-primary)',
-                                    outline: 'none'
-                                  }}
-                                  value={selectedSvc}
-                                  onChange={(e) => handleUpdateService(cloth, e.target.value)}
-                                >
-                                  {activeServices.map(s => (
-                                    <option key={s.service} value={s.service}>{serviceLabels[s.service]} ({s.prix} F)</option>
-                                  ))}
-                                </select>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)' }}>
-                                  {(unitPrice * qty).toLocaleString()} F
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: '0.75rem' }}>Urgence</label>
-                      <select 
-                        className="input-control" 
-                        style={{ padding: '0.5rem', fontSize: '0.8rem' }}
-                        value={niveauUrgence} 
-                        onChange={(e) => setNiveauUrgence(e.target.value)}
-                      >
-                        <option value="Normal">Normal</option>
-                        <option value="Express">Express (+50%)</option>
-                      </select>
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: '0.75rem' }}>Règlement</label>
-                      <select 
-                        className="input-control" 
-                        style={{ padding: '0.5rem', fontSize: '0.8rem' }}
-                        value={modeReglement} 
-                        onChange={(e) => setModeReglement(e.target.value)}
-                      >
-                        <option value="especes">Espèces</option>
-                        <option value="mobile_money">Mobile Money</option>
-                        <option value="avance_solde">Avance/Crédit</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.75rem' }}>Acompte Versé (FCFA)</label>
-                    <input 
-                      type="number" 
-                      className="input-control" 
-                      style={{ padding: '0.5rem', fontSize: '0.8rem' }}
-                      placeholder="Ex: 1000"
-                      value={avancePayee}
-                      onChange={(e) => setAvancePayee(e.target.value)}
-                    />
-                  </div>
-
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Prix Total:</span>
-                      <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)' }}>
-                        {getCalculatedPrice().toLocaleString()} FCFA
-                      </div>
-                    </div>
-                    
-                    <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px' }}>
-                      Enregistrer
-                    </button>
-                  </div>
-                </form>
+            {/* Search and filter tools */}
+            <div className="card" style={{ padding: '0.85rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  style={{ paddingLeft: '2.2rem', width: '100%', padding: '0.45rem', fontSize: '0.8rem' }}
+                  placeholder="Rechercher code, client, linge..."
+                  value={historySearchQuery}
+                  onChange={(e) => setHistorySearchQuery(e.target.value)}
+                />
               </div>
-            )}
 
-            {/* --- CRM CLIENTS SUB TAB --- */}
-            {facturationSubTab === 'crm' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <div className="card" style={{ padding: '0.85rem', borderRadius: '16px' }}>
-                  <div style={{ position: 'relative' }}>
-                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input 
-                      type="text" 
-                      className="input-control" 
-                      style={{ paddingLeft: '2.2rem', width: '100%', padding: '0.45rem', fontSize: '0.8rem' }}
-                      placeholder="Rechercher nom, tel..."
-                      value={crmSearch}
-                      onChange={(e) => setCrmSearch(e.target.value)}
-                    />
-                  </div>
+              {/* Status filter bar (scrollable horizontal pills) */}
+              <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.2rem', scrollbarWidth: 'none' }}>
+                {[
+                  { id: 'all', label: 'Toutes' },
+                  { id: 'en_attente', label: 'Tri' },
+                  { id: 'en_cours_lavage', label: 'Lavage' },
+                  { id: 'pret', label: 'Prêt' },
+                  { id: 'restitue', label: 'Livré' },
+                  { id: 'annule', label: 'Annulé' }
+                ].map(filter => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    style={{
+                      padding: '0.3rem 0.65rem',
+                      fontSize: '0.68rem',
+                      borderRadius: '20px',
+                      whiteSpace: 'nowrap',
+                      border: historyFilterStatus === filter.id ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                      background: historyFilterStatus === filter.id ? 'var(--primary)' : 'var(--bg-card)',
+                      color: historyFilterStatus === filter.id ? '#fff' : 'var(--text-secondary)',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setHistoryFilterStatus(filter.id)}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Orders list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {filteredHistoryOrders.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                  Aucune commande dans l'historique.
                 </div>
+              ) : (
+                filteredHistoryOrders.map(order => {
+                  const client = customers.find(c => c.id === order.customer_id);
+                  const clientName = client ? `${client.prenom} ${client.nom}` : 'Client B2B';
+                  const isExpress = order.niveau_urgence === 'Express';
+                  const remaining = order.prix_total - order.avance_payee;
 
-                {!selectedCrmCustomer ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                    {filteredCrmCustomers.map(cust => (
-                      <div 
-                        key={cust.id} 
-                        className="card" 
-                        style={{ padding: '0.85rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px' }}
-                        onClick={() => setSelectedCrmCustomer(cust)}
-                      >
+                  return (
+                    <div 
+                      key={order.id} 
+                      className="card" 
+                      style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', borderRadius: '16px' }}
+                    >
+                      {/* Header row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
                         <div>
-                          <h4 style={{ fontWeight: 700, fontSize: '0.85rem', margin: 0 }}>{cust.prenom} {cust.nom}</h4>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem', marginTop: '0.1rem' }}>
-                            <Phone size={10} /> {cust.telephone}
+                          <strong style={{ fontSize: '0.78rem', color: 'var(--primary)' }}>{order.identifiant_unique_marquage}</strong>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                            {new Date(order.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'end', gap: '0.1rem' }}>
-                          <span style={{ fontSize: '0.65rem', background: 'var(--secondary-light)', color: 'var(--secondary)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
-                            {cust.points_fidelite} pts
-                          </span>
-                          {cust.solde_dette > 0 && (
-                            <span style={{ color: 'var(--status-late)', fontSize: '0.65rem', fontWeight: 700 }}>
-                              Dette: {cust.solde_dette} F
-                            </span>
-                          )}
-                        </div>
+                        <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.58rem', padding: '0.1rem 0.35rem' }}>
+                          {statusLabels[order.statut]}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                      <div>
-                        <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>{selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}</h4>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{selectedCrmCustomer.telephone}</span>
-                      </div>
-                      <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px' }} onClick={() => setSelectedCrmCustomer(null)}>
-                        Retour
-                      </button>
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.75rem' }}>
-                      <div style={{ background: 'var(--primary-light)', padding: '0.5rem', borderRadius: '8px' }}>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>Pliage</div>
-                        <strong>{selectedCrmCustomer.preferences_pliage}</strong>
+                      {/* Client Info */}
+                      <div style={{ fontSize: '0.72rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                        <div>Client: <strong>{clientName}</strong> {client && <span style={{ color: 'var(--text-muted)' }}>({client.telephone})</span>}</div>
+                        <div>Urgence: <span style={{ fontWeight: 800, color: isExpress ? 'var(--status-late)' : 'var(--text-primary)' }}>{order.niveau_urgence}</span></div>
                       </div>
-                      <div style={{ background: 'var(--secondary-light)', padding: '0.5rem', borderRadius: '8px' }}>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>Fidélité</div>
-                        <strong style={{ color: 'var(--secondary)' }}>{selectedCrmCustomer.points_fidelite} pts</strong>
-                      </div>
-                    </div>
 
-                    <div style={{ background: selectedCrmCustomer.solde_dette > 0 ? 'var(--status-late-light)' : 'var(--status-ready-light)', padding: '0.75rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>Solde dette</div>
-                        <strong style={{ color: selectedCrmCustomer.solde_dette > 0 ? 'var(--status-late)' : 'var(--status-ready)', fontSize: '0.95rem' }}>
-                          {selectedCrmCustomer.solde_dette} FCFA
-                        </strong>
-                      </div>
-                      {selectedCrmCustomer.solde_dette > 0 && (
-                        <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.72rem', borderRadius: '6px' }} onClick={() => setShowDebtPaymentModal(true)}>
-                          Régler
-                        </button>
-                      )}
-                    </div>
-
-                    <div>
-                      <h5 style={{ fontSize: '0.8rem', fontWeight: 700, margin: '0 0 0.5rem' }}>Historique</h5>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '140px', overflowY: 'auto' }}>
-                        {orders.filter(o => o.customer_id === selectedCrmCustomer.id).length === 0 ? (
-                          <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', margin: 0 }}>Aucune commande enregistrée.</p>
-                        ) : (
-                          orders.filter(o => o.customer_id === selectedCrmCustomer.id).map(order => (
-                            <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-app)', padding: '0.5rem', borderRadius: '8px', fontSize: '0.75rem' }}>
-                              <div>
-                                <span style={{ fontWeight: 700 }}>{order.type_article}</span>
-                                <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>{order.identifiant_unique_marquage} • {new Date(order.created_at).toLocaleDateString()}</div>
-                              </div>
-                              <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.25rem' }}>
-                                {statusLabels[order.statut]}
-                              </span>
+                      {/* Items and Services */}
+                      <div style={{ background: 'var(--bg-app)', padding: '0.45rem', borderRadius: '8px', fontSize: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>Détails articles :</div>
+                        {order.items && order.items.length > 0 ? (
+                          order.items.map((it, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '0.25rem' }}>
+                              <span>• {it.quantite}x {it.article} ({serviceLabels[it.service]})</span>
                             </div>
                           ))
+                        ) : (
+                          <div style={{ paddingLeft: '0.25rem' }}>• {order.type_article} ({serviceLabels[order.type_service]})</div>
                         )}
                       </div>
+
+                      {/* Financial info */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.7rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
+                        <div>Total: <strong>{order.prix_total.toLocaleString()} F</strong></div>
+                        <div>Acompte: <strong style={{ color: 'var(--status-ready)' }}>{order.avance_payee.toLocaleString()} F</strong></div>
+                        <div>Réglement: <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{order.mode_reglement.replace(/_/g, ' ')}</span></div>
+                        <div style={{ color: remaining > 0 ? 'var(--status-late)' : 'var(--status-ready)' }}>
+                          Solde: <strong>{remaining.toLocaleString()} F</strong>
+                        </div>
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.2rem' }}>
+                        <button 
+                          className="btn btn-outline" 
+                          style={{ padding: '0.25rem 0.65rem', fontSize: '0.65rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                          onClick={() => setCreatedOrder(order)}
+                        >
+                          <Printer size={10} /> Voir Ticket
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
         )}
 
@@ -1086,11 +882,11 @@ export default function MobileView() {
           Gestion
         </button>
         <button 
-          className={`mobile-nav-btn ${activeTab === 'facturation' ? 'active' : ''}`}
-          onClick={() => setActiveTab('facturation')}
+          className={`mobile-nav-btn ${activeTab === 'historique' ? 'active' : ''}`}
+          onClick={() => setActiveTab('historique')}
         >
-          <CreditCard size={18} />
-          Facturation
+          <FileText size={18} />
+          Historique
         </button>
         <button 
           className={`mobile-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
@@ -1103,6 +899,254 @@ export default function MobileView() {
 
       {/* iOS Home Indicator bottom line */}
       <div className="phone-home-indicator"></div>
+
+      {/* ================= MODAL ENREGISTREMENT COMMANDE ================= */}
+      {showOrderRegistrationModal && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <form onSubmit={handleCreateOrder} className="card" style={{ width: '100%', height: '85%', background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '24px 24px 0 0', display: 'flex', flexDirection: 'column', gap: '0.85rem', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+              <h3 style={{ fontSize: '0.95rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0 }}>Nouvelle commande</h3>
+              <X size={18} style={{ cursor: 'pointer' }} onClick={() => setShowOrderRegistrationModal(false)} />
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingRight: '2px' }}>
+              
+              {/* Client Selection */}
+              <div style={{ padding: '0.5rem 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Sélection du Client</label>
+                  <button 
+                    type="button"
+                    className="btn btn-secondary" 
+                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.62rem', borderRadius: '6px' }}
+                    onClick={() => setShowNewCustomerModal(true)}
+                  >
+                    + Nouveau
+                  </button>
+                </div>
+                <select 
+                  className="input-control" 
+                  style={{ width: '100%', padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
+                  value={selectedCustomerId}
+                  onChange={(e) => setSelectedCustomerId(e.target.value)}
+                >
+                  <option value="">-- Choisir un client --</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>{c.prenom} {c.nom} ({c.telephone})</option>
+                  ))}
+                </select>
+
+                {activeCustomer && (
+                  <div style={{ marginTop: '0.5rem', padding: '0.45rem', background: 'var(--primary-light)', borderRadius: '8px', fontSize: '0.68rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Préférence : <strong>{activeCustomer.preferences_pliage}</strong></span>
+                      <span style={{ color: 'var(--secondary)' }}>Points: <strong>{activeCustomer.points_fidelite} pts</strong></span>
+                    </div>
+                    {activeCustomer.solde_dette > 0 && (
+                      <div style={{ color: 'var(--status-late)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                        <TriangleAlert size={10} /> Dette encours: {activeCustomer.solde_dette} FCFA
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Clothes & Services Selection */}
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Type de Linge & Services</label>
+                <div style={{ 
+                  maxHeight: '200px', 
+                  overflowY: 'auto', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '12px', 
+                  padding: '0.4rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem',
+                  background: 'var(--bg-app)',
+                  marginTop: '0.3rem'
+                }}>
+                  {catalogClothes.map(cloth => {
+                    const qty = articleQuantities[cloth] || 0;
+                    const selectedSvc = articleServices[cloth] || 'lavage_simple';
+                    
+                    const servicesForCloth = catalog.filter(c => c.categorie !== 'abonnement' && c.article === cloth);
+                    const activeServices = servicesForCloth.length > 0 ? servicesForCloth : [
+                      { service: 'lavage_simple', prix: 1500 },
+                      { service: 'nettoyage_a_sec', prix: 3000 },
+                      { service: 'repassage', prix: 1000 }
+                    ];
+
+                    const activeServiceObj = activeServices.find(s => s.service === selectedSvc) || activeServices[0];
+                    const unitPrice = activeServiceObj ? activeServiceObj.prix : 1500;
+                    
+                    return (
+                      <div key={cloth} style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '0.3rem', 
+                        padding: '0.45rem 0.55rem', 
+                        background: qty > 0 ? 'var(--primary-light)' : 'var(--bg-card)', 
+                        borderRadius: '10px',
+                        border: qty > 0 ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                        transition: 'all 0.15s ease'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: qty > 0 ? 800 : 600, color: 'var(--text-primary)' }}>{cloth}</span>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <button 
+                              type="button" 
+                              style={{ 
+                                width: '22px', 
+                                height: '22px', 
+                                borderRadius: '50%', 
+                                border: '1px solid var(--border-color)', 
+                                background: 'var(--bg-card)', 
+                                color: 'var(--text-primary)', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                cursor: qty === 0 ? 'not-allowed' : 'pointer', 
+                                opacity: qty === 0 ? 0.35 : 1,
+                                fontSize: '0.8rem',
+                                fontWeight: 'bold',
+                                padding: 0
+                              }}
+                              disabled={qty === 0}
+                              onClick={() => handleUpdateQty(cloth, -1)}
+                            >
+                              -
+                            </button>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, minWidth: '12px', textAlign: 'center' }}>{qty}</span>
+                            <button 
+                              type="button" 
+                              style={{ 
+                                width: '22px', 
+                                height: '22px', 
+                                borderRadius: '50%', 
+                                border: '1px solid var(--primary)', 
+                                background: 'var(--primary-light)', 
+                                color: 'var(--primary)', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: 'bold',
+                                padding: 0
+                              }}
+                              onClick={() => handleUpdateQty(cloth, 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        {qty > 0 && (
+                          <div style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            gap: '0.4rem', 
+                            borderTop: '1px dashed rgba(2, 132, 199, 0.2)', 
+                            paddingTop: '0.25rem', 
+                            marginTop: '0.1rem' 
+                          }}>
+                            <select 
+                              style={{ 
+                                padding: '0.15rem 0.3rem', 
+                                fontSize: '0.65rem', 
+                                border: '1px solid var(--border-color)', 
+                                borderRadius: '6px', 
+                                width: '60%', 
+                                background: 'var(--bg-card)', 
+                                color: 'var(--text-primary)',
+                                outline: 'none'
+                              }}
+                              value={selectedSvc}
+                              onChange={(e) => handleUpdateService(cloth, e.target.value)}
+                            >
+                              {activeServices.map(s => (
+                                <option key={s.service} value={s.service}>{serviceLabels[s.service]} ({s.prix} F)</option>
+                              ))}
+                            </select>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)' }}>
+                              {(unitPrice * qty).toLocaleString()} F
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Form Settings Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.7rem' }}>Urgence</label>
+                  <select 
+                    className="input-control" 
+                    style={{ padding: '0.45rem', fontSize: '0.78rem', borderRadius: '8px' }}
+                    value={niveauUrgence} 
+                    onChange={(e) => setNiveauUrgence(e.target.value)}
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="Express">Express (+50%)</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.7rem' }}>Règlement</label>
+                  <select 
+                    className="input-control" 
+                    style={{ padding: '0.45rem', fontSize: '0.78rem', borderRadius: '8px' }}
+                    value={modeReglement} 
+                    onChange={(e) => setModeReglement(e.target.value)}
+                  >
+                    <option value="especes">Espèces</option>
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="avance_solde">Avance/Crédit</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.7rem' }}>Acompte Versé (FCFA)</label>
+                <input 
+                  type="number" 
+                  className="input-control" 
+                  style={{ padding: '0.45rem', fontSize: '0.78rem', borderRadius: '8px' }}
+                  placeholder="Ex: 1000"
+                  value={avancePayee}
+                  onChange={(e) => setAvancePayee(e.target.value)}
+                />
+              </div>
+
+            </div>
+
+            {/* Total and Save Actions */}
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Prix Total:</span>
+                <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                  {getCalculatedPrice().toLocaleString()} FCFA
+                </div>
+              </div>
+              
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ padding: '0.45rem 1rem', fontSize: '0.75rem', borderRadius: '8px' }}
+              >
+                Enregistrer
+              </button>
+            </div>
+
+          </form>
+        </div>
+      )}
 
       {/* ================= MODAL CRÉATION CLIENT ================= */}
       {showNewCustomerModal && (
