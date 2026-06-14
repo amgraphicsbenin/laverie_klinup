@@ -262,7 +262,7 @@ export default function AdminView({ activeTab, searchQuery }) {
             {/* Commandes Livrées - White Theme */}
             <div className="card kpi-card white-theme">
               <div className="kpi-card-header">
-                <span>Commandes Restituées</span>
+                <span>Commandes Livrées</span>
                 {renderArrowBtn()}
               </div>
               <div className="kpi-card-body">
@@ -450,9 +450,9 @@ export default function AdminView({ activeTab, searchQuery }) {
             {/* Grid 2-column for SVG semi-circle Gauge & Time Tracker */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
 
-              {/* Taux de Restitution (Semi-circle Gauge) */}
+              {/* Taux de Livraison (Semi-circle Gauge) */}
               <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', justifyContent: 'space-between' }}>
-                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Taux de Restitution</h3>
+                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Taux de Livraison</h3>
 
                 <div className="gauge-container">
                   <svg className="gauge-svg" viewBox="0 0 160 100">
@@ -471,7 +471,7 @@ export default function AdminView({ activeTab, searchQuery }) {
 
                   <div className="gauge-center-text">
                     <h4>{restitutionRate}%</h4>
-                    <span>Restituées</span>
+                    <span>Livrées</span>
                   </div>
                 </div>
 

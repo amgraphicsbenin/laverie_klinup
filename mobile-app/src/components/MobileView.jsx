@@ -217,7 +217,7 @@ export default function MobileView() {
     en_attente: 'Reçu / Tri',
     en_cours_lavage: 'En Lavage',
     pret: 'Prêt',
-    restitue: 'Restitué',
+    restitue: 'Livré',
     annule: 'Annulé'
   };
 
@@ -528,7 +528,7 @@ export default function MobileView() {
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--status-ready)', color: '#fff' }}
                             onClick={() => handleStatusChange(order.id, 'restitue')}
                           >
-                            <DollarSign size={12} /> Restituer
+                            <DollarSign size={12} /> Livrer
                           </button>
                         )}
                         
