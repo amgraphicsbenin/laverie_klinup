@@ -117,6 +117,15 @@ export default function AdminView({ activeTab, searchQuery }) {
     setLogs(db.getLogs());
     setStaff(db.getStaff());
     setCustomers(db.getCustomers());
+
+    const unsubscribe = db.subscribe(() => {
+      setCatalog(db.getCatalog());
+      setOrders(db.getOrders());
+      setLogs(db.getLogs());
+      setStaff(db.getStaff());
+      setCustomers(db.getCustomers());
+    });
+    return () => unsubscribe();
   }, []);
 
   // Time Tracker Stopwatch Effect

@@ -1,5 +1,9 @@
 @echo off
 title KLIN UP - Admin CMS Server (Root Launcher)
+
+echo Demarrage du serveur de base de donnees partagee en arriere-plan...
+start /b node "%~dp0db-server.js"
+
 cd /d "%~dp0admin-cms"
 
 echo ===================================================

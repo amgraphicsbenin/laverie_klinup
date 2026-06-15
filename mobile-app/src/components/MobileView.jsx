@@ -143,6 +143,13 @@ export default function MobileView() {
     setCustomers(db.getCustomers());
     setOrders(db.getOrders());
     setCatalog(db.getCatalog());
+
+    const unsubscribe = db.subscribe(() => {
+      setCustomers(db.getCustomers());
+      setOrders(db.getOrders());
+      setCatalog(db.getCatalog());
+    });
+    return () => unsubscribe();
   }, [activeTab]);
 
   const refreshData = () => {

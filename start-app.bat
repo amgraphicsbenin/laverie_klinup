@@ -1,5 +1,9 @@
 @echo off
 title KLIN UP - Mobile App Server (Root Launcher)
+
+echo Demarrage du serveur de base de donnees partagee en arriere-plan...
+start /b node "%~dp0db-server.js"
+
 cd /d "%~dp0mobile-app"
 
 echo ===================================================
