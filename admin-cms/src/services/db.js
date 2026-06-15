@@ -233,7 +233,17 @@ async function initDb() {
         orders: DEFAULT_ORDERS,
         logs: DEFAULT_LOGS,
         catalog: DEFAULT_CATALOG,
-        current_user: DEFAULT_STAFF[0]
+        current_user: DEFAULT_STAFF[0],
+        whatsappConfig: {
+          enabled: false,
+          apiUrl: '',
+          method: 'POST',
+          phoneParam: 'to',
+          messageParam: 'body',
+          headerName: '',
+          headerValue: '',
+          extraParams: ''
+        }
       };
       await fetch(API_URL, {
         method: 'POST',
@@ -542,5 +552,59 @@ export const db = {
     persist();
     db.notify();
     return order;
+  },
+
+  getApiUrl: () => {
+    return API_URL.replace('/api/db', '');
+  },
+
+  getWhatsappConfig: () => {
+    return memoryDb.whatsappConfig || {
+      enabled: false,
+      apiUrl: '',
+      method: 'POST',
+      phoneParam: 'to',
+      messageParam: 'body',
+      headerName: '',
+      headerValue: '',
+      extraParams: ''
+    };
+  },
+
+  saveWhatsappConfig: (config) => {
+    memoryDb.whatsappConfig = config;
+    persist();
+    db.notify();
+  },
+
+  sendWhatsapp: async (phone, text, indicatif = '229') => {
+    const formatPhone = (phoneStr, ind) => {
+      if (!phoneStr) return '';
+      let cleaned = phoneStr.replace(/\D/g, '');
+      if (cleaned.startsWith('0') && ind !== '229') {
+        cleaned = cleaned.substring(1);
+      }
+      if (cleaned.startsWith(ind) && cleaned.length > ind.length + 5) {
+        return cleaned;
+      }
+      return ind + cleaned;
+    };
+    
+    const formattedPhone = formatPhone(phone, indicatif);
+    if (!formattedPhone) return;
+
+    try {
+      const serverUrl = API_URL.replace('/api/db', '/api/send-whatsapp');
+      await fetch(serverUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: formattedPhone,
+          text: text
+        })
+      });
+    } catch (e) {
+      console.error("Erreur d'envoi WhatsApp en arrière-plan:", e);
+    }
   }
 };

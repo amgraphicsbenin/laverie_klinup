@@ -378,9 +378,7 @@ export default function MobileView() {
 
   const sendWhatsAppMessage = (phone, text, indicatif = '229') => {
     if (!phone) return;
-    const formattedPhone = formatPhoneForWhatsApp(phone, indicatif);
-    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    db.sendWhatsapp(phone, text, indicatif);
   };
 
   // --- STATS DYNAMIQUE ---

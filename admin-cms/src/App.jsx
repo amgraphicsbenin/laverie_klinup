@@ -130,7 +130,10 @@ function App() {
 
             <div className="menu-section-title">GÉNÉRAL</div>
             <ul className="menu-list">
-              <li className="menu-item" onClick={() => alert('Configuration système Klin UP')}>
+              <li 
+                className={`menu-item ${adminMenu === 'settings' ? 'active' : ''}`}
+                onClick={() => setAdminMenu('settings')}
+              >
                 <Settings size={18} />
                 Paramètres
               </li>
@@ -170,6 +173,7 @@ function App() {
               {hasAdminAccess && adminMenu === 'crm_management' && "Clients CRM"}
               {hasAdminAccess && adminMenu === 'catalog' && "Catalogue Tarifs"}
               {hasAdminAccess && adminMenu === 'logs' && "Journal d'Audit"}
+              {hasAdminAccess && adminMenu === 'settings' && "Paramètres Système"}
             </h1>
             <p style={{ marginTop: '0.15rem' }}>
               {!hasAdminAccess && "Cet espace est restreint aux administrateurs."}
@@ -178,6 +182,7 @@ function App() {
               {hasAdminAccess && adminMenu === 'crm_management' && "Fiches clients, encours financiers et fidélité."}
               {hasAdminAccess && adminMenu === 'catalog' && "Gestion de la grille de prix de traitement de laverie B2B."}
               {hasAdminAccess && adminMenu === 'logs' && "Traçabilité des actions et sécurité des transactions."}
+              {hasAdminAccess && adminMenu === 'settings' && "Configuration des passerelles de notification et paramètres globaux."}
             </p>
           </div>
 
