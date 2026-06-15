@@ -23,7 +23,9 @@ import {
   Zap,
   Sparkles,
   Smartphone,
-  FileText
+  FileText,
+  Bell,
+  Settings
 } from 'lucide-react';
 
 export default function MobileView() {
@@ -146,6 +148,15 @@ export default function MobileView() {
 
   // Receipt Modal
   const [createdOrder, setCreatedOrder] = useState(null);
+
+  // Settings Modal & custom Server IP
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [tempServerIp, setTempServerIp] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('server_ip') || window.location.hostname;
+    }
+    return 'localhost';
+  });
 
   // Machine occupation simulator states
   const [machineStatus, setMachineStatus] = useState([
@@ -429,7 +440,7 @@ export default function MobileView() {
 
       {/* Status Bar */}
       <div className="phone-status-bar">
-        <span>10:40</span>
+        <span style={{ fontSize: "0.78rem", fontWeight: 800 }}>9:41</span>
         <div className="phone-status-bar-icons">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 20h.01M7 20v-4M12 20v-8M17 20V4M22 20V2" />
@@ -482,15 +493,29 @@ export default function MobileView() {
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-              {/* HEADER */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>Bonjour,</p>
-                  <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>{currentUser.prenom} {currentUser.nom}</h2>
+              {/* HEADER — Style image: avatar + name + actions */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div className="user-avatar">
+                    {currentUser.prenom?.[0]}{currentUser.nom?.[0]}
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>Bienvenue</p>
+                    <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>{currentUser.prenom} {currentUser.nom}</h2>
+                  </div>
                 </div>
-                <button className="btn btn-primary" style={{ width: '36px', height: '36px', borderRadius: '50%', padding: 0, flexShrink: 0 }} onClick={() => setShowOrderRegistrationModal(true)}>
-                  <Plus size={18} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#fff', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)', boxShadow: 'var(--shadow-sm)', position: 'relative' }}>
+                    <Bell size={15} />
+                    {lateOrders.length > 0 && <span style={{ position: 'absolute', top: '6px', right: '6px', width: '7px', height: '7px', background: '#ef4444', borderRadius: '50%', border: '1.5px solid #fff' }} />}
+                  </button>
+                  <button 
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#fff', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)', boxShadow: 'var(--shadow-sm)' }}
+                    onClick={() => setShowSettingsModal(true)}
+                  >
+                    <Settings size={15} />
+                  </button>
+                </div>
               </div>
 
               {/* ALERTE RETARDS */}
@@ -1601,6 +1626,63 @@ export default function MobileView() {
                 Fermer
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL PARAMÈTRES (CONFIG IP SERVEUR) ================= */}
+      {showSettingsModal && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '300px', background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+              <h3 style={{ fontSize: '0.95rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0 }}>Configuration Serveur</h3>
+              <X size={15} style={{ cursor: 'pointer' }} onClick={() => setShowSettingsModal(false)} />
+            </div>
+            
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem 0', lineHeight: '1.3' }}>
+              Renseignez l'adresse IP de votre ordinateur exécutant la base de données (ex: <code>192.168.1.100</code>).
+            </p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (tempServerIp.trim()) {
+                localStorage.setItem('server_ip', tempServerIp.trim());
+              } else {
+                localStorage.removeItem('server_ip');
+              }
+              setShowSettingsModal(false);
+              window.location.reload();
+            }} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.7rem' }}>Adresse IP du Serveur</label>
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  style={{ padding: '0.45rem', fontSize: '0.78rem' }}
+                  required
+                  placeholder="Ex: 192.168.1.50"
+                  value={tempServerIp} 
+                  onChange={(e) => setTempServerIp(e.target.value)} 
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  onClick={() => {
+                    localStorage.removeItem('server_ip');
+                    setShowSettingsModal(false);
+                    window.location.reload();
+                  }}
+                >
+                  Réinitialiser
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}>
+                  Enregistrer
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
