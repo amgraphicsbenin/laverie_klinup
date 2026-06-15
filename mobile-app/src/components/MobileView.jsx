@@ -367,7 +367,7 @@ export default function MobileView() {
   const formatPhoneForWhatsApp = (phoneStr, indicatif = '229') => {
     if (!phoneStr) return '';
     let cleaned = phoneStr.replace(/\D/g, '');
-    if (cleaned.startsWith('0')) {
+    if (cleaned.startsWith('0') && indicatif !== '229') {
       cleaned = cleaned.substring(1);
     }
     if (cleaned.startsWith(indicatif) && cleaned.length > indicatif.length + 5) {
