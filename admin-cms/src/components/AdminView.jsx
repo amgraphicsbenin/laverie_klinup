@@ -76,15 +76,7 @@ export default function AdminView({ activeTab, searchQuery }) {
   const [newCustPref, setNewCustPref] = useState('Plié');
   const [newCustIndicatif, setNewCustIndicatif] = useState('229');
 
-  // WhatsApp config states
-  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
-  const [whatsappApiUrl, setWhatsappApiUrl] = useState('');
-  const [whatsappMethod, setWhatsappMethod] = useState('POST');
-  const [whatsappPhoneParam, setWhatsappPhoneParam] = useState('to');
-  const [whatsappMessageParam, setWhatsappMessageParam] = useState('body');
-  const [whatsappHeaderName, setWhatsappHeaderName] = useState('');
-  const [whatsappHeaderValue, setWhatsappHeaderValue] = useState('');
-  const [whatsappExtraParams, setWhatsappExtraParams] = useState('');
+
 
   // CRM Search & Debt
   const [crmSearch, setCrmSearch] = useState('');
@@ -153,20 +145,7 @@ export default function AdminView({ activeTab, searchQuery }) {
     return () => clearInterval(interval);
   }, [isTimerRunning]);
 
-  // Load WhatsApp settings
-  useEffect(() => {
-    if (activeTab === 'settings') {
-      const config = db.getWhatsappConfig();
-      setWhatsappEnabled(config.enabled || false);
-      setWhatsappApiUrl(config.apiUrl || '');
-      setWhatsappMethod(config.method || 'POST');
-      setWhatsappPhoneParam(config.phoneParam || 'to');
-      setWhatsappMessageParam(config.messageParam || 'body');
-      setWhatsappHeaderName(config.headerName || '');
-      setWhatsappHeaderValue(config.headerValue || '');
-      setWhatsappExtraParams(config.extraParams || '');
-    }
-  }, [activeTab]);
+
 
   const refreshAdminData = () => {
     setCatalog(db.getCatalog());
@@ -343,7 +322,9 @@ export default function AdminView({ activeTab, searchQuery }) {
 
   const sendWhatsAppMessage = (phone, text, indicatif = '229') => {
     if (!phone) return;
-    db.sendWhatsapp(phone, text, indicatif);
+    const formattedPhone = formatPhoneForWhatsApp(phone, indicatif);
+    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   };
 
   const isOrderLate = (order) => {
@@ -559,56 +540,7 @@ export default function AdminView({ activeTab, searchQuery }) {
     }
   };
 
-  const handleSaveSettings = (e) => {
-    e.preventDefault();
-    db.saveWhatsappConfig({
-      enabled: whatsappEnabled,
-      apiUrl: whatsappApiUrl,
-      method: whatsappMethod,
-      phoneParam: whatsappPhoneParam,
-      messageParam: whatsappMessageParam,
-      headerName: whatsappHeaderName,
-      headerValue: whatsappHeaderValue,
-      extraParams: whatsappExtraParams
-    });
-    db.logAction('MAJ_CONFIG_WHATSAPP', `Configuration de la passerelle WhatsApp mise à jour par ${currentUser.prenom} ${currentUser.nom}`);
-    alert("Paramètres enregistrés avec succès !");
-  };
 
-  const handleTestWhatsappConnection = async () => {
-    const testPhone = prompt("Entrez un numéro de téléphone de test (format international, ex: 229XXXXXXXX) :");
-    if (!testPhone) return;
-
-    try {
-      const res = await fetch(`${db.getApiUrl()}/api/send-whatsapp-test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          config: {
-            enabled: true,
-            apiUrl: whatsappApiUrl,
-            method: whatsappMethod,
-            phoneParam: whatsappPhoneParam,
-            messageParam: whatsappMessageParam,
-            headerName: whatsappHeaderName,
-            headerValue: whatsappHeaderValue,
-            extraParams: whatsappExtraParams
-          },
-          phone: testPhone,
-          text: "Ceci est un message de test automatique envoyé depuis la plateforme de laverie KLIN UP !"
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        alert("Message de test envoyé avec succès ! Veuillez vérifier votre téléphone.");
-      } else {
-        alert("Erreur lors de l'envoi : " + (data.error || "Erreur inconnue"));
-      }
-    } catch (err) {
-      alert("Erreur réseau : " + err.message);
-    }
-  };
 
   const catalogClothes = catalog.length > 0 
     ? [...new Set(catalog.filter(c => c.categorie !== 'abonnement').map(c => c.article))] 
@@ -1699,136 +1631,7 @@ export default function AdminView({ activeTab, searchQuery }) {
         </div>
       )}
 
-      {/* ========================================================
-         ONGLET : PARAMÈTRES (SETTINGS)
-         ======================================================== */}
-      {activeTab === 'settings' && (
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <h3 className="chart-title" style={{ margin: 0 }}>Configuration de la Passerelle WhatsApp</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
-            Configurez les paramètres de connexion à votre API ou passerelle WhatsApp externe (ex: UltraMsg, Wassenger, etc.) pour envoyer automatiquement les messages d'état en tâche de fond.
-          </p>
 
-          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '600px' }}>
-            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <input 
-                type="checkbox" 
-                id="whatsappEnabled" 
-                checked={whatsappEnabled} 
-                onChange={(e) => setWhatsappEnabled(e.target.checked)} 
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-              <label htmlFor="whatsappEnabled" style={{ fontWeight: 600, cursor: 'pointer', margin: 0 }}>
-                Activer l'envoi automatique en arrière-plan via API
-              </label>
-            </div>
-
-            <div className="form-group">
-              <label>URL de l'API WhatsApp</label>
-              <input 
-                type="url" 
-                className="input-control" 
-                placeholder="Ex: https://api.ultramsg.com/instanceXXXX/messages/chat" 
-                value={whatsappApiUrl} 
-                onChange={(e) => setWhatsappApiUrl(e.target.value)}
-                required={whatsappEnabled}
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                L'URL HTTP POST de l'endpoint d'envoi de messages de votre fournisseur.
-              </span>
-            </div>
-
-            <div className="form-group">
-              <label>Méthode HTTP</label>
-              <select 
-                className="input-control" 
-                value={whatsappMethod} 
-                onChange={(e) => setWhatsappMethod(e.target.value)}
-              >
-                <option value="POST">POST (Recommandé)</option>
-                <option value="GET">GET</option>
-              </select>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label>Nom du paramètre Téléphone</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  placeholder="Ex: to, phone, recipient" 
-                  value={whatsappPhoneParam} 
-                  onChange={(e) => setWhatsappPhoneParam(e.target.value)}
-                  required={whatsappEnabled}
-                />
-              </div>
-              <div className="form-group">
-                <label>Nom du paramètre Message</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  placeholder="Ex: body, message, text" 
-                  value={whatsappMessageParam} 
-                  onChange={(e) => setWhatsappMessageParam(e.target.value)}
-                  required={whatsappEnabled}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label>En-tête HTTP d'Authentification (Optionnel)</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  placeholder="Ex: X-API-Key, Authorization" 
-                  value={whatsappHeaderName} 
-                  onChange={(e) => setWhatsappHeaderName(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>Valeur de l'En-tête (Optionnel)</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  placeholder="Clé d'API ou Token" 
-                  value={whatsappHeaderValue} 
-                  onChange={(e) => setWhatsappHeaderValue(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Paramètres Statiques Supplémentaires (Format URL-encoded, Optionnel)</label>
-              <input 
-                type="text" 
-                className="input-control" 
-                placeholder="Ex: token=mytoken123&priority=1" 
-                value={whatsappExtraParams} 
-                onChange={(e) => setWhatsappExtraParams(e.target.value)}
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Ces paramètres seront inclus dans le corps (ou la requête) envoyé à la passerelle.
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-              <button type="submit" className="btn btn-primary">
-                Enregistrer les Paramètres
-              </button>
-              <button 
-                type="button" 
-                className="btn" 
-                style={{ background: 'var(--border-color)', color: 'var(--text-primary)' }}
-                onClick={handleTestWhatsappConnection}
-                disabled={!whatsappApiUrl}
-              >
-                Tester la connexion (Envoi Test)
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* ========================================================
          MODAL D'AJOUT D'ARTICLE OU ABONNEMENT AU CATALOGUE
