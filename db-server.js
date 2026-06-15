@@ -104,13 +104,26 @@ const server = http.createServer((req, res) => {
           let targetUrl = config.apiUrl;
           let reqBody = {};
           
-          reqBody[config.phoneParam || 'to'] = phone;
-          reqBody[config.messageParam || 'body'] = text;
+          if (targetUrl.includes('graph.facebook.com')) {
+            reqBody = {
+              messaging_product: "whatsapp",
+              recipient_type: "individual",
+              to: phone,
+              type: "text",
+              text: {
+                preview_url: false,
+                body: text
+              }
+            };
+          } else {
+            reqBody[config.phoneParam || 'to'] = phone;
+            reqBody[config.messageParam || 'body'] = text;
 
-          if (config.extraParams) {
-            const params = new URLSearchParams(config.extraParams);
-            for (const [key, value] of params.entries()) {
-              reqBody[key] = value;
+            if (config.extraParams) {
+              const params = new URLSearchParams(config.extraParams);
+              for (const [key, value] of params.entries()) {
+                reqBody[key] = value;
+              }
             }
           }
 
@@ -162,13 +175,26 @@ const server = http.createServer((req, res) => {
           }
 
           let reqBody = {};
-          reqBody[config.phoneParam || 'to'] = phone;
-          reqBody[config.messageParam || 'body'] = text;
+          if (config.apiUrl.includes('graph.facebook.com')) {
+            reqBody = {
+              messaging_product: "whatsapp",
+              recipient_type: "individual",
+              to: phone,
+              type: "text",
+              text: {
+                preview_url: false,
+                body: text
+              }
+            };
+          } else {
+            reqBody[config.phoneParam || 'to'] = phone;
+            reqBody[config.messageParam || 'body'] = text;
 
-          if (config.extraParams) {
-            const params = new URLSearchParams(config.extraParams);
-            for (const [key, value] of params.entries()) {
-              reqBody[key] = value;
+            if (config.extraParams) {
+              const params = new URLSearchParams(config.extraParams);
+              for (const [key, value] of params.entries()) {
+                reqBody[key] = value;
+              }
             }
           }
 
