@@ -69,7 +69,7 @@ export default function MobileView() {
       );
     }
     return true;
-  });
+  }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   const handleUpdateQty = (cloth, delta) => {
     setArticleQuantities(prev => {
@@ -308,7 +308,7 @@ export default function MobileView() {
       );
     }
     return true;
-  });
+  }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   // Atelier filters
   const filteredAtelierOrders = orders.filter(o => {
@@ -316,7 +316,7 @@ export default function MobileView() {
     if (atelierFilter === 'urgent') return o.niveau_urgence === 'Express';
     if (atelierFilter === 'retard') return isOrderLate(o);
     return true;
-  });
+  }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   const activeCustomer = customers.find(c => c.id === selectedCustomerId);
   

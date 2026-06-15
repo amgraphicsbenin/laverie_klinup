@@ -741,7 +741,7 @@ export default function AdminView({ activeTab, searchQuery }) {
             </div>
 
             <div className="project-list">
-              {orders.slice(0, 4).map(order => {
+              {orders.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 4).map(order => {
                 const customer = customers.find(c => c.id === order.customer_id);
                 const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
                 const serviceName = serviceLabels[order.type_service] || order.type_service;
@@ -828,7 +828,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                   if (atelierFilter === 'urgent') return o.niveau_urgence === 'Express';
                   if (atelierFilter === 'retard') return isOrderLate(o);
                   return true;
-                });
+                }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
                 if (filteredAtelierOrders.length === 0) {
                   return (
@@ -1023,7 +1023,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                   const matchesStatus = historyFilterStatus === 'all' || o.statut === historyFilterStatus;
                   
                   return matchesSearch && matchesStatus;
-                });
+                }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
                 if (filteredHistory.length === 0) {
                   return (
@@ -1236,7 +1236,8 @@ export default function AdminView({ activeTab, searchQuery }) {
                       </thead>
                       <tbody>
                         {(() => {
-                          const clientOrders = orders.filter(o => o.customer_id === selectedCrmCustomer.id);
+                          const clientOrders = orders.filter(o => o.customer_id === selectedCrmCustomer.id)
+                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                           if (clientOrders.length === 0) {
                             return (
                               <tr>
