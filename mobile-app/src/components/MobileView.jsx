@@ -89,6 +89,13 @@ export default function MobileView() {
       if (confirm(`Confirmer la livraison de la commande ${order.identifiant_unique_marquage} ?`)) {
         db.updateOrderStatus(order.id, 'restitue');
         refreshData();
+
+        // Notification WhatsApp livraison directe (déjà payé)
+        const customer = customers.find(c => c.id === order.customer_id);
+        if (customer) {
+          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+          sendWhatsAppMessage(customer.telephone, text);
+        }
       }
     } else {
       setDelivOrder(order);
@@ -105,6 +112,14 @@ export default function MobileView() {
     db.deliverOrderWithPayment(delivOrder.id, Number(delivAmountPaid || 0), delivPaymentMethod);
     refreshData();
     setShowDeliveryPaymentModal(false);
+
+    // Notification WhatsApp solde livraison
+    const customer = customers.find(c => c.id === delivOrder.customer_id);
+    if (customer) {
+      const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la livraison de votre commande ${delivOrder.identifiant_unique_marquage} et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
+      sendWhatsAppMessage(customer.telephone, text);
+    }
+
     setDelivOrder(null);
   };
   
@@ -239,6 +254,15 @@ export default function MobileView() {
     setAvancePayee('');
     setArticleQuantities({});
     setShowOrderRegistrationModal(false);
+
+    // Notification WhatsApp à l'enregistrement
+    const customer = customers.find(c => c.id === selectedCustomerId);
+    if (customer) {
+      const remaining = newOrder.prix_total - newOrder.avance_payee;
+      const formattedDueDate = formatDateTime(newOrder.due_date);
+      const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP.\nTotal: ${newOrder.prix_total.toLocaleString()} FCFA\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+      sendWhatsAppMessage(customer.telephone, text);
+    }
   };
 
   const handlePayDebt = (e) => {
@@ -250,21 +274,61 @@ export default function MobileView() {
     
     refreshData();
     setShowDebtPaymentModal(false);
-    setDebtPaymentAmount('');
     
     const updatedCustomers = db.getCustomers();
-    setSelectedCrmCustomer(updatedCustomers.find(c => c.id === selectedCrmCustomer.id));
+    const updatedCustomer = updatedCustomers.find(c => c.id === selectedCrmCustomer.id);
+    setSelectedCrmCustomer(updatedCustomer);
+
+    // Notification WhatsApp règlement dette
+    if (updatedCustomer) {
+      const text = `Bonjour ${updatedCustomer.prenom} ${updatedCustomer.nom}, nous confirmons le paiement de ${Number(debtPaymentAmount).toLocaleString()} FCFA pour le règlement de votre dette chez KLIN UP.\nVotre nouveau solde débiteur est de ${updatedCustomer.solde_dette.toLocaleString()} FCFA.\nMerci et à bientôt !`;
+      sendWhatsAppMessage(updatedCustomer.telephone, text);
+    }
+
+    setDebtPaymentAmount('');
   };
 
   const handleStatusChange = (orderId, nextStatus) => {
+    const order = orders.find(o => o.id === orderId);
     db.updateOrderStatus(orderId, nextStatus);
     refreshData();
+
+    // Notification WhatsApp changement statut
+    if (order) {
+      const customer = customers.find(c => c.id === order.customer_id);
+      if (customer) {
+        let text = '';
+        if (nextStatus === 'en_cours_lavage') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est maintenant en cours de traitement (Lavage/Séchage) chez KLIN UP.`;
+        } else if (nextStatus === 'pret') {
+          const remaining = order.prix_total - order.avance_payee;
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer.\nReste à payer: ${remaining.toLocaleString()} FCFA.\nÀ bientôt chez KLIN UP !`;
+        } else if (nextStatus === 'restitue') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+        } else if (nextStatus === 'annule') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été annulée.`;
+        }
+        if (text) {
+          sendWhatsAppMessage(customer.telephone, text);
+        }
+      }
+    }
   };
 
   const handleCancelOrder = (orderId) => {
     if (confirm("Êtes-vous sûr de vouloir annuler cette commande ?")) {
+      const order = orders.find(o => o.id === orderId);
       db.cancelOrder(orderId);
       refreshData();
+
+      // Notification WhatsApp annulation
+      if (order) {
+        const customer = customers.find(c => c.id === order.customer_id);
+        if (customer) {
+          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été annulée.`;
+          sendWhatsAppMessage(customer.telephone, text);
+        }
+      }
     }
   };
 
@@ -294,6 +358,22 @@ export default function MobileView() {
     const datePart = d.toLocaleDateString('fr-FR');
     const timePart = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     return `${datePart} à ${timePart}`;
+  };
+
+  const formatPhoneForWhatsApp = (phoneStr) => {
+    if (!phoneStr) return '';
+    let cleaned = phoneStr.replace(/\D/g, '');
+    if (cleaned.startsWith('0') && cleaned.length === 10) {
+      return '225' + cleaned.substring(1);
+    }
+    return cleaned.length >= 11 ? cleaned : '225' + cleaned;
+  };
+
+  const sendWhatsAppMessage = (phone, text) => {
+    if (!phone) return;
+    const formattedPhone = formatPhoneForWhatsApp(phone);
+    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   };
 
   // --- STATS DYNAMIQUE ---
