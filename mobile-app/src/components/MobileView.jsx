@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
+import { countries } from '../utils/countriesData';
 import { 
   Plus, 
   Search, 
@@ -1289,13 +1290,11 @@ export default function MobileView() {
                   value={newCustIndicatif} 
                   onChange={(e) => setNewCustIndicatif(e.target.value)}
                 >
-                  <option value="229">Bénin (+229)</option>
-                  <option value="225">Côte d'Ivoire (+225)</option>
-                  <option value="228">Togo (+228)</option>
-                  <option value="227">Niger (+227)</option>
-                  <option value="226">Burkina Faso (+226)</option>
-                  <option value="223">Mali (+223)</option>
-                  <option value="221">Sénégal (+221)</option>
+                  {countries.map((c) => (
+                    <option key={`${c.code}-${c.name}`} value={c.code}>
+                      {c.flag} {c.name} (+{c.code})
+                    </option>
+                  ))}
                 </select>
               </div>
 
