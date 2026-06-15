@@ -168,7 +168,7 @@ const DEFAULT_CATALOG = [
   { id: 'sub4', article: 'Abonnement VIP', service: 'abonnement', prix: 100000, description: '200 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits', categorie: 'abonnement' }
 ];
 
-const API_URL = 'http://localhost:5050/api/db';
+const API_URL = typeof window !== 'undefined' ? `http://${window.location.hostname}:5050/api/db` : 'http://localhost:5050/api/db';
 
 let memoryDb = {
   staff: DEFAULT_STAFF,
