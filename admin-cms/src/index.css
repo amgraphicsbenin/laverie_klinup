@@ -64,27 +64,6 @@
   --radius-input: 12px;
 }
 
-/* Mode Sombre Global */
-body.dark-mode {
-  --bg-app: #0b0f0c;           /* Fond sombre vert-noir profond */
-  --bg-card: #131814;          /* Slate-900 adapté */
-  --bg-sidebar: #131814;
-  --text-primary: #f0f3f0;
-  --text-secondary: #a2aaa2;
-  --text-muted: #6b726b;
-  --border-color: #232c25;
-  
-  --primary-light: rgba(14, 98, 69, 0.15);
-  --secondary-light: rgba(0, 210, 196, 0.15);
-  --accent-light: rgba(244, 63, 94, 0.15);
-  --success-light: rgba(16, 185, 129, 0.15);
-  --warning-light: rgba(245, 158, 11, 0.15);
-  --danger-light: rgba(239, 68, 68, 0.15);
-  
-  --shadow-card: 0 6px 20px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.4);
-}
 
 /* Réglages globaux */
 * {
@@ -662,10 +641,6 @@ button, input, select, textarea {
   border: 1px solid var(--border-color);
 }
 
-body.dark-mode .column-bar.striped {
-  background: repeating-linear-gradient(45deg, #232c25, #232c25 5px, #131814 5px, #131814 10px);
-  border: 1px solid var(--border-color);
-}
 
 .column-label {
   font-size: 0.72rem;

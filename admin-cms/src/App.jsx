@@ -20,33 +20,17 @@ import {
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [adminMenu, setAdminMenu] = useState('dashboard'); // dashboard, catalog, logs
   const [staffList, setStaffList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    // Initialise theme
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDarkMode(systemPrefersDark);
-    if (systemPrefersDark) {
-      document.body.classList.add('dark-mode');
-    }
-
     // Initialise DB user and staff
     const user = db.getCurrentUser();
     setCurrentUser(user);
     setStaffList(db.getStaff());
   }, []);
 
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-    if (!isDarkMode) {
-      document.body.classList.add('dark-mode');
-    } else {
-      document.body.classList.remove('dark-mode');
-    }
-  };
 
   const handleUserRoleChange = (userId) => {
     const targetUser = staffList.find(s => s.id === userId);
@@ -204,10 +188,6 @@ function App() {
                 <Bell size={16} />
               </div>
 
-              {/* Mode Sombre */}
-              <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
-                {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
 
               {/* Profil Utilisateur Donezo Header Style */}
               <div className="topbar-profile">

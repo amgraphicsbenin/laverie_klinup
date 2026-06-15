@@ -2224,59 +2224,108 @@ export default function AdminView({ activeTab, searchQuery }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
           <div className="card" style={{ width: '100%', maxWidth: '340px', background: '#fff', color: '#000', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
             
-            <div style={{ textAlign: 'center', borderBottom: '1px dashed #ddd', paddingBottom: '0.75rem' }}>
-              <h2 style={{ fontFamily: 'var(--font-title)', color: '#000', fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>KLIN UP</h2>
-              <p style={{ fontSize: '0.75rem', color: '#555', margin: '0.1rem 0 0' }}>Ticket de Dépôt Client (Admin)</p>
-              <div style={{ background: '#000', color: '#fff', display: 'inline-block', padding: '0.4rem 0.8rem', borderRadius: '4px', fontWeight: 800, fontSize: '1rem', marginTop: '0.4rem', letterSpacing: '1px' }}>
-                {createdOrder.identifiant_unique_marquage}
+            <div id="receipt-print-area-admin" style={{
+              background: '#ffffff',
+              padding: '24px 20px',
+              borderRadius: '8px',
+              fontFamily: 'Arial, Helvetica, sans-serif',
+              color: '#1a1a1a',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              {/* ---- EN-TÊTE ---- */}
+              <div style={{ textAlign: 'center', paddingBottom: '16px', marginBottom: '16px', borderBottom: '2px dashed #cccccc' }}>
+                <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#000000', letterSpacing: '1px', fontFamily: 'Arial, Helvetica, sans-serif' }}>KLIN UP</h1>
+                <p style={{ margin: '4px 0 12px', fontSize: '12px', color: '#f59e0b', fontWeight: '600' }}>Ticket de Dépôt Client</p>
+                <div style={{
+                  display: 'inline-block',
+                  background: '#000000',
+                  color: '#ffffff',
+                  padding: '6px 16px',
+                  borderRadius: '6px',
+                  fontWeight: '800',
+                  fontSize: '16px',
+                  letterSpacing: '2px'
+                }}>
+                  {createdOrder.identifiant_unique_marquage}
+                </div>
+              </div>
+
+              {/* ---- DÉTAILS ---- */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', fontSize: '12px', paddingBottom: '14px', marginBottom: '14px', borderBottom: '1px solid #e5e5e5' }}>
+                <div><span style={{ fontWeight: '700' }}>Client :</span> {customers.find(c => c.id === createdOrder.customer_id)?.prenom} {customers.find(c => c.id === createdOrder.customer_id)?.nom}</div>
+                <div>
+                  <span style={{ fontWeight: '700' }}>Linge :</span>{' '}
+                  <span style={{ color: '#f59e0b', fontWeight: '600' }}>{createdOrder.type_article} ({serviceLabels[createdOrder.type_service] || createdOrder.type_service})</span>
+                </div>
+                <div><span style={{ fontWeight: '700' }}>Urgence :</span> {createdOrder.niveau_urgence}</div>
+                <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement}</div>
+                <div><span style={{ fontWeight: '700' }}>Dépôt :</span> {formatDateTime(createdOrder.created_at)}</div>
+                <div><span style={{ fontWeight: '700' }}>Échéance :</span> {formatDateTime(createdOrder.due_date)}</div>
+                {createdOrder.acompte_paid_at && (
+                  <div><span style={{ fontWeight: '700' }}>Règlement Acompte :</span> {formatDateTime(createdOrder.acompte_paid_at)}</div>
+                )}
+                {createdOrder.solde_paid_at && (
+                  <div><span style={{ fontWeight: '700' }}>Règlement Solde :</span> {formatDateTime(createdOrder.solde_paid_at)}</div>
+                )}
+              </div>
+
+              {/* ---- TOTAUX ---- */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#555555' }}>Total Commande :</span>
+                  <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.prix_total || 0).toLocaleString()} FCFA</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#555555' }}>Acompte Payé :</span>
+                  <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
+                  <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
+                  <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
+                    {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.75rem', borderBottom: '1px dashed #ddd', paddingBottom: '0.75rem', color: '#000' }}>
-              <div><strong>Client :</strong> {customers.find(c => c.id === createdOrder.customer_id)?.prenom} {customers.find(c => c.id === createdOrder.customer_id)?.nom}</div>
-              <div><strong>Linge :</strong> {createdOrder.type_article} ({serviceLabels[createdOrder.type_service] || createdOrder.type_service})</div>
-              <div><strong>Urgence :</strong> {createdOrder.niveau_urgence}</div>
-              <div><strong>Mode règlement :</strong> {createdOrder.mode_reglement}</div>
-              <div><strong>Dépôt :</strong> {formatDateTime(createdOrder.created_at)}</div>
-              <div><strong>Échéance :</strong> {formatDateTime(createdOrder.due_date)}</div>
-              {createdOrder.acompte_paid_at && (
-                <div><strong>Règlement Acompte :</strong> {formatDateTime(createdOrder.acompte_paid_at)}</div>
-              )}
-              {createdOrder.solde_paid_at && (
-                <div><strong>Règlement Solde :</strong> {formatDateTime(createdOrder.solde_paid_at)}</div>
-              )}
-            </div>
-
-            <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '0.5rem', color: '#000' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Total Commande :</span>
-                <strong>{createdOrder.prix_total.toLocaleString()} F</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <button 
+                  type="button"
+                  className="btn btn-outline" 
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  onClick={() => alert("Impression du reçu en cours !")}
+                >
+                  <Printer size={12} /> Imprimer
+                </button>
+                <button 
+                  type="button"
+                  className="btn btn-outline" 
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  onClick={() => {
+                    const element = document.getElementById('receipt-print-area-admin');
+                    if (element && window.html2pdf) {
+                      const opt = {
+                        margin:       0.3,
+                        filename:     `Facture_${createdOrder.identifiant_unique_marquage}.pdf`,
+                        image:        { type: 'jpeg', quality: 0.98 },
+                        html2canvas:  { scale: 2, useCORS: true, logging: false },
+                        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+                      };
+                      window.html2pdf().set(opt).from(element).save();
+                    } else {
+                      alert("Le module PDF est en cours de chargement. Veuillez réessayer.");
+                    }
+                  }}
+                >
+                  ↓ Télécharger
+                </button>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Acompte Payé :</span>
-                <strong>{createdOrder.avance_payee.toLocaleString()} F</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #ddd', paddingTop: '0.2rem', fontSize: '0.85rem' }}>
-                <span>Reste à payer :</span>
-                <strong style={{ color: createdOrder.prix_total - createdOrder.avance_payee > 0 ? '#d32f2f' : '#2e7d32' }}>
-                  {(createdOrder.prix_total - createdOrder.avance_payee).toLocaleString()} FCFA
-                </strong>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.25rem' }}>
-              <button 
-                type="button"
-                className="btn btn-outline" 
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                onClick={() => alert("Impression du reçu en cours !")}
-              >
-                <Printer size={12} /> Imprimer
-              </button>
               <button 
                 type="button"
                 className="btn btn-primary" 
-                style={{ flex: 1, background: '#000', color: '#fff', border: 'none', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                style={{ width: '100%', background: '#000', color: '#fff', border: 'none', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
                 onClick={() => setCreatedOrder(null)}
               >
                 Fermer

@@ -1,0 +1,451 @@
+﻿import React, { useState, useEffect } from 'react';
+import { db } from '../services/db';
+import { countries } from '../utils/countriesData';
+import { 
+  Plus, 
+  Search, 
+  Clock, 
+  CheckCircle, 
+  DollarSign, 
+  User, 
+  Phone, 
+  Sliders, 
+  TriangleAlert,
+  RotateCw,
+  Printer,
+  X,
+  Home,
+  Layers,
+  CreditCard,
+  TrendingUp,
+  Activity,
+  Award,
+  Zap,
+  Sparkles,
+  Smartphone,
+  FileText
+} from 'lucide-react';
+
+export default function MobileView() {
+  const [activeTab, setActiveTab] = useState('accueil'); // accueil, gestion, facturation, profile
+  const [customers, setCustomers] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [catalog, setCatalog] = useState([]);
+
+  // Formulaire Caisse
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [articleQuantities, setArticleQuantities] = useState({});
+  const [articleServices, setArticleServices] = useState({});
+  const [niveauUrgence, setNiveauUrgence] = useState('Normal');
+  const [modeReglement, setModeReglement] = useState('especes');
+  const [avancePayee, setAvancePayee] = useState('');
+
+  // Flow de Livraison / Paiement Final
+  const [showDeliveryPaymentModal, setShowDeliveryPaymentModal] = useState(false);
+  const [delivOrder, setDelivOrder] = useState(null);
+  const [delivPaymentMethod, setDelivPaymentMethod] = useState('especes');
+  const [delivAmountPaid, setDelivAmountPaid] = useState('');
+
+  // Modale de crÃ©ation de commande
+  const [showOrderRegistrationModal, setShowOrderRegistrationModal] = useState(false);
+
+  // Filtres Historique
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyFilterStatus, setHistoryFilterStatus] = useState('all');
+
+  // Filtered orders list for the history tab
+  const filteredHistoryOrders = orders.filter(o => {
+    // Filter by status
+    if (historyFilterStatus !== 'all' && o.statut !== historyFilterStatus) return false;
+
+    // Filter by search query
+    if (historySearchQuery) {
+      const q = historySearchQuery.toLowerCase();
+      const client = customers.find(c => c.id === o.customer_id);
+      const clientName = client ? `${client.prenom} ${client.nom}`.toLowerCase() : '';
+      return (
+        o.identifiant_unique_marquage.toLowerCase().includes(q) ||
+        o.type_article.toLowerCase().includes(q) ||
+        clientName.includes(q)
+      );
+    }
+    return true;
+  }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const handleUpdateQty = (cloth, delta) => {
+    setArticleQuantities(prev => {
+      const current = prev[cloth] || 0;
+      const next = Math.max(0, current + delta);
+      return { ...prev, [cloth]: next };
+    });
+  };
+
+  const handleUpdateService = (cloth, service) => {
+    setArticleServices(prev => ({ ...prev, [cloth]: service }));
+  };
+
+  const handleStartDelivery = (order) => {
+    const remainingToPay = order.prix_total - order.avance_payee;
+    if (remainingToPay <= 0) {
+      if (confirm(`Confirmer la livraison de la commande ${order.identifiant_unique_marquage} ?`)) {
+        db.updateOrderStatus(order.id, 'restitue');
+        refreshData();
+
+        // Notification WhatsApp livraison directe (dÃ©jÃ  payÃ©)
+        const customer = customers.find(c => c.id === order.customer_id);
+        if (customer) {
+          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a Ã©tÃ© livrÃ©e avec succÃ¨s. Merci pour votre confiance et Ã  bientÃ´t chez KLIN UP !`;
+          sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+        }
+      }
+    } else {
+      setDelivOrder(order);
+      setDelivPaymentMethod('especes');
+      setDelivAmountPaid(remainingToPay.toString());
+      setShowDeliveryPaymentModal(true);
+    }
+  };
+
+  const handleConfirmDelivery = (e) => {
+    e.preventDefault();
+    if (!delivOrder) return;
+    
+    db.deliverOrderWithPayment(delivOrder.id, Number(delivAmountPaid || 0), delivPaymentMethod);
+    refreshData();
+    setShowDeliveryPaymentModal(false);
+
+    // Notification WhatsApp solde livraison
+    const customer = customers.find(c => c.id === delivOrder.customer_id);
+    if (customer) {
+      const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la livraison de votre commande ${delivOrder.identifiant_unique_marquage} et le rÃ¨glement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entiÃ¨rement soldÃ©e. Merci pour votre fidÃ©litÃ© !`;
+      sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+    }
+
+    setDelivOrder(null);
+  };
+  
+  // Nouveau Client
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
+  const [newCustNom, setNewCustNom] = useState('');
+  const [newCustPrenom, setNewCustPrenom] = useState('');
+  const [newCustTel, setNewCustTel] = useState('');
+  const [newCustPref, setNewCustPref] = useState('PliÃ©');
+  const [newCustIndicatif, setNewCustIndicatif] = useState('229');
+
+  // CRM Search & Debt
+  const [crmSearch, setCrmSearch] = useState('');
+  const [selectedCrmCustomer, setSelectedCrmCustomer] = useState(null);
+  const [showDebtPaymentModal, setShowDebtPaymentModal] = useState(false);
+  const [debtPaymentAmount, setDebtPaymentAmount] = useState('');
+
+  // Atelier Filters (Gestion)
+  const [atelierFilter, setAtelierFilter] = useState('all'); // all, urgent, retard
+
+  // Search queries on Accueil
+  const [homeSearchQuery, setHomeSearchQuery] = useState('');
+
+  // Receipt Modal
+  const [createdOrder, setCreatedOrder] = useState(null);
+
+  // Machine occupation simulator states
+  const [machineStatus, setMachineStatus] = useState([
+    { id: 1, name: 'Machine NÂ°1 (12kg)', status: 'lavage', timeRemaining: '12 min', load: 'Pantalons/Vestes' },
+    { id: 2, name: 'Machine NÂ°2 (12kg)', status: 'repassage', timeRemaining: '24 min', load: 'Chemises Premium' },
+    { id: 3, name: 'Machine NÂ°3 (8kg)', status: 'disponible', timeRemaining: '-', load: '-' },
+    { id: 4, name: 'Machine NÂ°4 (8kg)', status: 'maintenance', timeRemaining: '-', load: 'DÃ©tartrage Tambour' }
+  ]);
+
+  // Load initial data
+  useEffect(() => {
+    setCustomers(db.getCustomers());
+    setOrders(db.getOrders());
+    setCatalog(db.getCatalog());
+
+    const unsubscribe = db.subscribe(() => {
+      setCustomers(db.getCustomers());
+      setOrders(db.getOrders());
+      setCatalog(db.getCatalog());
+    });
+    return () => unsubscribe();
+  }, [activeTab]);
+
+  const refreshData = () => {
+    setCustomers(db.getCustomers());
+    setOrders(db.getOrders());
+  };
+
+  // Extract unique clothes from catalog for Caisses dropdown
+  const catalogClothes = catalog.length > 0 
+    ? [...new Set(catalog.filter(c => c.categorie !== 'abonnement').map(c => c.article))] 
+    : ['Chemise', 'Pantalon', 'Robe', 'Combinaison', 'Jupe', 'Pull', 'Culotte', 'T-shirt', 'Polo', 'Blouson', 'Veste', 'Costume', 'Jeans'];
+
+  // --- LOGIQUE DE CALCUL DU PRIX ---
+  const getCalculatedPrice = () => {
+    let total = 0;
+    Object.keys(articleQuantities).forEach(cloth => {
+      const qty = articleQuantities[cloth];
+      if (qty > 0) {
+        const svc = articleServices[cloth] || 'lavage_simple';
+        const item = catalog.find(c => c.article === cloth && c.service === svc);
+        const price = item ? item.prix : 1500;
+        total += price * qty;
+      }
+    });
+    return niveauUrgence === 'Express' ? Math.round(total * 1.5) : total;
+  };
+
+  const handleCreateCustomer = (e) => {
+    e.preventDefault();
+    if (!newCustNom || !newCustPrenom || !newCustTel) return;
+    
+    const newCustomer = db.addCustomer({
+      nom: newCustNom,
+      prenom: newCustPrenom,
+      telephone: newCustTel,
+      indicatif: newCustIndicatif,
+      preferences_pliage: newCustPref
+    });
+    
+    refreshData();
+    setSelectedCustomerId(newCustomer.id);
+    setShowNewCustomerModal(false);
+    setNewCustNom('');
+    setNewCustPrenom('');
+    setNewCustTel('');
+    setNewCustIndicatif('229');
+  };
+
+  const handleCreateOrder = (e) => {
+    e.preventDefault();
+    if (!selectedCustomerId) {
+      alert("Veuillez sÃ©lectionner ou crÃ©er un client");
+      return;
+    }
+
+    const selectedItems = [];
+    Object.keys(articleQuantities).forEach(cloth => {
+      const qty = articleQuantities[cloth];
+      if (qty > 0) {
+        selectedItems.push({
+          article: cloth,
+          quantite: qty,
+          service: articleServices[cloth] || 'lavage_simple'
+        });
+      }
+    });
+
+    if (selectedItems.length === 0) {
+      alert("Veuillez sÃ©lectionner au moins un article avec une quantitÃ© supÃ©rieure Ã  0");
+      return;
+    }
+
+    const typeArticleSummary = selectedItems.map(item => `${item.quantite}x ${item.article}`).join(', ');
+    const primaryService = selectedItems[0].service;
+
+    const orderData = {
+      customer_id: selectedCustomerId,
+      type_article: typeArticleSummary,
+      type_service: primaryService,
+      niveau_urgence: niveauUrgence,
+      mode_reglement: modeReglement,
+      avance_payee: Number(avancePayee || 0),
+      items: selectedItems
+    };
+
+    const newOrder = db.createOrder(orderData);
+    refreshData();
+    setCreatedOrder(newOrder);
+    setAvancePayee('');
+    setArticleQuantities({});
+    setShowOrderRegistrationModal(false);
+
+    // Notification WhatsApp Ã  l'enregistrement
+    const customer = customers.find(c => c.id === selectedCustomerId);
+    if (customer) {
+      const remaining = newOrder.prix_total - newOrder.avance_payee;
+      const formattedDueDate = formatDateTime(newOrder.due_date);
+      const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien Ã©tÃ© enregistrÃ©e chez KLIN UP.\nTotal: ${newOrder.prix_total.toLocaleString()} FCFA\nAcompte payÃ©: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste Ã  payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prÃ©vue: ${formattedDueDate}\nMerci pour votre confiance !`;
+      sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+    }
+  };
+
+  const handlePayDebt = (e) => {
+    e.preventDefault();
+    if (!selectedCrmCustomer || !debtPaymentAmount) return;
+
+    db.updateCustomerDebt(selectedCrmCustomer.id, -Number(debtPaymentAmount));
+    db.logAction('RÃˆGLEMENT_DETTE', `Client ${selectedCrmCustomer.prenom} ${selectedCrmCustomer.nom} a rÃ©glÃ© ${debtPaymentAmount} FCFA de sa dette`);
+    
+    refreshData();
+    setShowDebtPaymentModal(false);
+    
+    const updatedCustomers = db.getCustomers();
+    const updatedCustomer = updatedCustomers.find(c => c.id === selectedCrmCustomer.id);
+    setSelectedCrmCustomer(updatedCustomer);
+
+    // Notification WhatsApp rÃ¨glement dette
+    if (updatedCustomer) {
+      const text = `Bonjour ${updatedCustomer.prenom} ${updatedCustomer.nom}, nous confirmons le paiement de ${Number(debtPaymentAmount).toLocaleString()} FCFA pour le rÃ¨glement de votre dette chez KLIN UP.\nVotre nouveau solde dÃ©biteur est de ${updatedCustomer.solde_dette.toLocaleString()} FCFA.\nMerci et Ã  bientÃ´t !`;
+      sendWhatsAppMessage(updatedCustomer.telephone, text, updatedCustomer.indicatif);
+    }
+
+    setDebtPaymentAmount('');
+  };
+
+  const handleStatusChange = (orderId, nextStatus) => {
+    const order = orders.find(o => o.id === orderId);
+    db.updateOrderStatus(orderId, nextStatus);
+    refreshData();
+
+    // Notification WhatsApp changement statut
+    if (order) {
+      const customer = customers.find(c => c.id === order.customer_id);
+      if (customer) {
+        let text = '';
+        if (nextStatus === 'en_cours_lavage') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est maintenant en cours de traitement (Lavage/SÃ©chage) chez KLIN UP.`;
+        } else if (nextStatus === 'pret') {
+          const remaining = order.prix_total - order.avance_payee;
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prÃªte ! Vous pouvez passer la rÃ©cupÃ©rer.\nReste Ã  payer: ${remaining.toLocaleString()} FCFA.\nÃ€ bientÃ´t chez KLIN UP !`;
+        } else if (nextStatus === 'restitue') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a Ã©tÃ© livrÃ©e avec succÃ¨s. Merci pour votre confiance et Ã  bientÃ´t chez KLIN UP !`;
+        } else if (nextStatus === 'annule') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a Ã©tÃ© annulÃ©e.`;
+        }
+        if (text) {
+          sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+        }
+      }
+    }
+  };
+
+  const handleCancelOrder = (orderId) => {
+    if (confirm("ÃŠtes-vous sÃ»r de vouloir annuler cette commande ?")) {
+      const order = orders.find(o => o.id === orderId);
+      db.cancelOrder(orderId);
+      refreshData();
+
+      // Notification WhatsApp annulation
+      if (order) {
+        const customer = customers.find(c => c.id === order.customer_id);
+        if (customer) {
+          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a Ã©tÃ© annulÃ©e.`;
+          sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+        }
+      }
+    }
+  };
+
+  const serviceLabels = {
+    lavage_simple: 'Lavage Simple',
+    nettoyage_a_sec: 'Nettoyage Ã  sec',
+    repassage: 'Repassage',
+    abonnement: 'Abonnement'
+  };
+
+  const statusLabels = {
+    en_attente: 'ReÃ§u / Tri',
+    en_cours_lavage: 'En Lavage',
+    pret: 'PrÃªt',
+    restitue: 'LivrÃ©',
+    annule: 'AnnulÃ©'
+  };
+
+  const isOrderLate = (order) => {
+    if (order.statut === 'restitue' || order.statut === 'annule') return false;
+    return new Date(order.due_date) < new Date();
+  };
+
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const datePart = d.toLocaleDateString('fr-FR');
+    const timePart = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return `${datePart} Ã  ${timePart}`;
+  };
+
+  const formatPhoneForWhatsApp = (phoneStr, indicatif = '229') => {
+    if (!phoneStr) return '';
+    let cleaned = phoneStr.replace(/\D/g, '');
+    if (cleaned.startsWith('0') && indicatif !== '229') {
+      cleaned = cleaned.substring(1);
+    }
+    if (cleaned.startsWith(indicatif) && cleaned.length > indicatif.length + 5) {
+      return cleaned;
+    }
+    return indicatif + cleaned;
+  };
+
+  const sendWhatsAppMessage = (phone, text, indicatif = '229') => {
+    if (!phone) return;
+    const formattedPhone = formatPhoneForWhatsApp(phone, indicatif);
+    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
+  // --- STATS DYNAMIQUE ---
+  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule').length;
+  const completedOrdersCount = orders.filter(o => o.statut === 'restitue').length;
+  const totalRevenue = orders.filter(o => o.statut !== 'annule').reduce((sum, o) => sum + o.avance_payee, 0);
+
+  // Active / Search orders filter on home
+  const filteredHomeOrders = orders.filter(o => {
+    if (o.statut === 'restitue' || o.statut === 'annule') return false;
+    if (homeSearchQuery) {
+      const q = homeSearchQuery.toLowerCase();
+      const client = customers.find(c => c.id === o.customer_id);
+      const clientName = client ? `${client.prenom} ${client.nom}`.toLowerCase() : '';
+      return (
+        o.type_article.toLowerCase().includes(q) ||
+        o.identifiant_unique_marquage.toLowerCase().includes(q) ||
+        clientName.includes(q)
+      );
+    }
+    return true;
+  }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  // Atelier filters
+  const filteredAtelierOrders = orders.filter(o => {
+    if (o.statut === 'restitue' || o.statut === 'annule') return false;
+    if (atelierFilter === 'urgent') return o.niveau_urgence === 'Express';
+    if (atelierFilter === 'retard') return isOrderLate(o);
+    return true;
+  }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const activeCustomer = customers.find(c => c.id === selectedCustomerId);
+  
+  const filteredCrmCustomers = customers.filter(c => 
+    c.nom.toLowerCase().includes(crmSearch.toLowerCase()) ||
+    c.prenom.toLowerCase().includes(crmSearch.toLowerCase()) ||
+    c.telephone.includes(crmSearch)
+  );
+
+  const currentUser = db.getCurrentUser() || { prenom: 'Pierre', nom: 'Diallo', role: 'agent_accueil' };
+
+  return (
+    <div className="mobile-simulator">
+      {/* Centered Notch */}
+      <div className="phone-notch"></div>
+
+      {/* Status Bar */}
+      <div className="phone-status-bar">
+        <span>10:40</span>
+        <div className="phone-status-bar-icons">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h.01M7 20v-4M12 20v-8M17 20V4M22 20V2" />
+          </svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
+          </svg>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px', border: '1px solid currentColor', padding: '1px 3px', borderRadius: '4px', fontSize: '0.55rem', fontWeight: 900, lineHeight: 1 }}>
+            98%
+          </div>
+        </div>
+      </div>
+
+      {/* Main Container */}
+      <div className="mobile-content">
+        
+        {/* ========================================================
+           ONGLET : ACCUEIL
+           ======================================================== */}

@@ -9,31 +9,15 @@ import {
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [staffList, setStaffList] = useState([]);
 
   useEffect(() => {
-    // Initialise theme
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDarkMode(systemPrefersDark);
-    if (systemPrefersDark) {
-      document.body.classList.add('dark-mode');
-    }
-
     // Initialise DB user and staff
     const user = db.getCurrentUser();
     setCurrentUser(user);
     setStaffList(db.getStaff());
   }, []);
 
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-    if (!isDarkMode) {
-      document.body.classList.add('dark-mode');
-    } else {
-      document.body.classList.remove('dark-mode');
-    }
-  };
 
   const handleUserRoleChange = (userId) => {
     const targetUser = staffList.find(s => s.id === userId);
@@ -58,26 +42,7 @@ function App() {
   return (
     <div className="app-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '1.5rem' }}>
       
-      {/* Top Banner indicating preview / active staff */}
-      <div style={{ maxWidth: '480px', width: '100%', margin: '0 auto 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div className="user-avatar" style={{ width: '32px', height: '32px', fontSize: '0.8rem' }}>
-            {currentUser.prenom.charAt(0)}{currentUser.nom.charAt(0)}
-          </div>
-          <div style={{ fontSize: '0.85rem' }}>
-            <strong>{currentUser.prenom} {currentUser.nom}</strong>
-            {isPreviewMode && (
-              <span style={{ marginLeft: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>
-                Preview
-              </span>
-            )}
-          </div>
-        </div>
 
-        <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme" style={{ padding: '0.4rem' }}>
-          {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
-      </div>
 
       {/* Smartphone Simulator */}
       <div style={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>

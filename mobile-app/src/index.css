@@ -57,26 +57,6 @@
   --radius-lg: 24px;
 }
 
-/* Version sombre globale par défaut */
-body.dark-mode {
-  --primary: hsl(215, 90%, 60%);
-  --primary-hover: hsl(215, 90%, 68%);
-  --primary-light: hsl(215, 30%, 15%);
-
-  --secondary: hsl(174, 80%, 46%);
-  --secondary-hover: hsl(174, 80%, 54%);
-  --secondary-light: hsl(174, 30%, 14%);
-  
-  --bg-app: linear-gradient(135deg, hsl(222, 47%, 9%) 0%, hsl(224, 45%, 5%) 100%);
-  --bg-card: rgba(20, 24, 38, 0.7);
-  --bg-sidebar: linear-gradient(180deg, hsl(222, 47%, 7%) 0%, hsl(222, 47%, 3%) 100%);
-  --text-primary: hsl(210, 40%, 98%);
-  --text-secondary: hsl(215, 20%, 75%);
-  --text-muted: hsl(215, 15%, 50%);
-  --border-color: rgba(45, 55, 80, 0.6);
-  --glass-border: rgba(20, 24, 38, 0.3);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-}
 
 /* Réglages globaux */
 * {
@@ -434,9 +414,6 @@ button, input, select, textarea {
   box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
 }
 
-body.dark-mode .mobile-footer-nav {
-  background: rgba(15, 18, 30, 0.75);
-}
 
 .mobile-nav-btn {
   display: flex;
