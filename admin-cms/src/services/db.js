@@ -336,6 +336,7 @@ export const db = {
       nom: customer.nom,
       prenom: customer.prenom,
       telephone: customer.telephone,
+      indicatif: customer.indicatif || '229',
       preferences_pliage: customer.preferences_pliage || 'Plié',
       points_fidelite: 0,
       solde_dette: 0.00,

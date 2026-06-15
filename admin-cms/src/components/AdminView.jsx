@@ -73,6 +73,7 @@ export default function AdminView({ activeTab, searchQuery }) {
   const [newCustPrenom, setNewCustPrenom] = useState('');
   const [newCustTel, setNewCustTel] = useState('');
   const [newCustPref, setNewCustPref] = useState('Plié');
+  const [newCustIndicatif, setNewCustIndicatif] = useState('229');
 
   // CRM Search & Debt
   const [crmSearch, setCrmSearch] = useState('');
@@ -302,18 +303,21 @@ export default function AdminView({ activeTab, searchQuery }) {
     return `${datePart} à ${timePart}`;
   };
 
-  const formatPhoneForWhatsApp = (phoneStr) => {
+  const formatPhoneForWhatsApp = (phoneStr, indicatif = '229') => {
     if (!phoneStr) return '';
     let cleaned = phoneStr.replace(/\D/g, '');
-    if (cleaned.startsWith('0') && cleaned.length === 10) {
-      return '225' + cleaned.substring(1);
+    if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
     }
-    return cleaned.length >= 11 ? cleaned : '225' + cleaned;
+    if (cleaned.startsWith(indicatif) && cleaned.length > indicatif.length + 5) {
+      return cleaned;
+    }
+    return indicatif + cleaned;
   };
 
-  const sendWhatsAppMessage = (phone, text) => {
+  const sendWhatsAppMessage = (phone, text, indicatif = '229') => {
     if (!phone) return;
-    const formattedPhone = formatPhoneForWhatsApp(phone);
+    const formattedPhone = formatPhoneForWhatsApp(phone, indicatif);
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -357,6 +361,7 @@ export default function AdminView({ activeTab, searchQuery }) {
       nom: newCustNom,
       prenom: newCustPrenom,
       telephone: newCustTel,
+      indicatif: newCustIndicatif,
       preferences_pliage: newCustPref
     });
     
@@ -366,6 +371,7 @@ export default function AdminView({ activeTab, searchQuery }) {
     setNewCustNom('');
     setNewCustPrenom('');
     setNewCustTel('');
+    setNewCustIndicatif('229');
   };
 
   const handleCreateOrder = (e) => {
@@ -418,7 +424,7 @@ export default function AdminView({ activeTab, searchQuery }) {
       const remaining = newOrder.prix_total - newOrder.avance_payee;
       const formattedDueDate = formatDateTime(newOrder.due_date);
       const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP.\nTotal: ${newOrder.prix_total.toLocaleString()} FCFA\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
-      sendWhatsAppMessage(customer.telephone, text);
+      sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
     }
   };
 
@@ -433,7 +439,7 @@ export default function AdminView({ activeTab, searchQuery }) {
         const customer = customers.find(c => c.id === order.customer_id);
         if (customer) {
           const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
-          sendWhatsAppMessage(customer.telephone, text);
+          sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
         }
       }
     } else {
@@ -456,7 +462,7 @@ export default function AdminView({ activeTab, searchQuery }) {
     const customer = customers.find(c => c.id === delivOrder.customer_id);
     if (customer) {
       const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la livraison de votre commande ${delivOrder.identifiant_unique_marquage} et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
-      sendWhatsAppMessage(customer.telephone, text);
+      sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
     }
 
     setDelivOrder(null);
@@ -479,7 +485,7 @@ export default function AdminView({ activeTab, searchQuery }) {
     // Notification WhatsApp règlement dette
     if (updatedCustomer) {
       const text = `Bonjour ${updatedCustomer.prenom} ${updatedCustomer.nom}, nous confirmons le paiement de ${Number(debtPaymentAmount).toLocaleString()} FCFA pour le règlement de votre dette chez KLIN UP.\nVotre nouveau solde débiteur est de ${updatedCustomer.solde_dette.toLocaleString()} FCFA.\nMerci et à bientôt !`;
-      sendWhatsAppMessage(updatedCustomer.telephone, text);
+      sendWhatsAppMessage(updatedCustomer.telephone, text, updatedCustomer.indicatif);
     }
 
     setDebtPaymentAmount('');
@@ -506,7 +512,7 @@ export default function AdminView({ activeTab, searchQuery }) {
           text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été annulée.`;
         }
         if (text) {
-          sendWhatsAppMessage(customer.telephone, text);
+          sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
         }
       }
     }
@@ -523,7 +529,7 @@ export default function AdminView({ activeTab, searchQuery }) {
         const customer = customers.find(c => c.id === order.customer_id);
         if (customer) {
           const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été annulée.`;
-          sendWhatsAppMessage(customer.telephone, text);
+          sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
         }
       }
     }
@@ -2062,11 +2068,28 @@ export default function AdminView({ activeTab, searchQuery }) {
               </div>
 
               <div className="form-group">
+                <label>Pays (Indicatif)</label>
+                <select 
+                  className="input-control"
+                  value={newCustIndicatif} 
+                  onChange={(e) => setNewCustIndicatif(e.target.value)}
+                >
+                  <option value="229">Bénin (+229)</option>
+                  <option value="225">Côte d'Ivoire (+225)</option>
+                  <option value="228">Togo (+228)</option>
+                  <option value="227">Niger (+227)</option>
+                  <option value="226">Burkina Faso (+226)</option>
+                  <option value="223">Mali (+223)</option>
+                  <option value="221">Sénégal (+221)</option>
+                </select>
+              </div>
+
+              <div className="form-group">
                 <label>Téléphone</label>
                 <input 
                   type="tel" 
                   className="input-control" 
-                  placeholder="Ex: 0707894512" 
+                  placeholder="Ex: 97979797" 
                   required
                   value={newCustTel} 
                   onChange={(e) => setNewCustTel(e.target.value)} 
