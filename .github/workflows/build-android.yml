@@ -52,6 +52,10 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x mobile-app/android/gradlew
 
+      - name: Install Android SDK 36
+        run: |
+          echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-36"
+
       - name: Build Debug APK
         run: |
           cd mobile-app/android
