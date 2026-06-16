@@ -5,6 +5,7 @@ import {
   Sun, 
   Moon, 
   ShieldAlert, 
+  ShieldCheck,
   LayoutDashboard, 
   ListFilter, 
   History, 
@@ -102,13 +103,22 @@ function App() {
                 Catalogue Tarifs
               </li>
               {isSuperAdmin && (
-                <li 
-                  className={`menu-item ${adminMenu === 'logs' ? 'active' : ''}`}
-                  onClick={() => setAdminMenu('logs')}
-                >
-                  <History size={18} />
-                  Journal d'Audit
-                </li>
+                <>
+                  <li 
+                    className={`menu-item ${adminMenu === 'staff_management' ? 'active' : ''}`}
+                    onClick={() => setAdminMenu('staff_management')}
+                  >
+                    <ShieldCheck size={18} />
+                    Gestion des Accès
+                  </li>
+                  <li 
+                    className={`menu-item ${adminMenu === 'logs' ? 'active' : ''}`}
+                    onClick={() => setAdminMenu('logs')}
+                  >
+                    <History size={18} />
+                    Journal d'Audit
+                  </li>
+                </>
               )}
             </ul>
 
@@ -153,6 +163,7 @@ function App() {
               {hasAdminAccess && adminMenu === 'orders_management' && "Gestion des Commandes"}
               {hasAdminAccess && adminMenu === 'crm_management' && "Clients CRM"}
               {hasAdminAccess && adminMenu === 'catalog' && "Catalogue Tarifs"}
+              {hasAdminAccess && adminMenu === 'staff_management' && "Gestion des Accès"}
               {hasAdminAccess && adminMenu === 'logs' && "Journal d'Audit"}
             </h1>
             <p style={{ marginTop: '0.15rem' }}>
@@ -161,6 +172,7 @@ function App() {
               {hasAdminAccess && adminMenu === 'orders_management' && "Enregistrement, suivi d'atelier et facturation des commandes."}
               {hasAdminAccess && adminMenu === 'crm_management' && "Fiches clients, encours financiers et fidélité."}
               {hasAdminAccess && adminMenu === 'catalog' && "Gestion de la grille de prix de traitement de laverie B2B."}
+              {hasAdminAccess && adminMenu === 'staff_management' && "Habilitations du personnel, gestion des rôles et autorisations d'accès."}
               {hasAdminAccess && adminMenu === 'logs' && "Traçabilité des actions et sécurité des transactions."}
             </p>
           </div>

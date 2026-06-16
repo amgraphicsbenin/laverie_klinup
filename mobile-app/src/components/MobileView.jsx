@@ -41,6 +41,19 @@ export default function MobileView() {
   const [niveauUrgence, setNiveauUrgence] = useState('Normal');
   const [modeReglement, setModeReglement] = useState('especes');
   const [avancePayee, setAvancePayee] = useState('');
+  const [payWithSubscription, setPayWithSubscription] = useState(false);
+  const [subscribePlanId, setSubscribePlanId] = useState('');
+
+  useEffect(() => {
+    const cust = customers.find(c => c.id === selectedCustomerId);
+    if (subscribePlanId) {
+      setPayWithSubscription(true);
+    } else if (cust && cust.active_subscription) {
+      setPayWithSubscription(true);
+    } else {
+      setPayWithSubscription(false);
+    }
+  }, [selectedCustomerId, customers, subscribePlanId]);
 
   // Flow de Livraison / Paiement Final
   const [showDeliveryPaymentModal, setShowDeliveryPaymentModal] = useState(false);
@@ -139,6 +152,36 @@ export default function MobileView() {
   const [selectedCrmCustomer, setSelectedCrmCustomer] = useState(null);
   const [showDebtPaymentModal, setShowDebtPaymentModal] = useState(false);
   const [debtPaymentAmount, setDebtPaymentAmount] = useState('');
+  const [selectedCrmSubId, setSelectedCrmSubId] = useState('');
+
+  const handleSubscribeCrm = (customerId, catalogItemId) => {
+    if (!catalogItemId) {
+      alert("Veuillez sélectionner un forfait d'abonnement.");
+      return;
+    }
+    const updated = db.subscribeCustomer(customerId, catalogItemId);
+    if (updated) {
+      refreshData();
+      const updatedCustomers = db.getCustomers();
+      const updatedCust = updatedCustomers.find(c => c.id === customerId);
+      setSelectedCrmCustomer(updatedCust);
+      setSelectedCrmSubId('');
+      alert(`Abonnement souscrit avec succès !`);
+    }
+  };
+
+  const handleUnsubscribeCrm = (customerId) => {
+    if (confirm("Êtes-vous sûr de vouloir résilier cet abonnement ?")) {
+      const updated = db.unsubscribeCustomer(customerId);
+      if (updated) {
+        refreshData();
+        const updatedCustomers = db.getCustomers();
+        const updatedCust = updatedCustomers.find(c => c.id === customerId);
+        setSelectedCrmCustomer(updatedCust);
+        alert("Abonnement résilié avec succès !");
+      }
+    }
+  };
 
   // Atelier Filters (Gestion)
   const [atelierFilter, setAtelierFilter] = useState('all'); // all, urgent, retard
@@ -190,8 +233,21 @@ export default function MobileView() {
     ? [...new Set(catalog.filter(c => c.categorie !== 'abonnement').map(c => c.article))] 
     : ['Chemise', 'Pantalon', 'Robe', 'Combinaison', 'Jupe', 'Pull', 'Culotte', 'T-shirt', 'Polo', 'Blouson', 'Veste', 'Costume', 'Jeans'];
 
+  const getTotalClothesCount = () => {
+    let total = 0;
+    Object.keys(articleQuantities).forEach(cloth => {
+      total += articleQuantities[cloth] || 0;
+    });
+    return total;
+  };
+
   // --- LOGIQUE DE CALCUL DU PRIX ---
   const getCalculatedPrice = () => {
+    if (subscribePlanId) {
+      const subPlan = catalog.find(c => c.id === subscribePlanId && c.service === 'abonnement');
+      return subPlan ? subPlan.prix : 0;
+    }
+    if (payWithSubscription) return 0;
     let total = 0;
     Object.keys(articleQuantities).forEach(cloth => {
       const qty = articleQuantities[cloth];
@@ -253,30 +309,59 @@ export default function MobileView() {
     const typeArticleSummary = selectedItems.map(item => `${item.quantite}x ${item.article}`).join(', ');
     const primaryService = selectedItems[0].service;
 
+    const activeCustomerObj = customers.find(c => c.id === selectedCustomerId);
+    if (payWithSubscription && !subscribePlanId && activeCustomerObj && activeCustomerObj.active_subscription) {
+      const remaining = activeCustomerObj.active_subscription.remaining_clothes;
+      const totalClothes = selectedItems.reduce((sum, item) => sum + Number(item.quantite), 0);
+      if (remaining < totalClothes) {
+        alert(`Solde d'abonnement insuffisant. Requis: ${totalClothes}, Disponible: ${remaining}. Veuillez souscrire à un abonnement/renouvellement immédiat ou payer par un autre mode de règlement.`);
+        return;
+      }
+    }
+
     const orderData = {
       customer_id: selectedCustomerId,
       type_article: typeArticleSummary,
       type_service: primaryService,
       niveau_urgence: niveauUrgence,
-      mode_reglement: modeReglement,
-      avance_payee: Number(avancePayee || 0),
+      mode_reglement: payWithSubscription ? (subscribePlanId ? modeReglement : 'abonnement') : modeReglement,
+      avance_payee: (payWithSubscription && !subscribePlanId) ? 0 : Number(avancePayee || 0),
+      pay_with_subscription: payWithSubscription,
+      subscribe_plan_id: subscribePlanId,
       items: selectedItems
     };
 
-    const newOrder = db.createOrder(orderData);
-    refreshData();
-    setCreatedOrder(newOrder);
-    setAvancePayee('');
-    setArticleQuantities({});
-    setShowOrderRegistrationModal(false);
+    try {
+      const newOrder = db.createOrder(orderData);
+      refreshData();
+      setCreatedOrder(newOrder);
+      setAvancePayee('');
+      setSubscribePlanId('');
+      setArticleQuantities({});
+      setShowOrderRegistrationModal(false);
 
-    // Notification WhatsApp à l'enregistrement
-    const customer = customers.find(c => c.id === selectedCustomerId);
-    if (customer) {
-      const remaining = newOrder.prix_total - newOrder.avance_payee;
-      const formattedDueDate = formatDateTime(newOrder.due_date);
-      const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP.\nTotal: ${newOrder.prix_total.toLocaleString()} FCFA\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
-      sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      // Notification WhatsApp à l'enregistrement
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      if (customer) {
+        let text = '';
+        const formattedDueDate = formatDateTime(newOrder.due_date);
+        
+        if (newOrder.is_subscription_order && newOrder.subscription_details) {
+          const det = newOrder.subscription_details;
+          if (det.immediate_subscription) {
+            const remaining = newOrder.prix_total - newOrder.avance_payee;
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP avec souscription immédiate au forfait ${det.immediate_subscription.name} (${det.immediate_subscription.prix.toLocaleString()} FCFA).\nArticles déposés: ${det.clothes_deducted} vêtements\nNouveau solde restant: ${det.new_balance} vêt.\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer sur l'abonnement: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          } else {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP via votre forfait ${det.name}.\nArticles déposés: ${det.clothes_deducted} vêtements\nSolde précédent: ${det.previous_balance} vêt.\nNouveau solde restant: ${det.new_balance} vêt.\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          }
+        } else {
+          const remaining = newOrder.prix_total - newOrder.avance_payee;
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP.\nTotal: ${newOrder.prix_total.toLocaleString()} FCFA\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+        }
+        sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      }
+    } catch (err) {
+      alert("Erreur d'enregistrement : " + err.message);
     }
   };
 
@@ -1034,6 +1119,134 @@ export default function MobileView() {
               </div>
             </div>
 
+            {/* Gestion des Abonnements (CRM Mobile) */}
+            <div className="card" style={{ padding: '1rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Award size={15} color="var(--primary)" />
+                Abonnements Clients (CRM)
+              </h4>
+              
+              <div style={{ position: 'relative' }}>
+                <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.75rem', padding: '0.38rem 1rem 0.38rem 2rem' }} 
+                  placeholder="Rechercher client (nom, tél)..." 
+                  value={crmSearch} 
+                  onChange={(e) => {
+                    setCrmSearch(e.target.value);
+                    setSelectedCrmCustomer(null);
+                  }} 
+                />
+              </div>
+
+              {crmSearch && !selectedCrmCustomer && (
+                <div style={{ 
+                  maxHeight: '120px', 
+                  overflowY: 'auto', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '10px',
+                  background: 'var(--bg-app)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  padding: '4px'
+                }}>
+                  {filteredCrmCustomers.slice(0, 5).map(c => (
+                    <div 
+                      key={c.id} 
+                      onClick={() => {
+                        setSelectedCrmCustomer(c);
+                        setCrmSearch('');
+                      }}
+                      style={{ padding: '0.45rem 0.6rem', fontSize: '0.72rem', borderRadius: '6px', cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}
+                    >
+                      {c.prenom} {c.nom} ({c.telephone})
+                    </div>
+                  ))}
+                  {filteredCrmCustomers.length === 0 && (
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', padding: '0.5rem', textAlign: 'center' }}>Aucun client trouvé</div>
+                  )}
+                </div>
+              )}
+
+              {selectedCrmCustomer && (
+                <div style={{ background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.5rem', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>{selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setSelectedCrmCustomer(null)}
+                      style={{ border: 'none', background: 'transparent', fontSize: '0.7rem', color: 'var(--status-late)', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Tél : {selectedCrmCustomer.telephone}</div>
+                  
+                  {selectedCrmCustomer.active_subscription ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
+                        <strong style={{ color: 'var(--primary)' }}>{selectedCrmCustomer.active_subscription.name}</strong>
+                        <span style={{ fontWeight: 600 }}>{selectedCrmCustomer.active_subscription.remaining_clothes} / {selectedCrmCustomer.active_subscription.total_clothes} vêt.</span>
+                      </div>
+                      
+                      {/* Progress bar */}
+                      {(() => {
+                        const remaining = selectedCrmCustomer.active_subscription.remaining_clothes;
+                        const total = selectedCrmCustomer.active_subscription.total_clothes;
+                        const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                        return (
+                          <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${percentUsed}%`, background: 'var(--primary)', borderRadius: '10px' }}></div>
+                          </div>
+                        );
+                      })()}
+                      
+                      <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                        Expire le : {new Date(selectedCrmCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}
+                      </div>
+
+                      <button 
+                        type="button" 
+                        className="btn btn-outline" 
+                        onClick={() => handleUnsubscribeCrm(selectedCrmCustomer.id)}
+                        style={{ padding: '0.3rem', fontSize: '0.68rem', color: 'var(--status-late)', borderColor: '#fee2e2', background: '#fff5f5', borderRadius: '6px', marginTop: '0.2rem' }}
+                      >
+                        Résilier l'abonnement
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '0.1rem' }}>Aucun forfait actif.</div>
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <select 
+                          className="input-control" 
+                          style={{ flex: 1, padding: '0.3rem', fontSize: '0.7rem', borderRadius: '6px' }}
+                          value={selectedCrmSubId}
+                          onChange={(e) => setSelectedCrmSubId(e.target.value)}
+                        >
+                          <option value="">-- Choisir --</option>
+                          {catalog.filter(i => i.service === 'abonnement').map(sub => (
+                            <option key={sub.id} value={sub.id}>{sub.article} ({sub.prix} F)</option>
+                          ))}
+                        </select>
+                        <button 
+                          type="button" 
+                          className="btn btn-primary" 
+                          onClick={() => handleSubscribeCrm(selectedCrmCustomer.id, selectedCrmSubId)}
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', borderRadius: '6px' }}
+                        >
+                          Souscrire
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* General configurations */}
             <div className="card" style={{ padding: '1rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
@@ -1140,6 +1353,65 @@ export default function MobileView() {
                     {activeCustomer.solde_dette > 0 && (
                       <div style={{ color: 'var(--status-late)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                         <TriangleAlert size={10} /> Dette encours: {activeCustomer.solde_dette} FCFA
+                      </div>
+                    )}
+                    {/* Zone d'abonnement dynamique */}
+                    {activeCustomer.active_subscription ? (
+                      <div style={{ marginTop: '0.35rem', borderTop: '1px dashed rgba(2, 132, 199, 0.2)', paddingTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: subscribePlanId ? 'not-allowed' : 'pointer', fontWeight: 700, color: 'var(--primary)' }}>
+                            <input 
+                              type="checkbox"
+                              checked={payWithSubscription}
+                              disabled={!!subscribePlanId}
+                              onChange={(e) => setPayWithSubscription(e.target.checked)}
+                            />
+                            Régler avec l'abonnement
+                          </label>
+                          <span style={{ fontWeight: 700 }}>
+                            ({activeCustomer.active_subscription.remaining_clothes} vêt. restants)
+                          </span>
+                        </div>
+
+                        {/* Alerte si solde insuffisant */}
+                        {payWithSubscription && !subscribePlanId && getTotalClothesCount() > activeCustomer.active_subscription.remaining_clothes && (
+                          <div style={{ color: 'var(--status-late)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.65rem' }}>
+                            <AlertCircle size={10} /> Solde insuffisant ({getTotalClothesCount()} requis)
+                          </div>
+                        )}
+
+                        {/* Menu de renouvellement */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span style={{ fontWeight: 600, fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Renouveler / Changer :</span>
+                          <select 
+                            className="input-control"
+                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.72rem', borderRadius: '6px', width: '100%', background: 'var(--bg-card)' }}
+                            value={subscribePlanId}
+                            onChange={(e) => setSubscribePlanId(e.target.value)}
+                          >
+                            <option value="">-- Conserver l'abonnement en cours --</option>
+                            {catalog.filter(c => c.categorie === 'abonnement').map(p => (
+                              <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '0.35rem', borderTop: '1px dashed rgba(2, 132, 199, 0.2)', paddingTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.65rem' }}>Souscrire à un abonnement immédiat :</span>
+                          <select 
+                            className="input-control"
+                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.72rem', borderRadius: '6px', width: '100%', background: 'var(--bg-card)' }}
+                            value={subscribePlanId}
+                            onChange={(e) => setSubscribePlanId(e.target.value)}
+                          >
+                            <option value="">-- Pas d'abonnement --</option>
+                            {catalog.filter(c => c.categorie === 'abonnement').map(p => (
+                              <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1297,27 +1569,36 @@ export default function MobileView() {
                   <select 
                     className="input-control" 
                     style={{ padding: '0.45rem', fontSize: '0.78rem', borderRadius: '8px' }}
-                    value={modeReglement} 
+                    value={(payWithSubscription && !subscribePlanId) ? 'abonnement' : modeReglement} 
+                    disabled={payWithSubscription && !subscribePlanId}
                     onChange={(e) => setModeReglement(e.target.value)}
                   >
-                    <option value="especes">Espèces</option>
-                    <option value="mobile_money">Mobile Money</option>
-                    <option value="avance_solde">Avance/Crédit</option>
+                    {(payWithSubscription && !subscribePlanId) ? (
+                      <option value="abonnement">Abonnement</option>
+                    ) : (
+                      <>
+                        <option value="especes">Espèces</option>
+                        <option value="mobile_money">Mobile Money</option>
+                        <option value="avance_solde">Avance/Crédit</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
-                <label style={{ fontSize: '0.7rem' }}>Acompte Versé (FCFA)</label>
-                <input 
-                  type="number" 
-                  className="input-control" 
-                  style={{ padding: '0.45rem', fontSize: '0.78rem', borderRadius: '8px' }}
-                  placeholder="Ex: 1000"
-                  value={avancePayee}
-                  onChange={(e) => setAvancePayee(e.target.value)}
-                />
-              </div>
+              {(!payWithSubscription || !!subscribePlanId) && (
+                <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.7rem' }}>Acompte Versé (FCFA)</label>
+                  <input 
+                    type="number" 
+                    className="input-control" 
+                    style={{ padding: '0.45rem', fontSize: '0.78rem', borderRadius: '8px' }}
+                    placeholder="Ex: 1000"
+                    value={avancePayee}
+                    onChange={(e) => setAvancePayee(e.target.value)}
+                  />
+                </div>
+              )}
 
             </div>
 
@@ -1565,22 +1846,61 @@ export default function MobileView() {
                 )}
               </div>
 
+              {createdOrder.is_subscription_order && createdOrder.subscription_details && (
+                /* ---- DÉTAILS SOLDE ABONNEMENT ---- */
+                <div style={{ padding: '8px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
+                  <div style={{ fontWeight: '800', color: '#16a34a', borderBottom: '1px dashed #bbf7d0', paddingBottom: '3px', marginBottom: '2px' }}>
+                    Suivi Solde Abonnement
+                  </div>
+                  {createdOrder.subscription_details.immediate_subscription && (
+                    <div style={{ fontWeight: '800', color: '#b45309', borderBottom: '1px dashed #fbd38d', paddingBottom: '3px', marginBottom: '4px' }}>
+                      Abonnement souscrit : {createdOrder.subscription_details.immediate_subscription.name}
+                    </div>
+                  )}
+                  <div>Forfait : <strong>{createdOrder.subscription_details.name}</strong></div>
+                  <div>Vêtements retirés : <strong>-{createdOrder.subscription_details.clothes_deducted}</strong></div>
+                  {!createdOrder.subscription_details.immediate_subscription && (
+                    <div>Solde précédent : <strong>{createdOrder.subscription_details.previous_balance} vêt.</strong></div>
+                  )}
+                  <div style={{ borderTop: '1px dashed #bbf7d0', paddingTop: '3px', marginTop: '2px', fontWeight: '800', color: '#16a34a' }}>
+                    Nouveau solde : {createdOrder.subscription_details.new_balance} vêtements restants
+                  </div>
+                </div>
+              )}
+
               {/* ---- TOTAUX ---- */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#555555' }}>Total Commande :</span>
-                  <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.prix_total || 0).toLocaleString()} FCFA</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#555555' }}>Acompte Payé :</span>
-                  <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
-                  <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
-                  <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
-                    {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
+                  <span style={{ fontWeight: '700', color: '#000000' }}>
+                    {createdOrder.is_subscription_order 
+                      ? (createdOrder.subscription_details.immediate_subscription 
+                        ? `${(createdOrder.prix_total || 0).toLocaleString()} FCFA` 
+                        : '0 FCFA (Abonnement)') 
+                      : `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`}
                   </span>
                 </div>
+                {(!createdOrder.is_subscription_order || !!createdOrder.subscription_details.immediate_subscription) ? (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#555555' }}>Acompte Payé :</span>
+                      <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
+                      <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
+                      <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
+                        {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
+                    <span style={{ color: '#16a34a', fontWeight: '800' }}>Reste à payer :</span>
+                    <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a' }}>
+                      0 FCFA
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

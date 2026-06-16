@@ -34,7 +34,8 @@ import {
   Zap,
   DollarSign,
   Trash2,
-  UserPlus
+  UserPlus,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function AdminView({ activeTab, searchQuery }) {
@@ -51,6 +52,19 @@ export default function AdminView({ activeTab, searchQuery }) {
   const [niveauUrgence, setNiveauUrgence] = useState('Normal');
   const [modeReglement, setModeReglement] = useState('especes');
   const [avancePayee, setAvancePayee] = useState('');
+  const [payWithSubscription, setPayWithSubscription] = useState(false);
+  const [subscribePlanId, setSubscribePlanId] = useState('');
+
+  useEffect(() => {
+    const cust = customers.find(c => c.id === selectedCustomerId);
+    if (subscribePlanId) {
+      setPayWithSubscription(true);
+    } else if (cust && cust.active_subscription) {
+      setPayWithSubscription(true);
+    } else {
+      setPayWithSubscription(false);
+    }
+  }, [selectedCustomerId, customers, subscribePlanId]);
 
   // Flow de Livraison / Paiement Final
   const [showDeliveryPaymentModal, setShowDeliveryPaymentModal] = useState(false);
@@ -83,6 +97,36 @@ export default function AdminView({ activeTab, searchQuery }) {
   const [selectedCrmCustomer, setSelectedCrmCustomer] = useState(null);
   const [showDebtPaymentModal, setShowDebtPaymentModal] = useState(false);
   const [debtPaymentAmount, setDebtPaymentAmount] = useState('');
+  const [selectedCrmSubId, setSelectedCrmSubId] = useState('');
+
+  const handleSubscribeCrm = (customerId, catalogItemId) => {
+    if (!catalogItemId) {
+      alert("Veuillez sélectionner un forfait d'abonnement.");
+      return;
+    }
+    const updated = db.subscribeCustomer(customerId, catalogItemId);
+    if (updated) {
+      refreshAdminData();
+      const updatedCustomers = db.getCustomers();
+      const updatedCust = updatedCustomers.find(c => c.id === customerId);
+      setSelectedCrmCustomer(updatedCust);
+      setSelectedCrmSubId('');
+      alert(`Abonnement souscrit avec succès pour ${updatedCust.prenom} ${updatedCust.nom} !`);
+    }
+  };
+
+  const handleUnsubscribeCrm = (customerId) => {
+    if (confirm("Êtes-vous sûr de vouloir résilier cet abonnement ?")) {
+      const updated = db.unsubscribeCustomer(customerId);
+      if (updated) {
+        refreshAdminData();
+        const updatedCustomers = db.getCustomers();
+        const updatedCust = updatedCustomers.find(c => c.id === customerId);
+        setSelectedCrmCustomer(updatedCust);
+        alert("Abonnement résilié avec succès !");
+      }
+    }
+  };
 
   // Receipt Modal
   const [createdOrder, setCreatedOrder] = useState(null);
@@ -114,6 +158,120 @@ export default function AdminView({ activeTab, searchQuery }) {
   // Logs filters
   const [logFilterAction, setLogFilterAction] = useState('all');
   const [logSearchText, setLogSearchText] = useState('');
+
+  // Staff Access management states
+  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [showNewStaffModal, setShowNewStaffModal] = useState(false);
+  const [newStaffNom, setNewStaffNom] = useState('');
+  const [newStaffPrenom, setNewStaffPrenom] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState('agent_accueil');
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [newStaffTel, setNewStaffTel] = useState('');
+
+  // Formulaire d'édition
+  const [editStaffNom, setEditStaffNom] = useState('');
+  const [editStaffPrenom, setEditStaffPrenom] = useState('');
+  const [editStaffRole, setEditStaffRole] = useState('');
+  const [editStaffEmail, setEditStaffEmail] = useState('');
+  const [editStaffTel, setEditStaffTel] = useState('');
+  const [editStaffStatut, setEditStaffStatut] = useState('actif');
+  const [editStaffPermissions, setEditStaffPermissions] = useState({});
+
+  const selectedMember = staff.find(s => s.id === selectedStaffId) || staff[0];
+
+  useEffect(() => {
+    if (selectedMember) {
+      if (!selectedStaffId) {
+        setSelectedStaffId(selectedMember.id);
+      }
+      setEditStaffNom(selectedMember.nom || '');
+      setEditStaffPrenom(selectedMember.prenom || '');
+      setEditStaffRole(selectedMember.role || 'agent_accueil');
+      setEditStaffEmail(selectedMember.email || `${selectedMember.prenom.toLowerCase()}.${selectedMember.nom.toLowerCase()}@klinup.com`);
+      setEditStaffTel(selectedMember.telephone || '');
+      setEditStaffStatut(selectedMember.statut || 'actif');
+      
+      const defaultPerms = {
+        can_view_dashboard: selectedMember.role === 'super_admin' || selectedMember.role === 'manager',
+        can_manage_orders: true,
+        can_manage_crm: true,
+        can_edit_catalog: selectedMember.role === 'super_admin' || selectedMember.role === 'manager',
+        can_view_logs: selectedMember.role === 'super_admin',
+        can_manage_staff: selectedMember.role === 'super_admin'
+      };
+      setEditStaffPermissions(selectedMember.permissions || defaultPerms);
+    }
+  }, [selectedStaffId, staff, selectedMember]);
+
+  const handleRoleChangeInForm = (role) => {
+    setEditStaffRole(role);
+    setEditStaffPermissions({
+      can_view_dashboard: role === 'super_admin' || role === 'manager',
+      can_manage_orders: true,
+      can_manage_crm: true,
+      can_edit_catalog: role === 'super_admin' || role === 'manager',
+      can_view_logs: role === 'super_admin',
+      can_manage_staff: role === 'super_admin'
+    });
+  };
+
+  const handleSaveStaff = (e) => {
+    e.preventDefault();
+    if (!selectedStaffId) return;
+
+    db.updateStaff(selectedStaffId, {
+      nom: editStaffNom,
+      prenom: editStaffPrenom,
+      role: editStaffRole,
+      email: editStaffEmail,
+      telephone: editStaffTel,
+      statut: editStaffStatut,
+      permissions: editStaffPermissions
+    });
+    alert("Profil du personnel mis à jour avec succès !");
+    refreshAdminData();
+  };
+
+  const handleCreateStaff = (e) => {
+    e.preventDefault();
+    if (!newStaffNom || !newStaffPrenom) return;
+
+    const defaultPerms = {
+      can_view_dashboard: newStaffRole === 'super_admin' || newStaffRole === 'manager',
+      can_manage_orders: true,
+      can_manage_crm: true,
+      can_edit_catalog: newStaffRole === 'super_admin' || newStaffRole === 'manager',
+      can_view_logs: newStaffRole === 'super_admin',
+      can_manage_staff: newStaffRole === 'super_admin'
+    };
+
+    const newMember = db.addStaff({
+      nom: newStaffNom,
+      prenom: newStaffPrenom,
+      role: newStaffRole,
+      email: newStaffEmail,
+      telephone: newStaffTel,
+      statut: 'actif',
+      permissions: defaultPerms
+    });
+
+    setSelectedStaffId(newMember.id);
+    setShowNewStaffModal(false);
+    setNewStaffNom('');
+    setNewStaffPrenom('');
+    setNewStaffRole('agent_accueil');
+    setNewStaffEmail('');
+    setNewStaffTel('');
+    refreshAdminData();
+  };
+
+  const handleDeleteStaff = (id) => {
+    if (confirm("Êtes-vous sûr de vouloir supprimer définitivement cet employé ?")) {
+      db.deleteStaff(id);
+      setSelectedStaffId('');
+      refreshAdminData();
+    }
+  };
 
   useEffect(() => {
     setCatalog(db.getCatalog());
@@ -344,7 +502,20 @@ export default function AdminView({ activeTab, searchQuery }) {
     setArticleServices(prev => ({ ...prev, [cloth]: service }));
   };
 
+  const getTotalClothesCount = () => {
+    let total = 0;
+    Object.keys(articleQuantities).forEach(cloth => {
+      total += articleQuantities[cloth] || 0;
+    });
+    return total;
+  };
+
   const getCalculatedPrice = () => {
+    if (subscribePlanId) {
+      const subPlan = catalog.find(c => c.id === subscribePlanId && c.service === 'abonnement');
+      return subPlan ? subPlan.prix : 0;
+    }
+    if (payWithSubscription) return 0;
     let total = 0;
     Object.keys(articleQuantities).forEach(cloth => {
       const qty = articleQuantities[cloth];
@@ -406,30 +577,59 @@ export default function AdminView({ activeTab, searchQuery }) {
     const typeArticleSummary = selectedItems.map(item => `${item.quantite}x ${item.article}`).join(', ');
     const primaryService = selectedItems[0].service;
 
+    const activeCustomerObj = customers.find(c => c.id === selectedCustomerId);
+    if (payWithSubscription && !subscribePlanId && activeCustomerObj && activeCustomerObj.active_subscription) {
+      const remaining = activeCustomerObj.active_subscription.remaining_clothes;
+      const totalClothes = selectedItems.reduce((sum, item) => sum + Number(item.quantite), 0);
+      if (remaining < totalClothes) {
+        alert(`Solde d'abonnement insuffisant. Requis: ${totalClothes}, Disponible: ${remaining}. Veuillez souscrire à un abonnement/renouvellement immédiat ou payer par un autre mode de règlement.`);
+        return;
+      }
+    }
+
     const orderData = {
       customer_id: selectedCustomerId,
       type_article: typeArticleSummary,
       type_service: primaryService,
       niveau_urgence: niveauUrgence,
-      mode_reglement: modeReglement,
-      avance_payee: Number(avancePayee || 0),
+      mode_reglement: payWithSubscription ? (subscribePlanId ? modeReglement : 'abonnement') : modeReglement,
+      avance_payee: (payWithSubscription && !subscribePlanId) ? 0 : Number(avancePayee || 0),
+      pay_with_subscription: payWithSubscription,
+      subscribe_plan_id: subscribePlanId,
       items: selectedItems
     };
 
-    const newOrder = db.createOrder(orderData);
-    refreshAdminData();
-    setCreatedOrder(newOrder);
-    setAvancePayee('');
-    setArticleQuantities({});
-    setShowOrderRegistrationModal(false);
+    try {
+      const newOrder = db.createOrder(orderData);
+      refreshAdminData();
+      setCreatedOrder(newOrder);
+      setAvancePayee('');
+      setSubscribePlanId('');
+      setArticleQuantities({});
+      setShowOrderRegistrationModal(false);
 
-    // Notification WhatsApp à l'enregistrement
-    const customer = customers.find(c => c.id === selectedCustomerId);
-    if (customer) {
-      const remaining = newOrder.prix_total - newOrder.avance_payee;
-      const formattedDueDate = formatDateTime(newOrder.due_date);
-      const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP.\nTotal: ${newOrder.prix_total.toLocaleString()} FCFA\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
-      sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      // Notification WhatsApp à l'enregistrement
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      if (customer) {
+        let text = '';
+        const formattedDueDate = formatDateTime(newOrder.due_date);
+        
+        if (newOrder.is_subscription_order && newOrder.subscription_details) {
+          const det = newOrder.subscription_details;
+          if (det.immediate_subscription) {
+            const remaining = newOrder.prix_total - newOrder.avance_payee;
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP avec souscription immédiate au forfait ${det.immediate_subscription.name} (${det.immediate_subscription.prix.toLocaleString()} FCFA).\nArticles déposés: ${det.clothes_deducted} vêtements\nNouveau solde restant: ${det.new_balance} vêt.\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer sur l'abonnement: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          } else {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP via votre forfait ${det.name}.\nArticles déposés: ${det.clothes_deducted} vêtements\nSolde précédent: ${det.previous_balance} vêt.\nNouveau solde restant: ${det.new_balance} vêt.\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          }
+        } else {
+          const remaining = newOrder.prix_total - newOrder.avance_payee;
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP.\nTotal: ${newOrder.prix_total.toLocaleString()} FCFA\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+        }
+        sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      }
+    } catch (err) {
+      alert("Erreur d'enregistrement : " + err.message);
     }
   };
 
@@ -1321,6 +1521,84 @@ export default function AdminView({ activeTab, searchQuery }) {
                   </div>
                 </div>
 
+                {/* Section Abonnement CRM */}
+                <div className="card" style={{ padding: '1rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Award size={15} color="var(--primary)" />
+                      Forfait d'Abonnement
+                    </span>
+                    {selectedCrmCustomer.active_subscription && (
+                      <span className="badge badge-pret" style={{ fontSize: '0.62rem', padding: '0.1rem 0.35rem' }}>Actif</span>
+                    )}
+                  </div>
+
+                  {selectedCrmCustomer.active_subscription ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>{selectedCrmCustomer.active_subscription.name}</strong>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          Solde : {selectedCrmCustomer.active_subscription.remaining_clothes} / {selectedCrmCustomer.active_subscription.total_clothes} vêtements
+                        </span>
+                      </div>
+                      
+                      {/* Barre de progression premium */}
+                      {(() => {
+                        const remaining = selectedCrmCustomer.active_subscription.remaining_clothes;
+                        const total = selectedCrmCustomer.active_subscription.total_clothes;
+                        const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${percentUsed}%`, background: 'var(--primary)', borderRadius: '10px', transition: 'width 0.4s ease' }}></div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                              <span>Consommé : {percentUsed}%</span>
+                              <span>Disponible : {remaining} vêtements</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
+                        <span>Souscrit le : {new Date(selectedCrmCustomer.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}</span>
+                        <span>Expire le : {new Date(selectedCrmCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}</span>
+                      </div>
+
+                      <button 
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => handleUnsubscribeCrm(selectedCrmCustomer.id)}
+                        style={{ padding: '0.4rem', fontSize: '0.72rem', borderRadius: '8px', color: 'var(--status-late)', borderColor: '#fecaca', background: '#fff5f5', marginTop: '0.2rem' }}
+                      >
+                        Résilier l'abonnement
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <select
+                        className="input-control"
+                        style={{ flexGrow: 1, padding: '0.4rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                        value={selectedCrmSubId}
+                        onChange={(e) => setSelectedCrmSubId(e.target.value)}
+                      >
+                        <option value="">-- Choisir une formule --</option>
+                        {catalog.filter(item => item.service === 'abonnement').map(sub => (
+                          <option key={sub.id} value={sub.id}>{sub.article} ({sub.prix.toLocaleString()} F/mois)</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handleSubscribeCrm(selectedCrmCustomer.id, selectedCrmSubId)}
+                        style={{ padding: '0.4rem 0.85rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                      >
+                        Souscrire
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Historique individuel */}
                 <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
                   <h4 style={{ fontSize: '0.9rem', fontWeight: 800, margin: 0 }}>Historique des Commandes</h4>
@@ -1631,6 +1909,359 @@ export default function AdminView({ activeTab, searchQuery }) {
         </div>
       )}
 
+      {/* ========================================================
+         ONGLET : GESTION DES ACCÈS / PERSONNEL (STAFF ACCESS)
+         ======================================================== */}
+      {activeTab === 'staff_management' && (
+        <div className="grid-2" style={{ gridTemplateColumns: '0.8fr 1.2fr', gap: '1.5rem', alignItems: 'start' }}>
+          
+          {/* COLONNE GAUCHE : LISTE DES EMPLOYÉS */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', alignItems: 'center' }}>
+              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                Membres de l'Équipe
+              </h3>
+              <button 
+                type="button"
+                className="btn btn-primary" 
+                onClick={() => setShowNewStaffModal(true)}
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+              >
+                <UserPlus size={14} /> Ajouter
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', maxHeight: '550px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {staff.map(s => {
+                const isSelected = selectedStaffId === s.id;
+                const isSuper = s.role === 'super_admin';
+                const isMgr = s.role === 'manager';
+                const roleLabel = isSuper ? 'Admin' : isMgr ? 'Manager' : "Accueil";
+                const isSuspended = s.statut === 'suspendu';
+
+                return (
+                  <div 
+                    key={s.id} 
+                    style={{ 
+                      padding: '0.85rem', 
+                      borderRadius: '12px', 
+                      border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)', 
+                      background: isSelected ? 'var(--primary-light)' : 'var(--bg-app)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      opacity: isSuspended ? 0.65 : 1
+                    }}
+                    onClick={() => setSelectedStaffId(s.id)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ fontSize: '0.85rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>
+                        {s.prenom} {s.nom}
+                      </strong>
+                      <span 
+                        className="badge" 
+                        style={{ 
+                          fontSize: '0.65rem',
+                          padding: '0.15rem 0.4rem',
+                          borderRadius: '6px',
+                          background: isSuper ? '#0e6245' : isMgr ? '#20b885' : '#64748b',
+                          color: '#fff'
+                        }}
+                      >
+                        {roleLabel}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
+                      <span>{s.email || `${s.prenom.toLowerCase()}.${s.nom.toLowerCase()}@klinup.com`}</span>
+                      {isSuspended ? (
+                        <span style={{ color: 'var(--status-late)', fontWeight: 700 }}>Suspendu</span>
+                      ) : (
+                        <span style={{ color: 'var(--status-ready)', fontWeight: 700 }}>Actif</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* COLONNE DROITE : FICHE DÉTAILLÉE ET CONFIGURATION DES ACCÈS */}
+          <div className="card" style={{ minHeight: '450px', display: 'flex', flexDirection: 'column' }}>
+            {selectedMember ? (
+              <form onSubmit={handleSaveStaff} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                
+                {/* Header Profil */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                  <div className="user-avatar" style={{ background: selectedMember.role === 'super_admin' ? '#0e6245' : selectedMember.role === 'manager' ? '#20b885' : '#64748b', color: '#fff', width: '48px', height: '48px', fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
+                    {selectedMember.prenom.charAt(0)}{selectedMember.nom.charAt(0)}
+                  </div>
+                  <div style={{ flexGrow: 1 }}>
+                    <h4 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                      {selectedMember.prenom} {selectedMember.nom}
+                    </h4>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0' }}>
+                      Rôle principal : <strong style={{ color: 'var(--primary)' }}>{selectedMember.role === 'super_admin' ? 'Super Administrateur' : selectedMember.role === 'manager' ? 'Manager Caisse' : "Agent d'accueil"}</strong>
+                    </p>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn btn-outline" 
+                    style={{ padding: '0.45rem', color: 'var(--status-late)', borderColor: '#fee2e2' }}
+                    onClick={() => handleDeleteStaff(selectedMember.id)}
+                    title="Supprimer le profil"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
+                {/* Formulaire d'information */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label>Prénom</label>
+                    <input 
+                      type="text" 
+                      className="input-control" 
+                      required 
+                      value={editStaffPrenom} 
+                      onChange={(e) => setEditStaffPrenom(e.target.value)} 
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Nom</label>
+                    <input 
+                      type="text" 
+                      className="input-control" 
+                      required 
+                      value={editStaffNom} 
+                      onChange={(e) => setEditStaffNom(e.target.value)} 
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label>Email professionnel</label>
+                    <input 
+                      type="email" 
+                      className="input-control" 
+                      required 
+                      value={editStaffEmail} 
+                      onChange={(e) => setEditStaffEmail(e.target.value)} 
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Téléphone</label>
+                    <input 
+                      type="text" 
+                      className="input-control" 
+                      placeholder="Non renseigné" 
+                      value={editStaffTel} 
+                      onChange={(e) => setEditStaffTel(e.target.value)} 
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label>Rôle Système</label>
+                    <select 
+                      className="input-control"
+                      value={editStaffRole}
+                      onChange={(e) => handleRoleChangeInForm(e.target.value)}
+                    >
+                      <option value="super_admin">Super Administrateur (CMS)</option>
+                      <option value="manager">Manager Caisse (CMS)</option>
+                      <option value="agent_accueil">Agent d'accueil (Mobile App)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Statut d'Accès</label>
+                    <select 
+                      className="input-control"
+                      value={editStaffStatut}
+                      onChange={(e) => setEditStaffStatut(e.target.value)}
+                    >
+                      <option value="actif">Compte Actif (Autorisé)</option>
+                      <option value="suspendu">Compte Suspendu (Bloqué)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Habilitations Détaillées */}
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                    <Sliders size={16} color="var(--primary)" />
+                    Matrice de Permissions Granulaires
+                  </h4>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>
+                    Configurez précisément les droits d'accès de cet utilisateur au sein de la plateforme.
+                  </p>
+
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1fr 1fr', 
+                    gap: '0.65rem', 
+                    background: 'var(--bg-app)', 
+                    padding: '0.75rem', 
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!editStaffPermissions.can_view_dashboard} 
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_view_dashboard: e.target.checked }))} 
+                      />
+                      Accès Tableau de Bord
+                    </label>
+                    
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!editStaffPermissions.can_manage_orders} 
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_orders: e.target.checked }))} 
+                      />
+                      Gérer les Commandes
+                    </label>
+                    
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!editStaffPermissions.can_manage_crm} 
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_crm: e.target.checked }))} 
+                      />
+                      Consulter le CRM Clients
+                    </label>
+                    
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!editStaffPermissions.can_edit_catalog} 
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_edit_catalog: e.target.checked }))} 
+                      />
+                      Modifier les Tarifs
+                    </label>
+                    
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!editStaffPermissions.can_view_logs} 
+                        disabled={editStaffRole !== 'super_admin'}
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_view_logs: e.target.checked }))} 
+                      />
+                      Voir Journal d'Audit
+                    </label>
+                    
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!editStaffPermissions.can_manage_staff} 
+                        disabled={editStaffRole !== 'super_admin'}
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_staff: e.target.checked }))} 
+                      />
+                      Gérer le Personnel
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.55rem 1.5rem', fontSize: '0.85rem' }}>
+                    Sauvegarder les modifications
+                  </button>
+                </div>
+
+              </form>
+            ) : (
+              <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '0.5rem' }}>
+                <User size={48} style={{ color: 'var(--text-muted)' }} />
+                <span>Sélectionnez un employé pour gérer son profil et ses droits d'accès.</span>
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* ========================================================
+         MODAL : AJOUT D'UN NOUVEL EMPLOYÉ
+         ======================================================== */}
+      {showNewStaffModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+              Ajouter un Employé
+            </h3>
+            
+            <form onSubmit={handleCreateStaff} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div className="form-group">
+                  <label>Prénom</label>
+                  <input 
+                    type="text" 
+                    className="input-control" 
+                    placeholder="Prénom" 
+                    required
+                    value={newStaffPrenom} 
+                    onChange={(e) => setNewStaffPrenom(e.target.value)} 
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Nom</label>
+                  <input 
+                    type="text" 
+                    className="input-control" 
+                    placeholder="Nom" 
+                    required
+                    value={newStaffNom} 
+                    onChange={(e) => setNewStaffNom(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Email Professionnel</label>
+                <input 
+                  type="email" 
+                  className="input-control" 
+                  placeholder="nom.prenom@klinup.com" 
+                  required
+                  value={newStaffEmail} 
+                  onChange={(e) => setNewStaffEmail(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Téléphone</label>
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  placeholder="Ex: +229 97979797" 
+                  value={newStaffTel} 
+                  onChange={(e) => setNewStaffTel(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Rôle Principal</label>
+                <select 
+                  className="input-control"
+                  value={newStaffRole} 
+                  onChange={(e) => setNewStaffRole(e.target.value)}
+                >
+                  <option value="agent_accueil">Agent d'accueil (Mobile App)</option>
+                  <option value="manager">Manager Caisse (CMS)</option>
+                  <option value="super_admin">Super Administrateur (CMS)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Ajouter</button>
+                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowNewStaffModal(false)}>Annuler</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
 
 
       {/* ========================================================
@@ -1831,6 +2462,65 @@ export default function AdminView({ activeTab, searchQuery }) {
                         <TriangleAlert size={12} /> Dette encours: {activeCustomer.solde_dette.toLocaleString()} FCFA
                       </div>
                     )}
+                    {/* Zone d'abonnement dynamique */}
+                    {activeCustomer.active_subscription ? (
+                      <div style={{ marginTop: '0.4rem', borderTop: '1px dashed rgba(14, 98, 69, 0.2)', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: subscribePlanId ? 'not-allowed' : 'pointer', fontWeight: 700, color: 'var(--primary)' }}>
+                            <input 
+                              type="checkbox"
+                              checked={payWithSubscription}
+                              disabled={!!subscribePlanId}
+                              onChange={(e) => setPayWithSubscription(e.target.checked)}
+                            />
+                            Régler avec l'abonnement
+                          </label>
+                          <span style={{ fontWeight: 700 }}>
+                            ({activeCustomer.active_subscription.remaining_clothes} vêtements restants)
+                          </span>
+                        </div>
+
+                        {/* Alerte si solde insuffisant et pas encore de renouvellement choisi */}
+                        {payWithSubscription && !subscribePlanId && getTotalClothesCount() > activeCustomer.active_subscription.remaining_clothes && (
+                          <div style={{ color: 'var(--accent)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.15rem' }}>
+                            <AlertCircle size={12} /> Solde insuffisant ({getTotalClothesCount()} requis)
+                          </div>
+                        )}
+
+                        {/* Menu de renouvellement / changement */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.2rem' }}>
+                          <span style={{ fontWeight: 600, fontSize: '0.7rem' }}>Renouveler / Changer d'abonnement :</span>
+                          <select 
+                            className="input-control"
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px', width: '100%', background: 'var(--bg-card)' }}
+                            value={subscribePlanId}
+                            onChange={(e) => setSubscribePlanId(e.target.value)}
+                          >
+                            <option value="">-- Conserver l'abonnement en cours --</option>
+                            {catalog.filter(c => c.categorie === 'abonnement').map(p => (
+                              <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '0.4rem', borderTop: '1px dashed rgba(14, 98, 69, 0.2)', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>Souscrire immédiatement à un abonnement :</span>
+                          <select 
+                            className="input-control"
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px', width: '100%', background: 'var(--bg-card)' }}
+                            value={subscribePlanId}
+                            onChange={(e) => setSubscribePlanId(e.target.value)}
+                          >
+                            <option value="">-- Pas d'abonnement --</option>
+                            {catalog.filter(c => c.categorie === 'abonnement').map(p => (
+                              <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1986,27 +2676,36 @@ export default function AdminView({ activeTab, searchQuery }) {
                   <select 
                     className="input-control" 
                     style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                    value={modeReglement} 
+                    value={(payWithSubscription && !subscribePlanId) ? 'abonnement' : modeReglement} 
+                    disabled={payWithSubscription && !subscribePlanId}
                     onChange={(e) => setModeReglement(e.target.value)}
                   >
-                    <option value="especes">Espèces</option>
-                    <option value="mobile_money">Mobile Money</option>
-                    <option value="avance_solde">Avance/Crédit</option>
+                    {(payWithSubscription && !subscribePlanId) ? (
+                      <option value="abonnement">Abonnement</option>
+                    ) : (
+                      <>
+                        <option value="especes">Espèces</option>
+                        <option value="mobile_money">Mobile Money</option>
+                        <option value="avance_solde">Avance/Crédit</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
-                <label style={{ fontSize: '0.75rem' }}>Acompte Versé (FCFA)</label>
-                <input 
-                  type="number" 
-                  className="input-control" 
-                  style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                  placeholder="Ex: 2000"
-                  value={avancePayee}
-                  onChange={(e) => setAvancePayee(e.target.value)}
-                />
-              </div>
+              {(!payWithSubscription || !!subscribePlanId) && (
+                <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.75rem' }}>Acompte Versé (FCFA)</label>
+                  <input 
+                    type="number" 
+                    className="input-control" 
+                    style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
+                    placeholder="Ex: 2000"
+                    value={avancePayee}
+                    onChange={(e) => setAvancePayee(e.target.value)}
+                  />
+                </div>
+              )}
 
               {/* Total and Actions */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
@@ -2270,22 +2969,60 @@ export default function AdminView({ activeTab, searchQuery }) {
                 )}
               </div>
 
+               {createdOrder.is_subscription_order && createdOrder.subscription_details && (
+                <div style={{ padding: '8px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
+                  <div style={{ fontWeight: '800', color: '#16a34a', borderBottom: '1px dashed #bbf7d0', paddingBottom: '3px', marginBottom: '2px' }}>
+                    Suivi Solde Abonnement
+                  </div>
+                  {createdOrder.subscription_details.immediate_subscription && (
+                    <div style={{ fontWeight: '800', color: '#b45309', borderBottom: '1px dashed #fbd38d', paddingBottom: '3px', marginBottom: '4px' }}>
+                      Abonnement souscrit : {createdOrder.subscription_details.immediate_subscription.name}
+                    </div>
+                  )}
+                  <div>Forfait : <strong>{createdOrder.subscription_details.name}</strong></div>
+                  <div>Vêtements retirés : <strong>-{createdOrder.subscription_details.clothes_deducted}</strong></div>
+                  {!createdOrder.subscription_details.immediate_subscription && (
+                    <div>Solde précédent : <strong>{createdOrder.subscription_details.previous_balance} vêt.</strong></div>
+                  )}
+                  <div style={{ borderTop: '1px dashed #bbf7d0', paddingTop: '3px', marginTop: '2px', fontWeight: '800', color: '#16a34a' }}>
+                    Nouveau solde : {createdOrder.subscription_details.new_balance} vêtements restants
+                  </div>
+                </div>
+              )}
+
               {/* ---- TOTAUX ---- */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#555555' }}>Total Commande :</span>
-                  <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.prix_total || 0).toLocaleString()} FCFA</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#555555' }}>Acompte Payé :</span>
-                  <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
-                  <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
-                  <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
-                    {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
+                  <span style={{ fontWeight: '700', color: '#000000' }}>
+                    {createdOrder.is_subscription_order 
+                      ? (createdOrder.subscription_details.immediate_subscription 
+                        ? `${(createdOrder.prix_total || 0).toLocaleString()} FCFA` 
+                        : '0 FCFA (Abonnement)') 
+                      : `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`}
                   </span>
                 </div>
+                {(!createdOrder.is_subscription_order || !!createdOrder.subscription_details.immediate_subscription) ? (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#555555' }}>Acompte Payé :</span>
+                      <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
+                      <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
+                      <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
+                        {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
+                    <span style={{ color: '#16a34a', fontWeight: '800' }}>Reste à payer :</span>
+                    <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a' }}>
+                      0 FCFA
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
