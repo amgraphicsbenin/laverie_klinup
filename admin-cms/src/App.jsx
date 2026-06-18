@@ -16,7 +16,10 @@ import {
   HelpCircle,
   Settings,
   ShoppingBag,
-  Users
+  Users,
+  Lock,
+  LogOut,
+  X
 } from 'lucide-react';
 
 function App() {
@@ -25,29 +28,299 @@ function App() {
   const [staffList, setStaffList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Authentication states
+  const [selectedLoginUser, setSelectedLoginUser] = useState(null);
+  const [pinCode, setPinCode] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  
+  const [loginEmail, setLoginEmail] = useState('');
+  const [showResetPinModal, setShowResetPinModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   useEffect(() => {
-    // Initialise DB user and staff
-    const user = db.getCurrentUser();
-    setCurrentUser(user);
+    setCurrentUser(db.getCurrentUser());
     setStaffList(db.getStaff());
+
+    const unsubscribe = db.subscribe(() => {
+      setCurrentUser(db.getCurrentUser());
+      setStaffList(db.getStaff());
+    });
+    return () => unsubscribe();
   }, []);
 
-
-  const handleUserRoleChange = (userId) => {
-    const targetUser = staffList.find(s => s.id === userId);
-    if (targetUser) {
-      db.setCurrentUser(targetUser);
-      setCurrentUser(targetUser);
-      setAdminMenu('dashboard');
+  const handleEmailSubmit = (e) => {
+    e.preventDefault();
+    if (!loginEmail) return;
+    
+    const matchedUser = db.getStaff().find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
+    if (matchedUser) {
+      if (matchedUser.statut === 'suspendu') {
+        alert("Votre compte a été suspendu par un administrateur.");
+        return;
+      }
+      setSelectedLoginUser(matchedUser);
+      setPinCode('');
+    } else {
+      alert("Aucun employé trouvé avec cette adresse email.");
     }
   };
 
+  const handleRequestPinResetSubmit = (e) => {
+    e.preventDefault();
+    if (!resetEmail) return;
+    
+    db.createPinResetRequest(resetEmail.trim());
+    alert(`Demande de réinitialisation envoyée pour ${resetEmail} ! Veuillez demander à un administrateur d'approuver votre demande.`);
+    setShowResetPinModal(false);
+    setResetEmail('');
+  };
+
+  const handleKeypadPress = (val) => {
+    if (pinError || isUnlocking) return;
+    
+    if (val === 'delete') {
+      setPinCode(prev => prev.slice(0, -1));
+      return;
+    }
+    
+    if (pinCode.length >= 6) return;
+    
+    const newCode = pinCode + val;
+    setPinCode(newCode);
+    
+    if (newCode.length === 6) {
+      if (selectedLoginUser.code_pin === newCode) {
+        setIsUnlocking(true);
+        setTimeout(() => {
+          db.setCurrentUser(selectedLoginUser);
+          setSelectedLoginUser(null);
+          setPinCode('');
+          setIsUnlocking(false);
+        }, 300);
+      } else {
+        setPinError(true);
+        setTimeout(() => {
+          setPinCode('');
+          setPinError(false);
+        }, 800);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedLoginUser) return;
+    
+    const handleKeyDown = (e) => {
+      if (e.key >= '0' && e.key <= '9') {
+        handleKeypadPress(e.key);
+      } else if (e.key === 'Backspace') {
+        handleKeypadPress('delete');
+      } else if (e.key === 'Escape') {
+        setSelectedLoginUser(null);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedLoginUser, pinCode, pinError, isUnlocking]);
+
   if (!currentUser) {
     return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-app)' }}>
-        <div className="card" style={{ width: '320px', padding: '2rem', textAlign: 'center' }}>
-          <h2 style={{ fontFamily: 'var(--font-title)', marginBottom: '1.5rem' }}>Chargement...</h2>
+      <div className="lockscreen-container">
+        <div className="lockscreen-logo-area">
+          <div style={{ background: 'rgba(255,255,255,0.08)', padding: '1rem', borderRadius: '20px', display: 'inline-flex', marginBottom: '1rem', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <Lock size={36} color="#ffffff" strokeWidth={1.5} />
+          </div>
+          <h2 className="lockscreen-title">KLIN UP</h2>
+          <p className="lockscreen-subtitle">Plateforme Laverie Admin CMS</p>
         </div>
+
+        {!selectedLoginUser ? (
+          <form onSubmit={handleEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: '320px', animation: 'fadeIn 0.3s ease-out forwards' }}>
+            <div style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.7)', fontWeight: 600, textAlign: 'center', marginBottom: '0.5rem' }}>
+              Connexion Administration
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <input 
+                type="email"
+                required
+                placeholder="Email de l'administrateur"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.95rem 1.25rem',
+                  borderRadius: '14px',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: '#fff',
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                  transition: 'all 0.2s ease',
+                  textAlign: 'center'
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.5)'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.15)'}
+              />
+            </div>
+
+            <button 
+              type="submit"
+              className="btn"
+              style={{
+                background: '#ffffff',
+                color: '#1a1a5e',
+                padding: '0.95rem',
+                borderRadius: '14px',
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                border: 'none',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+              }}
+            >
+              Continuer
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowResetPinModal(true)}
+              style={{
+                background: 'transparent',
+                color: 'rgba(255,255,255,0.6)',
+                border: 'none',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                marginTop: '0.5rem',
+                textAlign: 'center',
+                transition: 'color 0.2s ease'
+              }}
+            >
+              Réinitialiser le PIN
+            </button>
+          </form>
+        ) : (
+          <div className="pin-view-container" style={{ maxWidth: '320px' }}>
+            <button 
+              type="button" 
+              className="pin-view-back"
+              onClick={() => setSelectedLoginUser(null)}
+            >
+              ← Retour
+            </button>
+
+            <div 
+              className="pin-user-avatar" 
+              style={{ 
+                background: selectedLoginUser.role === 'super_admin' ? 'hsl(224, 76%, 48%)' : selectedLoginUser.role === 'manager' ? 'hsl(271, 76%, 53%)' : 'hsl(162, 76%, 38%)' 
+              }}
+            >
+              {selectedLoginUser.prenom[0]}{selectedLoginUser.nom[0]}
+            </div>
+            <h3 className="pin-user-name">{selectedLoginUser.prenom} {selectedLoginUser.nom}</h3>
+            <p className="pin-user-role">{selectedLoginUser.role === 'super_admin' ? 'Super Administrateur' : selectedLoginUser.role === 'manager' ? 'Gestionnaire' : "Agent d'accueil"}</p>
+
+            <div className={`pin-dots-row ${pinError ? 'shake' : ''}`}>
+              {[0, 1, 2, 3, 4, 5].map(idx => (
+                <div 
+                  key={idx} 
+                  className={`pin-dot ${pinCode.length > idx ? 'filled' : ''} ${pinError ? 'error' : ''}`}
+                />
+              ))}
+            </div>
+
+            <div className="keypad-grid">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                <button 
+                  key={num} 
+                  type="button" 
+                  className="keypad-btn"
+                  onClick={() => handleKeypadPress(num.toString())}
+                >
+                  {num}
+                </button>
+              ))}
+              <button 
+                type="button" 
+                className="keypad-btn action-btn"
+                onClick={() => setSelectedLoginUser(null)}
+              >
+                Annuler
+              </button>
+              <button 
+                type="button" 
+                className="keypad-btn"
+                onClick={() => handleKeypadPress('0')}
+              >
+                0
+              </button>
+              <button 
+                type="button" 
+                className="keypad-btn action-btn"
+                style={{ fontSize: '0.85rem' }}
+                onClick={() => handleKeypadPress('delete')}
+              >
+                Effacer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showResetPinModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div className="card" style={{ width: '360px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', color: 'var(--text-primary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>Réinitialiser le PIN</h3>
+                <button type="button" onClick={() => setShowResetPinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <form onSubmit={handleRequestPinResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  Saisissez votre email professionnel. Une demande de réinitialisation sera envoyée à l'administrateur pour approbation.
+                </p>
+                <input 
+                  type="email"
+                  required
+                  placeholder="votre.email@klinup.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-color)',
+                    outline: 'none',
+                    fontSize: '0.9rem'
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowResetPinModal(false)}>Annuler</button>
+                  <button type="submit" className="btn btn-primary">Envoyer</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -131,6 +404,10 @@ function App() {
               <li className="menu-item" onClick={() => alert('Support / Aide en ligne')}>
                 <HelpCircle size={18} />
                 Aide
+              </li>
+              <li className="menu-item" onClick={() => setShowLogoutConfirm(true)}>
+                <LogOut size={18} />
+                Déconnexion
               </li>
             </ul>
           </div>
@@ -231,6 +508,13 @@ function App() {
                 Désolé <strong>{currentUser.prenom} {currentUser.nom}</strong>, votre rôle <strong>{currentUser.role}</strong> ne vous autorise pas à accéder au CMS Administrateur.<br />
                 Veuillez utiliser l'application de terrain sur le port <strong>5174</strong>.
               </p>
+              <button 
+                className="btn btn-outline" 
+                style={{ marginTop: '1rem', width: '100%' }}
+                onClick={() => db.setCurrentUser(null)}
+              >
+                Changer de compte
+              </button>
             </div>
           </div>
         ) : (
@@ -239,40 +523,33 @@ function App() {
 
       </main>
 
-      {/* ================= WIDGET SIMULATEUR RBAC FLOTTANT ================= */}
-      <div className="rbac-widget">
-        <div className="rbac-widget-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <ShieldAlert size={15} color="hsl(38, 95%, 52%)" />
-            <span style={{ fontSize: '0.8rem' }}>Simulateur RBAC</span>
+      {showLogoutConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div className="card" style={{ width: '360px', padding: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', color: 'var(--text-primary)' }}>
+            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.25rem', fontWeight: 700 }}>Confirmer la déconnexion</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Êtes-vous sûr de vouloir vous déconnecter de la plateforme Admin CMS ?</p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button className="btn btn-outline" onClick={() => setShowLogoutConfirm(false)}>Annuler</button>
+              <button className="btn btn-primary" style={{ backgroundColor: 'var(--accent)' }} onClick={() => {
+                db.setCurrentUser(null);
+                setShowLogoutConfirm(false);
+              }}>Déconnexion</button>
+            </div>
           </div>
         </div>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-          <label style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Utilisateur actif :</label>
-          <select 
-            className="rbac-role-select"
-            value={currentUser.id}
-            onChange={(e) => handleUserRoleChange(e.target.value)}
-          >
-            {staffList.map(s => (
-              <option key={s.id} value={s.id}>
-                {s.prenom} {s.nom} ({s.role === 'super_admin' ? 'Admin' : s.role === 'manager' ? 'Manager' : 'Accueil'})
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div style={{ fontSize: '0.68rem', color: '#94a3b8', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-          <div><strong>Rôle:</strong> {currentUser.role}</div>
-          <div><strong>Autorisations:</strong> </div>
-          <div style={{ color: 'var(--secondary)', fontWeight: 600 }}>
-            {currentUser.role === 'super_admin' && "• Accès Total (CMS)"}
-            {currentUser.role === 'manager' && "• Dashboard, Catalogue"}
-            {currentUser.role === 'agent_accueil' && "• Bloqué (Utiliser Port 5174)"}
-          </div>
-        </div>
-      </div>
+      )}
 
     </div>
   );

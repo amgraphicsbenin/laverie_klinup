@@ -13,9 +13,10 @@ const STORAGE_KEYS = {
 
 // --- DONNÉES PAR DÉFAUT (SEEDS) ---
 const DEFAULT_STAFF = [
-  { id: 'u1', nom: 'Gomez', prenom: 'Jean-Luc', role: 'super_admin', created_at: new Date().toISOString() },
-  { id: 'u2', nom: 'Koffi', prenom: 'Marie-Antoinette', role: 'manager', created_at: new Date().toISOString() },
-  { id: 'u3', nom: 'Diallo', prenom: 'Pierre', role: 'agent_accueil', created_at: new Date().toISOString() }
+  { id: 'u1', nom: 'Gomez', prenom: 'Jean-Luc', role: 'super_admin', email: 'jean-luc.gomez@klinup.com', code_pin: '111111', created_at: new Date().toISOString() },
+  { id: 'u2', nom: 'Koffi', prenom: 'Marie-Antoinette', role: 'manager', email: 'marie.koffi@klinup.com', code_pin: '222222', created_at: new Date().toISOString() },
+  { id: 'u3', nom: 'Diallo', prenom: 'Pierre', role: 'agent_accueil', email: 'pierre.diallo@klinup.com', code_pin: '333333', created_at: new Date().toISOString() },
+  { id: 'u4', nom: 'Koutomi', prenom: 'André', role: 'super_admin', email: 'andre.koutomi98@gmail.com', code_pin: '000000', created_at: new Date().toISOString() }
 ];
 
 // Nettoyage complet des données de test
@@ -176,7 +177,8 @@ let memoryDb = {
   orders: DEFAULT_ORDERS,
   logs: DEFAULT_LOGS,
   catalog: DEFAULT_CATALOG,
-  current_user: DEFAULT_STAFF[0]
+  current_user: null,
+  pin_reset_requests: []
 };
 
 const listeners = new Set();
@@ -214,7 +216,8 @@ function loadFromLocalStorage() {
   memoryDb.orders = loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
   memoryDb.logs = loadData(STORAGE_KEYS.LOGS, DEFAULT_LOGS);
   memoryDb.catalog = loadData(STORAGE_KEYS.CATALOG, DEFAULT_CATALOG);
-  memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, DEFAULT_STAFF[0]);
+  memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
+  memoryDb.pin_reset_requests = loadData('klin_up_pin_reset_requests', []);
   db.notify();
 }
 
@@ -223,7 +226,9 @@ async function initDb() {
     const res = await fetch(API_URL);
     if (res.ok) {
       const data = await res.json();
+      const localUser = memoryDb.current_user;
       memoryDb = data;
+      memoryDb.current_user = localUser;
       isUsingRemote = true;
       db.notify();
     } else if (res.status === 404) {
@@ -233,7 +238,8 @@ async function initDb() {
         orders: DEFAULT_ORDERS,
         logs: DEFAULT_LOGS,
         catalog: DEFAULT_CATALOG,
-        current_user: DEFAULT_STAFF[0]
+        current_user: null,
+        pin_reset_requests: []
       };
       await fetch(API_URL, {
         method: 'POST',
@@ -258,6 +264,7 @@ async function persist() {
   saveData(STORAGE_KEYS.LOGS, memoryDb.logs);
   saveData(STORAGE_KEYS.CATALOG, memoryDb.catalog);
   saveData(STORAGE_KEYS.CURRENT_USER, memoryDb.current_user);
+  saveData('klin_up_pin_reset_requests', memoryDb.pin_reset_requests || []);
 
   if (isUsingRemote) {
     try {
@@ -284,7 +291,9 @@ setInterval(async () => {
         isUsingRemote = true;
       }
       if (JSON.stringify(data) !== JSON.stringify(memoryDb)) {
+        const localUser = memoryDb.current_user;
         memoryDb = data;
+        memoryDb.current_user = localUser;
         db.notify();
       }
     } else if (res.status === 404) {
@@ -326,7 +335,11 @@ export const db = {
 
   setCurrentUser: (user) => {
     memoryDb.current_user = user;
-    db.logAction('CONNEXION', `Connexion de ${user.prenom} ${user.nom} (${user.role})`);
+    if (user) {
+      db.logAction('CONNEXION', `Connexion de ${user.prenom} ${user.nom} (${user.role})`);
+    } else {
+      db.logAction('DECONNEXION', `Déconnexion de l'utilisateur`);
+    }
     persist();
     db.notify();
   },
@@ -734,5 +747,74 @@ export const db = {
       db.notify();
       return customer;
     }
+  },
+
+  getPinResetRequests: () => memoryDb.pin_reset_requests || [],
+
+  createPinResetRequest: (email) => {
+    if (!memoryDb.pin_reset_requests) {
+      memoryDb.pin_reset_requests = [];
+    }
+    const staffMember = memoryDb.staff.find(s => s.email.toLowerCase() === email.toLowerCase());
+    const newRequest = {
+      id: 'req_' + Math.random().toString(36).substr(2, 9),
+      email: email,
+      staff_name: staffMember ? `${staffMember.prenom} ${staffMember.nom}` : 'Inconnu',
+      status: 'pending',
+      created_at: new Date().toISOString()
+    };
+    memoryDb.pin_reset_requests.unshift(newRequest);
+    db.logAction('DEMANDE_RESET_PIN', `Demande de réinitialisation de PIN reçue pour l'email: ${email}`);
+    persist();
+    db.notify();
+    return newRequest;
+  },
+
+  approvePinResetRequest: (requestId) => {
+    if (!memoryDb.pin_reset_requests) return null;
+    const req = memoryDb.pin_reset_requests.find(r => r.id === requestId);
+    if (req) {
+      const staffMember = memoryDb.staff.find(s => s.email.toLowerCase() === req.email.toLowerCase());
+      if (staffMember) {
+        const newPin = Math.floor(100000 + Math.random() * 900000).toString();
+        staffMember.code_pin = newPin;
+        req.status = 'approved';
+        req.resolved_pin = newPin;
+        db.logAction('MODIFICATION_PERSONNEL', `Demande de reset PIN approuvée pour ${staffMember.prenom} ${staffMember.nom}. Nouveau PIN : ${newPin} (Envoyé par email)`);
+        persist();
+        db.notify();
+        return { req, newPin, staffMember };
+      } else {
+        req.status = 'rejected';
+        db.logAction('MODIFICATION_PERSONNEL', `Demande de reset PIN rejetée : aucun personnel trouvé pour l'email ${req.email}`);
+        persist();
+        db.notify();
+        return null;
+      }
+    }
+    return null;
+  },
+
+  rejectPinResetRequest: (requestId) => {
+    if (!memoryDb.pin_reset_requests) return;
+    const req = memoryDb.pin_reset_requests.find(r => r.id === requestId);
+    if (req) {
+      req.status = 'rejected';
+      db.logAction('MODIFICATION_PERSONNEL', `Demande de reset PIN rejetée pour l'email ${req.email}`);
+      persist();
+      db.notify();
+    }
+  },
+
+  resetStaffPin: (userId, newPin) => {
+    const staffMember = memoryDb.staff.find(s => s.id === userId);
+    if (staffMember) {
+      staffMember.code_pin = newPin;
+      db.logAction('MODIFICATION_PERSONNEL', `Code PIN réinitialisé manuellement par l'admin pour ${staffMember.prenom} ${staffMember.nom}. Nouveau PIN : ${newPin}`);
+      persist();
+      db.notify();
+      return staffMember;
+    }
+    return null;
   }
 };

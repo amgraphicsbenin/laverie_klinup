@@ -33,7 +33,9 @@ import {
   Waves,
   CheckCircle2,
   Eye,
-  EyeOff
+  EyeOff,
+  LogOut,
+  Lock
 } from 'lucide-react';
 
 export default function MobileView() {
@@ -41,12 +43,82 @@ export default function MobileView() {
   const [customers, setCustomers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [catalog, setCatalog] = useState([]);
-  const [currentUser, setCurrentUser] = useState(() => db.getCurrentUser() || { prenom: 'Pierre', nom: 'Diallo', role: 'agent_accueil' });
+  const [currentUser, setCurrentUser] = useState(() => db.getCurrentUser());
   const [showCAValues, setShowCAValues] = useState(true);
 
   // Détermine si l'utilisateur peut voir le CA en fonction de son rôle
-  const isCAAccessible = currentUser.role === 'super_admin' || currentUser.role === 'manager';
+  const isCAAccessible = currentUser ? (currentUser.role === 'super_admin' || currentUser.role === 'manager') : false;
   const canViewCA = isCAAccessible;
+
+  // États d'authentification par email & code PIN de 6 chiffres
+  const [selectedLoginUser, setSelectedLoginUser] = useState(null);
+  const [pinCode, setPinCode] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  
+  const [loginEmail, setLoginEmail] = useState('');
+  const [showResetPinModal, setShowResetPinModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const handleEmailSubmit = (e) => {
+    e.preventDefault();
+    if (!loginEmail) return;
+    
+    const matchedUser = db.getStaff().find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
+    if (matchedUser) {
+      if (matchedUser.statut === 'suspendu') {
+        alert("Votre compte a été suspendu par un administrateur.");
+        return;
+      }
+      setSelectedLoginUser(matchedUser);
+      setPinCode('');
+    } else {
+      alert("Aucun employé trouvé avec cette adresse email.");
+    }
+  };
+
+  const handleRequestPinResetSubmit = (e) => {
+    e.preventDefault();
+    if (!resetEmail) return;
+    
+    db.createPinResetRequest(resetEmail.trim());
+    alert(`Demande de réinitialisation envoyée pour ${resetEmail} ! Veuillez demander à un administrateur d'approuver votre demande.`);
+    setShowResetPinModal(false);
+    setResetEmail('');
+  };
+
+  const handleKeypadPress = (val) => {
+    if (pinError || isUnlocking) return;
+    
+    if (val === 'delete') {
+      setPinCode(prev => prev.slice(0, -1));
+      return;
+    }
+    
+    if (pinCode.length >= 6) return;
+    
+    const newCode = pinCode + val;
+    setPinCode(newCode);
+    
+    if (newCode.length === 6) {
+      if (selectedLoginUser.code_pin === newCode) {
+        setIsUnlocking(true);
+        setTimeout(() => {
+          db.setCurrentUser(selectedLoginUser);
+          setSelectedLoginUser(null);
+          setPinCode('');
+          setIsUnlocking(false);
+        }, 300);
+      } else {
+        setPinError(true);
+        setTimeout(() => {
+          setPinCode('');
+          setPinError(false);
+        }, 800);
+      }
+    }
+  };
 
   // Formulaire Caisse
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -228,13 +300,13 @@ export default function MobileView() {
     setCustomers(db.getCustomers());
     setOrders(db.getOrders());
     setCatalog(db.getCatalog());
-    setCurrentUser(db.getCurrentUser() || { prenom: 'Pierre', nom: 'Diallo', role: 'agent_accueil' });
+    setCurrentUser(db.getCurrentUser());
 
     const unsubscribe = db.subscribe(() => {
       setCustomers(db.getCustomers());
       setOrders(db.getOrders());
       setCatalog(db.getCatalog());
-      setCurrentUser(db.getCurrentUser() || { prenom: 'Pierre', nom: 'Diallo', role: 'agent_accueil' });
+      setCurrentUser(db.getCurrentUser());
     });
     return () => unsubscribe();
   }, [activeTab]);
@@ -556,8 +628,156 @@ export default function MobileView() {
       </div>
 
       {/* Main Container */}
-      <div className="mobile-content">
-        
+      <div className="mobile-content" style={{ padding: !currentUser ? 0 : undefined }}>
+        {!currentUser ? (
+          <div className="lockscreen-container">
+            <div className="lockscreen-logo-area">
+              <div style={{ background: 'rgba(255,255,255,0.08)', padding: '0.65rem', borderRadius: '16px', display: 'inline-flex', marginBottom: '0.65rem', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <Lock size={28} color="#ffffff" strokeWidth={1.5} />
+              </div>
+              <h2 className="lockscreen-title">KLIN UP</h2>
+              <p className="lockscreen-subtitle">Plateforme Laverie Caisse & Atelier</p>
+            </div>
+
+            {!selectedLoginUser ? (
+              <form onSubmit={handleEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%', maxWidth: '280px', animation: 'fadeIn 0.3s ease-out forwards' }}>
+                <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', fontWeight: 600, textAlign: 'center', marginBottom: '0.5rem' }}>
+                  Connexion Utilisateur
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <input 
+                    type="email"
+                    required
+                    placeholder="Email de l'utilisateur"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.8rem 1rem',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'rgba(255,255,255,0.06)',
+                      color: '#fff',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      textAlign: 'center'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.5)'}
+                    onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.15)'}
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  className="btn"
+                  style={{
+                    background: '#ffffff',
+                    color: '#1a1a5e',
+                    padding: '0.75rem',
+                    borderRadius: '12px',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    border: 'none',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  Continuer
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowResetPinModal(true)}
+                  style={{
+                    background: 'transparent',
+                    color: 'rgba(255,255,255,0.6)',
+                    border: 'none',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    marginTop: '0.5rem',
+                    textAlign: 'center',
+                    transition: 'color 0.2s ease'
+                  }}
+                >
+                  Réinitialiser le PIN
+                </button>
+              </form>
+            ) : (
+              <div className="pin-view-container">
+                <button 
+                  type="button" 
+                  className="pin-view-back"
+                  onClick={() => setSelectedLoginUser(null)}
+                >
+                  ← Retour
+                </button>
+
+                <div 
+                  className="pin-user-avatar" 
+                  style={{ 
+                    background: selectedLoginUser.role === 'super_admin' ? 'hsl(224, 76%, 48%)' : selectedLoginUser.role === 'manager' ? 'hsl(271, 76%, 53%)' : 'hsl(162, 76%, 38%)' 
+                  }}
+                >
+                  {selectedLoginUser.prenom[0]}{selectedLoginUser.nom[0]}
+                </div>
+                <h3 className="pin-user-name">{selectedLoginUser.prenom} {selectedLoginUser.nom}</h3>
+                <p className="pin-user-role">{selectedLoginUser.role === 'super_admin' ? 'Super Administrateur' : selectedLoginUser.role === 'manager' ? 'Gestionnaire' : "Agent d'accueil"}</p>
+
+                {/* PIN Code Indicator Dots (6 dots) */}
+                <div className={`pin-dots-row ${pinError ? 'shake' : ''}`}>
+                  {[0, 1, 2, 3, 4, 5].map(idx => (
+                    <div 
+                      key={idx} 
+                      className={`pin-dot ${pinCode.length > idx ? 'filled' : ''} ${pinError ? 'error' : ''}`}
+                    />
+                  ))}
+                </div>
+
+                {/* Keypad Grid */}
+                <div className="keypad-grid">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                    <button 
+                      key={num} 
+                      type="button" 
+                      className="keypad-btn"
+                      onClick={() => handleKeypadPress(num.toString())}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                  <button 
+                    type="button" 
+                    className="keypad-btn action-btn"
+                    onClick={() => setSelectedLoginUser(null)}
+                  >
+                    Retour
+                  </button>
+                  <button 
+                    type="button" 
+                    className="keypad-btn"
+                    onClick={() => handleKeypadPress('0')}
+                  >
+                    0
+                  </button>
+                  <button 
+                    type="button" 
+                    className="keypad-btn action-btn"
+                    style={{ fontSize: '0.85rem' }}
+                    onClick={() => handleKeypadPress('delete')}
+                  >
+                    Effacer
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
         {/* ========================================================
            ONGLET : ACCUEIL — Style Finance App
            ======================================================== */}
@@ -1409,42 +1629,74 @@ export default function MobileView() {
                 </div>
               </div>
             </div>
+
+            {/* Déconnexion */}
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{
+                borderColor: 'var(--status-late)',
+                color: 'var(--status-late)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.55rem',
+                padding: '0.75rem',
+                borderRadius: '14px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                width: '100%',
+                marginTop: '0.5rem',
+                transition: 'all 0.2s ease',
+                background: 'transparent'
+              }}
+              onClick={() => {
+                setShowLogoutConfirm(true);
+              }}
+            >
+              <LogOut size={15} />
+              Déconnexion
+            </button>
           </div>
         )}
 
+          </>
+        )}
       </div>
 
       {/* Bottom Navigation — Style Finance App */}
-      <div className="mobile-footer-nav">
-        <button 
-          className={`mobile-nav-btn ${activeTab === 'accueil' ? 'active' : ''}`}
-          onClick={() => setActiveTab('accueil')}
-        >
-          <Home size={18} />
-          Accueil
-        </button>
-        <button 
-          className={`mobile-nav-btn ${activeTab === 'gestion' ? 'active' : ''}`}
-          onClick={() => setActiveTab('gestion')}
-        >
-          <Layers size={18} />
-          Gestion
-        </button>
-        <button 
-          className={`mobile-nav-btn ${activeTab === 'historique' ? 'active' : ''}`}
-          onClick={() => setActiveTab('historique')}
-        >
-          <FileText size={18} />
-          Historique
-        </button>
-        <button 
-          className={`mobile-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveTab('profile')}
-        >
-          <User size={18} />
-          Compte
-        </button>
-      </div>
+      {currentUser && (
+        <div className="mobile-footer-nav">
+          <button 
+            className={`mobile-nav-btn ${activeTab === 'accueil' ? 'active' : ''}`}
+            onClick={() => setActiveTab('accueil')}
+          >
+            <Home size={18} />
+            Accueil
+          </button>
+          <button 
+            className={`mobile-nav-btn ${activeTab === 'gestion' ? 'active' : ''}`}
+            onClick={() => setActiveTab('gestion')}
+          >
+            <Layers size={18} />
+            Gestion
+          </button>
+          <button 
+            className={`mobile-nav-btn ${activeTab === 'historique' ? 'active' : ''}`}
+            onClick={() => setActiveTab('historique')}
+          >
+            <FileText size={18} />
+            Historique
+          </button>
+          <button 
+            className={`mobile-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+            <User size={18} />
+            Compte
+          </button>
+        </div>
+      )}
 
       {/* iOS Home Indicator bottom line */}
       <div className="phone-home-indicator"></div>
@@ -2047,6 +2299,80 @@ export default function MobileView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL RESET PIN ================= */}
+      {showResetPinModal && (
+        <div className="modal-overlay center-align" style={{ zIndex: 1000 }}>
+          <div className="modal-dialog" style={{ maxWidth: '300px', background: '#ffffff', color: '#000000', padding: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+              <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>Réinitialiser le PIN</h3>
+              <button type="button" onClick={() => setShowResetPinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={15} color="var(--text-muted)" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleRequestPinResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
+                Saisissez votre adresse email pour envoyer une demande de réinitialisation. L'administrateur devra approuver la demande.
+              </p>
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Adresse Email</label>
+                <input 
+                  type="email" 
+                  className="input-control" 
+                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
+                  required 
+                  placeholder="Ex: marie.koffi@klinup.com" 
+                  value={resetEmail} 
+                  onChange={(e) => setResetEmail(e.target.value)} 
+                />
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.3rem', padding: '0.48rem', fontSize: '0.75rem', borderRadius: '8px', width: '100%' }}>
+                Envoyer la demande
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL CONFIRMATION DÉCONNEXION ================= */}
+      {showLogoutConfirm && (
+        <div className="modal-overlay center-align" style={{ zIndex: 1000 }}>
+          <div className="modal-dialog" style={{ maxWidth: '280px', background: '#ffffff', color: '#000000', padding: '1.25rem', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ background: 'var(--status-late-light)', padding: '0.65rem', borderRadius: '50%', display: 'inline-flex', color: 'var(--status-late)' }}>
+                <LogOut size={24} />
+              </div>
+              <h3 style={{ fontSize: '0.95rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Déconnexion</h3>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
+                Êtes-vous sûr de vouloir vous déconnecter de votre session ?
+              </p>
+              
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginTop: '0.5rem' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px' }}
+                  onClick={() => setShowLogoutConfirm(false)}
+                >
+                  Annuler
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-danger" 
+                  style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--status-late)', color: '#ffffff', border: 'none' }}
+                  onClick={() => {
+                    db.setCurrentUser(null);
+                    setShowLogoutConfirm(false);
+                  }}
+                >
+                  Confirmer
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

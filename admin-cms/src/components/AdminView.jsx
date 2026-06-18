@@ -1915,72 +1915,151 @@ export default function AdminView({ activeTab, searchQuery }) {
       {activeTab === 'staff_management' && (
         <div className="grid-2" style={{ gridTemplateColumns: '0.8fr 1.2fr', gap: '1.5rem', alignItems: 'start' }}>
           
-          {/* COLONNE GAUCHE : LISTE DES EMPLOYÉS */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', alignItems: 'center' }}>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
-                Membres de l'Équipe
-              </h3>
-              <button 
-                type="button"
-                className="btn btn-primary" 
-                onClick={() => setShowNewStaffModal(true)}
-                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-              >
-                <UserPlus size={14} /> Ajouter
-              </button>
+          {/* COLONNE GAUCHE : LISTE DES EMPLOYÉS & DEMANDES DE PIN */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            
+            {/* Membres de l'Équipe */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', alignItems: 'center' }}>
+                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                  Membres de l'Équipe
+                </h3>
+                <button 
+                  type="button"
+                  className="btn btn-primary" 
+                  onClick={() => setShowNewStaffModal(true)}
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                >
+                  <UserPlus size={14} /> Ajouter
+                </button>
+              </div>
+
+              <div style={{ overflowY: 'auto', maxHeight: '380px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {staff.map(s => {
+                  const isSelected = selectedStaffId === s.id;
+                  const isSuper = s.role === 'super_admin';
+                  const isMgr = s.role === 'manager';
+                  const roleLabel = isSuper ? 'Admin' : isMgr ? 'Manager' : "Accueil";
+                  const isSuspended = s.statut === 'suspendu';
+
+                  return (
+                    <div 
+                      key={s.id} 
+                      style={{ 
+                        padding: '0.85rem', 
+                        borderRadius: '12px', 
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)', 
+                        background: isSelected ? 'var(--primary-light)' : 'var(--bg-app)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        opacity: isSuspended ? 0.65 : 1
+                      }}
+                      onClick={() => setSelectedStaffId(s.id)}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '0.85rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>
+                          {s.prenom} {s.nom}
+                        </strong>
+                        <span 
+                          className="badge" 
+                          style={{ 
+                            fontSize: '0.65rem',
+                            padding: '0.15rem 0.4rem',
+                            borderRadius: '6px',
+                            background: isSuper ? '#0e6245' : isMgr ? '#20b885' : '#64748b',
+                            color: '#fff'
+                          }}
+                        >
+                          {roleLabel}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
+                        <span>{s.email || `${s.prenom.toLowerCase()}.${s.nom.toLowerCase()}@klinup.com`}</span>
+                        {isSuspended ? (
+                          <span style={{ color: 'var(--status-late)', fontWeight: 700 }}>Suspendu</span>
+                        ) : (
+                          <span style={{ color: 'var(--status-ready)', fontWeight: 700 }}>Actif</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div style={{ overflowY: 'auto', maxHeight: '550px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {staff.map(s => {
-                const isSelected = selectedStaffId === s.id;
-                const isSuper = s.role === 'super_admin';
-                const isMgr = s.role === 'manager';
-                const roleLabel = isSuper ? 'Admin' : isMgr ? 'Manager' : "Accueil";
-                const isSuspended = s.statut === 'suspendu';
+            {/* Demandes de réinitialisation PIN */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <ShieldCheck size={18} color="var(--primary)" />
+                  Demandes de Reset PIN
+                </h3>
+              </div>
 
-                return (
-                  <div 
-                    key={s.id} 
-                    style={{ 
-                      padding: '0.85rem', 
-                      borderRadius: '12px', 
-                      border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)', 
-                      background: isSelected ? 'var(--primary-light)' : 'var(--bg-app)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      opacity: isSuspended ? 0.65 : 1
-                    }}
-                    onClick={() => setSelectedStaffId(s.id)}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ fontSize: '0.85rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>
-                        {s.prenom} {s.nom}
-                      </strong>
-                      <span 
-                        className="badge" 
-                        style={{ 
-                          fontSize: '0.65rem',
-                          padding: '0.15rem 0.4rem',
-                          borderRadius: '6px',
-                          background: isSuper ? '#0e6245' : isMgr ? '#20b885' : '#64748b',
-                          color: '#fff'
-                        }}
-                      >
-                        {roleLabel}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
-                      <span>{s.email || `${s.prenom.toLowerCase()}.${s.nom.toLowerCase()}@klinup.com`}</span>
-                      {isSuspended ? (
-                        <span style={{ color: 'var(--status-late)', fontWeight: 700 }}>Suspendu</span>
-                      ) : (
-                        <span style={{ color: 'var(--status-ready)', fontWeight: 700 }}>Actif</span>
-                      )}
-                    </div>
+              <div style={{ overflowY: 'auto', maxHeight: '250px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {db.getPinResetRequests().filter(r => r.status === 'pending').length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Aucune demande en attente
                   </div>
-                );
-              })}
+                ) : (
+                  db.getPinResetRequests().filter(r => r.status === 'pending').map(req => (
+                    <div 
+                      key={req.id} 
+                      style={{ 
+                        padding: '0.75rem', 
+                        borderRadius: '10px', 
+                        border: '1px solid var(--border-color)', 
+                        background: 'var(--bg-app)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.45rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                        <div>
+                          <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{req.staff_name}</strong>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>{req.email}</div>
+                        </div>
+                        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                          {new Date(req.created_at).toLocaleDateString('fr-FR')}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ flex: 1, padding: '0.3rem', fontSize: '0.7rem', borderRadius: '6px', background: 'var(--status-ready)' }}
+                          onClick={() => {
+                            const res = db.approvePinResetRequest(req.id);
+                            if (res) {
+                              alert(`Demande approuvée pour ${res.staffMember.prenom} ${res.staffMember.nom} !\n\nNouveau PIN généré : ${res.newPin}\n(Envoyé par email à ${res.staffMember.email})`);
+                              refreshAdminData();
+                            } else {
+                              alert("Erreur: Impossible d'approuver (l'employé n'existe plus ou l'email est invalide).");
+                            }
+                          }}
+                        >
+                          Approuver
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ flex: 1, padding: '0.3rem', fontSize: '0.7rem', borderRadius: '6px', color: 'var(--status-late)', borderColor: '#fee2e2' }}
+                          onClick={() => {
+                            if (confirm("Rejeter cette demande de réinitialisation ?")) {
+                              db.rejectPinResetRequest(req.id);
+                              refreshAdminData();
+                            }
+                          }}
+                        >
+                          Rejeter
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
@@ -2084,6 +2163,33 @@ export default function AdminView({ activeTab, searchQuery }) {
                       <option value="suspendu">Compte Suspendu (Bloqué)</option>
                     </select>
                   </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.75rem', alignItems: 'end' }}>
+                  <div className="form-group">
+                    <label>Code PIN actuel</label>
+                    <input 
+                      type="text" 
+                      className="input-control" 
+                      readOnly
+                      disabled
+                      value={selectedMember.code_pin || 'Non défini'} 
+                      style={{ background: '#f1f5f9', cursor: 'not-allowed', fontWeight: 'bold', letterSpacing: '2px', textAlign: 'center' }}
+                    />
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    style={{ padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, width: '100%' }}
+                    onClick={() => {
+                      const newPin = Math.floor(100000 + Math.random() * 900000).toString();
+                      db.resetStaffPin(selectedMember.id, newPin);
+                      alert(`Code PIN réinitialisé pour ${selectedMember.prenom} ${selectedMember.nom} !\n\nNouveau PIN : ${newPin}\n(Un email a été envoyé à ${selectedMember.email})`);
+                      refreshAdminData();
+                    }}
+                  >
+                    Générer nouveau PIN
+                  </button>
                 </div>
 
                 {/* Habilitations Détaillées */}
