@@ -262,6 +262,14 @@ async function initDb() {
 }
 
 async function persist() {
+  // Always backup to localStorage
+  saveData(STORAGE_KEYS.STAFF, memoryDb.staff);
+  saveData(STORAGE_KEYS.CUSTOMERS, memoryDb.customers);
+  saveData(STORAGE_KEYS.ORDERS, memoryDb.orders);
+  saveData(STORAGE_KEYS.LOGS, memoryDb.logs);
+  saveData(STORAGE_KEYS.CATALOG, memoryDb.catalog);
+  saveData(STORAGE_KEYS.CURRENT_USER, memoryDb.current_user);
+
   if (isUsingRemote) {
     try {
       await fetch(API_URL, {
@@ -271,31 +279,39 @@ async function persist() {
       });
     } catch (err) {
       console.error("[DB] Failed to persist to remote database:", err);
+      isUsingRemote = false;
     }
-  } else {
-    saveData(STORAGE_KEYS.STAFF, memoryDb.staff);
-    saveData(STORAGE_KEYS.CUSTOMERS, memoryDb.customers);
-    saveData(STORAGE_KEYS.ORDERS, memoryDb.orders);
-    saveData(STORAGE_KEYS.LOGS, memoryDb.logs);
-    saveData(STORAGE_KEYS.CATALOG, memoryDb.catalog);
-    saveData(STORAGE_KEYS.CURRENT_USER, memoryDb.current_user);
   }
 }
 
-// Background sync loop (1 second polling)
+// Background sync loop (1 second polling with automatic reconnection)
 setInterval(async () => {
-  if (isUsingRemote) {
-    try {
-      const res = await fetch(API_URL);
-      if (res.ok) {
-        const data = await res.json();
-        if (JSON.stringify(data) !== JSON.stringify(memoryDb)) {
-          memoryDb = data;
-          db.notify();
-        }
+  try {
+    const res = await fetch(API_URL);
+    if (res.ok) {
+      const data = await res.json();
+      if (!isUsingRemote) {
+        console.log("[DB] Remote database server connected!");
+        isUsingRemote = true;
       }
-    } catch (err) {
-      console.warn("[DB] Remote database offline during poll.");
+      if (JSON.stringify(data) !== JSON.stringify(memoryDb)) {
+        memoryDb = data;
+        db.notify();
+      }
+    } else if (res.status === 404) {
+      if (!isUsingRemote) {
+        console.log("[DB] Remote database server connected (uninitialized). Initializing...");
+        isUsingRemote = true;
+        await persist();
+      }
+    } else {
+      isUsingRemote = false;
+    }
+  } catch (err) {
+    if (isUsingRemote) {
+      console.warn("[DB] Remote database went offline, falling back to localStorage.");
+      isUsingRemote = false;
+      loadFromLocalStorage();
     }
   }
 }, 1000);
