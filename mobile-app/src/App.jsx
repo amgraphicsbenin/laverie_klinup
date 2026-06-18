@@ -73,12 +73,22 @@ function App() {
           </select>
         </div>
         
-        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          <div><strong>Rôle:</strong> {currentUser.role}</div>
-          <div><strong>Autorisations:</strong> </div>
-          <div style={{ color: 'var(--secondary)' }}>
-            {currentUser.role === 'agent_accueil' && "• Rôle standard (Terrain/Caisse)"}
-            {isPreviewMode && "• Admin en mode test mobile"}
+        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div><strong>Rôle:</strong> {currentUser.role === 'super_admin' ? 'Administrateur' : currentUser.role === 'manager' ? 'Gestionnaire' : 'Agent d\'accueil'}</div>
+          <div><strong>Autorisations:</strong></div>
+          <div style={{ color: 'var(--secondary)', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', marginLeft: '0.25rem' }}>
+            <div>
+              {db.canUserViewCA(currentUser) ? '✓' : '✗'} Voir le Chiffre d\'Affaires
+            </div>
+            <div>
+              {db.canUserViewDashboard(currentUser) ? '✓' : '✗'} Voir le Tableau de bord
+            </div>
+            <div>
+              {db.canUserEditCatalog(currentUser) ? '✓' : '✗'} Modifier le Catalogue
+            </div>
+            <div>
+              {db.canUserManageStaff(currentUser) ? '✓' : '✗'} Gérer le Personnel
+            </div>
           </div>
         </div>
       </div>

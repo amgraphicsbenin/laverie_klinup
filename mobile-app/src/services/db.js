@@ -708,5 +708,37 @@ export const db = {
       db.notify();
       return customer;
     }
+  },
+
+  // Vérifications des permissions utilisateur
+  canUserViewCA: (user) => {
+    if (!user) return false;
+    // Seuls les super_admin et manager peuvent voir le CA
+    return user.role === 'super_admin' || user.role === 'manager';
+  },
+
+  canUserViewDashboard: (user) => {
+    if (!user) return false;
+    return user.role === 'super_admin' || user.role === 'manager';
+  },
+
+  canUserManageOrders: (user) => {
+    if (!user) return false;
+    return true; // Tous les rôles peuvent gérer les commandes
+  },
+
+  canUserManageCRM: (user) => {
+    if (!user) return false;
+    return true; // Tous les rôles peuvent gérer le CRM
+  },
+
+  canUserEditCatalog: (user) => {
+    if (!user) return false;
+    return user.role === 'super_admin' || user.role === 'manager';
+  },
+
+  canUserManageStaff: (user) => {
+    if (!user) return false;
+    return user.role === 'super_admin';
   }
 };
