@@ -35,7 +35,10 @@ import {
   Eye,
   EyeOff,
   LogOut,
-  Lock
+  Lock,
+  Users,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 
 export default function MobileView() {
@@ -60,6 +63,67 @@ export default function MobileView() {
   const [showResetPinModal, setShowResetPinModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // États pour la gestion des profils clients (Création, Modification, Suppression)
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [custNom, setCustNom] = useState('');
+  const [custPrenom, setCustPrenom] = useState('');
+  const [custTelephone, setCustTelephone] = useState('');
+  const [custPreferences, setCustPreferences] = useState('Plié');
+  const [profileSearch, setProfileSearch] = useState('');
+  const [showDeleteCustomerConfirm, setShowDeleteCustomerConfirm] = useState(null);
+
+  const handleOpenCreateCustomer = () => {
+    setEditingCustomer(null);
+    setCustNom('');
+    setCustPrenom('');
+    setCustTelephone('');
+    setCustPreferences('Plié');
+    setShowCustomerModal(true);
+  };
+
+  const handleOpenEditCustomer = (cust) => {
+    setEditingCustomer(cust);
+    setCustNom(cust.nom);
+    setCustPrenom(cust.prenom);
+    setCustTelephone(cust.telephone);
+    setCustPreferences(cust.preferences_pliage || 'Plié');
+    setShowCustomerModal(true);
+  };
+
+  const handleSaveCustomer = (e) => {
+    e.preventDefault();
+    if (!custNom.trim() || !custPrenom.trim() || !custTelephone.trim()) {
+      alert("Veuillez remplir tous les champs obligatoires.");
+      return;
+    }
+
+    if (editingCustomer) {
+      db.updateCustomer(editingCustomer.id, {
+        nom: custNom.trim(),
+        prenom: custPrenom.trim(),
+        telephone: custTelephone.trim(),
+        preferences_pliage: custPreferences
+      });
+      alert("Profil client mis à jour avec succès !");
+    } else {
+      db.addCustomer({
+        nom: custNom.trim(),
+        prenom: custPrenom.trim(),
+        telephone: custTelephone.trim(),
+        preferences_pliage: custPreferences
+      });
+      alert("Nouveau client créé avec succès !");
+    }
+    setShowCustomerModal(false);
+  };
+
+  const handleDeleteCustomer = (id) => {
+    db.deleteCustomer(id);
+    alert("Profil client supprimé avec succès !");
+    setShowDeleteCustomerConfirm(null);
+  };
 
   const handleEmailSubmit = (e) => {
     e.preventDefault();
@@ -1411,6 +1475,111 @@ export default function MobileView() {
                 </div>
               )}
             </div>
+
+            {/* ================= GESTION DES PROFILS CLIENTS ================= */}
+            <div style={{ background: '#fff', border: '1px solid var(--border-color)', padding: '1rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)' }}>
+                  <Users size={16} />
+                  <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>Profils Clients</h4>
+                </div>
+                <button 
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleOpenCreateCustomer}
+                  style={{ padding: '0.28rem 0.55rem', fontSize: '0.68rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  <Plus size={12} /> Nouveau
+                </button>
+              </div>
+
+              {/* Search Bar for profiles */}
+              <div style={{ position: 'relative' }}>
+                <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
+                  placeholder="Rechercher un profil..." 
+                  value={profileSearch} 
+                  onChange={(e) => setProfileSearch(e.target.value)} 
+                />
+              </div>
+
+              {/* List of Profiles */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
+                {customers.filter(c => 
+                  c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                  c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                  c.telephone.includes(profileSearch)
+                ).map(c => (
+                  <div 
+                    key={c.id} 
+                    style={{ 
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                      background: 'var(--bg-app)', padding: '0.55rem 0.7rem', borderRadius: '12px', 
+                      border: '1px solid var(--border-color)', gap: '0.4rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                      <div style={{
+                        width: '26px', height: '26px', borderRadius: '50%', 
+                        background: 'var(--primary-light)', color: 'var(--primary)', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                        fontSize: '0.7rem', fontWeight: 800, flexShrink: 0
+                      }}>
+                        {c.prenom[0]}{c.nom[0]}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {c.prenom} {c.nom}
+                        </div>
+                        <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>
+                          {c.telephone}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <span style={{ 
+                        fontSize: '0.55rem', fontWeight: 700, padding: '0.15rem 0.35rem', 
+                        borderRadius: '6px', background: c.preferences_pliage === 'Sur cintre' ? 'rgba(0,210,196,0.1)' : 'var(--primary-light)', 
+                        color: c.preferences_pliage === 'Sur cintre' ? 'var(--secondary)' : 'var(--primary)',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {c.preferences_pliage === 'Sur cintre' ? 'Cintre' : 'Plié'}
+                      </span>
+                      <button 
+                        type="button"
+                        onClick={() => handleOpenEditCustomer(c)}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--primary)', padding: '0.15rem', display: 'flex' }}
+                        title="Modifier"
+                      >
+                        <Edit2 size={11} />
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setShowDeleteCustomerConfirm(c)}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-late)', padding: '0.15rem', display: 'flex' }}
+                        title="Supprimer"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {customers.filter(c => 
+                  c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                  c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                  c.telephone.includes(profileSearch)
+                ).length === 0 && (
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', padding: '0.75rem', textAlign: 'center' }}>
+                    Aucun profil trouvé.
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -2370,6 +2539,116 @@ export default function MobileView() {
                   }}
                 >
                   Confirmer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL CRÉATION / MODIFICATION CLIENT ================= */}
+      {showCustomerModal && (
+        <div className="modal-overlay center-align" style={{ zIndex: 1000 }}>
+          <div className="modal-dialog" style={{ maxWidth: '300px', background: '#ffffff', color: '#000000', padding: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+              <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>
+                {editingCustomer ? 'Modifier Profil' : 'Nouveau Client'}
+              </h3>
+              <button type="button" onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={15} color="var(--text-muted)" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Prénom</label>
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
+                  required 
+                  placeholder="Ex: Marie" 
+                  value={custPrenom} 
+                  onChange={(e) => setCustPrenom(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Nom</label>
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
+                  required 
+                  placeholder="Ex: Koffi" 
+                  value={custNom} 
+                  onChange={(e) => setCustNom(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Téléphone</label>
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
+                  required 
+                  placeholder="Ex: 0167676767" 
+                  value={custTelephone} 
+                  onChange={(e) => setCustTelephone(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Préférence Pliage</label>
+                <select 
+                  className="input-control" 
+                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
+                  value={custPreferences}
+                  onChange={(e) => setCustPreferences(e.target.value)}
+                >
+                  <option value="Plié">Plié</option>
+                  <option value="Sur cintre">Sur cintre</option>
+                </select>
+              </div>
+
+              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.3rem', padding: '0.48rem', fontSize: '0.75rem', borderRadius: '8px', width: '100%' }}>
+                {editingCustomer ? 'Enregistrer les modifications' : 'Créer le profil'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL CONFIRMATION SUPPRESSION CLIENT ================= */}
+      {showDeleteCustomerConfirm && (
+        <div className="modal-overlay center-align" style={{ zIndex: 1000 }}>
+          <div className="modal-dialog" style={{ maxWidth: '280px', background: '#ffffff', color: '#000000', padding: '1.25rem', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ background: 'var(--status-late-light)', padding: '0.65rem', borderRadius: '50%', display: 'inline-flex', color: 'var(--status-late)' }}>
+                <Trash2 size={24} />
+              </div>
+              <h3 style={{ fontSize: '0.95rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Supprimer le Client ?</h3>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
+                Êtes-vous sûr de vouloir supprimer définitivement le profil de <strong>{showDeleteCustomerConfirm.prenom} {showDeleteCustomerConfirm.nom}</strong> ? Cette action est irréversible.
+              </p>
+              
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginTop: '0.5rem' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px' }}
+                  onClick={() => setShowDeleteCustomerConfirm(null)}
+                >
+                  Annuler
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-danger" 
+                  style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--status-late)', color: '#ffffff', border: 'none' }}
+                  onClick={() => handleDeleteCustomer(showDeleteCustomerConfirm.id)}
+                >
+                  Supprimer
                 </button>
               </div>
             </div>

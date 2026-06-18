@@ -385,6 +385,34 @@ export const db = {
     return newCustomer;
   },
 
+  updateCustomer: (id, updatedFields) => {
+    const customer = memoryDb.customers.find(c => c.id === id);
+    if (customer) {
+      customer.nom = updatedFields.nom ?? customer.nom;
+      customer.prenom = updatedFields.prenom ?? customer.prenom;
+      customer.telephone = updatedFields.telephone ?? customer.telephone;
+      customer.preferences_pliage = updatedFields.preferences_pliage ?? customer.preferences_pliage;
+      db.logAction('MODIFICATION_CLIENT', `Client ${customer.prenom} ${customer.nom} mis à jour`);
+      persist();
+      db.notify();
+      return customer;
+    }
+    return null;
+  },
+
+  deleteCustomer: (id) => {
+    const idx = memoryDb.customers.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      const customer = memoryDb.customers[idx];
+      memoryDb.customers.splice(idx, 1);
+      db.logAction('SUPPRESSION_CLIENT', `Client ${customer.prenom} ${customer.nom} supprimé`);
+      persist();
+      db.notify();
+      return true;
+    }
+    return false;
+  },
+
   updateCustomerDebt: (customerId, amount) => {
     const customer = memoryDb.customers.find(c => c.id === customerId);
     if (customer) {
