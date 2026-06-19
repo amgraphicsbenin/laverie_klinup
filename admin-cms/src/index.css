@@ -848,6 +848,16 @@ tr:hover td {
   background: var(--status-delivered-light);
   color: var(--status-delivered);
 }
+.badge-a_livrer {
+  background: rgba(43, 130, 240, 0.1);
+  color: #2B82F0;
+  border: 1px solid rgba(43, 130, 240, 0.2);
+}
+.badge-a_recuperer {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
 .badge-en_retard {
   background: var(--status-late-light);
   color: var(--status-late);

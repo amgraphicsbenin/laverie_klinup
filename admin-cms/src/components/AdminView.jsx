@@ -89,6 +89,8 @@ export default function AdminView({ activeTab, searchQuery }) {
   const [newCustTel, setNewCustTel] = useState('');
   const [newCustPref, setNewCustPref] = useState('Plié');
   const [newCustIndicatif, setNewCustIndicatif] = useState('229');
+  const [newCustAdresse, setNewCustAdresse] = useState('');
+  const [delivFinalStatus, setDelivFinalStatus] = useState('a_livrer');
 
 
 
@@ -328,10 +330,20 @@ export default function AdminView({ activeTab, searchQuery }) {
   const earnedRevenue = nonCancelledOrders.reduce((sum, o) => sum + o.prix_total, 0);
 
   const totalOrdersCount = orders.length;
-  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule').length;
+  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule').length;
 
-  const completedOrdersCount = orders.filter(o => o.statut === 'restitue').length;
+  const completedOrdersCount = orders.filter(o => o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer').length;
   const pendingOrdersCount = orders.filter(o => o.statut === 'en_attente').length;
+
+  const statusDisplayLabels = {
+    en_attente: 'En attente',
+    en_cours_lavage: 'En cours',
+    pret: 'Prêt',
+    a_livrer: 'À livrer',
+    a_recuperer: 'À récupérer',
+    restitue: 'Restitué',
+    annule: 'Annulé'
+  };
 
   const serviceLabels = {
     lavage_simple: 'Lavage Simple',
@@ -486,7 +498,7 @@ export default function AdminView({ activeTab, searchQuery }) {
   };
 
   const isOrderLate = (order) => {
-    if (order.statut === 'restitue' || order.statut === 'annule') return false;
+    if (order.statut === 'restitue' || order.statut === 'a_livrer' || order.statut === 'a_recuperer' || order.statut === 'annule') return false;
     return new Date(order.due_date) < new Date();
   };
 
@@ -531,23 +543,29 @@ export default function AdminView({ activeTab, searchQuery }) {
 
   const handleCreateCustomer = (e) => {
     e.preventDefault();
-    if (!newCustNom || !newCustPrenom || !newCustTel) return;
+    if (!newCustNom || !newCustPrenom || !newCustTel || !newCustAdresse) return;
     
-    const newCustomer = db.addCustomer({
-      nom: newCustNom,
-      prenom: newCustPrenom,
-      telephone: newCustTel,
-      indicatif: newCustIndicatif,
-      preferences_pliage: newCustPref
-    });
-    
-    refreshAdminData();
-    setSelectedCustomerId(newCustomer.id);
-    setShowNewCustomerModal(false);
-    setNewCustNom('');
-    setNewCustPrenom('');
-    setNewCustTel('');
-    setNewCustIndicatif('229');
+    try {
+      const newCustomer = db.addCustomer({
+        nom: newCustNom,
+        prenom: newCustPrenom,
+        telephone: newCustTel,
+        indicatif: newCustIndicatif,
+        preferences_pliage: newCustPref,
+        adresse: newCustAdresse
+      });
+      
+      refreshAdminData();
+      setSelectedCustomerId(newCustomer.id);
+      setShowNewCustomerModal(false);
+      setNewCustNom('');
+      setNewCustPrenom('');
+      setNewCustTel('');
+      setNewCustIndicatif('229');
+      setNewCustAdresse('');
+    } catch (err) {
+      alert("Erreur de création : " + err.message);
+    }
   };
 
   const handleCreateOrder = (e) => {
@@ -633,17 +651,19 @@ export default function AdminView({ activeTab, searchQuery }) {
     }
   };
 
-  const handleStartDelivery = (order) => {
+  const handleStartDelivery = (order, finalStatus = 'restitue') => {
+    setDelivFinalStatus(finalStatus);
     const remainingToPay = order.prix_total - order.avance_payee;
     if (remainingToPay <= 0) {
-      if (confirm(`Confirmer la livraison de la commande ${order.identifiant_unique_marquage} ?`)) {
-        db.updateOrderStatus(order.id, 'restitue');
+      if (confirm(`Confirmer la finalisation de la commande ${order.identifiant_unique_marquage} ?`)) {
+        db.updateOrderStatus(order.id, finalStatus);
         refreshAdminData();
 
         // Notification WhatsApp livraison directe (déjà payé)
         const customer = customers.find(c => c.id === order.customer_id);
         if (customer) {
-          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+          const finalStatusLabel = finalStatus === 'a_livrer' ? 'mise en livraison' : 'récupérée';
+          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${finalStatusLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
           sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
         }
       }
@@ -659,14 +679,15 @@ export default function AdminView({ activeTab, searchQuery }) {
     e.preventDefault();
     if (!delivOrder) return;
     
-    db.deliverOrderWithPayment(delivOrder.id, Number(delivAmountPaid || 0), delivPaymentMethod);
+    db.deliverOrderWithPayment(delivOrder.id, Number(delivAmountPaid || 0), delivPaymentMethod, delivFinalStatus);
     refreshAdminData();
     setShowDeliveryPaymentModal(false);
 
     // Notification WhatsApp solde livraison
     const customer = customers.find(c => c.id === delivOrder.customer_id);
     if (customer) {
-      const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la livraison de votre commande ${delivOrder.identifiant_unique_marquage} et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
+      const finalStatusLabel = delivFinalStatus === 'a_livrer' ? 'mise en livraison' : 'récupérée';
+      const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la ${finalStatusLabel} de votre commande ${delivOrder.identifiant_unique_marquage} et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
       sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
     }
 
@@ -1054,6 +1075,8 @@ export default function AdminView({ activeTab, searchQuery }) {
                 if (order.statut === 'en_cours_lavage') bulletBg = '#00d2c4';
                 if (order.statut === 'pret') bulletBg = '#10b981';
                 if (order.statut === 'restitue') bulletBg = '#64748b';
+                if (order.statut === 'a_livrer') bulletBg = '#3b82f6';
+                if (order.statut === 'a_recuperer') bulletBg = '#10b981';
                 if (order.statut === 'annule') bulletBg = '#ef4444';
 
                 return (
@@ -1072,7 +1095,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {isExpress && <span className="badge badge-en_retard" style={{ fontSize: '0.6rem', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>Express</span>}
                       <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.65rem' }}>
-                        {order.statut.replace(/_/g, ' ')}
+                        {statusDisplayLabels[order.statut] || order.statut.replace(/_/g, ' ')}
                       </span>
                     </div>
                   </div>
@@ -1242,14 +1265,24 @@ export default function AdminView({ activeTab, searchQuery }) {
                           </button>
                         )}
                         {order.statut === 'pret' && (
-                          <button 
-                            type="button"
-                            className="btn btn-primary" 
-                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                            onClick={() => handleStartDelivery(order)}
-                          >
-                            <DollarSign size={12} /> Livrer
-                          </button>
+                          <>
+                            <button 
+                              type="button"
+                              className="btn btn-primary" 
+                              style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                              onClick={() => handleStartDelivery(order, 'a_livrer')}
+                            >
+                              <ShoppingBag size={12} /> À livrer
+                            </button>
+                            <button 
+                              type="button"
+                              className="btn btn-primary" 
+                              style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                              onClick={() => handleStartDelivery(order, 'a_recuperer')}
+                            >
+                              <CheckCircle size={12} /> À récupérer
+                            </button>
+                          </>
                         )}
                         
                         <button 
@@ -1308,6 +1341,8 @@ export default function AdminView({ activeTab, searchQuery }) {
                 <option value="en_attente">En attente</option>
                 <option value="en_cours_lavage">En cours</option>
                 <option value="pret">Prêt</option>
+                <option value="a_livrer">À livrer</option>
+                <option value="a_recuperer">À récupérer</option>
                 <option value="restitue">Livré</option>
                 <option value="annule">Annulé</option>
               </select>
@@ -1358,7 +1393,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>{order.identifiant_unique_marquage}</span>
                         <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
-                          {order.statut.replace(/_/g, ' ')}
+                          {statusDisplayLabels[order.statut] || order.statut.replace(/_/g, ' ')}
                         </span>
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: 600 }}>
@@ -1638,7 +1673,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                               <td style={{ fontWeight: 600 }}>{o.prix_total.toLocaleString()} F</td>
                               <td>
                                 <span className={`badge badge-${o.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
-                                  {o.statut.replace(/_/g, ' ')}
+                                  {statusDisplayLabels[o.statut] || o.statut.replace(/_/g, ' ')}
                                 </span>
                               </td>
                               <td>
@@ -2918,6 +2953,18 @@ export default function AdminView({ activeTab, searchQuery }) {
                   <option value="Plié">Plié</option>
                   <option value="Sur cintre">Sur cintre</option>
                 </select>
+              </div>
+
+              <div className="form-group">
+                <label>Adresse physique</label>
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  placeholder="Adresse (domicile ou bureau)" 
+                  required
+                  value={newCustAdresse} 
+                  onChange={(e) => setNewCustAdresse(e.target.value)} 
+                />
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>

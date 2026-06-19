@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../services/db';
 import { countries } from '../utils/countriesData';
+import logoDark from '../assets/logo_dark.png';
+import logoGold from '../assets/logo_gold.png';
 import {
   Plus,
   Search,
@@ -23,6 +25,7 @@ import {
   Zap,
   Sparkles,
   Smartphone,
+  Scan,
   FileText,
   Bell,
   Settings,
@@ -38,11 +41,203 @@ import {
   Lock,
   Users,
   Edit2,
-  Trash2
+  Trash2,
+  ArrowLeft,
+  Sun,
+  Flame,
+  Feather,
+  HelpCircle,
+  ChevronDown,
+  Check
 } from 'lucide-react';
+
+const CustomSelect = ({ value, onChange, options, placeholder, disabled, style, dropdownStyle, buttonStyle }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', ...style }}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '0.42rem 0.65rem 0.42rem 0.65rem',
+          fontSize: '0.75rem',
+          borderRadius: '8px',
+          background: 'rgba(255, 255, 255, 0.7)',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.6 : 1,
+          textAlign: 'left',
+          color: selectedOption ? 'var(--text-primary)' : 'var(--text-muted)',
+          outline: 'none',
+          boxShadow: 'none',
+          transition: 'all 0.2s ease',
+          ...buttonStyle
+        }}
+        onMouseEnter={(e) => {
+          if (!disabled) {
+            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.85)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!disabled) {
+            e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+          }
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedOption ? selectedOption.label : (placeholder || '-- Choisir --')}
+        </span>
+        <ChevronDown 
+          size={14} 
+          style={{ 
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
+            transition: 'transform 0.2s ease', 
+            color: 'var(--text-secondary)',
+            marginLeft: '0.35rem',
+            flexShrink: 0
+          }} 
+        />
+      </button>
+      
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '105%',
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          background: 'rgba(255, 255, 255, 0.98)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          borderRadius: '10px',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+          overflowY: 'auto',
+          maxHeight: '180px',
+          padding: '4px',
+          animation: 'slideUp 0.12s ease-out',
+          ...dropdownStyle
+        }}>
+          {options.map((opt) => {
+            const isSelected = String(opt.value) === String(value);
+            return (
+              <div
+                key={String(opt.value)}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                style={{
+                  padding: '7px 10px',
+                  fontSize: '0.72rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  background: isSelected ? 'var(--primary-light)' : 'transparent',
+                  color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
+                  fontWeight: isSelected ? '700' : '500',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.03)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.background = 'transparent';
+                  }
+                }}
+              >
+                <span>{opt.label}</span>
+                {isSelected && <CheckCircle2 size={11} color="var(--primary)" />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function MobileView() {
   const [activeTab, setActiveTab] = useState('accueil'); // accueil, gestion, facturation, profile
+  const [accueilSubView, setAccueilSubView] = useState('main'); // main, top_clients
+  const [loyaltySearchQuery, setLoyaltySearchQuery] = useState('');
+
+  const [notifications, setNotifications] = useState([
+    { id: '1', text: 'Commande Express reçue pour Marie-Antoinette', type: 'info', read: false, date: 'Il y a 10 min' },
+    { id: '2', text: 'Machine N°1 (12kg) : Lavage terminé', type: 'success', read: false, date: 'Il y a 30 min' },
+    { id: '3', text: 'Commande KLIN-908122 en retard de livraison', type: 'warning', read: false, date: 'Il y a 2h' },
+    { id: '4', text: 'Abonnement VIP souscrit par Pierre Diallo', type: 'info', read: true, date: 'Hier' }
+  ]);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+
+  const markAsRead = (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const deleteNotification = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+  };
+  
+  // États Mode Client Calmy (Simulation)
+  const [isCalmyClientMode, setIsCalmyClientMode] = useState(false);
+  const [calmyView, setCalmyView] = useState('dashboard'); // dashboard, select_cycle, tracker
+  const [selectedCalmyMachine, setSelectedCalmyMachine] = useState(3); // Machine N°3 par défaut
+  const [selectedCalmyCycle, setSelectedCalmyCycle] = useState('express'); // delicat, express, hot
+  const [calmyTimeRemaining, setCalmyTimeRemaining] = useState(1200); // 20 minutes en secondes par défaut
+  const [calmyIsActive, setCalmyIsActive] = useState(false);
+  const [notifyFiveMinBefore, setNotifyFiveMinBefore] = useState(true);
+
+  // Compte à rebours temps réel pour le cycle Calmy
+  useEffect(() => {
+    let timer;
+    if (isCalmyClientMode && calmyIsActive && calmyTimeRemaining > 0) {
+      timer = setInterval(() => {
+        setCalmyTimeRemaining(prev => {
+          if (prev <= 1) {
+            setCalmyIsActive(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isCalmyClientMode, calmyIsActive, calmyTimeRemaining]);
+
   const [customers, setCustomers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [catalog, setCatalog] = useState([]);
@@ -70,6 +265,7 @@ export default function MobileView() {
   const [custNom, setCustNom] = useState('');
   const [custPrenom, setCustPrenom] = useState('');
   const [custTelephone, setCustTelephone] = useState('');
+  const [custAdresse, setCustAdresse] = useState('');
   const [custPreferences, setCustPreferences] = useState('Plié');
   const [profileSearch, setProfileSearch] = useState('');
   const [showDeleteCustomerConfirm, setShowDeleteCustomerConfirm] = useState(null);
@@ -79,6 +275,7 @@ export default function MobileView() {
     setCustNom('');
     setCustPrenom('');
     setCustTelephone('');
+    setCustAdresse('');
     setCustPreferences('Plié');
     setShowCustomerModal(true);
   };
@@ -88,35 +285,42 @@ export default function MobileView() {
     setCustNom(cust.nom);
     setCustPrenom(cust.prenom);
     setCustTelephone(cust.telephone);
+    setCustAdresse(cust.adresse || '');
     setCustPreferences(cust.preferences_pliage || 'Plié');
     setShowCustomerModal(true);
   };
 
   const handleSaveCustomer = (e) => {
     e.preventDefault();
-    if (!custNom.trim() || !custPrenom.trim() || !custTelephone.trim()) {
-      alert("Veuillez remplir tous les champs obligatoires.");
+    if (!custNom.trim() || !custPrenom.trim() || !custTelephone.trim() || !custAdresse.trim()) {
+      alert("Veuillez remplir tous les champs obligatoires (adresse comprise).");
       return;
     }
 
-    if (editingCustomer) {
-      db.updateCustomer(editingCustomer.id, {
-        nom: custNom.trim(),
-        prenom: custPrenom.trim(),
-        telephone: custTelephone.trim(),
-        preferences_pliage: custPreferences
-      });
-      alert("Profil client mis à jour avec succès !");
-    } else {
-      db.addCustomer({
-        nom: custNom.trim(),
-        prenom: custPrenom.trim(),
-        telephone: custTelephone.trim(),
-        preferences_pliage: custPreferences
-      });
-      alert("Nouveau client créé avec succès !");
+    try {
+      if (editingCustomer) {
+        db.updateCustomer(editingCustomer.id, {
+          nom: custNom.trim(),
+          prenom: custPrenom.trim(),
+          telephone: custTelephone.trim(),
+          adresse: custAdresse.trim(),
+          preferences_pliage: custPreferences
+        });
+        alert("Profil client mis à jour avec succès !");
+      } else {
+        db.addCustomer({
+          nom: custNom.trim(),
+          prenom: custPrenom.trim(),
+          telephone: custTelephone.trim(),
+          adresse: custAdresse.trim(),
+          preferences_pliage: custPreferences
+        });
+        alert("Nouveau client créé avec succès !");
+      }
+      setShowCustomerModal(false);
+    } catch (err) {
+      alert(err.message);
     }
-    setShowCustomerModal(false);
   };
 
   const handleDeleteCustomer = (id) => {
@@ -249,17 +453,18 @@ export default function MobileView() {
     setArticleServices(prev => ({ ...prev, [cloth]: service }));
   };
 
-  const handleStartDelivery = (order) => {
+  const handleStartDelivery = (order, finalStatus) => {
+    setDelivFinalStatus(finalStatus);
     const remainingToPay = order.prix_total - order.avance_payee;
     if (remainingToPay <= 0) {
-      if (confirm(`Confirmer la livraison de la commande ${order.identifiant_unique_marquage} ?`)) {
-        db.updateOrderStatus(order.id, 'restitue');
+      if (confirm(`Confirmer la restitution de la commande ${order.identifiant_unique_marquage} ?`)) {
+        db.updateOrderStatus(order.id, finalStatus);
         refreshData();
 
         // Notification WhatsApp livraison directe (déjà payé)
         const customer = customers.find(c => c.id === order.customer_id);
         if (customer) {
-          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été marquée comme '${finalStatus === 'a_livrer' ? 'À livrer' : 'À récupérer'}'. Merci pour votre confiance et à bientôt chez KLIN UP !`;
           sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
         }
       }
@@ -275,27 +480,29 @@ export default function MobileView() {
     e.preventDefault();
     if (!delivOrder) return;
     
-    db.deliverOrderWithPayment(delivOrder.id, Number(delivAmountPaid || 0), delivPaymentMethod);
+    db.deliverOrderWithPayment(delivOrder.id, Number(delivAmountPaid || 0), delivPaymentMethod, delivFinalStatus);
     refreshData();
     setShowDeliveryPaymentModal(false);
 
     // Notification WhatsApp solde livraison
     const customer = customers.find(c => c.id === delivOrder.customer_id);
     if (customer) {
-      const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la livraison de votre commande ${delivOrder.identifiant_unique_marquage} et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
+      const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la livraison de votre commande ${delivOrder.identifiant_unique_marquage} (${delivFinalStatus === 'a_livrer' ? 'À livrer' : 'À récupérer'}) et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
       sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
     }
 
     setDelivOrder(null);
   };
-  
+
   // Nouveau Client
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [newCustNom, setNewCustNom] = useState('');
   const [newCustPrenom, setNewCustPrenom] = useState('');
   const [newCustTel, setNewCustTel] = useState('');
+  const [newCustAdresse, setNewCustAdresse] = useState('');
   const [newCustPref, setNewCustPref] = useState('Plié');
   const [newCustIndicatif, setNewCustIndicatif] = useState('229');
+  const [delivFinalStatus, setDelivFinalStatus] = useState('a_livrer');
 
   // CRM Search & Debt
   const [crmSearch, setCrmSearch] = useState('');
@@ -415,23 +622,32 @@ export default function MobileView() {
 
   const handleCreateCustomer = (e) => {
     e.preventDefault();
-    if (!newCustNom || !newCustPrenom || !newCustTel) return;
+    if (!newCustNom || !newCustPrenom || !newCustTel || !newCustAdresse) {
+      alert("Veuillez remplir tous les champs obligatoires (adresse comprise).");
+      return;
+    }
     
-    const newCustomer = db.addCustomer({
-      nom: newCustNom,
-      prenom: newCustPrenom,
-      telephone: newCustTel,
-      indicatif: newCustIndicatif,
-      preferences_pliage: newCustPref
-    });
-    
-    refreshData();
-    setSelectedCustomerId(newCustomer.id);
-    setShowNewCustomerModal(false);
-    setNewCustNom('');
-    setNewCustPrenom('');
-    setNewCustTel('');
-    setNewCustIndicatif('229');
+    try {
+      const newCustomer = db.addCustomer({
+        nom: newCustNom,
+        prenom: newCustPrenom,
+        telephone: newCustTel,
+        adresse: newCustAdresse,
+        indicatif: newCustIndicatif,
+        preferences_pliage: newCustPref
+      });
+      
+      refreshData();
+      setSelectedCustomerId(newCustomer.id);
+      setShowNewCustomerModal(false);
+      setNewCustNom('');
+      setNewCustPrenom('');
+      setNewCustTel('');
+      setNewCustAdresse('');
+      setNewCustIndicatif('229');
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const handleCreateOrder = (e) => {
@@ -592,15 +808,17 @@ export default function MobileView() {
   };
 
   const statusLabels = {
-    en_attente: 'Reçu / Tri',
-    en_cours_lavage: 'En Lavage',
+    en_attente: 'Reçu',
+    en_cours_lavage: 'Lavage',
     pret: 'Prêt',
     restitue: 'Livré',
+    a_livrer: 'À livrer',
+    a_recuperer: 'À récupérer',
     annule: 'Annulé'
   };
 
   const isOrderLate = (order) => {
-    if (order.statut === 'restitue' || order.statut === 'annule') return false;
+    if (order.statut === 'restitue' || order.statut === 'a_livrer' || order.statut === 'a_recuperer' || order.statut === 'annule') return false;
     return new Date(order.due_date) < new Date();
   };
 
@@ -632,13 +850,13 @@ export default function MobileView() {
   };
 
   // --- STATS DYNAMIQUE ---
-  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule').length;
-  const completedOrdersCount = orders.filter(o => o.statut === 'restitue').length;
+  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule').length;
+  const completedOrdersCount = orders.filter(o => o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer').length;
   const totalRevenue = orders.filter(o => o.statut !== 'annule').reduce((sum, o) => sum + o.avance_payee, 0);
 
   // Active / Search orders filter on home
   const filteredHomeOrders = orders.filter(o => {
-    if (o.statut === 'restitue' || o.statut === 'annule') return false;
+    if (o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer' || o.statut === 'annule') return false;
     if (homeSearchQuery) {
       const q = homeSearchQuery.toLowerCase();
       const client = customers.find(c => c.id === o.customer_id);
@@ -654,7 +872,7 @@ export default function MobileView() {
 
   // Atelier filters
   const filteredAtelierOrders = orders.filter(o => {
-    if (o.statut === 'restitue' || o.statut === 'annule') return false;
+    if (o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer' || o.statut === 'annule') return false;
     if (atelierFilter === 'urgent') return o.niveau_urgence === 'Express';
     if (atelierFilter === 'retard') return isOrderLate(o);
     return true;
@@ -670,42 +888,775 @@ export default function MobileView() {
 
   // canViewCA defined at the top of the component
 
-  return (
-    <div className="mobile-simulator">
-      {/* Centered Notch */}
-      <div className="phone-notch"></div>
+  // Rendu de l'application cliente Calmy
+  const renderCalmyClientView = () => {
+    const formatTime = (seconds) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
 
-      {/* Status Bar */}
-      <div className="phone-status-bar">
-        <span style={{ fontSize: "0.78rem", fontWeight: 800 }}>9:41</span>
-        <div className="phone-status-bar-icons">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 20h.01M7 20v-4M12 20v-8M17 20V4M22 20V2" />
-          </svg>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
-          </svg>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2px', border: '1px solid currentColor', padding: '1px 3px', borderRadius: '4px', fontSize: '0.55rem', fontWeight: 900, lineHeight: 1 }}>
-            98%
+    const getCycleDuration = (id) => {
+      if (id === 'delicat') return 2100; // 35 min
+      if (id === 'express') return 1200; // 20 min
+      return 3000; // 50 min
+    };
+
+    const getCycleLabel = (id) => {
+      if (id === 'delicat') return 'Délicat';
+      if (id === 'express') return 'Express';
+      return 'Haute Température';
+    };
+
+    const getCyclePrice = (id) => {
+      if (id === 'delicat') return '2 200 F';
+      if (id === 'express') return '1 500 F';
+      return '2 600 F';
+    };
+
+    const getStepStatus = () => {
+      const duration = getCycleDuration(selectedCalmyCycle);
+      const elapsed = duration - calmyTimeRemaining;
+      const pct = (elapsed / duration) * 100;
+
+      if (pct < 60) return { label: 'Lavage en cours', step: 1 };
+      if (pct < 85) return { label: 'Rinçage en cours', step: 2 };
+      return { label: 'Essorage & Séchage', step: 3 };
+    };
+
+    const stepInfo = getStepStatus();
+
+    // VIEW: DASHBOARD
+    if (calmyView === 'dashboard') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '16px 20px 32px', minHeight: '100%', position: 'relative' }}>
+          
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px' }}>
+            <div>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>Bonjour Marie,</p>
+              <h2 style={{ margin: '2px 0 0 0', fontSize: '1.4rem', fontWeight: 900, fontFamily: 'var(--font-title)', letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>Ma Laverie</h2>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button 
+                onClick={() => setIsCalmyClientMode(false)} 
+                className="btn btn-secondary" 
+                style={{ padding: '0.35rem 0.65rem', fontSize: '0.68rem', borderRadius: '10px', fontWeight: 700 }}
+              >
+                ← Staff Portal
+              </button>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', border: '1px solid rgba(43, 130, 240, 0.2)' }}>
+                MA
+              </div>
+            </div>
           </div>
+
+          {/* Active Machine Widget */}
+          {calmyIsActive ? (
+            <div 
+              className="card" 
+              onClick={() => setCalmyView('tracker')}
+              style={{ 
+                cursor: 'pointer',
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '0.8rem', 
+                border: '1.5px solid var(--primary)', 
+                background: 'linear-gradient(135deg, rgba(43, 130, 240, 0.1) 0%, rgba(26, 75, 140, 0.05) 100%)',
+                boxShadow: '0 8px 24px rgba(43, 130, 240, 0.12)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div className="spin-washing" style={{ width: '38px', height: '38px', borderRadius: '50%', border: '2.5px dashed var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Waves size={16} color="var(--primary)" />
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '0.8rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Machine N°{selectedCalmyMachine}</h4>
+                    <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>{stepInfo.label}</p>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)', fontFamily: 'var(--font-title)' }}>
+                    {formatTime(calmyTimeRemaining)}
+                  </div>
+                  <span style={{ fontSize: '0.52rem', color: 'var(--text-muted)' }}>restantes</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(43, 130, 240, 0.15)', paddingTop: '0.6rem' }}>
+                <span style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>Cycle : <strong>{getCycleLabel(selectedCalmyCycle)}</strong></span>
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  Suivre en direct <ChevronRight size={12} />
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="card" style={{ padding: '1.25rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.65)', border: '1px solid rgba(0, 0, 0, 0.05)', display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Smartphone size={22} strokeWidth={1.5} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Aucun cycle actif</h4>
+                <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', margin: '2px 0 0', lineHeight: 1.35 }}>Sélectionnez une machine libre dans l'application pour lancer votre cycle de lavage.</p>
+              </div>
+              <button 
+                onClick={() => setCalmyView('select_cycle')}
+                className="btn btn-primary" 
+                style={{ width: '100%', borderRadius: '12px', padding: '0.65rem', fontSize: '0.78rem', marginTop: '0.2rem' }}
+              >
+                + Lancer un cycle
+              </button>
+            </div>
+          )}
+
+          {/* Machine Grid Status */}
+          <div>
+            <div className="section-header">
+              <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>Machines Disponibles</h4>
+              <span className="see-all">Plan</span>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', padding: '0.85rem', background: 'rgba(255, 255, 255, 0.65)', border: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(43, 130, 240, 0.08)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Waves size={14} />
+                  </div>
+                  <span className="badge badge-pret" style={{ fontSize: '0.48rem', padding: '0.05rem 0.25rem' }}>4 Libres</span>
+                </div>
+                <div>
+                  <h5 style={{ fontSize: '0.78rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Lavantes</h5>
+                  <p style={{ fontSize: '0.58rem', color: 'var(--text-muted)', margin: '1px 0 0' }}>4 libres sur 6</p>
+                </div>
+              </div>
+
+              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', padding: '0.85rem', background: 'rgba(255, 255, 255, 0.65)', border: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(217, 119, 6, 0.08)', color: 'var(--status-pending)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Sun size={14} />
+                  </div>
+                  <span className="badge badge-pret" style={{ fontSize: '0.48rem', padding: '0.05rem 0.25rem' }}>2 Libres</span>
+                </div>
+                <div>
+                  <h5 style={{ fontSize: '0.78rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Séchantes</h5>
+                  <p style={{ fontSize: '0.58rem', color: 'var(--text-muted)', margin: '1px 0 0' }}>2 libres sur 4</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick instructions */}
+          <div className="card" style={{ padding: '0.85rem', background: 'rgba(255, 255, 255, 0.5)', border: '1px solid rgba(0, 0, 0, 0.05)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <h4 style={{ fontSize: '0.75rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Comment démarrer ?</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+              <div>1. Mettez votre linge dans une machine disponible.</div>
+              <div>2. Cliquez sur <strong>Lancer un cycle</strong> dans l'application.</div>
+              <div>3. Sélectionnez le numéro de la machine.</div>
+              <div>4. Payez et suivez le lavage en temps réel !</div>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // VIEW: SELECT CYCLE
+    if (calmyView === 'select_cycle') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', padding: '16px 20px 32px', minHeight: '100%' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingTop: '10px' }}>
+            <button 
+              onClick={() => setCalmyView('dashboard')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Choisir un cycle</h2>
+          </div>
+
+          {/* Machine selection row */}
+          <div>
+            <label style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+              Sélectionner la machine
+            </label>
+            <div style={{ display: 'flex', gap: '0.55rem', marginTop: '0.35rem' }}>
+              {[
+                { id: 1, label: 'N°1', busy: true },
+                { id: 2, label: 'N°2', busy: true },
+                { id: 3, label: 'N°3', busy: false },
+                { id: 4, label: 'N°4', busy: false }
+              ].map(mach => {
+                const isSelected = selectedCalmyMachine === mach.id;
+                return (
+                  <button
+                    key={mach.id}
+                    type="button"
+                    disabled={mach.busy}
+                    onClick={() => setSelectedCalmyMachine(mach.id)}
+                    style={{
+                      flex: 1,
+                      padding: '0.65rem 0',
+                      borderRadius: '12px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                      background: isSelected ? 'var(--primary-gradient)' : mach.busy ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.7)',
+                      color: isSelected ? '#fff' : mach.busy ? 'var(--text-muted)' : 'var(--text-primary)',
+                      cursor: mach.busy ? 'not-allowed' : 'pointer',
+                      opacity: mach.busy ? 0.35 : 1,
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {mach.label}
+                    {mach.busy && <div style={{ fontSize: '0.45rem', fontWeight: 500, marginTop: '1px' }}>Occupée</div>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* List of cycles (3 cards) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <label style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+              Type de cycle
+            </label>
+
+            {/* Option 1: Délicat */}
+            <div 
+              onClick={() => setSelectedCalmyCycle('delicat')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.75rem 1rem',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                border: selectedCalmyCycle === 'delicat' ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                background: selectedCalmyCycle === 'delicat' ? 'linear-gradient(135deg, rgba(43, 130, 240, 0.08) 0%, rgba(26, 75, 140, 0.04) 100%)' : 'rgba(255, 255, 255, 0.65)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#fff', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: selectedCalmyCycle === 'delicat' ? 'var(--primary)' : 'var(--text-muted)' }}>
+                  <Feather size={16} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Délicat</h4>
+                  <p style={{ fontSize: '0.62rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>Laine, soie & linges fins 30°C</p>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>35 min</div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 700 }}>2 200 F</div>
+              </div>
+            </div>
+
+            {/* Option 2: Express */}
+            <div 
+              onClick={() => setSelectedCalmyCycle('express')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.75rem 1rem',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                border: selectedCalmyCycle === 'express' ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                background: selectedCalmyCycle === 'express' ? 'linear-gradient(135deg, rgba(43, 130, 240, 0.08) 0%, rgba(26, 75, 140, 0.04) 100%)' : 'rgba(255, 255, 255, 0.65)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#fff', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: selectedCalmyCycle === 'express' ? 'var(--primary)' : 'var(--text-muted)' }}>
+                  <Clock size={16} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Express</h4>
+                  <p style={{ fontSize: '0.62rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>Lavage rapide quotidien 40°C</p>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>20 min</div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 700 }}>1 500 F</div>
+              </div>
+            </div>
+
+            {/* Option 3: Haute Température */}
+            <div 
+              onClick={() => setSelectedCalmyCycle('hot')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.75rem 1rem',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                border: selectedCalmyCycle === 'hot' ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                background: selectedCalmyCycle === 'hot' ? 'linear-gradient(135deg, rgba(43, 130, 240, 0.08) 0%, rgba(26, 75, 140, 0.04) 100%)' : 'rgba(255, 255, 255, 0.65)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#fff', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: selectedCalmyCycle === 'hot' ? 'var(--primary)' : 'var(--text-muted)' }}>
+                  <Flame size={16} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Haute Température</h4>
+                  <p style={{ fontSize: '0.62rem', color: 'var(--text-secondary)', margin: '1px 0 0' }}>Désinfection intense 60°C</p>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>50 min</div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 700 }}>2 600 F</div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Confirm launch button */}
+          <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+            <button
+              onClick={() => {
+                const duration = getCycleDuration(selectedCalmyCycle);
+                setCalmyTimeRemaining(duration);
+                setCalmyIsActive(true);
+                setCalmyView('tracker');
+              }}
+              className="btn btn-primary"
+              style={{
+                width: '100%',
+                padding: '0.85rem',
+                borderRadius: '16px',
+                fontSize: '0.85rem',
+                fontWeight: 800,
+                boxShadow: '0 8px 24px rgba(43, 130, 240, 0.25)'
+              }}
+            >
+              Payer et Démarrer ({getCyclePrice(selectedCalmyCycle)})
+            </button>
+          </div>
+
+        </div>
+      );
+    }
+
+    // VIEW: TRACKER
+    if (calmyView === 'tracker') {
+      const duration = getCycleDuration(selectedCalmyCycle);
+      const elapsed = duration - calmyTimeRemaining;
+      const progressPercent = (elapsed / duration) * 100;
+      
+      // Ring dimensions
+      const radius = 80;
+      const strokeWidth = 8;
+      const circumference = 2 * Math.PI * radius;
+      const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', padding: '16px 20px 32px', minHeight: '100%', alignItems: 'center' }}>
+          
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingTop: '10px' }}>
+            <button 
+              onClick={() => setCalmyView('dashboard')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Suivi en direct</h2>
+            <button 
+              onClick={() => setCalmyView('dashboard')}
+              style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.05)', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'center', width: '100%' }}>
+            Machine N°{selectedCalmyMachine} • Cycle {getCycleLabel(selectedCalmyCycle)}
+          </div>
+
+          {/* 200px Circle Progress */}
+          <div style={{ position: 'relative', width: '200px', height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.5rem 0' }}>
+            <svg width="200" height="200" viewBox="0 0 200 200" style={{ transform: 'rotate(-90deg)' }}>
+              {/* Outer Track */}
+              <circle
+                cx="100"
+                cy="100"
+                r={radius}
+                fill="transparent"
+                stroke="rgba(43, 130, 240, 0.08)"
+                strokeWidth={strokeWidth}
+              />
+              {/* Filled Progress Ring */}
+              <circle
+                cx="100"
+                cy="100"
+                r={radius}
+                fill="transparent"
+                stroke="var(--primary)"
+                strokeWidth={strokeWidth}
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+              />
+            </svg>
+
+            {/* Inner Content overlay */}
+            <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+              <div style={{ fontSize: '2.2rem', fontWeight: 900, fontFamily: 'var(--font-title)', letterSpacing: '-1px', lineHeight: 1, color: 'var(--text-primary)' }}>
+                {formatTime(calmyTimeRemaining)}
+              </div>
+              <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '6px' }}>
+                {stepInfo.label}
+              </span>
+            </div>
+          </div>
+
+          {/* Stepper Steps (Lavage, Rinçage, Séchage) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0.5rem 10px', position: 'relative', marginTop: '0.5rem' }}>
+            {/* Stepper background line */}
+            <div style={{ position: 'absolute', top: '23px', left: '30px', right: '30px', height: '3px', background: 'var(--border-color)', zIndex: 1 }}>
+              {/* Active fill line */}
+              <div 
+                style={{ 
+                  height: '100%', 
+                  background: 'var(--primary)', 
+                  width: stepInfo.step === 1 ? '0%' : stepInfo.step === 2 ? '50%' : '100%', 
+                  transition: 'width 0.4s ease' 
+                }} 
+              />
+            </div>
+
+            {/* Steps */}
+            {[
+              { num: 1, label: 'Lavage', icon: <Waves size={12} /> },
+              { num: 2, label: 'Rinçage', icon: <Clock size={12} /> },
+              { num: 3, label: 'Séchage', icon: <Sun size={12} /> }
+            ].map(step => {
+              const isDone = stepInfo.step > step.num;
+              const isActive = stepInfo.step === step.num;
+              
+              let stepBg = 'rgba(255,255,255,0.7)';
+              let stepBorder = 'rgba(0,0,0,0.06)';
+              let stepColor = 'var(--text-secondary)';
+
+              if (isDone) {
+                stepBg = 'var(--primary)';
+                stepBorder = 'var(--primary)';
+                stepColor = '#ffffff';
+              } else if (isActive) {
+                stepBg = 'var(--primary-light)';
+                stepBorder = 'var(--primary)';
+                stepColor = 'var(--primary)';
+              }
+
+              return (
+                <div key={step.num} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem', zIndex: 2, width: '60px' }}>
+                  <div 
+                    style={{ 
+                      width: '28px', 
+                      height: '28px', 
+                      borderRadius: '50%', 
+                      background: stepBg, 
+                      border: `1px solid ${stepBorder}`, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      color: stepColor,
+                      boxShadow: isActive ? '0 0 10px rgba(43, 130, 240, 0.3)' : 'none',
+                      transition: 'all 0.3s ease'
+                    }}
+                    className={isActive && step.num === 1 ? 'spin-washing' : ''}
+                  >
+                    {isDone ? <CheckCircle size={12} /> : step.icon}
+                  </div>
+                  <span style={{ fontSize: '0.58rem', fontWeight: isActive ? 800 : 600, color: isActive ? 'var(--primary)' : 'var(--text-muted)' }}>
+                    {step.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Toggle notify settings card */}
+          <div className="card" style={{ width: '100%', padding: '0.85rem', background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0, 0, 0, 0.05)', marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Bell size={13} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: '0.72rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>M'avertir avant la fin</h4>
+                <p style={{ fontSize: '0.55rem', color: 'var(--text-muted)', margin: '1px 0 0' }}>Notification 5 min avant</p>
+              </div>
+            </div>
+            <label style={{ position: 'relative', display: 'inline-block', width: '38px', height: '22px' }}>
+              <input 
+                type="checkbox" 
+                checked={notifyFiveMinBefore} 
+                onChange={(e) => setNotifyFiveMinBefore(e.target.checked)}
+                style={{ opacity: 0, width: 0, height: 0 }} 
+              />
+              <span 
+                style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: notifyFiveMinBefore ? 'var(--primary)' : '#ccc',
+                  transition: '.3s',
+                  borderRadius: '34px'
+                }}
+              >
+                <span 
+                  style={{
+                    position: 'absolute',
+                    content: '""',
+                    height: '16px', width: '16px',
+                    left: notifyFiveMinBefore ? '19px' : '3px',
+                    bottom: '3px',
+                    backgroundColor: 'white',
+                    transition: '.3s',
+                    borderRadius: '50%'
+                  }}
+                />
+              </span>
+            </label>
+          </div>
+
+          {/* Cancel button */}
+          <button 
+            type="button"
+            className="btn btn-outline"
+            style={{ width: '100%', color: 'var(--status-late)', borderColor: 'rgba(220, 38, 38, 0.25)', padding: '0.65rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700 }}
+            onClick={() => {
+              if (confirm("Voulez-vous vraiment annuler le cycle en cours ? Vous serez remboursé.")) {
+                setCalmyIsActive(false);
+                setCalmyTimeRemaining(1200);
+                setCalmyView('dashboard');
+              }
+            }}
+          >
+            Annuler le cycle
+          </button>
+
+          <a 
+            href="#" 
+            onClick={(e) => { e.preventDefault(); alert("Un technicien a été alerté. Il arrivera sous peu !"); }}
+            style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textDecoration: 'underline', marginTop: '0.2rem' }}
+          >
+            Signaler un problème
+          </a>
+
+        </div>
+      );
+    }
+  };
+
+  const renderTopClientsView = () => {
+    // 1. Calculate loyalty of all customers
+    const loyaltyCustomers = customers.map(c => {
+      const orderCount = orders.filter(o => o.customer_id === c.id && o.statut !== 'annule').length;
+      const totalSpent = orders.filter(o => o.customer_id === c.id && o.statut !== 'annule').reduce((s, o) => s + (o.prix_total || 0), 0);
+      return {
+        ...c,
+        orderCount,
+        totalSpent
+      };
+    }).sort((a, b) => b.totalSpent - a.totalSpent);
+
+    // 2. Filter by search query
+    const filteredCustomers = loyaltyCustomers.filter(c => {
+      const query = loyaltySearchQuery.toLowerCase();
+      return (
+        c.nom.toLowerCase().includes(query) ||
+        c.prenom.toLowerCase().includes(query) ||
+        (c.telephone && c.telephone.includes(query))
+      );
+    });
+
+    // 3. Render
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        {/* Header with back button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button"
+            onClick={() => {
+              setAccueilSubView('main');
+              setLoyaltySearchQuery('');
+            }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Classement Fidélité</h2>
+        </div>
+
+        <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
+          Liste de tous les clients classés selon leur niveau d'activité et leur fidélité.
+        </p>
+
+        {/* Search Input */}
+        <div style={{ position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input 
+            type="text" 
+            className="input-control" 
+            style={{ paddingLeft: '2.2rem', width: '100%', borderRadius: '12px', fontSize: '0.75rem', padding: '0.45rem 1rem 0.45rem 2.2rem' }} 
+            placeholder="Rechercher par nom, prénom, tél..." 
+            value={loyaltySearchQuery} 
+            onChange={(e) => setLoyaltySearchQuery(e.target.value)} 
+          />
+          {loyaltySearchQuery && (
+            <button 
+              type="button"
+              onClick={() => setLoyaltySearchQuery('')}
+              style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Loyalty List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '500px', paddingRight: '2px' }}>
+          {filteredCustomers.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Aucun client trouvé.
+            </div>
+          ) : (
+            filteredCustomers.map((c, index) => {
+              // Determine actual index in global sorted list for podium icons
+              const globalIndex = loyaltyCustomers.findIndex(gc => gc.id === c.id);
+              
+              // Loyalty tier based on rank / totalSpent
+              let tierName = "Nouveau 🌱";
+              let tierColor = "var(--text-muted)";
+              if (c.totalSpent > 0) {
+                if (globalIndex < 3) {
+                  tierName = "Élite 👑";
+                  tierColor = "#FFB800"; // Gold
+                } else if (globalIndex < 10) {
+                  tierName = "Fidèle ⭐";
+                  tierColor = "#2B82F0"; // Blue
+                } else {
+                  tierName = "Membre 🎫";
+                  tierColor = "var(--text-secondary)";
+                }
+              }
+
+              return (
+                <div 
+                  key={c.id} 
+                  className="card"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.65rem', 
+                    padding: '0.6rem 0.75rem',
+                    background: globalIndex === 0 ? 'rgba(255, 184, 0, 0.08)' : undefined,
+                    borderColor: globalIndex === 0 ? 'rgba(255, 184, 0, 0.3)' : undefined
+                  }}
+                >
+                  {/* Rank Badge */}
+                  <div style={{ 
+                    width: '32px', 
+                    height: '32px', 
+                    borderRadius: '50%', 
+                    background: globalIndex < 3 ? 'var(--primary-light)' : 'var(--border-color)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: globalIndex < 3 ? '1rem' : '0.7rem', 
+                    fontWeight: 800, 
+                    color: 'var(--text-primary)', 
+                    flexShrink: 0 
+                  }}>
+                    {globalIndex === 0 ? '🥇' : globalIndex === 1 ? '🥈' : globalIndex === 2 ? '🥉' : `#${globalIndex + 1}`}
+                  </div>
+
+                  {/* Initials Avatar */}
+                  <div style={{
+                    width: '30px', 
+                    height: '30px', 
+                    borderRadius: '50%', 
+                    background: 'var(--primary-light)', 
+                    color: 'var(--primary)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 800, 
+                    flexShrink: 0
+                  }}>
+                    {c.prenom[0]?.toUpperCase()}{c.nom[0]?.toUpperCase()}
+                  </div>
+
+                  {/* Customer Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>
+                      {c.prenom} {c.nom}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '2px' }}>
+                      <span style={{ fontSize: '0.62rem', color: tierColor, fontWeight: 700 }}>
+                        {tierName}
+                      </span>
+                      {c.telephone && (
+                        <>
+                          <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>•</span>
+                          <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{c.telephone}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary)' }}>
+                      {c.orderCount} cmd{c.orderCount > 1 ? 's' : ''}
+                    </span>
+                    {canViewCA && (
+                      <span style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>
+                        {showCAValues ? `${c.totalSpent.toLocaleString()} F` : '•••••• F'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
+    );
+  };
+
+  return (
+    <div className="mobile-simulator">
+      {/* Background Liquid Orbs */}
+      <div className="liquid-orb-1"></div>
+      <div className="liquid-orb-2"></div>
 
       {/* Main Container */}
-      <div className="mobile-content" style={{ padding: !currentUser ? 0 : undefined }}>
-        {!currentUser ? (
+      <div className="mobile-content" style={{ padding: (isCalmyClientMode || !currentUser) ? 0 : undefined }}>
+        {isCalmyClientMode ? (
+          renderCalmyClientView()
+        ) : !currentUser ? (
           <div className="lockscreen-container">
-            <div className="lockscreen-logo-area">
-              <div style={{ background: 'rgba(255,255,255,0.08)', padding: '0.65rem', borderRadius: '16px', display: 'inline-flex', marginBottom: '0.65rem', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <Lock size={28} color="#ffffff" strokeWidth={1.5} />
+            <div className="lockscreen-logo-area" style={{ overflow: 'visible' }}>
+              <div style={{ background: 'var(--primary-light)', padding: '0.65rem', borderRadius: '16px', display: 'inline-flex', marginBottom: '0.2rem', border: '1px solid var(--border-color)' }}>
+                <Lock size={28} color="var(--primary)" strokeWidth={1.5} />
               </div>
-              <h2 className="lockscreen-title">KLIN UP</h2>
-              <p className="lockscreen-subtitle">Plateforme Laverie Caisse & Atelier</p>
+              <div style={{ height: '70px', overflow: 'visible', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0' }}>
+                <img src={logoDark} alt="KLIN UP Logo" style={{ height: '140px', objectFit: 'contain', display: 'block', margin: '-30px auto -30px auto' }} />
+              </div>
+              <p className="lockscreen-subtitle" style={{ marginTop: '0px' }}>Plateforme Laverie Caisse & Atelier</p>
             </div>
 
             {!selectedLoginUser ? (
               <form onSubmit={handleEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%', maxWidth: '280px', animation: 'fadeIn 0.3s ease-out forwards' }}>
-                <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', fontWeight: 600, textAlign: 'center', marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'center', marginBottom: '0.5rem' }}>
                   Connexion Utilisateur
                 </div>
                 
@@ -716,37 +1667,24 @@ export default function MobileView() {
                     placeholder="Email de l'utilisateur"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
+                    className="input-control"
                     style={{
                       width: '100%',
                       padding: '0.8rem 1rem',
                       borderRadius: '12px',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.06)',
-                      color: '#fff',
-                      fontSize: '0.85rem',
-                      outline: 'none',
-                      transition: 'all 0.2s ease',
                       textAlign: 'center'
                     }}
-                    onFocus={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.5)'}
-                    onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.15)'}
                   />
                 </div>
 
                 <button 
                   type="submit"
-                  className="btn"
+                  className="btn btn-primary"
                   style={{
-                    background: '#ffffff',
-                    color: '#1a1a5e',
                     padding: '0.75rem',
                     borderRadius: '12px',
-                    fontWeight: 700,
                     fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    border: 'none',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                    width: '100%'
                   }}
                 >
                   Continuer
@@ -757,7 +1695,7 @@ export default function MobileView() {
                   onClick={() => setShowResetPinModal(true)}
                   style={{
                     background: 'transparent',
-                    color: 'rgba(255,255,255,0.6)',
+                    color: 'var(--text-secondary)',
                     border: 'none',
                     fontSize: '0.75rem',
                     fontWeight: 600,
@@ -769,6 +1707,29 @@ export default function MobileView() {
                   }}
                 >
                   Réinitialiser le PIN
+                </button>
+
+                <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.4rem 0' }} />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCalmyClientMode(true);
+                    setCalmyView('dashboard');
+                  }}
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '0.65rem',
+                    borderRadius: '12px',
+                    fontSize: '0.78rem',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  📱 Démo Espace Client Calmy
                 </button>
               </form>
             ) : (
@@ -846,10 +1807,14 @@ export default function MobileView() {
            ONGLET : ACCUEIL — Style Finance App
            ======================================================== */}
         {activeTab === 'accueil' && (() => {
+          if (accueilSubView === 'top_clients') {
+            return renderTopClientsView();
+          }
+
           const now = new Date();
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
-          const completedThisMonth = orders.filter(o => o.statut === 'restitue' && new Date(o.updated_at || o.created_at) >= startOfMonth);
+          const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule');
+          const completedThisMonth = orders.filter(o => (o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer') && new Date(o.updated_at || o.created_at) >= startOfMonth);
           const lateOrders = activeOrders.filter(o => isOrderLate(o));
           const expressOrders = activeOrders.filter(o => o.niveau_urgence === 'Express');
           const revenueTotal = orders.filter(o => o.statut !== 'annule').reduce((s, o) => s + (o.prix_total || 0), 0);
@@ -873,24 +1838,39 @@ export default function MobileView() {
             ...c,
             orderCount: orders.filter(o => o.customer_id === c.id && o.statut !== 'annule').length,
             totalSpent: orders.filter(o => o.customer_id === c.id && o.statut !== 'annule').reduce((s, o) => s + (o.prix_total || 0), 0)
-          })).sort((a, b) => b.orderCount - a.orderCount).slice(0, 3);
+          })).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 3);
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
 
-              {/* HEADER — Style Finance: Title + Circle Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: '8px' }}>
-                <div>
-                  <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.65rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1, margin: 0 }}>KLIN UP</h1>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 500 }}>Gérez votre atelier<br /><span style={{ color: 'var(--text-secondary)' }}>en toute simplicité.</span></p>
+              {/* HEADER — Logo + Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', paddingBottom: '4px' }}>
+                {/* Crop transparent Photoshop padding: ~27% top, ~42% content, ~31% bottom */}
+                <div style={{ width: '125px', height: '50px', overflow: 'hidden', flexShrink: 0 }}>
+                  <img
+                    src={logoDark}
+                    alt="KLIN UP Logo"
+                    style={{
+                      width: '125px',
+                      height: 'auto',
+                      display: 'block',
+                      marginTop: '-34px',
+                    }}
+                  />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button className="action-circle-btn filled" onClick={() => setShowSettingsModal(true)}>
                     <Settings size={15} />
                   </button>
-                  <button className="action-circle-btn" style={{ position: 'relative' }}>
+                  <button 
+                    className="action-circle-btn" 
+                    style={{ position: 'relative' }}
+                    onClick={() => setShowNotificationsModal(true)}
+                  >
                     <Bell size={15} />
-                    {lateOrders.length > 0 && <span style={{ position: 'absolute', top: '7px', right: '7px', width: '6px', height: '6px', background: 'var(--status-late)', borderRadius: '50%', border: '1.5px solid #fff' }} />}
+                    {notifications.some(n => !n.read) && (
+                      <span style={{ position: 'absolute', top: '7px', right: '7px', width: '6px', height: '6px', background: 'var(--status-late)', borderRadius: '50%', border: '1.5px solid #fff' }} />
+                    )}
                   </button>
                 </div>
               </div>
@@ -1045,7 +2025,7 @@ export default function MobileView() {
               </div>
 
               {/* PIPELINE ATELIER — Premium Style */}
-              <div style={{ background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(238, 238, 248, 0.4) 100%)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '1.1rem', backdropFilter: 'blur(10px)' }}>
+              <div className="card" style={{ background: 'var(--bg-card)', padding: '1.1rem' }}>
                 <div className="section-header">
                   <h4>Pipeline Atelier</h4>
                   <span className="see-all">Temps réel</span>
@@ -1074,7 +2054,7 @@ export default function MobileView() {
               </div>
 
               {/* ACTIVITÉ 7 JOURS */}
-              <div style={{ background: '#fff', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '0.85rem' }}>
+              <div className="card" style={{ padding: '0.85rem' }}>
                 <div className="section-header">
                   <h4>Activité — 7 jours</h4>
                   <span className="see-all">Voir tout</span>
@@ -1100,10 +2080,14 @@ export default function MobileView() {
 
               {/* TOP CLIENTS */}
               {topCustomers.length > 0 && (
-                <div style={{ background: '#fff', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '0.85rem' }}>
+                <div 
+                  className="card" 
+                  style={{ padding: '0.85rem', cursor: 'pointer' }}
+                  onClick={() => setAccueilSubView('top_clients')}
+                >
                   <div className="section-header">
                     <h4>Top Clients</h4>
-                    <span className="see-all">Voir tout</span>
+                    <span className="see-all" style={{ cursor: 'pointer' }}>Voir tout</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     {topCustomers.map((c, idx) => (
@@ -1283,13 +2267,22 @@ export default function MobileView() {
                           </button>
                         )}
                         {order.statut === 'pret' && (
-                          <button 
-                            className="btn btn-primary" 
-                            style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px', background: 'var(--status-ready)', color: '#fff' }}
-                            onClick={() => handleStartDelivery(order)}
-                          >
-                            <DollarSign size={11} /> Livrer
-                          </button>
+                          <>
+                            <button 
+                              className="btn btn-primary" 
+                              style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                              onClick={() => handleStartDelivery(order, 'a_livrer')}
+                            >
+                              <DollarSign size={10} /> À livrer
+                            </button>
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                              onClick={() => handleStartDelivery(order, 'a_recuperer')}
+                            >
+                              <CheckCircle size={10} /> À récupérer
+                            </button>
+                          </>
                         )}
                         
                         <button 
@@ -1359,8 +2352,8 @@ export default function MobileView() {
             </div>
 
             {/* CRM Abonnements */}
-            <div style={{ background: '#fff', border: '1px solid var(--border-color)', padding: '0.85rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+            <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
                 <Award size={14} color="var(--primary)" />
                 <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>Abonnements Clients</h4>
               </div>
@@ -1450,17 +2443,16 @@ export default function MobileView() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.35rem' }}>
                       <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Aucun forfait actif.</div>
                       <div style={{ display: 'flex', gap: '0.3rem' }}>
-                        <select 
-                          className="input-control" 
-                          style={{ flex: 1, padding: '0.28rem', fontSize: '0.68rem', borderRadius: '6px' }}
+                        <CustomSelect
                           value={selectedCrmSubId}
-                          onChange={(e) => setSelectedCrmSubId(e.target.value)}
-                        >
-                          <option value="">-- Choisir --</option>
-                          {catalog.filter(i => i.service === 'abonnement').map(sub => (
-                            <option key={sub.id} value={sub.id}>{sub.article} ({sub.prix} F)</option>
-                          ))}
-                        </select>
+                          onChange={setSelectedCrmSubId}
+                          placeholder="-- Choisir --"
+                          options={catalog.filter(i => i.service === 'abonnement').map(sub => ({
+                            value: sub.id,
+                            label: `${sub.article} (${sub.prix} F)`
+                          }))}
+                          style={{ flex: 1 }}
+                        />
                         <button 
                           type="button" 
                           className="btn btn-primary" 
@@ -1477,7 +2469,7 @@ export default function MobileView() {
             </div>
 
             {/* ================= GESTION DES PROFILS CLIENTS ================= */}
-            <div style={{ background: '#fff', border: '1px solid var(--border-color)', padding: '1rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
+            <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)' }}>
                   <Users size={16} />
@@ -1594,7 +2586,7 @@ export default function MobileView() {
             </div>
 
             {/* Search and filter */}
-            <div style={{ background: '#fff', border: '1px solid var(--border-color)', padding: '0.75rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            <div className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
               <div style={{ position: 'relative' }}>
                 <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input 
@@ -1625,9 +2617,9 @@ export default function MobileView() {
                       fontSize: '0.65rem',
                       borderRadius: '20px',
                       whiteSpace: 'nowrap',
-                      border: historyFilterStatus === filter.id ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                      background: historyFilterStatus === filter.id ? 'var(--primary)' : '#fff',
-                      color: historyFilterStatus === filter.id ? '#fff' : 'var(--text-secondary)',
+                      border: historyFilterStatus === filter.id ? '1px solid var(--secondary)' : '1px solid var(--border-color)',
+                      background: historyFilterStatus === filter.id ? 'var(--primary-gradient)' : 'rgba(255, 255, 255, 0.05)',
+                      color: '#fff',
                       fontWeight: 600,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease'
@@ -1657,12 +2649,13 @@ export default function MobileView() {
                   return (
                     <div 
                       key={order.id} 
-                      style={{ background: '#fff', border: '1px solid var(--border-color)', padding: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', borderRadius: '16px' }}
+                      className="mobile-order-row"
+                      style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.8rem' }}
                     >
                       {/* Header row */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.58rem' }}>
+                          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.58rem' }}>
                             {clientInitials}
                           </div>
                           <div>
@@ -1676,13 +2669,13 @@ export default function MobileView() {
                       </div>
 
                       {/* Client Info */}
-                      <div style={{ fontSize: '0.68rem', display: 'flex', flexDirection: 'column', gap: '0.12rem' }}>
-                        <div>Client: <strong>{clientName}</strong> {client && <span style={{ color: 'var(--text-muted)' }}>({client.telephone})</span>}</div>
+                      <div style={{ fontSize: '0.68rem', display: 'flex', flexDirection: 'column', gap: '0.12rem', width: '100%', textAlign: 'left' }}>
+                        <div>Client: <strong>{clientName}</strong> {client && <span style={{ color: 'var(--text-secondary)' }}>({client.telephone})</span>}</div>
                         <div>Urgence: <span style={{ fontWeight: 700, color: isExpress ? 'var(--status-late)' : 'var(--text-primary)' }}>{order.niveau_urgence}</span></div>
                       </div>
 
                       {/* Items and Services */}
-                      <div style={{ background: 'var(--bg-app)', padding: '0.4rem', borderRadius: '8px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.4rem', borderRadius: '8px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', width: '100%', textAlign: 'left', border: '1px solid var(--border-color)' }}>
                         <div style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.6rem' }}>Détails articles :</div>
                         {order.items && order.items.length > 0 ? (
                           order.items.map((it, idx) => (
@@ -1696,7 +2689,7 @@ export default function MobileView() {
                       </div>
 
                       {/* Financial info */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.65rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.35rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.65rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.35rem', width: '100%', textAlign: 'left' }}>
                         <div>Total: <strong>{order.prix_total.toLocaleString()} F</strong></div>
                         <div>Acompte: <strong style={{ color: 'var(--status-ready)' }}>{order.avance_payee.toLocaleString()} F</strong></div>
                         <div>Réglement: <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{order.mode_reglement.replace(/_/g, ' ')}</span></div>
@@ -1706,7 +2699,7 @@ export default function MobileView() {
                       </div>
 
                       {/* Footer */}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.3rem', marginTop: '0.1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.3rem', marginTop: '0.1rem', width: '100%' }}>
                         <button 
                           className="btn btn-outline" 
                           style={{ padding: '0.22rem 0.55rem', fontSize: '0.62rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
@@ -1734,7 +2727,7 @@ export default function MobileView() {
             </div>
 
             {/* Profile card — finance style */}
-            <div style={{ background: '#fff', border: '1px solid var(--border-color)', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.9rem' }}>
+            <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.9rem' }}>
               <div className="user-avatar" style={{ width: '48px', height: '48px', fontSize: '1.1rem' }}>
                 {currentUser.prenom.charAt(0)}{currentUser.nom.charAt(0)}
               </div>
@@ -1778,7 +2771,7 @@ export default function MobileView() {
 
 
             {/* Configuration */}
-            <div style={{ background: '#fff', border: '1px solid var(--border-color)', padding: '0.85rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
               <h4 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', fontFamily: 'var(--font-title)' }}>
                 Configuration
               </h4>
@@ -1797,6 +2790,27 @@ export default function MobileView() {
                   <span style={{ color: 'var(--status-ready)', fontWeight: 700 }}>Synced</span>
                 </div>
               </div>
+            </div>
+
+            {/* Espace Client Calmy */}
+            <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              <h4 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', fontFamily: 'var(--font-title)', color: 'var(--primary)' }}>
+                Espace Client Calmy
+              </h4>
+              <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                Simulez l'expérience de l'application cliente Calmy (réservation de machine, choix de cycle, suivi en direct).
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ width: '100%', padding: '0.55rem', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}
+                onClick={() => {
+                  setIsCalmyClientMode(true);
+                  setCalmyView('dashboard');
+                }}
+              >
+                📱 Passer au Mode Client
+              </button>
             </div>
 
             {/* Déconnexion */}
@@ -1833,46 +2847,76 @@ export default function MobileView() {
         )}
       </div>
 
-      {/* Bottom Navigation — Style Finance App */}
+      {/* Bottom Navigation — Redesign */}
       {currentUser && (
         <div className="mobile-footer-nav">
-          <button 
-            className={`mobile-nav-btn ${activeTab === 'accueil' ? 'active' : ''}`}
-            onClick={() => setActiveTab('accueil')}
-          >
-            <Home size={18} />
-            Accueil
-          </button>
-          <button 
-            className={`mobile-nav-btn ${activeTab === 'gestion' ? 'active' : ''}`}
-            onClick={() => setActiveTab('gestion')}
-          >
-            <Layers size={18} />
-            Gestion
-          </button>
-          <button 
-            className={`mobile-nav-btn ${activeTab === 'historique' ? 'active' : ''}`}
-            onClick={() => setActiveTab('historique')}
-          >
-            <FileText size={18} />
-            Historique
-          </button>
-          <button 
-            className={`mobile-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
-            onClick={() => setActiveTab('profile')}
-          >
-            <User size={18} />
-            Compte
-          </button>
+          <div className="menu-list">
+            <button 
+              className={`menu-item ${activeTab === 'accueil' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('accueil');
+                setAccueilSubView('main');
+              }}
+            >
+              <Home size={24} />
+              <span>Accueil</span>
+            </button>
+            <button 
+              className={`menu-item ${activeTab === 'gestion' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('gestion');
+                setAccueilSubView('main');
+              }}
+            >
+              <Layers size={24} />
+              <span>Gestion</span>
+            </button>
+            <div className="scan-item">
+              <button 
+                type="button"
+                className="scan-btn"
+                title="Scanner un vêtement"
+                onClick={() => {
+                  setShowOrderRegistrationModal(true);
+                }}
+              >
+                <Plus size={24} />
+              </button>
+            </div>
+            <button 
+              className={`menu-item ${activeTab === 'historique' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('historique');
+                setAccueilSubView('main');
+              }}
+            >
+              <FileText size={24} />
+              <span>Historique</span>
+            </button>
+            <button 
+              className={`menu-item ${activeTab === 'profile' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('profile');
+                setAccueilSubView('main');
+              }}
+            >
+              <User size={24} />
+              <span>Compte</span>
+            </button>
+          </div>
+          <div className="iphone-indicator">
+            <div className="indicator-line"></div>
+          </div>
         </div>
       )}
 
-      {/* iOS Home Indicator bottom line */}
-      <div className="phone-home-indicator"></div>
-
       {/* ================= MODAL ENREGISTREMENT COMMANDE ================= */}
       {showOrderRegistrationModal && (
-        <div className="modal-overlay bottom-align" style={{ zIndex: 999 }}>
+        <div 
+          className="modal-overlay bottom-align" 
+          style={{ zIndex: 999 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowOrderRegistrationModal(false); }}
+        >
           <form onSubmit={handleCreateOrder} className="modal-sheet">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.45rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Nouvelle commande</h3>
@@ -1885,28 +2929,19 @@ export default function MobileView() {
               
               {/* Client Selection */}
               <div style={{ padding: '0.4rem 0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <div style={{ marginBottom: '0.35rem' }}>
                   <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Client</label>
-                  <button 
-                    type="button"
-                    className="btn btn-secondary" 
-                    style={{ padding: '0.18rem 0.45rem', fontSize: '0.6rem', borderRadius: '6px' }}
-                    onClick={() => setShowNewCustomerModal(true)}
-                  >
-                    + Nouveau
-                  </button>
                 </div>
-                <select 
-                  className="input-control" 
-                  style={{ width: '100%', padding: '0.42rem', fontSize: '0.78rem', borderRadius: '8px' }}
+                <CustomSelect
                   value={selectedCustomerId}
-                  onChange={(e) => setSelectedCustomerId(e.target.value)}
-                >
-                  <option value="">-- Choisir un client --</option>
-                  {customers.map(c => (
-                    <option key={c.id} value={c.id}>{c.prenom} {c.nom} ({c.telephone})</option>
-                  ))}
-                </select>
+                  onChange={setSelectedCustomerId}
+                  placeholder="-- Choisir un client --"
+                  options={customers.map(c => ({
+                    value: c.id,
+                    label: `${c.prenom} ${c.nom} (${c.telephone})`
+                  }))}
+                  style={{ width: '100%', fontSize: '0.78rem' }}
+                />
 
                 {activeCustomer && (
                   <div style={{ marginTop: '0.45rem', padding: '0.4rem', background: 'var(--primary-light)', borderRadius: '8px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.12rem' }}>
@@ -1945,34 +2980,30 @@ export default function MobileView() {
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.12rem' }}>
                           <span style={{ fontWeight: 600, fontSize: '0.62rem', color: 'var(--text-secondary)' }}>Renouveler :</span>
-                          <select 
-                            className="input-control"
-                            style={{ padding: '0.18rem 0.35rem', fontSize: '0.7rem', borderRadius: '6px', width: '100%', background: '#fff' }}
+                          <CustomSelect
                             value={subscribePlanId}
-                            onChange={(e) => setSubscribePlanId(e.target.value)}
-                          >
-                            <option value="">-- Conserver l'abonnement --</option>
-                            {catalog.filter(c => c.categorie === 'abonnement').map(p => (
-                              <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
-                            ))}
-                          </select>
+                            onChange={setSubscribePlanId}
+                            placeholder="-- Conserver l'abonnement --"
+                            options={catalog.filter(c => c.categorie === 'abonnement').map(p => ({
+                              value: p.id,
+                              label: `${p.article} (${p.prix.toLocaleString()} F)`
+                            }))}
+                          />
                         </div>
                       </div>
                     ) : (
                       <div style={{ marginTop: '0.3rem', borderTop: '1px dashed rgba(26, 26, 94, 0.15)', paddingTop: '0.3rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.12rem' }}>
                           <span style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.62rem' }}>Souscrire un abonnement :</span>
-                          <select 
-                            className="input-control"
-                            style={{ padding: '0.18rem 0.35rem', fontSize: '0.7rem', borderRadius: '6px', width: '100%', background: '#fff' }}
+                          <CustomSelect
                             value={subscribePlanId}
-                            onChange={(e) => setSubscribePlanId(e.target.value)}
-                          >
-                            <option value="">-- Pas d'abonnement --</option>
-                            {catalog.filter(c => c.categorie === 'abonnement').map(p => (
-                              <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
-                            ))}
-                          </select>
+                            onChange={setSubscribePlanId}
+                            placeholder="-- Pas d'abonnement --"
+                            options={catalog.filter(c => c.categorie === 'abonnement').map(p => ({
+                              value: p.id,
+                              label: `${p.article} (${p.prix.toLocaleString()} F)`
+                            }))}
+                          />
                         </div>
                       </div>
                     )}
@@ -2050,19 +3081,17 @@ export default function MobileView() {
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.35rem', 
                             borderTop: '1px dashed rgba(26, 26, 94, 0.12)', paddingTop: '0.2rem'
                           }}>
-                            <select 
-                              style={{ 
-                                padding: '0.12rem 0.25rem', fontSize: '0.62rem', 
-                                border: '1px solid var(--border-color)', borderRadius: '6px', 
-                                width: '60%', background: '#fff', color: 'var(--text-primary)', outline: 'none'
-                              }}
+                            <CustomSelect
                               value={selectedSvc}
-                              onChange={(e) => handleUpdateService(cloth, e.target.value)}
-                            >
-                              {activeServices.map(s => (
-                                <option key={s.service} value={s.service}>{serviceLabels[s.service]} ({s.prix} F)</option>
-                              ))}
-                            </select>
+                              onChange={(val) => handleUpdateService(cloth, val)}
+                              options={activeServices.map(s => ({
+                                value: s.service,
+                                label: `${serviceLabels[s.service]} (${s.prix} F)`
+                              }))}
+                              style={{ width: '60%' }}
+                              dropdownStyle={{ maxHeight: '120px' }}
+                              buttonStyle={{ padding: '0.2rem 0.35rem', fontSize: '0.62rem', borderRadius: '6px' }}
+                            />
                             <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--primary)' }}>
                               {(unitPrice * qty).toLocaleString()} F
                             </span>
@@ -2078,36 +3107,32 @@ export default function MobileView() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
                 <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
                   <label style={{ fontSize: '0.68rem' }}>Urgence</label>
-                  <select 
-                    className="input-control" 
-                    style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                    value={niveauUrgence} 
-                    onChange={(e) => setNiveauUrgence(e.target.value)}
-                  >
-                    <option value="Normal">Normal</option>
-                    <option value="Express">Express (+50%)</option>
-                  </select>
+                  <CustomSelect
+                    value={niveauUrgence}
+                    onChange={setNiveauUrgence}
+                    options={[
+                      { value: 'Normal', label: 'Normal' },
+                      { value: 'Express', label: 'Express (+50%)' }
+                    ]}
+                  />
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
                   <label style={{ fontSize: '0.68rem' }}>Règlement</label>
-                  <select 
-                    className="input-control" 
-                    style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  <CustomSelect
                     value={(payWithSubscription && !subscribePlanId) ? 'abonnement' : modeReglement} 
                     disabled={payWithSubscription && !subscribePlanId}
-                    onChange={(e) => setModeReglement(e.target.value)}
-                  >
-                    {(payWithSubscription && !subscribePlanId) ? (
-                      <option value="abonnement">Abonnement</option>
-                    ) : (
-                      <>
-                        <option value="especes">Espèces</option>
-                        <option value="mobile_money">Mobile Money</option>
-                        <option value="avance_solde">Avance/Crédit</option>
-                      </>
-                    )}
-                  </select>
+                    onChange={setModeReglement}
+                    options={
+                      (payWithSubscription && !subscribePlanId) ? [
+                        { value: 'abonnement', label: 'Abonnement' }
+                      ] : [
+                        { value: 'especes', label: 'Espèces' },
+                        { value: 'mobile_money', label: 'Mobile Money' },
+                        { value: 'avance_solde', label: 'Avance/Crédit' }
+                      ]
+                    }
+                  />
                 </div>
               </div>
 
@@ -2151,7 +3176,10 @@ export default function MobileView() {
 
       {/* ================= MODAL CRÉATION CLIENT ================= */}
       {showNewCustomerModal && (
-        <div className="modal-overlay center-align">
+        <div 
+          className="modal-overlay center-align"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowNewCustomerModal(false); }}
+        >
           <div className="modal-dialog" style={{ maxWidth: '300px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Nouveau Client</h3>
@@ -2171,22 +3199,33 @@ export default function MobileView() {
               </div>
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
                 <label style={{ fontSize: '0.68rem' }}>Pays (Indicatif)</label>
-                <select className="input-control" style={{ padding: '0.42rem', fontSize: '0.75rem' }} value={newCustIndicatif} onChange={(e) => setNewCustIndicatif(e.target.value)}>
-                  {countries.map((c) => (
-                    <option key={`${c.code}-${c.name}`} value={c.code}>{c.flag} {c.name} (+{c.code})</option>
-                  ))}
-                </select>
+                <CustomSelect
+                  value={newCustIndicatif}
+                  onChange={setNewCustIndicatif}
+                  options={countries.map((c) => ({
+                    value: c.code,
+                    label: `${c.flag} ${c.name} (+${c.code})`
+                  }))}
+                />
               </div>
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
                 <label style={{ fontSize: '0.68rem' }}>Téléphone</label>
                 <input type="tel" className="input-control" style={{ padding: '0.42rem', fontSize: '0.75rem' }} required placeholder="Ex: 97979797" value={newCustTel} onChange={(e) => setNewCustTel(e.target.value)} />
               </div>
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.68rem' }}>Adresse</label>
+                <input type="text" className="input-control" style={{ padding: '0.42rem', fontSize: '0.75rem' }} required placeholder="Ex: Rue 125, Cotonou" value={newCustAdresse} onChange={(e) => setNewCustAdresse(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
                 <label style={{ fontSize: '0.68rem' }}>Préférence Pliage</label>
-                <select className="input-control" style={{ padding: '0.42rem', fontSize: '0.75rem' }} value={newCustPref} onChange={(e) => setNewCustPref(e.target.value)}>
-                  <option value="Plié">Plié</option>
-                  <option value="Sur cintre">Sur cintre</option>
-                </select>
+                <CustomSelect
+                  value={newCustPref}
+                  onChange={setNewCustPref}
+                  options={[
+                    { value: 'Plié', label: 'Plié' },
+                    { value: 'Sur cintre', label: 'Sur cintre' }
+                  ]}
+                />
               </div>
               <button type="submit" className="btn btn-primary" style={{ marginTop: '0.3rem', padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }}>
                 Enregistrer
@@ -2198,7 +3237,10 @@ export default function MobileView() {
 
       {/* ================= MODAL RÈGLEMENT DETTE CRM ================= */}
       {showDebtPaymentModal && selectedCrmCustomer && (
-        <div className="modal-overlay center-align">
+        <div 
+          className="modal-overlay center-align"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowDebtPaymentModal(false); }}
+        >
           <div className="modal-dialog" style={{ maxWidth: '300px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Régler la Dette</h3>
@@ -2229,7 +3271,10 @@ export default function MobileView() {
 
       {/* ================= MODAL RÈGLEMENT LIVRAISON ================= */}
       {showDeliveryPaymentModal && delivOrder && (
-        <div className="modal-overlay center-align">
+        <div 
+          className="modal-overlay center-align"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowDeliveryPaymentModal(false); }}
+        >
           <div className="modal-dialog" style={{ maxWidth: '320px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Solde Livraison</h3>
@@ -2251,10 +3296,14 @@ export default function MobileView() {
             <form onSubmit={handleConfirmDelivery} style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
                 <label style={{ fontSize: '0.68rem' }}>Mode de règlement</label>
-                <select className="input-control" style={{ padding: '0.42rem', fontSize: '0.75rem' }} value={delivPaymentMethod} onChange={(e) => setDelivPaymentMethod(e.target.value)}>
-                  <option value="especes">Espèces</option>
-                  <option value="mobile_money">Mobile Money</option>
-                </select>
+                <CustomSelect
+                  value={delivPaymentMethod}
+                  onChange={setDelivPaymentMethod}
+                  options={[
+                    { value: 'especes', label: 'Espèces' },
+                    { value: 'mobile_money', label: 'Mobile Money' }
+                  ]}
+                />
               </div>
 
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
@@ -2272,7 +3321,10 @@ export default function MobileView() {
 
       {/* ================= MODAL REÇU / TICKET DE MARQUAGE ================= */}
       {createdOrder && (
-        <div className="modal-overlay center-align">
+        <div 
+          className="modal-overlay center-align"
+          onClick={(e) => { if (e.target === e.currentTarget) { setCreatedOrder(null); setSelectedCustomerId(''); } }}
+        >
           <div className="modal-dialog" style={{ maxWidth: '320px', color: '#000' }}>
             <div id="receipt-print-area" style={{
               background: '#ffffff',
@@ -2285,8 +3337,10 @@ export default function MobileView() {
             }}>
               {/* ---- EN-TÊTE ---- */}
               <div style={{ textAlign: 'center', paddingBottom: '14px', marginBottom: '14px', borderBottom: '2px dashed #e8e8ef' }}>
-                <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#0a0a0a', letterSpacing: '1px', fontFamily: 'DM Sans, Arial, Helvetica, sans-serif' }}>KLIN UP</h1>
-                <p style={{ margin: '4px 0 10px', fontSize: '11px', color: 'var(--status-pending)', fontWeight: '600' }}>Ticket de Dépôt Client</p>
+                <div style={{ height: '55px', overflow: 'visible', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 4px auto' }}>
+                  <img src={logoDark} alt="KLIN UP Logo" style={{ height: '110px', objectFit: 'contain', display: 'block', margin: '-20px auto' }} />
+                </div>
+                <p style={{ margin: '0 0 10px', fontSize: '11px', color: 'var(--status-pending)', fontWeight: '600' }}>Ticket de Dépôt Client</p>
                 <div style={{
                   display: 'inline-block',
                   background: '#1a1a5e',
@@ -2423,7 +3477,10 @@ export default function MobileView() {
 
       {/* ================= MODAL PARAMÈTRES (CONFIG IP SERVEUR) ================= */}
       {showSettingsModal && (
-        <div className="modal-overlay center-align">
+        <div 
+          className="modal-overlay center-align"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowSettingsModal(false); }}
+        >
           <div className="modal-dialog" style={{ maxWidth: '300px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Serveur</h3>
@@ -2474,7 +3531,11 @@ export default function MobileView() {
 
       {/* ================= MODAL RESET PIN ================= */}
       {showResetPinModal && (
-        <div className="modal-overlay center-align" style={{ zIndex: 1000 }}>
+        <div 
+          className="modal-overlay center-align" 
+          style={{ zIndex: 1000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowResetPinModal(false); }}
+        >
           <div className="modal-dialog" style={{ maxWidth: '300px', background: '#ffffff', color: '#000000', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>Réinitialiser le PIN</h3>
@@ -2509,7 +3570,11 @@ export default function MobileView() {
 
       {/* ================= MODAL CONFIRMATION DÉCONNEXION ================= */}
       {showLogoutConfirm && (
-        <div className="modal-overlay center-align" style={{ zIndex: 1000 }}>
+        <div 
+          className="modal-overlay center-align" 
+          style={{ zIndex: 1000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowLogoutConfirm(false); }}
+        >
           <div className="modal-dialog" style={{ maxWidth: '280px', background: '#ffffff', color: '#000000', padding: '1.25rem', textAlign: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{ background: 'var(--status-late-light)', padding: '0.65rem', borderRadius: '50%', display: 'inline-flex', color: 'var(--status-late)' }}>
@@ -2548,7 +3613,11 @@ export default function MobileView() {
 
       {/* ================= MODAL CRÉATION / MODIFICATION CLIENT ================= */}
       {showCustomerModal && (
-        <div className="modal-overlay center-align" style={{ zIndex: 1000 }}>
+        <div 
+          className="modal-overlay center-align" 
+          style={{ zIndex: 1000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCustomerModal(false); }}
+        >
           <div className="modal-dialog" style={{ maxWidth: '300px', background: '#ffffff', color: '#000000', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>
@@ -2600,16 +3669,28 @@ export default function MobileView() {
               </div>
 
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Préférence Pliage</label>
-                <select 
+                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Adresse</label>
+                <input 
+                  type="text" 
                   className="input-control" 
                   style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
+                  required 
+                  placeholder="Ex: Haie Vive, Cotonou" 
+                  value={custAdresse} 
+                  onChange={(e) => setCustAdresse(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Préférence Pliage</label>
+                <CustomSelect
                   value={custPreferences}
-                  onChange={(e) => setCustPreferences(e.target.value)}
-                >
-                  <option value="Plié">Plié</option>
-                  <option value="Sur cintre">Sur cintre</option>
-                </select>
+                  onChange={setCustPreferences}
+                  options={[
+                    { value: 'Plié', label: 'Plié' },
+                    { value: 'Sur cintre', label: 'Sur cintre' }
+                  ]}
+                />
               </div>
 
               <button type="submit" className="btn btn-primary" style={{ marginTop: '0.3rem', padding: '0.48rem', fontSize: '0.75rem', borderRadius: '8px', width: '100%' }}>
@@ -2622,7 +3703,11 @@ export default function MobileView() {
 
       {/* ================= MODAL CONFIRMATION SUPPRESSION CLIENT ================= */}
       {showDeleteCustomerConfirm && (
-        <div className="modal-overlay center-align" style={{ zIndex: 1000 }}>
+        <div 
+          className="modal-overlay center-align" 
+          style={{ zIndex: 1000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteCustomerConfirm(null); }}
+        >
           <div className="modal-dialog" style={{ maxWidth: '280px', background: '#ffffff', color: '#000000', padding: '1.25rem', textAlign: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{ background: 'var(--status-late-light)', padding: '0.65rem', borderRadius: '50%', display: 'inline-flex', color: 'var(--status-late)' }}>
@@ -2652,6 +3737,116 @@ export default function MobileView() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* ================= MODAL NOTIFICATIONS ================= */}
+      {showNotificationsModal && (
+        <div 
+          className="modal-overlay center-align" 
+          style={{ zIndex: 1001 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowNotificationsModal(false); }}
+        >
+          <div className="modal-dialog" style={{ maxWidth: '320px', background: '#ffffff', color: '#000000', padding: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Bell size={16} color="var(--primary)" />
+                <h3 style={{ fontSize: '0.95rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                  Notifications
+                </h3>
+              </div>
+              <button type="button" onClick={() => setShowNotificationsModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <X size={16} color="var(--text-muted)" />
+              </button>
+            </div>
+
+            {notifications.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                Aucune notification pour le moment.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '2px', marginBottom: '0.8rem' }}>
+                {notifications.map(n => (
+                  <div 
+                    key={n.id} 
+                    style={{ 
+                      padding: '0.6rem 0.7rem', 
+                      borderRadius: '10px', 
+                      background: n.read ? 'rgba(0,0,0,0.02)' : 'var(--primary-light)', 
+                      border: n.read ? '1px solid var(--border-color)' : '1px solid rgba(59, 130, 246, 0.15)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.35rem',
+                      position: 'relative'
+                    }}
+                  >
+                    <div style={{ fontSize: '0.68rem', fontWeight: n.read ? 600 : 700, color: 'var(--text-primary)', paddingRight: '30px', lineHeight: '1.3' }}>
+                      {n.text}
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                      <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>{n.date}</span>
+                      
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        {!n.read && (
+                          <button 
+                            type="button" 
+                            onClick={() => markAsRead(n.id)}
+                            style={{ 
+                              background: 'none', 
+                              border: 'none', 
+                              color: 'var(--primary)', 
+                              fontSize: '0.6rem', 
+                              fontWeight: 700, 
+                              cursor: 'pointer',
+                              padding: '2px 4px'
+                            }}
+                          >
+                            Lu
+                          </button>
+                        )}
+                        <button 
+                          type="button" 
+                          onClick={() => deleteNotification(n.id)}
+                          style={{ 
+                            background: 'none', 
+                            border: 'none', 
+                            color: 'var(--status-late)', 
+                            fontSize: '0.6rem', 
+                            fontWeight: 600, 
+                            cursor: 'pointer',
+                            padding: '2px 4px'
+                          }}
+                        >
+                          Effacer
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {notifications.length > 0 && (
+              <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.6rem' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  style={{ flex: 1, padding: '0.38rem', fontSize: '0.68rem', borderRadius: '8px' }}
+                  onClick={markAllAsRead}
+                >
+                  Tout lire
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-danger" 
+                  style={{ flex: 1, padding: '0.38rem', fontSize: '0.68rem', borderRadius: '8px', background: 'var(--status-late-light)', color: 'var(--status-late)', border: 'none' }}
+                  onClick={clearAllNotifications}
+                >
+                  Tout effacer
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -360,11 +360,17 @@ export const db = {
   },
 
   addCustomer: (customer) => {
+    const cleanPhone = customer.telephone.trim();
+    const phoneExists = memoryDb.customers.some(c => c.telephone.trim() === cleanPhone);
+    if (phoneExists) {
+      throw new Error("Ce numéro de téléphone est déjà associé à un autre client actif.");
+    }
     const newCustomer = {
       id: 'c_' + Math.random().toString(36).substr(2, 9),
       nom: customer.nom,
       prenom: customer.prenom,
-      telephone: customer.telephone,
+      telephone: cleanPhone,
+      adresse: customer.adresse || '',
       indicatif: customer.indicatif || '229',
       preferences_pliage: customer.preferences_pliage || 'Plié',
       points_fidelite: 0,
@@ -381,9 +387,17 @@ export const db = {
   updateCustomer: (id, updatedFields) => {
     const customer = memoryDb.customers.find(c => c.id === id);
     if (customer) {
+      if (updatedFields.telephone) {
+        const cleanPhone = updatedFields.telephone.trim();
+        const phoneExists = memoryDb.customers.some(c => c.id !== id && c.telephone.trim() === cleanPhone);
+        if (phoneExists) {
+          throw new Error("Ce numéro de téléphone est déjà associé à un autre client actif.");
+        }
+      }
       customer.nom = updatedFields.nom ?? customer.nom;
       customer.prenom = updatedFields.prenom ?? customer.prenom;
-      customer.telephone = updatedFields.telephone ?? customer.telephone;
+      customer.telephone = updatedFields.telephone ? updatedFields.telephone.trim() : customer.telephone;
+      customer.adresse = updatedFields.adresse ?? customer.adresse;
       customer.preferences_pliage = updatedFields.preferences_pliage ?? customer.preferences_pliage;
       db.logAction('MODIFICATION_CLIENT', `Client ${customer.prenom} ${customer.nom} mis à jour`);
       persist();
@@ -610,7 +624,7 @@ export const db = {
     const oldStatus = order.statut;
     order.statut = newStatus;
 
-    if (newStatus === 'restitue') {
+    if (newStatus === 'restitue' || newStatus === 'a_livrer' || newStatus === 'a_recuperer') {
       order.solde_paid_at = new Date().toISOString();
       const customer = memoryDb.customers.find(c => c.id === order.customer_id);
       if (customer) {
@@ -630,12 +644,12 @@ export const db = {
     return order;
   },
 
-  deliverOrderWithPayment: (orderId, amountPaid, paymentMethod) => {
+  deliverOrderWithPayment: (orderId, amountPaid, paymentMethod, finalStatus = 'restitue') => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
     const oldStatus = order.statut;
-    order.statut = 'restitue';
+    order.statut = finalStatus;
     order.mode_reglement = paymentMethod;
     
     order.avance_payee = Number(order.avance_payee) + Number(amountPaid);
@@ -652,7 +666,7 @@ export const db = {
       'PAIEMENT_FINAL', 
       `Livraison commande ${order.identifiant_unique_marquage}. Paiement reçu : ${amountPaid} FCFA (Méthode: ${paymentMethod === 'especes' ? 'Espèces' : 'Mobile Money'})`
     );
-    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage} passée de '${oldStatus}' à 'restitue'`);
+    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage} passée de '${oldStatus}' à '${finalStatus}'`);
     persist();
     db.notify();
     return order;
