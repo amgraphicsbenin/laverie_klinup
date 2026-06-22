@@ -187,6 +187,20 @@ export default function MobileView() {
   const [activeTab, setActiveTab] = useState('accueil'); // accueil, gestion, facturation, profile
   const [accueilSubView, setAccueilSubView] = useState('main'); // main, top_clients
   const [loyaltySearchQuery, setLoyaltySearchQuery] = useState('');
+  
+  // Paramètres fonctionnels
+  const [enableWhatsAppNotifications, setEnableWhatsAppNotifications] = useState(() => {
+    return localStorage.getItem('klin_up_whatsapp_enabled') !== 'false';
+  });
+  const [expressHours, setExpressHours] = useState(() => {
+    return Number(localStorage.getItem('klin_up_express_hours') || 6);
+  });
+  const [normalHours, setNormalHours] = useState(() => {
+    return Number(localStorage.getItem('klin_up_normal_hours') || 48);
+  });
+  const [expressMarkup, setExpressMarkup] = useState(() => {
+    return Number(localStorage.getItem('klin_up_express_markup') || 50);
+  });
 
   const [notifications, setNotifications] = useState([
     { id: '1', text: 'Commande Express reçue pour Marie-Antoinette', type: 'info', read: false, date: 'Il y a 10 min' },
@@ -617,7 +631,7 @@ export default function MobileView() {
         total += price * qty;
       }
     });
-    return niveauUrgence === 'Express' ? Math.round(total * 1.5) : total;
+    return niveauUrgence === 'Express' ? Math.round(total * (1 + expressMarkup / 100)) : total;
   };
 
   const handleCreateCustomer = (e) => {
@@ -843,6 +857,7 @@ export default function MobileView() {
   };
 
   const sendWhatsAppMessage = (phone, text, indicatif = '229') => {
+    if (!enableWhatsAppNotifications) return;
     if (!phone) return;
     const formattedPhone = formatPhoneForWhatsApp(phone, indicatif);
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
@@ -1859,9 +1874,6 @@ export default function MobileView() {
                   />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <button className="action-circle-btn filled" onClick={() => setShowSettingsModal(true)}>
-                    <Settings size={15} />
-                  </button>
                   <button 
                     className="action-circle-btn" 
                     style={{ position: 'relative' }}
@@ -2768,49 +2780,101 @@ export default function MobileView() {
               </div>
             </div>
 
-
-
-            {/* Configuration */}
-            <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-              <h4 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', fontFamily: 'var(--font-title)' }}>
-                Configuration
-              </h4>
+            {/* Paramètres de Fonctionnement */}
+            <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+                <Sliders size={14} color="var(--primary)" />
+                <h4 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>
+                  Paramètres de Fonctionnement
+                </h4>
+              </div>
               
-              <div style={{ fontSize: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {/* WhatsApp Notification Toggle */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Version</span>
-                  <strong>v1.0.4 B2B</strong>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)' }}>Notifications WhatsApp</span>
+                    <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>Ouverture automatique de wa.me</span>
+                  </div>
+                  <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '34px', height: '20px' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={enableWhatsAppNotifications}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setEnableWhatsAppNotifications(val);
+                        localStorage.setItem('klin_up_whatsapp_enabled', String(val));
+                      }}
+                      style={{ opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span style={{
+                      position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                      backgroundColor: enableWhatsAppNotifications ? 'var(--primary)' : 'rgba(0, 0, 0, 0.1)',
+                      transition: '0.3s', borderRadius: '20px'
+                    }}>
+                      <span style={{
+                        position: 'absolute', content: '""', height: '14px', width: '14px', left: '3px', bottom: '3px',
+                        backgroundColor: 'white', transition: '0.3s', borderRadius: '50%',
+                        transform: enableWhatsAppNotifications ? 'translateX(14px)' : 'translateX(0)'
+                      }} />
+                    </span>
+                  </label>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Port</span>
-                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>5174</span>
+
+                {/* Traitement Express Inputs */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.6rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Délai Express (heures)</label>
+                    <input 
+                      type="number" 
+                      className="input-control" 
+                      style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.02)', border: '1px solid var(--border-color)' }}
+                      min="1"
+                      max="168"
+                      value={expressHours}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setExpressHours(val);
+                        localStorage.setItem('klin_up_express_hours', String(val));
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Majoration Express (%)</label>
+                    <input 
+                      type="number" 
+                      className="input-control" 
+                      style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.02)', border: '1px solid var(--border-color)' }}
+                      min="0"
+                      max="200"
+                      value={expressMarkup}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setExpressMarkup(val);
+                        localStorage.setItem('klin_up_express_markup', String(val));
+                      }}
+                    />
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Base de Données</span>
-                  <span style={{ color: 'var(--status-ready)', fontWeight: 700 }}>Synced</span>
+
+                {/* Traitement Normal Input */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.6rem' }}>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Délai Normal (heures)</label>
+                  <input 
+                    type="number" 
+                    className="input-control" 
+                    style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.02)', border: '1px solid var(--border-color)' }}
+                    min="1"
+                    max="720"
+                    value={normalHours}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setNormalHours(val);
+                      localStorage.setItem('klin_up_normal_hours', String(val));
+                    }}
+                  />
                 </div>
               </div>
-            </div>
-
-            {/* Espace Client Calmy */}
-            <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-              <h4 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', fontFamily: 'var(--font-title)', color: 'var(--primary)' }}>
-                Espace Client Calmy
-              </h4>
-              <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
-                Simulez l'expérience de l'application cliente Calmy (réservation de machine, choix de cycle, suivi en direct).
-              </p>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ width: '100%', padding: '0.55rem', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}
-                onClick={() => {
-                  setIsCalmyClientMode(true);
-                  setCalmyView('dashboard');
-                }}
-              >
-                📱 Passer au Mode Client
-              </button>
             </div>
 
             {/* Déconnexion */}
