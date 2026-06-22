@@ -37,7 +37,10 @@ const DEFAULT_CATALOG = [
   { id: 'sub1', article: 'Offre Active', service: 'abonnement', prix: 20000, description: '25 vêtements | Livraison et ramassage gratuits', categorie: 'abonnement' },
   { id: 'sub2', article: 'Abonnement Premium', service: 'abonnement', prix: 35000, description: '50 vêtements max/mois | 2 ramassages max par mois | Ramassage et livraison gratuits', categorie: 'abonnement' },
   { id: 'sub3', article: 'Abonnement Prestige', service: 'abonnement', prix: 60000, description: '100 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits', categorie: 'abonnement' },
-  { id: 'sub4', article: 'Abonnement VIP', service: 'abonnement', prix: 100000, description: '200 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits', categorie: 'abonnement' }
+  { id: 'sub4', article: 'Abonnement VIP', service: 'abonnement', prix: 100000, description: '200 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits', categorie: 'abonnement' },
+  { id: 'setting_express_hours', article: 'Délai Express (heures)', service: 'system', prix: 6, categorie: 'system_setting', description: 'Configuration système' },
+  { id: 'setting_normal_hours', article: 'Délai Normal (heures)', service: 'system', prix: 48, categorie: 'system_setting', description: 'Configuration système' },
+  { id: 'setting_express_markup', article: 'Majoration Express (%)', service: 'system', prix: 50, categorie: 'system_setting', description: 'Configuration système' }
 ];
 
 let memoryDb = {
@@ -471,7 +474,8 @@ export const db = {
       }
 
       if (orderData.niveau_urgence === 'Express') {
-        const expressMarkup = Number(localStorage.getItem('klin_up_express_markup') || 50);
+        const expressMarkupItem = memoryDb.catalog.find(c => c.id === 'setting_express_markup');
+        const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
         totalPrice = Math.round(totalPrice * (1 + expressMarkup / 100));
       }
     }
@@ -490,12 +494,16 @@ export const db = {
 
     const codeMarquage = 'KLIN-' + Math.floor(100000 + Math.random() * 900000).toString();
     
-    const expressHours = Number(localStorage.getItem('klin_up_express_hours') || 6);
-    const normalHours = Number(localStorage.getItem('klin_up_normal_hours') || 48);
+    const expressHoursItem = memoryDb.catalog.find(c => c.id === 'setting_express_hours');
+    const expressHours = expressHoursItem ? Number(expressHoursItem.prix) : 6;
+    const normalHoursItem = memoryDb.catalog.find(c => c.id === 'setting_normal_hours');
+    const normalHours = normalHoursItem ? Number(normalHoursItem.prix) : 48;
     const hoursToAdd = orderData.niveau_urgence === 'Express' ? expressHours : normalHours;
     
     const dueDate = new Date(Date.now() + 3600000 * hoursToAdd).toISOString();
     const nowStr = new Date().toISOString();
+
+    const currentUser = db.getCurrentUser();
 
     const newOrder = {
       id: 'o_' + Math.random().toString(36).substr(2, 9),
@@ -512,7 +520,10 @@ export const db = {
       due_date: dueDate,
       acompte_paid_at: advancePaid > 0 ? nowStr : null,
       solde_paid_at: unpaidBalance <= 0 ? nowStr : null,
-      items: orderData.items || []
+      items: orderData.items || [],
+      // Attribution à l'utilisateur connecté
+      created_by_id: currentUser ? currentUser.id : null,
+      created_by_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : null
     };
 
     if (isSubscriptionOrder) {

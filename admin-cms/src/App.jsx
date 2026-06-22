@@ -397,7 +397,10 @@ function App() {
 
             <div className="menu-section-title">GÉNÉRAL</div>
             <ul className="menu-list">
-              <li className="menu-item" onClick={() => alert('Configuration système Klin UP')}>
+              <li 
+                className={`menu-item ${adminMenu === 'settings' ? 'active' : ''}`}
+                onClick={() => setAdminMenu('settings')}
+              >
                 <Settings size={18} />
                 Paramètres
               </li>
@@ -442,6 +445,7 @@ function App() {
               {hasAdminAccess && adminMenu === 'catalog' && "Catalogue Tarifs"}
               {hasAdminAccess && adminMenu === 'staff_management' && "Gestion des Accès"}
               {hasAdminAccess && adminMenu === 'logs' && "Journal d'Audit"}
+              {hasAdminAccess && adminMenu === 'settings' && "Paramètres Système"}
             </h1>
             <p style={{ marginTop: '0.15rem' }}>
               {!hasAdminAccess && "Cet espace est restreint aux administrateurs."}
@@ -451,6 +455,7 @@ function App() {
               {hasAdminAccess && adminMenu === 'catalog' && "Gestion de la grille de prix de traitement de laverie B2B."}
               {hasAdminAccess && adminMenu === 'staff_management' && "Habilitations du personnel, gestion des rôles et autorisations d'accès."}
               {hasAdminAccess && adminMenu === 'logs' && "Traçabilité des actions et sécurité des transactions."}
+              {hasAdminAccess && adminMenu === 'settings' && "Configuration globale des délais et majorations d'urgence de la laverie."}
             </p>
           </div>
 

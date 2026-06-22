@@ -1,5 +1,12 @@
 {
   "appId": "com.klinup.laverie",
   "appName": "KLIN UP",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#f9fafc",
+      "overlaysWebView": false
+    }
+  }
 }

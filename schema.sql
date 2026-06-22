@@ -52,7 +52,10 @@ CREATE TABLE IF NOT EXISTS public.orders (
   solde_paid_at TIMESTAMP WITH TIME ZONE,
   items JSONB,
   is_subscription_order BOOLEAN DEFAULT FALSE,
-  subscription_details JSONB
+  subscription_details JSONB,
+  -- Traçabilité : agent ayant créé la commande
+  created_by_id TEXT,
+  created_by_name TEXT
 );
 
 -- 4. Table: activity_logs
@@ -104,7 +107,10 @@ INSERT INTO public.catalog (id, article, service, prix, categorie, description) 
 ('sub1', 'Offre Active', 'abonnement', 20000, 'abonnement', '25 vêtements | Livraison et ramassage gratuits'),
 ('sub2', 'Abonnement Premium', 'abonnement', 35000, 'abonnement', '50 vêtements max/mois | 2 ramassages max par mois | Ramassage et livraison gratuits'),
 ('sub3', 'Abonnement Prestige', 'abonnement', 60000, 'abonnement', '100 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits'),
-('sub4', 'Abonnement VIP', 'abonnement', 100000, 'abonnement', '200 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits')
+('sub4', 'Abonnement VIP', 'abonnement', 100000, 'abonnement', '200 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits'),
+('setting_express_hours', 'Délai Express (heures)', 'system', 6, 'system_setting', 'Configuration système'),
+('setting_normal_hours', 'Délai Normal (heures)', 'system', 48, 'system_setting', 'Configuration système'),
+('setting_express_markup', 'Majoration Express (%)', 'system', 50, 'system_setting', 'Configuration système')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.staff (id, nom, prenom, role, email, code_pin, statut) VALUES
@@ -116,18 +122,38 @@ ON CONFLICT (id) DO NOTHING;
 
 -- ========================================================
 -- CONFIGURATION DU REALTIME (TEMPS RÉEL)
+-- Utilisation de blocs DO pour éviter les erreurs si les tables
+-- sont déjà membres de la publication (idempotent).
 -- ========================================================
 
--- Permet aux applications d'écouter les modifications en temps réel sur ces tables
-ALTER PUBLICATION supabase_realtime ADD TABLE public.staff;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.customers;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.activity_logs;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.catalog;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.pin_reset_requests;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.staff;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.customers;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.activity_logs;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.catalog;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.pin_reset_requests;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ========================================================
 -- SÉCURITÉ : ROW LEVEL SECURITY (RLS) POLICIES
+-- Utilisation de blocs DO pour éviter les erreurs si les
+-- politiques existent déjà (idempotent).
 -- ========================================================
 
 -- Activation de RLS sur toutes les tables
@@ -138,28 +164,50 @@ ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.catalog ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pin_reset_requests ENABLE ROW LEVEL SECURITY;
 
--- 1. Politiques pour la table "catalog" (Lecture publique, écriture par le personnel)
-CREATE POLICY "Lecture publique du catalogue" ON public.catalog 
-  FOR SELECT USING (true);
-CREATE POLICY "Modifications catalogue par le personnel" ON public.catalog 
-  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- 1. Politiques pour la table "catalog"
+DO $$ BEGIN
+  CREATE POLICY "Lecture publique du catalogue" ON public.catalog FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Modifications catalogue par le personnel" ON public.catalog
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 2. Politiques pour la table "staff"
-CREATE POLICY "Gestion du personnel" ON public.staff 
-  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Gestion du personnel" ON public.staff
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 3. Politiques pour la table "customers"
-CREATE POLICY "Gestion des clients" ON public.customers 
-  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Gestion des clients" ON public.customers
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 4. Politiques pour la table "orders"
-CREATE POLICY "Gestion des commandes" ON public.orders 
-  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Gestion des commandes" ON public.orders
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 5. Politiques pour la table "activity_logs"
-CREATE POLICY "Gestion des logs" ON public.activity_logs 
-  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Gestion des logs" ON public.activity_logs
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 6. Politiques pour la table "pin_reset_requests"
-CREATE POLICY "Gestion des demandes de reset PIN" ON public.pin_reset_requests 
-  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Gestion des demandes de reset PIN" ON public.pin_reset_requests
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ========================================================
+-- MIGRATION : Ajout des colonnes created_by à orders
+-- ADD COLUMN IF NOT EXISTS est idempotent nativement.
+-- ========================================================
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_by_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+

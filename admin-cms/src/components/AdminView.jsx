@@ -101,6 +101,42 @@ export default function AdminView({ activeTab, searchQuery }) {
   const [debtPaymentAmount, setDebtPaymentAmount] = useState('');
   const [selectedCrmSubId, setSelectedCrmSubId] = useState('');
 
+  // États pour les Paramètres Système (Délais et Majoration)
+  const [inputExpressHours, setInputExpressHours] = useState('');
+  const [inputNormalHours, setInputNormalHours] = useState('');
+  const [inputExpressMarkup, setInputExpressMarkup] = useState('');
+
+  useEffect(() => {
+    if (catalog.length > 0) {
+      const expHours = catalog.find(item => item.id === 'setting_express_hours')?.prix;
+      const normHours = catalog.find(item => item.id === 'setting_normal_hours')?.prix;
+      const expMarkup = catalog.find(item => item.id === 'setting_express_markup')?.prix;
+      
+      if (expHours !== undefined) setInputExpressHours(String(expHours));
+      if (normHours !== undefined) setInputNormalHours(String(normHours));
+      if (expMarkup !== undefined) setInputExpressMarkup(String(expMarkup));
+    }
+  }, [catalog]);
+
+  const handleSaveSettings = (e) => {
+    e.preventDefault();
+    const expHours = Number(inputExpressHours);
+    const normHours = Number(inputNormalHours);
+    const expMarkup = Number(inputExpressMarkup);
+
+    if (isNaN(expHours) || expHours <= 0 || isNaN(normHours) || normHours <= 0 || isNaN(expMarkup) || expMarkup < 0) {
+      alert("Veuillez saisir des valeurs numériques valides.");
+      return;
+    }
+
+    db.updateCatalogPrice('setting_express_hours', expHours);
+    db.updateCatalogPrice('setting_normal_hours', normHours);
+    db.updateCatalogPrice('setting_express_markup', expMarkup);
+
+    db.logAction('MODIFICATION_PARAMETRES', `Délais et majorations modifiés : Express ${expHours}h (+${expMarkup}%), Normal ${normHours}h`);
+    alert("Paramètres système enregistrés et synchronisés en temps réel !");
+  };
+
   const handleSubscribeCrm = (customerId, catalogItemId) => {
     if (!catalogItemId) {
       alert("Veuillez sélectionner un forfait d'abonnement.");
@@ -2319,6 +2355,74 @@ export default function AdminView({ activeTab, searchQuery }) {
             )}
           </div>
 
+        </div>
+      )}
+
+      {/* ========================================================
+         ONGLET : PARAMÈTRES SYSTÈME (SETTINGS)
+         ======================================================== */}
+      {activeTab === 'settings' && (
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '600px', margin: '0 auto' }}>
+          <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <Sliders size={18} color="var(--primary)" />
+              Configuration Délais & Majorations
+            </h3>
+          </div>
+
+          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Délai Express (heures)</label>
+                <input 
+                  type="number" 
+                  className="input-control" 
+                  required
+                  min="1"
+                  max="168"
+                  value={inputExpressHours} 
+                  onChange={(e) => setInputExpressHours(e.target.value)} 
+                />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Temps de traitement en urgence (ex: 6)</span>
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Majoration Express (%)</label>
+                <input 
+                  type="number" 
+                  className="input-control" 
+                  required
+                  min="0"
+                  max="200"
+                  value={inputExpressMarkup} 
+                  onChange={(e) => setInputExpressMarkup(e.target.value)} 
+                />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Taux additionnel sur les prix de base (ex: 50)</span>
+              </div>
+            </div>
+
+            <div className="form-group" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '1rem' }}>
+              <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Délai de Livraison Normal (heures)</label>
+              <input 
+                type="number" 
+                className="input-control" 
+                required
+                min="1"
+                max="720"
+                value={inputNormalHours} 
+                onChange={(e) => setInputNormalHours(e.target.value)} 
+              />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Temps de traitement standard de laverie (ex: 48)</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+              <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 2rem', fontWeight: 700, fontSize: '0.85rem' }}>
+                Enregistrer les paramètres
+              </button>
+            </div>
+
+          </form>
         </div>
       )}
 

@@ -48,6 +48,7 @@ import {
   Feather,
   HelpCircle,
   ChevronDown,
+  ChevronLeft,
   Check
 } from 'lucide-react';
 
@@ -186,20 +187,14 @@ const CustomSelect = ({ value, onChange, options, placeholder, disabled, style, 
 export default function MobileView() {
   const [activeTab, setActiveTab] = useState('accueil'); // accueil, gestion, facturation, profile
   const [accueilSubView, setAccueilSubView] = useState('main'); // main, top_clients
+  const [gestionSubView, setGestionSubView] = useState('main'); // main, all_profiles, all_subscriptions
+  const [activityPeriod, setActivityPeriod] = useState('7_days'); // 3_days, 7_days, 1_month, 3_months, 6_months, 12_months
+  const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [loyaltySearchQuery, setLoyaltySearchQuery] = useState('');
   
   // Paramètres fonctionnels
   const [enableWhatsAppNotifications, setEnableWhatsAppNotifications] = useState(() => {
     return localStorage.getItem('klin_up_whatsapp_enabled') !== 'false';
-  });
-  const [expressHours, setExpressHours] = useState(() => {
-    return Number(localStorage.getItem('klin_up_express_hours') || 6);
-  });
-  const [normalHours, setNormalHours] = useState(() => {
-    return Number(localStorage.getItem('klin_up_normal_hours') || 48);
-  });
-  const [expressMarkup, setExpressMarkup] = useState(() => {
-    return Number(localStorage.getItem('klin_up_express_markup') || 50);
   });
 
   const [notifications, setNotifications] = useState([
@@ -255,6 +250,9 @@ export default function MobileView() {
   const [customers, setCustomers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [catalog, setCatalog] = useState([]);
+  const expressHours = Number(catalog.find(c => c.id === 'setting_express_hours')?.prix ?? 6);
+  const normalHours = Number(catalog.find(c => c.id === 'setting_normal_hours')?.prix ?? 48);
+  const expressMarkup = Number(catalog.find(c => c.id === 'setting_express_markup')?.prix ?? 50);
   const [currentUser, setCurrentUser] = useState(() => db.getCurrentUser());
   const [showCAValues, setShowCAValues] = useState(true);
 
@@ -283,6 +281,8 @@ export default function MobileView() {
   const [custPreferences, setCustPreferences] = useState('Plié');
   const [profileSearch, setProfileSearch] = useState('');
   const [showDeleteCustomerConfirm, setShowDeleteCustomerConfirm] = useState(null);
+  const [selectedClientForHistory, setSelectedClientForHistory] = useState(null);
+  const [previousGestionSubView, setPreviousGestionSubView] = useState('main');
 
   const handleOpenCreateCustomer = () => {
     setEditingCustomer(null);
@@ -455,6 +455,72 @@ export default function MobileView() {
     return true;
   }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
+  // ── Stats réelles pour l'onglet Compte ──────────────────────────────
+  // On filtre les commandes de l'utilisateur connecté.
+  // Rétro-compatibilité : si une commande n'a pas de created_by_id (données
+  // existantes avant la migration), on ne l'inclut PAS dans les stats perso.
+  const myOrders = currentUser
+    ? orders.filter(o => o.created_by_id === currentUser.id)
+    : [];
+
+  // Dépôts du Jour : commandes créées aujourd'hui par l'utilisateur connecté
+  const todayDeposits = (() => {
+    const todayStr = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    return myOrders.filter(o => o.created_at && o.created_at.slice(0, 10) === todayStr).length;
+  })();
+
+  // Score Qualité : basé sur les 90 derniers jours, filtré par utilisateur
+  // Critères : commandes livrées à temps (+), annulées (-), en retard (-)
+  const qualityScore = (() => {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 3600 * 1000);
+    const recentOrders = myOrders.filter(o => o.created_at && new Date(o.created_at) >= ninetyDaysAgo);
+
+    if (recentOrders.length === 0) return null; // Pas encore assez de données
+
+    const now = new Date();
+    let totalHandled = 0;
+    let lateCount = 0;
+    let cancelledCount = 0;
+    let onTimeCount = 0;
+
+    recentOrders.forEach(o => {
+      if (o.statut === 'annule') {
+        cancelledCount++;
+        totalHandled++;
+      } else if (o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer') {
+        totalHandled++;
+        const due = o.due_date ? new Date(o.due_date) : null;
+        const paidAt = o.solde_paid_at ? new Date(o.solde_paid_at) : null;
+        if (due && paidAt && paidAt <= due) {
+          onTimeCount++;
+        } else if (due && paidAt && paidAt > due) {
+          lateCount++;
+        } else {
+          onTimeCount++; // Pas d'info → bénéfice du doute
+        }
+      } else {
+        // Commandes en cours : pénalité si due_date dépassée
+        const due = o.due_date ? new Date(o.due_date) : null;
+        if (due && now > due) {
+          lateCount++;
+          totalHandled++;
+        }
+      }
+    });
+
+    if (totalHandled === 0) return null;
+
+    // Algorithme de score :
+    // - Commande livrée à temps = pas de pénalité
+    // - Commande annulée = -5 points
+    // - Commande en retard = -10 points
+    const penalty = (cancelledCount * 5) + (lateCount * 10);
+    const rawScore = Math.max(0, 100 - (penalty / totalHandled) * 100);
+    return Math.min(100, rawScore).toFixed(1);
+  })();
+  // ─────────────────────────────────────────────────────────────────────
+
+
   const handleUpdateQty = (cloth, delta) => {
     setArticleQuantities(prev => {
       const current = prev[cloth] || 0;
@@ -578,6 +644,135 @@ export default function MobileView() {
     { id: 2, name: 'Machine N°2 (12kg)', status: 'repassage', timeRemaining: '24 min', load: 'Chemises Premium' },
     { id: 3, name: 'Machine N°3 (8kg)', status: 'disponible', timeRemaining: '-', load: '-' },
     { id: 4, name: 'Machine N°4 (8kg)', status: 'maintenance', timeRemaining: '-', load: 'Détartrage Tambour' }
+  ]);
+
+  // Gestion du retour gestuel et physique Android (Back Button)
+  useEffect(() => {
+    const handleBackButton = async () => {
+      // 1. Fermer les modales ou dropdowns actifs
+      if (showOrderRegistrationModal) {
+        setShowOrderRegistrationModal(false);
+        return;
+      }
+      if (showNotificationsModal) {
+        setShowNotificationsModal(false);
+        return;
+      }
+      if (showResetPinModal) {
+        setShowResetPinModal(false);
+        return;
+      }
+      if (showLogoutConfirm) {
+        setShowLogoutConfirm(false);
+        return;
+      }
+      if (showCustomerModal) {
+        setShowCustomerModal(false);
+        return;
+      }
+      if (showDeleteCustomerConfirm) {
+        setShowDeleteCustomerConfirm(null);
+        return;
+      }
+      if (showDeliveryPaymentModal) {
+        setShowDeliveryPaymentModal(false);
+        return;
+      }
+      if (showNewCustomerModal) {
+        setShowNewCustomerModal(false);
+        return;
+      }
+      if (showDebtPaymentModal) {
+        setShowDebtPaymentModal(false);
+        return;
+      }
+      if (showSettingsModal) {
+        setShowSettingsModal(false);
+        return;
+      }
+      if (showPeriodDropdown) {
+        setShowPeriodDropdown(false);
+        return;
+      }
+      if (createdOrder) {
+        setCreatedOrder(null);
+        return;
+      }
+
+      // 2. Revenir aux vues principales des onglets
+      if (accueilSubView !== 'main') {
+        setAccueilSubView('main');
+        return;
+      }
+      if (gestionSubView !== 'main') {
+        if (gestionSubView === 'client_order_history') {
+          setGestionSubView(previousGestionSubView);
+        } else {
+          setGestionSubView('main');
+        }
+        return;
+      }
+
+      // 3. Revenir à l'onglet principal "accueil"
+      if (activeTab !== 'accueil') {
+        setActiveTab('accueil');
+        setAccueilSubView('main');
+        setGestionSubView('main');
+        return;
+      }
+
+      // 4. Si sur l'accueil racine, minimiser l'app natrice
+      try {
+        const { App } = await import('@capacitor/app');
+        await App.minimizeApp();
+      } catch (err) {
+        console.log('App.minimizeApp is not available on this platform.', err);
+      }
+    };
+
+    let active = true;
+    let listenerHandle = null;
+    const setupBackButtonListener = async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        const handle = await App.addListener('backButton', () => {
+          handleBackButton();
+        });
+        if (!active) {
+          handle.remove();
+        } else {
+          listenerHandle = handle;
+        }
+      } catch (err) {
+        console.log('Capacitor App backButton listener registration skipped (not on native platform).', err);
+      }
+    };
+
+    setupBackButtonListener();
+
+    return () => {
+      active = false;
+      if (listenerHandle) {
+        listenerHandle.remove();
+      }
+    };
+  }, [
+    showOrderRegistrationModal,
+    showNotificationsModal,
+    showResetPinModal,
+    showLogoutConfirm,
+    showCustomerModal,
+    showDeleteCustomerConfirm,
+    showDeliveryPaymentModal,
+    showNewCustomerModal,
+    showDebtPaymentModal,
+    showSettingsModal,
+    showPeriodDropdown,
+    createdOrder,
+    accueilSubView,
+    gestionSubView,
+    previousGestionSubView,
+    activeTab
   ]);
 
   // Load initial data
@@ -1469,6 +1664,438 @@ export default function MobileView() {
     }
   };
 
+  const getPeriodLabel = (val) => {
+    switch (val) {
+      case '3_days': return '3 jours';
+      case '7_days': return '7 jours';
+      case '1_month': return '1 mois';
+      case '3_months': return '3 mois';
+      case '6_months': return '6 mois';
+      case '12_months': return '12 mois';
+      default: return '7 jours';
+    }
+  };
+
+  const getActivityData = () => {
+    if (activityPeriod === '3_days') {
+      return Array.from({ length: 3 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - (2 - i));
+        const dayOrders = orders.filter(o => new Date(o.created_at).toDateString() === d.toDateString());
+        return { label: d.toLocaleDateString('fr-FR', { weekday: 'short' }), count: dayOrders.length };
+      });
+    }
+    if (activityPeriod === '7_days') {
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - (6 - i));
+        const dayOrders = orders.filter(o => new Date(o.created_at).toDateString() === d.toDateString());
+        return { label: d.toLocaleDateString('fr-FR', { weekday: 'short' }).slice(0, 2), count: dayOrders.length };
+      });
+    }
+    if (activityPeriod === '1_month') {
+      return Array.from({ length: 4 }, (_, i) => {
+        const start = new Date(); start.setDate(start.getDate() - (28 - i * 7));
+        const end = new Date(start); end.setDate(end.getDate() + 7);
+        const weekOrders = orders.filter(o => {
+          const od = new Date(o.created_at);
+          return od >= start && od < end;
+        });
+        return { label: `S${i+1}`, count: weekOrders.length };
+      });
+    }
+    if (activityPeriod === '3_months') {
+      return Array.from({ length: 3 }, (_, i) => {
+        const d = new Date(); d.setMonth(d.getMonth() - (2 - i));
+        const monthOrders = orders.filter(o => {
+          const od = new Date(o.created_at);
+          return od.getMonth() === d.getMonth() && od.getFullYear() === d.getFullYear();
+        });
+        return { label: d.toLocaleDateString('fr-FR', { month: 'short' }), count: monthOrders.length };
+      });
+    }
+    if (activityPeriod === '6_months') {
+      return Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(); d.setMonth(d.getMonth() - (5 - i));
+        const monthOrders = orders.filter(o => {
+          const od = new Date(o.created_at);
+          return od.getMonth() === d.getMonth() && od.getFullYear() === d.getFullYear();
+        });
+        return { label: d.toLocaleDateString('fr-FR', { month: 'short' }), count: monthOrders.length };
+      });
+    }
+    if (activityPeriod === '12_months') {
+      return Array.from({ length: 12 }, (_, i) => {
+        const d = new Date(); d.setMonth(d.getMonth() - (11 - i));
+        const monthOrders = orders.filter(o => {
+          const od = new Date(o.created_at);
+          return od.getMonth() === d.getMonth() && od.getFullYear() === d.getFullYear();
+        });
+        return { label: d.toLocaleDateString('fr-FR', { month: 'narrow' }), count: monthOrders.length };
+      });
+    }
+    return [];
+  };
+
+  const renderCADetailView = () => {
+    const revenueTotal = orders.filter(o => o.statut !== 'annule').reduce((s, o) => s + (o.prix_total || 0), 0);
+    const encaisseTotal = orders.filter(o => o.statut !== 'annule').reduce((s, o) => s + (o.avance_payee || 0), 0);
+    const resteTotal = revenueTotal - encaisseTotal;
+    const servicesRevenue = orders.filter(o => o.statut !== 'annule').reduce((acc, o) => {
+      acc[o.type_service] = (acc[o.type_service] || 0) + (o.prix_total || 0);
+      return acc;
+    }, {});
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button"
+            onClick={() => setAccueilSubView('main')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Finances & CA</h2>
+        </div>
+
+        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+          Analyse financière du chiffre d'affaires et de l'encaissement de la caisse.
+        </p>
+
+        <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Récapitulatif Global</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+              <span>Chiffre d'Affaires</span>
+              <strong style={{ color: 'var(--primary)' }}>{revenueTotal.toLocaleString()} F</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+              <span>Montant Encaissé</span>
+              <strong style={{ color: 'var(--status-ready)' }}>{encaisseTotal.toLocaleString()} F</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+              <span>Restes à Percevoir</span>
+              <strong style={{ color: 'var(--status-late)' }}>{resteTotal.toLocaleString()} F</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Par Service</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {Object.entries(servicesRevenue).map(([srv, val]) => (
+              <div key={srv} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+                <span style={{ textTransform: 'capitalize' }}>{serviceLabels[srv] || srv}</span>
+                <strong>{val.toLocaleString()} F</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderActivesDetailView = () => {
+    const activeOrdersList = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule')
+      .sort((a, b) => {
+        if (a.niveau_urgence === 'Express' && b.niveau_urgence !== 'Express') return -1;
+        if (a.niveau_urgence !== 'Express' && b.niveau_urgence === 'Express') return 1;
+        return new Date(a.due_date) - new Date(b.due_date);
+      });
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button"
+            onClick={() => setAccueilSubView('main')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Commandes en Cours</h2>
+        </div>
+
+        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+          Liste complète des commandes actuellement en traitement à l'atelier.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '480px' }}>
+          {activeOrdersList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Aucune commande en cours.
+            </div>
+          ) : (
+            activeOrdersList.map(order => {
+              const client = customers.find(c => c.id === order.customer_id);
+              const isExpress = order.niveau_urgence === 'Express';
+              return (
+                <div key={order.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', borderLeft: isExpress ? '4px solid var(--status-pending)' : undefined }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)' }}>{order.identifiant_unique_marquage}</span>
+                    <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.52rem', padding: '0.05rem 0.25rem' }}>{statusLabels[order.statut]}</span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{order.type_article} · <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</span></div>
+                  <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>Échéance : {formatDateTime(order.due_date)}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderLivreesDetailView = () => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const completedOrders = orders.filter(o => (o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer') && new Date(o.updated_at || o.created_at) >= startOfMonth);
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button"
+            onClick={() => setAccueilSubView('main')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Commandes Restituées</h2>
+        </div>
+
+        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+          Liste des commandes livrées/récupérées avec succès ce mois-ci.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '480px' }}>
+          {completedOrders.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Aucune commande livrée ce mois-ci.
+            </div>
+          ) : (
+            completedOrders.map(order => {
+              const client = customers.find(c => c.id === order.customer_id);
+              return (
+                <div key={order.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--status-ready)' }}>{order.identifiant_unique_marquage}</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>{order.prix_total} F</span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{order.type_article} · <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</span></div>
+                  <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>Livrée le : {formatDateTime(order.updated_at || order.created_at)}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderExpressDetailView = () => {
+    const expressOrdersList = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule' && o.niveau_urgence === 'Express');
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button"
+            onClick={() => setAccueilSubView('main')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Commandes Express</h2>
+        </div>
+
+        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+          Commandes express prioritaires à traiter en urgence.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '480px' }}>
+          {expressOrdersList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Aucune commande Express en cours.
+            </div>
+          ) : (
+            expressOrdersList.map(order => {
+              const client = customers.find(c => c.id === order.customer_id);
+              return (
+                <div key={order.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', borderLeft: '4px solid var(--status-pending)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--status-pending)' }}>{order.identifiant_unique_marquage}</span>
+                    <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.52rem', padding: '0.05rem 0.25rem' }}>{statusLabels[order.statut]}</span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{order.type_article} · <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</span></div>
+                  <div style={{ fontSize: '0.62rem', color: 'var(--status-late)', fontWeight: 700 }}>Échéance : {formatDateTime(order.due_date)}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderRetardDetailView = () => {
+    const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule');
+    const lateOrdersList = activeOrders.filter(o => isOrderLate(o));
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button"
+            onClick={() => setAccueilSubView('main')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Commandes en Retard</h2>
+        </div>
+
+        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+          Commandes dont la date de livraison prévue est dépassée.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '480px' }}>
+          {lateOrdersList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Aucune commande en retard. Bon travail !
+            </div>
+          ) : (
+            lateOrdersList.map(order => {
+              const client = customers.find(c => c.id === order.customer_id);
+              return (
+                <div key={order.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', borderLeft: '4px solid var(--status-late)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--status-late)' }}>{order.identifiant_unique_marquage}</span>
+                    <span className="badge badge-en_retard" style={{ fontSize: '0.52rem', padding: '0.05rem 0.25rem' }}>RETARD</span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{order.type_article} · <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</span></div>
+                  <div style={{ fontSize: '0.62rem', color: 'var(--status-late)' }}>Échéance : {formatDateTime(order.due_date)}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderPipelineDetailView = () => {
+    const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule');
+    const pipeline = [
+      { label: 'Reçu / En attente de tri', key: 'en_attente', color: 'var(--status-pending)', desc: 'Nouveaux vêtements déposés nécessitant un tri et un marquage.' },
+      { label: 'En Lavage', key: 'en_cours_lavage', color: 'var(--status-washing)', desc: 'Articles actuellement en machine de lavage.' },
+      { label: 'Prêt', key: 'pret', color: 'var(--status-ready)', desc: 'Lavage et repassage terminés. Prêt pour livraison ou retrait.' },
+    ];
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button"
+            onClick={() => setAccueilSubView('main')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Pipeline Atelier</h2>
+        </div>
+
+        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+          État de charge détaillé de chaque étape du pipeline de traitement.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+          {pipeline.map(p => {
+            const count = activeOrders.filter(o => o.statut === p.key).length;
+            return (
+              <div key={p.key} className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: p.color }}>{p.label}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, background: p.color + '15', color: p.color, padding: '0.2rem 0.6rem', borderRadius: '8px' }}>{count}</span>
+                </div>
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.35 }}>{p.desc}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderActivityDetailView = () => {
+    const actData = getActivityData();
+    const totalOrders = actData.reduce((s, d) => s + d.count, 0);
+    const maxBar = Math.max(...actData.map(d => d.count), 1);
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button"
+            onClick={() => setAccueilSubView('main')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Performances d'Activité</h2>
+        </div>
+
+        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+          Analyse des performances pour la période sélectionnée : <strong>{getPeriodLabel(activityPeriod)}</strong>.
+        </p>
+
+        {/* Grand Graphique */}
+        <div className="card" style={{ padding: '1.2rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Commandes Créées</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary)' }}>{totalOrders} au total</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '140px', marginTop: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+            {actData.map((d, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                <div style={{ 
+                  width: '100%', 
+                  background: 'var(--primary)', 
+                  borderRadius: '4px 4px 0 0', 
+                  height: `${Math.max(d.count > 0 ? 5 : 2, (d.count / maxBar) * 120)}px`, 
+                  transition: 'height 0.5s ease',
+                  position: 'relative'
+                }}>
+                  {d.count > 0 && (
+                    <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.55rem', fontWeight: 700, color: 'var(--primary)' }}>
+                      {d.count}
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{d.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Autres KPI sur la période */}
+        <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Statistiques de Période</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+              <span>Moyenne par intervalle</span>
+              <strong>{(totalOrders / actData.length).toFixed(1)} cmd</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+              <span>Maximum enregistré</span>
+              <strong>{maxBar} cmd</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderTopClientsView = () => {
     // 1. Calculate loyalty of all customers
     const loyaltyCustomers = customers.map(c => {
@@ -1825,6 +2452,27 @@ export default function MobileView() {
           if (accueilSubView === 'top_clients') {
             return renderTopClientsView();
           }
+          if (accueilSubView === 'ca_detail') {
+            return renderCADetailView();
+          }
+          if (accueilSubView === 'actives_detail') {
+            return renderActivesDetailView();
+          }
+          if (accueilSubView === 'livrees_detail') {
+            return renderLivreesDetailView();
+          }
+          if (accueilSubView === 'express_detail') {
+            return renderExpressDetailView();
+          }
+          if (accueilSubView === 'retard_detail') {
+            return renderRetardDetailView();
+          }
+          if (accueilSubView === 'pipeline_detail') {
+            return renderPipelineDetailView();
+          }
+          if (accueilSubView === 'activity_detail') {
+            return renderActivityDetailView();
+          }
 
           const now = new Date();
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1888,15 +2536,15 @@ export default function MobileView() {
               </div>
 
               {/* ALERTE RETARDS */}
-              {lateOrders.length > 0 && (
-                <div className="alert-banner warning">
-                  <TriangleAlert size={14} />
-                  <span>{lateOrders.length} commande{lateOrders.length > 1 ? 's' : ''} en retard de livraison !</span>
-                </div>
-              )}
-
-              {/* TOTAL SPEND — Style Finance Card (Adaptive) */}
-              <div className="dashboard-main-card" style={{ borderRadius: '20px', padding: '1.2rem 1.1rem' }}>
+                         {/* TOTAL SPEND — Style Finance Card (Adaptive) */}
+              <div 
+                className="dashboard-main-card" 
+                style={{ borderRadius: '20px', padding: '1.2rem 1.1rem', cursor: 'pointer' }}
+                onClick={(e) => {
+                  if (e.target.closest('.eye-toggle-btn')) return;
+                  setAccueilSubView(isCAAccessible ? 'ca_detail' : 'actives_detail');
+                }}
+              >
                 {isCAAccessible ? (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
@@ -1916,7 +2564,10 @@ export default function MobileView() {
                         <button
                           type="button"
                           className="eye-toggle-btn"
-                          onClick={() => setShowCAValues(!showCAValues)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCAValues(!showCAValues);
+                          }}
                           title={showCAValues ? 'Masquer le CA' : 'Afficher le CA'}
                         >
                           {showCAValues ? <Eye size={18} /> : <EyeOff size={18} />}
@@ -2004,40 +2655,67 @@ export default function MobileView() {
               {/* KPI GRID — Style Income/Expenses */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
                 {[
-                  { label: 'Actives', value: activeOrders.length, color: 'var(--primary)', bg: 'var(--primary-light)', icon: <Activity size={14} color="var(--primary)" />, sub: 'commandes en cours' },
-                  { label: 'Livrées', value: completedThisMonth.length, color: 'var(--status-ready)', bg: 'var(--status-ready-light)', icon: <CheckCircle size={14} color="var(--status-ready)" />, sub: 'ce mois-ci' },
-                  { label: 'Express', value: expressOrders.length, color: 'var(--status-pending)', bg: 'var(--status-pending-light)', icon: <Zap size={14} color="var(--status-pending)" />, sub: 'urgentes' },
+                  { label: 'Actives', value: activeOrders.length, color: 'var(--primary)', bg: 'var(--primary-light)', icon: <Activity size={14} color="var(--primary)" />, sub: 'commandes en cours', subView: 'actives_detail' },
+                  { label: 'Livrées', value: completedThisMonth.length, color: 'var(--status-ready)', bg: 'var(--status-ready-light)', icon: <CheckCircle size={14} color="var(--status-ready)" />, sub: 'ce mois-ci', subView: 'livrees_detail' },
+                  { label: 'Express', value: expressOrders.length, color: 'var(--status-pending)', bg: 'var(--status-pending-light)', icon: <Zap size={14} color="var(--status-pending)" />, sub: 'urgentes', subView: 'express_detail' },
                   isCAAccessible ? {
                     label: 'CA Mois',
                     value: showCAValues ? (revenueMonth >= 1000 ? `${(revenueMonth/1000).toFixed(0)}k` : revenueMonth) : '••••••',
                     color: 'var(--secondary)',
                     bg: 'var(--secondary-light)',
                     icon: <TrendingUp size={14} color="var(--secondary)" />,
-                    sub: 'FCFA'
+                    sub: 'FCFA',
+                    subView: 'ca_detail'
                   } : { 
                     label: 'En Retard', 
                     value: lateOrders.length, 
                     color: 'var(--status-late)', 
                     bg: 'var(--status-late-light)', 
                     icon: <TriangleAlert size={14} color="var(--status-late)" />, 
-                    sub: 'à livrer' 
+                    sub: 'à livrer',
+                    subView: 'retard_detail'
                   },
-                ].map((kpi, i) => (
-                  <div key={i} className="kpi-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div className="kpi-label">{kpi.label}</div>
-                        <div className="kpi-value" style={{ color: kpi.color }}>{kpi.value}</div>
+                ].map((kpi, i) => {
+                  const isColoredCard = kpi.label === 'Actives' || kpi.label === 'Livrées';
+                  return (
+                    <div 
+                      key={i} 
+                      className="kpi-card" 
+                      style={{ 
+                        cursor: 'pointer',
+                        background: isColoredCard ? kpi.color : undefined,
+                        borderColor: isColoredCard ? kpi.color : undefined,
+                        color: isColoredCard ? '#ffffff' : undefined
+                      }}
+                      onClick={() => setAccueilSubView(kpi.subView)}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div className="kpi-label" style={{ color: isColoredCard ? 'rgba(255, 255, 255, 0.85)' : undefined }}>{kpi.label}</div>
+                          <div className="kpi-value" style={{ color: isColoredCard ? '#ffffff' : kpi.color }}>{kpi.value}</div>
+                        </div>
+                        <div 
+                          className="kpi-icon" 
+                          style={{ 
+                            background: isColoredCard ? 'rgba(255, 255, 255, 0.25)' : kpi.bg,
+                            color: isColoredCard ? '#ffffff' : undefined
+                          }}
+                        >
+                          {isColoredCard ? React.cloneElement(kpi.icon, { color: '#ffffff' }) : kpi.icon}
+                        </div>
                       </div>
-                      <div className="kpi-icon" style={{ background: kpi.bg }}>{kpi.icon}</div>
+                      <div className="kpi-sub" style={{ color: isColoredCard ? 'rgba(255, 255, 255, 0.8)' : undefined }}>{kpi.sub}</div>
                     </div>
-                    <div className="kpi-sub">{kpi.sub}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* PIPELINE ATELIER — Premium Style */}
-              <div className="card" style={{ background: 'var(--bg-card)', padding: '1.1rem' }}>
+              <div 
+                className="card" 
+                style={{ background: 'var(--bg-card)', padding: '1.1rem', cursor: 'pointer' }}
+                onClick={() => setAccueilSubView('pipeline_detail')}
+              >
                 <div className="section-header">
                   <h4>Pipeline Atelier</h4>
                   <span className="see-all">Temps réel</span>
@@ -2065,29 +2743,72 @@ export default function MobileView() {
                 </div>
               </div>
 
-              {/* ACTIVITÉ 7 JOURS */}
+              {/* ACTIVITÉ PÉRIODIQUE */}
               <div className="card" style={{ padding: '0.85rem' }}>
-                <div className="section-header">
-                  <h4>Activité — 7 jours</h4>
-                  <span className="see-all">Voir tout</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: '55px' }}>
-                  {last7.map((d, i) => (
-                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                      <div style={{ 
-                        width: '100%', 
-                        background: i === 6 ? 'var(--primary)' : 'var(--primary-light)', 
-                        borderRadius: '4px 4px 0 0', 
-                        height: `${Math.max(d.count > 0 ? 5 : 2, (d.count / maxBarCount) * 50)}px`, 
-                        transition: 'height 0.5s ease', 
-                        position: 'relative' 
-                      }}>
-                        {d.count > 0 && i >= 5 && <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.5rem', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>{d.count}</div>}
-                      </div>
-                      <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 500 }}>{d.label}</span>
+                <div className="section-header" style={{ position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }} onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}>
+                    <h4 style={{ margin: 0 }}>Activité — <span style={{ color: 'var(--primary)', borderBottom: '1px dashed var(--primary)' }}>{getPeriodLabel(activityPeriod)}</span></h4>
+                    <ChevronDown size={14} color="var(--primary)" />
+                  </div>
+                  <span className="see-all" style={{ cursor: 'pointer' }} onClick={() => setAccueilSubView('activity_detail')}>Voir plus</span>
+                  
+                  {showPeriodDropdown && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, zIndex: 100,
+                      background: '#fff', border: '1px solid var(--border-color)', borderRadius: '12px',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '120px'
+                    }}>
+                      {[
+                        { value: '3_days', label: '3 jours' },
+                        { value: '7_days', label: '7 jours' },
+                        { value: '1_month', label: '1 mois' },
+                        { value: '3_months', label: '3 mois' },
+                        { value: '6_months', label: '6 mois' },
+                        { value: '12_months', label: '12 mois' }
+                      ].map(p => (
+                        <div
+                          key={p.value}
+                          onClick={() => {
+                            setActivityPeriod(p.value);
+                            setShowPeriodDropdown(false);
+                          }}
+                          style={{
+                            padding: '0.45rem 0.6rem', fontSize: '0.72rem', borderRadius: '6px', cursor: 'pointer',
+                            background: activityPeriod === p.value ? 'var(--primary-light)' : 'transparent',
+                            color: activityPeriod === p.value ? 'var(--primary)' : 'var(--text-primary)',
+                            fontWeight: activityPeriod === p.value ? 700 : 400
+                          }}
+                        >
+                          {p.label}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
+                
+                {(() => {
+                  const actData = getActivityData();
+                  const maxBar = Math.max(...actData.map(d => d.count), 1);
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: '55px', marginTop: '0.5rem' }}>
+                      {actData.map((d, i) => (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                          <div style={{ 
+                            width: '100%', 
+                            background: i === actData.length - 1 ? 'var(--primary)' : 'var(--primary-light)', 
+                            borderRadius: '4px 4px 0 0', 
+                            height: `${Math.max(d.count > 0 ? 5 : 2, (d.count / maxBar) * 50)}px`, 
+                            transition: 'height 0.5s ease', 
+                            position: 'relative' 
+                          }}>
+                            {d.count > 0 && i >= actData.length - 2 && <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.5rem', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>{d.count}</div>}
+                          </div>
+                          <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 500 }}>{d.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* TOP CLIENTS */}
@@ -2103,7 +2824,7 @@ export default function MobileView() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     {topCustomers.map((c, idx) => (
-                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.4rem 0.5rem', background: idx === 0 ? 'var(--primary-light)' : 'transparent', borderRadius: '10px' }}>
+                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.4rem 0.55rem', background: idx === 0 ? 'var(--primary-light)' : 'transparent', borderRadius: '10px' }}>
                         <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: idx === 0 ? 'var(--primary)' : 'var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 800, color: idx === 0 ? '#fff' : 'var(--text-secondary)', flexShrink: 0 }}>
                           {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
                         </div>
@@ -2169,420 +2890,789 @@ export default function MobileView() {
            ======================================================== */}
         {activeTab === 'gestion' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px' }}>
-              <div>
-                <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.4px', margin: 0 }}>Gestion</h1>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Suivi et traitement</p>
-              </div>
-              <button 
-                type="button"
-                className="btn btn-primary" 
-                style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                onClick={() => setShowOrderRegistrationModal(true)}
-              >
-                <Plus size={14} /> Nouvelle
-              </button>
-            </div>
-
-            {/* Atelier sub-filters */}
-            <div style={{ display: 'flex', gap: '0.35rem', background: '#fff', padding: '0.3rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-              <button 
-                className={`btn ${atelierFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
-                style={{ flex: 1, padding: '0.35rem', fontSize: '0.7rem', borderRadius: '8px' }}
-                onClick={() => setAtelierFilter('all')}
-              >
-                Tous
-              </button>
-              <button 
-                className={`btn ${atelierFilter === 'urgent' ? 'btn-primary' : 'btn-outline'}`}
-                style={{ flex: 1, padding: '0.35rem', fontSize: '0.7rem', borderRadius: '8px' }}
-                onClick={() => setAtelierFilter('urgent')}
-              >
-                Urgents
-              </button>
-              <button 
-                className={`btn ${atelierFilter === 'retard' ? 'btn-danger' : 'btn-outline'}`}
-                style={{ flex: 1, padding: '0.35rem', fontSize: '0.7rem', borderRadius: '8px' }}
-                onClick={() => setAtelierFilter('retard')}
-              >
-                Retards
-              </button>
-            </div>
-
-            {/* Atelier active orders cards list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {filteredAtelierOrders.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <CheckCircle size={28} color="var(--status-ready)" style={{ marginBottom: '0.5rem' }} />
-                  Aucun vêtement en traitement.
-                </div>
-              ) : (
-                filteredAtelierOrders.map(order => {
-                  const client = customers.find(c => c.id === order.customer_id);
-                  const isLate = isOrderLate(order);
-                  const isExpress = order.niveau_urgence === 'Express';
-
-                  return (
-                    <div 
-                      key={order.id} 
-                      className={`${isExpress ? 'pulse-express' : ''}`}
-                      style={{ background: '#fff', border: '1px solid var(--border-color)', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', borderRadius: '16px' }}
+            {gestionSubView === 'main' && (
+              <>
+                {/* Header */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingTop: '8px' }}>
+                  <div>
+                    <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.4px', margin: 0 }}>Gestion</h1>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Suivi et traitement</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button 
+                      type="button"
+                      className="btn btn-primary" 
+                      style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                      onClick={() => setShowOrderRegistrationModal(true)}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                        <div>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary)' }}>
-                            {order.identifiant_unique_marquage}
-                          </span>
-                          <h4 style={{ fontSize: '0.82rem', fontWeight: 700, margin: '0.1rem 0 0' }}>
-                            {order.type_article} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.7rem' }}>({serviceLabels[order.type_service]})</span>
-                          </h4>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                            {client ? `${client.prenom} ${client.nom}` : 'Inconnu'}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'end', gap: '0.2rem' }}>
-                          <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.55rem', padding: '0.1rem 0.35rem' }}>
-                            {statusLabels[order.statut]}
-                          </span>
-                          {isLate && (
-                            <span className="badge badge-en_retard" style={{ fontSize: '0.52rem', padding: '0.05rem 0.25rem' }}>
-                              RETARD
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                      <Plus size={14} /> Ajouter une commande
+                    </button>
+                    <button 
+                      type="button"
+                      className="btn" 
+                      style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--status-ready)', color: '#fff', border: 'none' }}
+                      onClick={handleOpenCreateCustomer}
+                    >
+                      <Plus size={14} /> Ajouter un profil client
+                    </button>
+                  </div>
+                </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)', background: 'var(--bg-app)', padding: '0.3rem 0.5rem', borderRadius: '8px' }}>
-                        <span>Dépôt: {formatDateTime(order.created_at)}</span>
-                        <span>Éch: {formatDateTime(order.due_date)}</span>
-                      </div>
+                {/* Atelier sub-filters */}
+                <div style={{ display: 'flex', gap: '0.35rem', background: '#fff', padding: '0.3rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <button 
+                    className={`btn ${atelierFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ flex: 1, padding: '0.35rem', fontSize: '0.7rem', borderRadius: '8px' }}
+                    onClick={() => setAtelierFilter('all')}
+                  >
+                    Tous
+                  </button>
+                  <button 
+                    className={`btn ${atelierFilter === 'urgent' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ flex: 1, padding: '0.35rem', fontSize: '0.7rem', borderRadius: '8px' }}
+                    onClick={() => setAtelierFilter('urgent')}
+                  >
+                    Urgents
+                  </button>
+                  <button 
+                    className={`btn ${atelierFilter === 'retard' ? 'btn-danger' : 'btn-outline'}`}
+                    style={{ flex: 1, padding: '0.35rem', fontSize: '0.7rem', borderRadius: '8px' }}
+                    onClick={() => setAtelierFilter('retard')}
+                  >
+                    Retards
+                  </button>
+                </div>
 
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.15rem' }}>
-                        {order.statut === 'en_attente' && (
-                          <button 
-                            className="btn btn-primary" 
-                            style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
-                            onClick={() => handleStatusChange(order.id, 'en_cours_lavage')}
-                          >
-                            <RotateCw size={11} className="spin-washing" /> Lancer Lavage
-                          </button>
-                        )}
-                        {order.statut === 'en_cours_lavage' && (
-                          <button 
-                            className="btn btn-secondary" 
-                            style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
-                            onClick={() => handleStatusChange(order.id, 'pret')}
-                          >
-                            <CheckCircle size={11} /> Marquer Prêt
-                          </button>
-                        )}
-                        {order.statut === 'pret' && (
-                          <>
-                            <button 
-                              className="btn btn-primary" 
-                              style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
-                              onClick={() => handleStartDelivery(order, 'a_livrer')}
-                            >
-                              <DollarSign size={10} /> À livrer
-                            </button>
-                            <button 
-                              className="btn btn-secondary" 
-                              style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
-                              onClick={() => handleStartDelivery(order, 'a_recuperer')}
-                            >
-                              <CheckCircle size={10} /> À récupérer
-                            </button>
-                          </>
-                        )}
-                        
-                        <button 
-                          className="btn btn-outline" 
-                          style={{ padding: '0.4rem', color: 'var(--status-late)', borderRadius: '8px' }}
-                          onClick={() => handleCancelOrder(order.id)}
+                {/* Atelier active orders cards list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {filteredAtelierOrders.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <CheckCircle size={28} color="var(--status-ready)" style={{ marginBottom: '0.5rem' }} />
+                      Aucun vêtement en traitement.
+                    </div>
+                  ) : (
+                    filteredAtelierOrders.map(order => {
+                      const client = customers.find(c => c.id === order.customer_id);
+                      const isLate = isOrderLate(order);
+                      const isExpress = order.niveau_urgence === 'Express';
+
+                      return (
+                        <div 
+                          key={order.id} 
+                          className={`${isExpress ? 'pulse-express' : ''}`}
+                          style={{ background: '#fff', border: '1px solid var(--border-color)', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', borderRadius: '16px' }}
                         >
-                          <X size={11} />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                            <div>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary)' }}>
+                                {order.identifiant_unique_marquage}
+                              </span>
+                              <h4 style={{ fontSize: '0.82rem', fontWeight: 700, margin: '0.1rem 0 0' }}>
+                                {order.type_article} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.7rem' }}>({serviceLabels[order.type_service]})</span>
+                              </h4>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                                {client ? `${client.prenom} ${client.nom}` : 'Inconnu'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'end', gap: '0.2rem' }}>
+                              <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.55rem', padding: '0.1rem 0.35rem' }}>
+                                {statusLabels[order.statut]}
+                              </span>
+                              {isLate && (
+                                <span className="badge badge-en_retard" style={{ fontSize: '0.52rem', padding: '0.05rem 0.25rem' }}>
+                                  RETARD
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)', background: 'var(--bg-app)', padding: '0.3rem 0.5rem', borderRadius: '8px' }}>
+                            <span>Dépôt: {formatDateTime(order.created_at)}</span>
+                            <span>Éch: {formatDateTime(order.due_date)}</span>
+                          </div>
+
+                          {/* Action buttons */}
+                          <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.15rem' }}>
+                            {order.statut === 'en_attente' && (
+                              <button 
+                                className="btn btn-primary" 
+                                style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
+                                onClick={() => handleStatusChange(order.id, 'en_cours_lavage')}
+                              >
+                                <RotateCw size={11} className="spin-washing" /> Lancer Lavage
+                              </button>
+                            )}
+                            {order.statut === 'en_cours_lavage' && (
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
+                                onClick={() => handleStatusChange(order.id, 'pret')}
+                              >
+                                <CheckCircle size={11} /> Marquer Prêt
+                              </button>
+                            )}
+                            {order.statut === 'pret' && (
+                              <>
+                                <button 
+                                  className="btn btn-primary" 
+                                  style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                                  onClick={() => handleStartDelivery(order, 'a_livrer')}
+                                >
+                                  <DollarSign size={10} /> À livrer
+                                </button>
+                                <button 
+                                  className="btn btn-secondary" 
+                                  style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                                  onClick={() => handleStartDelivery(order, 'a_recuperer')}
+                                >
+                                  <CheckCircle size={10} /> À récupérer
+                                </button>
+                              </>
+                            )}
+                            
+                            <button 
+                              className="btn btn-outline" 
+                              style={{ padding: '0.4rem', color: 'var(--status-late)', borderRadius: '8px' }}
+                              onClick={() => handleCancelOrder(order.id)}
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* ================= GESTION DES PROFILS CLIENTS ================= */}
+                <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)' }}>
+                      <Users size={16} />
+                      <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>Profils Clients</h4>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setGestionSubView('all_profiles')}
+                      style={{ border: 'none', background: 'transparent', fontSize: '0.68rem', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }}
+                    >
+                      Voir tout
+                    </button>
+                  </div>
+
+                  {/* Search Bar for profiles */}
+                  <div style={{ position: 'relative' }}>
+                    <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input 
+                      type="text" 
+                      className="input-control" 
+                      style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
+                      placeholder="Rechercher un profil..." 
+                      value={profileSearch} 
+                      onChange={(e) => setProfileSearch(e.target.value)} 
+                    />
+                  </div>
+
+                  {/* List of Profiles */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
+                    {customers.filter(c => 
+                      c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                      c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                      c.telephone.includes(profileSearch)
+                    ).map(c => (
+                      <div 
+                        key={c.id} 
+                        onClick={(e) => {
+                          if (e.target.closest('button') || e.target.closest('svg')) return;
+                          setSelectedClientForHistory(c);
+                          setPreviousGestionSubView('main');
+                          setGestionSubView('client_order_history');
+                        }}
+                        style={{ 
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                          background: 'var(--bg-app)', padding: '0.55rem 0.7rem', borderRadius: '12px', 
+                          border: '1px solid var(--border-color)', gap: '0.4rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                          <div style={{
+                            width: '26px', height: '26px', borderRadius: '50%', 
+                            background: 'var(--primary-light)', color: 'var(--primary)', 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                            fontSize: '0.7rem', fontWeight: 800, flexShrink: 0
+                          }}>
+                            {c.prenom[0]}{c.nom[0]}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {c.prenom} {c.nom}
+                            </div>
+                            <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>
+                              {c.telephone}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span style={{ 
+                            fontSize: '0.55rem', fontWeight: 700, padding: '0.15rem 0.35rem', 
+                            borderRadius: '6px', background: c.preferences_pliage === 'Sur cintre' ? 'rgba(0,210,196,0.1)' : 'var(--primary-light)', 
+                            color: c.preferences_pliage === 'Sur cintre' ? 'var(--secondary)' : 'var(--primary)',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {c.preferences_pliage === 'Sur cintre' ? 'Cintre' : 'Plié'}
+                          </span>
+                          <button 
+                            type="button"
+                            onClick={() => handleOpenEditCustomer(c)}
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--primary)', padding: '0.15rem', display: 'flex' }}
+                            title="Modifier"
+                          >
+                            <Edit2 size={11} />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setShowDeleteCustomerConfirm(c)}
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-late)', padding: '0.15rem', display: 'flex' }}
+                            title="Supprimer"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {customers.filter(c => 
+                      c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                      c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                      c.telephone.includes(profileSearch)
+                    ).length === 0 && (
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', padding: '0.75rem', textAlign: 'center' }}>
+                        Aucun profil trouvé.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* CRM Abonnements */}
+                <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Award size={14} color="var(--primary)" />
+                      <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Abonnements Clients</h4>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setGestionSubView('all_subscriptions')}
+                      style={{ border: 'none', background: 'transparent', fontSize: '0.68rem', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }}
+                    >
+                      Voir tout
+                    </button>
+                  </div>
+                  
+                  <div style={{ position: 'relative' }}>
+                    <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input 
+                      type="text" 
+                      className="input-control" 
+                      style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
+                      placeholder="Rechercher client..." 
+                      value={crmSearch} 
+                      onChange={(e) => {
+                        setCrmSearch(e.target.value);
+                        setSelectedCrmCustomer(null);
+                      }} 
+                    />
+                  </div>
+
+                  {crmSearch && !selectedCrmCustomer && (
+                    <div style={{ 
+                      maxHeight: '120px', overflowY: 'auto', 
+                      border: '1px solid var(--border-color)', borderRadius: '10px',
+                      background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', gap: '2px', padding: '4px'
+                    }}>
+                      {filteredCrmCustomers.slice(0, 5).map(c => (
+                        <div 
+                          key={c.id} 
+                          onClick={() => { setSelectedCrmCustomer(c); setCrmSearch(''); }}
+                          style={{ padding: '0.4rem 0.55rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', background: '#fff', border: '1px solid var(--border-color)' }}
+                        >
+                          {c.prenom} {c.nom} ({c.telephone})
+                        </div>
+                      ))}
+                      {filteredCrmCustomers.length === 0 && (
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', padding: '0.5rem', textAlign: 'center' }}>Aucun client trouvé</div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedCrmCustomer && (
+                    <div style={{ background: 'var(--bg-app)', padding: '0.7rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.45rem', border: '1px solid var(--border-color)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>{selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => setSelectedCrmCustomer(null)}
+                          style={{ border: 'none', background: 'transparent', fontSize: '0.65rem', color: 'var(--status-late)', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Fermer
                         </button>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Tél : {selectedCrmCustomer.telephone}</div>
+                      
+                      {selectedCrmCustomer.active_subscription ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.35rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem' }}>
+                            <strong style={{ color: 'var(--primary)' }}>{selectedCrmCustomer.active_subscription.name}</strong>
+                            <span style={{ fontWeight: 600 }}>{selectedCrmCustomer.active_subscription.remaining_clothes} / {selectedCrmCustomer.active_subscription.total_clothes} vêt.</span>
+                          </div>
+                          
+                          {(() => {
+                            const remaining = selectedCrmCustomer.active_subscription.remaining_clothes;
+                            const total = selectedCrmCustomer.active_subscription.total_clothes;
+                            const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                            return (
+                              <div className="progress-bar-track">
+                                <div className="progress-bar-fill" style={{ width: `${percentUsed}%`, background: 'var(--primary)' }}></div>
+                              </div>
+                            );
+                          })()}
+                          
+                          <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>
+                            Expire le : {new Date(selectedCrmCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}
+                          </div>
 
-            {/* Machines Status Grid */}
-            <div>
-              <div className="section-header">
-                <h4>État des machines</h4>
-                <span className="see-all">Voir tout</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
-                {machineStatus.map(m => {
-                  const isActive = m.status === 'lavage' || m.status === 'respassage' || m.status === 'repassage';
-                  let statusColor = 'var(--text-muted)';
-                  let statusBg = 'var(--border-color)';
-                  let label = 'Inactif';
-
-                  if (m.status === 'lavage') {
-                    statusColor = 'var(--status-washing)';
-                    statusBg = 'var(--status-washing-light)';
-                    label = 'Lavage';
-                  } else if (m.status === 'repassage') {
-                    statusColor = 'var(--accent)';
-                    statusBg = 'rgba(108, 106, 208, 0.1)';
-                    label = 'Séchage/Rep';
-                  } else if (m.status === 'disponible') {
-                    statusColor = 'var(--status-ready)';
-                    statusBg = 'var(--status-ready-light)';
-                    label = 'Disponible';
-                  } else if (m.status === 'maintenance') {
-                    statusColor = 'var(--status-pending)';
-                    statusBg = 'var(--status-pending-light)';
-                    label = 'Maintenance';
-                  }
-
-                  return (
-                    <div className="metric-mini-card" key={m.id} style={{ opacity: m.status === 'maintenance' ? 0.8 : 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 700 }}>{m.name}</span>
-                        <span style={{ width: '6px', height: '6px', background: statusColor, borderRadius: '50%' }}></span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
-                        <Activity size={11} color={statusColor} className={m.status === 'lavage' ? 'spin-washing' : ''} />
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: statusColor }}>{label}</span>
-                      </div>
-                      {isActive && (
-                        <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginTop: '0.08rem' }}>
-                          {m.load} · <strong>{m.timeRemaining}</strong>
+                          <button 
+                            type="button" 
+                            className="btn btn-outline" 
+                            onClick={() => handleUnsubscribeCrm(selectedCrmCustomer.id)}
+                            style={{ padding: '0.25rem', fontSize: '0.65rem', color: 'var(--status-late)', borderColor: '#f5c6c6', background: 'var(--status-late-light)', borderRadius: '6px', marginTop: '0.15rem' }}
+                          >
+                            Résilier l'abonnement
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.35rem' }}>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Aucun forfait actif.</div>
+                          <div style={{ display: 'flex', gap: '0.3rem' }}>
+                            <CustomSelect
+                              value={selectedCrmSubId}
+                              onChange={setSelectedCrmSubId}
+                              placeholder="-- Choisir --"
+                              options={catalog.filter(i => i.service === 'abonnement').map(sub => ({
+                                value: sub.id,
+                                label: `${sub.article} (${sub.prix} F)`
+                              }))}
+                              style={{ flex: 1 }}
+                            />
+                            <button 
+                              type="button" 
+                              className="btn btn-primary" 
+                              onClick={() => handleSubscribeCrm(selectedCrmCustomer.id, selectedCrmSubId)}
+                              style={{ padding: '0.28rem 0.55rem', fontSize: '0.68rem', borderRadius: '6px' }}
+                            >
+                              Souscrire
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* CRM Abonnements */}
-            <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
-                <Award size={14} color="var(--primary)" />
-                <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>Abonnements Clients</h4>
-              </div>
-              
-              <div style={{ position: 'relative' }}>
-                <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
-                  placeholder="Rechercher client..." 
-                  value={crmSearch} 
-                  onChange={(e) => {
-                    setCrmSearch(e.target.value);
-                    setSelectedCrmCustomer(null);
-                  }} 
-                />
-              </div>
-
-              {crmSearch && !selectedCrmCustomer && (
-                <div style={{ 
-                  maxHeight: '120px', overflowY: 'auto', 
-                  border: '1px solid var(--border-color)', borderRadius: '10px',
-                  background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', gap: '2px', padding: '4px'
-                }}>
-                  {filteredCrmCustomers.slice(0, 5).map(c => (
-                    <div 
-                      key={c.id} 
-                      onClick={() => { setSelectedCrmCustomer(c); setCrmSearch(''); }}
-                      style={{ padding: '0.4rem 0.55rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', background: '#fff', border: '1px solid var(--border-color)' }}
-                    >
-                      {c.prenom} {c.nom} ({c.telephone})
-                    </div>
-                  ))}
-                  {filteredCrmCustomers.length === 0 && (
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', padding: '0.5rem', textAlign: 'center' }}>Aucun client trouvé</div>
                   )}
                 </div>
-              )}
+              </>
+            )}
 
-              {selectedCrmCustomer && (
-                <div style={{ background: 'var(--bg-app)', padding: '0.7rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.45rem', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>{selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}</span>
-                    <button 
-                      type="button" 
-                      onClick={() => setSelectedCrmCustomer(null)}
-                      style={{ border: 'none', background: 'transparent', fontSize: '0.65rem', color: 'var(--status-late)', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Fermer
-                    </button>
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Tél : {selectedCrmCustomer.telephone}</div>
-                  
-                  {selectedCrmCustomer.active_subscription ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.35rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem' }}>
-                        <strong style={{ color: 'var(--primary)' }}>{selectedCrmCustomer.active_subscription.name}</strong>
-                        <span style={{ fontWeight: 600 }}>{selectedCrmCustomer.active_subscription.remaining_clothes} / {selectedCrmCustomer.active_subscription.total_clothes} vêt.</span>
-                      </div>
-                      
-                      {(() => {
-                        const remaining = selectedCrmCustomer.active_subscription.remaining_clothes;
-                        const total = selectedCrmCustomer.active_subscription.total_clothes;
-                        const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                        return (
-                          <div className="progress-bar-track">
-                            <div className="progress-bar-fill" style={{ width: `${percentUsed}%`, background: 'var(--primary)' }}></div>
-                          </div>
-                        );
-                      })()}
-                      
-                      <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>
-                        Expire le : {new Date(selectedCrmCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}
-                      </div>
-
-                      <button 
-                        type="button" 
-                        className="btn btn-outline" 
-                        onClick={() => handleUnsubscribeCrm(selectedCrmCustomer.id)}
-                        style={{ padding: '0.25rem', fontSize: '0.65rem', color: 'var(--status-late)', borderColor: '#f5c6c6', background: 'var(--status-late-light)', borderRadius: '6px', marginTop: '0.15rem' }}
-                      >
-                        Résilier l'abonnement
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.35rem' }}>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Aucun forfait actif.</div>
-                      <div style={{ display: 'flex', gap: '0.3rem' }}>
-                        <CustomSelect
-                          value={selectedCrmSubId}
-                          onChange={setSelectedCrmSubId}
-                          placeholder="-- Choisir --"
-                          options={catalog.filter(i => i.service === 'abonnement').map(sub => ({
-                            value: sub.id,
-                            label: `${sub.article} (${sub.prix} F)`
-                          }))}
-                          style={{ flex: 1 }}
-                        />
-                        <button 
-                          type="button" 
-                          className="btn btn-primary" 
-                          onClick={() => handleSubscribeCrm(selectedCrmCustomer.id, selectedCrmSubId)}
-                          style={{ padding: '0.28rem 0.55rem', fontSize: '0.68rem', borderRadius: '6px' }}
-                        >
-                          Souscrire
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* ================= GESTION DES PROFILS CLIENTS ================= */}
-            <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)' }}>
-                  <Users size={16} />
-                  <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>Profils Clients</h4>
-                </div>
-                <button 
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleOpenCreateCustomer}
-                  style={{ padding: '0.28rem 0.55rem', fontSize: '0.68rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                >
-                  <Plus size={12} /> Nouveau
-                </button>
-              </div>
-
-              {/* Search Bar for profiles */}
-              <div style={{ position: 'relative' }}>
-                <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
-                  placeholder="Rechercher un profil..." 
-                  value={profileSearch} 
-                  onChange={(e) => setProfileSearch(e.target.value)} 
-                />
-              </div>
-
-              {/* List of Profiles */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
-                {customers.filter(c => 
-                  c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
-                  c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
-                  c.telephone.includes(profileSearch)
-                ).map(c => (
-                  <div 
-                    key={c.id} 
-                    style={{ 
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-                      background: 'var(--bg-app)', padding: '0.55rem 0.7rem', borderRadius: '12px', 
-                      border: '1px solid var(--border-color)', gap: '0.4rem'
-                    }}
+            {gestionSubView === 'all_profiles' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setGestionSubView('main')} 
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
-                      <div style={{
-                        width: '26px', height: '26px', borderRadius: '50%', 
-                        background: 'var(--primary-light)', color: 'var(--primary)', 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                        fontSize: '0.7rem', fontWeight: 800, flexShrink: 0
-                      }}>
-                        {c.prenom[0]}{c.nom[0]}
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {c.prenom} {c.nom}
+                    <ChevronLeft size={20} color="var(--primary)" />
+                  </button>
+                  <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.3rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Tous les profils clients</h1>
+                </div>
+                
+                <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input 
+                      type="text" 
+                      className="input-control" 
+                      style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
+                      placeholder="Rechercher un profil..." 
+                      value={profileSearch} 
+                      onChange={(e) => setProfileSearch(e.target.value)} 
+                    />
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '2px' }}>
+                    {customers.filter(c => 
+                      c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                      c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                      c.telephone.includes(profileSearch)
+                    ).map(c => (
+                      <div 
+                        key={c.id} 
+                        onClick={(e) => {
+                          if (e.target.closest('button') || e.target.closest('svg')) return;
+                          setSelectedClientForHistory(c);
+                          setPreviousGestionSubView('all_profiles');
+                          setGestionSubView('client_order_history');
+                        }}
+                        style={{ 
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                          background: 'var(--bg-app)', padding: '0.65rem 0.8rem', borderRadius: '12px', 
+                          border: '1px solid var(--border-color)', gap: '0.4rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                          <div style={{
+                            width: '32px', height: '32px', borderRadius: '50%', 
+                            background: 'var(--primary-light)', color: 'var(--primary)', 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                            fontSize: '0.75rem', fontWeight: 800, flexShrink: 0
+                          }}>
+                            {c.prenom[0]}{c.nom[0]}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {c.prenom} {c.nom}
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                              {c.telephone} · <strong style={{ color: 'var(--secondary)' }}>{c.points_fidelite} pts</strong>
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>
-                          {c.telephone}
-                        </div>
-                      </div>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <span style={{ 
-                        fontSize: '0.55rem', fontWeight: 700, padding: '0.15rem 0.35rem', 
-                        borderRadius: '6px', background: c.preferences_pliage === 'Sur cintre' ? 'rgba(0,210,196,0.1)' : 'var(--primary-light)', 
-                        color: c.preferences_pliage === 'Sur cintre' ? 'var(--secondary)' : 'var(--primary)',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {c.preferences_pliage === 'Sur cintre' ? 'Cintre' : 'Plié'}
-                      </span>
-                      <button 
-                        type="button"
-                        onClick={() => handleOpenEditCustomer(c)}
-                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--primary)', padding: '0.15rem', display: 'flex' }}
-                        title="Modifier"
-                      >
-                        <Edit2 size={11} />
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setShowDeleteCustomerConfirm(c)}
-                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-late)', padding: '0.15rem', display: 'flex' }}
-                        title="Supprimer"
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ 
+                            fontSize: '0.58rem', fontWeight: 700, padding: '0.2rem 0.45rem', 
+                            borderRadius: '6px', background: c.preferences_pliage === 'Sur cintre' ? 'rgba(0,210,196,0.1)' : 'var(--primary-light)', 
+                            color: c.preferences_pliage === 'Sur cintre' ? 'var(--secondary)' : 'var(--primary)',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {c.preferences_pliage === 'Sur cintre' ? 'Cintre' : 'Plié'}
+                          </span>
+                          <button 
+                            type="button"
+                            onClick={() => handleOpenEditCustomer(c)}
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--primary)', padding: '0.2rem', display: 'flex' }}
+                            title="Modifier"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setShowDeleteCustomerConfirm(c)}
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-late)', padding: '0.2rem', display: 'flex' }}
+                            title="Supprimer"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {customers.filter(c => 
+                      c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                      c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                      c.telephone.includes(profileSearch)
+                    ).length === 0 && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', padding: '1rem', textAlign: 'center' }}>
+                        Aucun profil trouvé.
+                      </div>
+                    )}
                   </div>
-                ))}
-                {customers.filter(c => 
-                  c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
-                  c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
-                  c.telephone.includes(profileSearch)
-                ).length === 0 && (
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', padding: '0.75rem', textAlign: 'center' }}>
-                    Aucun profil trouvé.
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {gestionSubView === 'all_subscriptions' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setGestionSubView('main')} 
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                  >
+                    <ChevronLeft size={20} color="var(--primary)" />
+                  </button>
+                  <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.3rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Tous les abonnements</h1>
+                </div>
+
+                <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input 
+                      type="text" 
+                      className="input-control" 
+                      style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
+                      placeholder="Rechercher un abonné..." 
+                      value={crmSearch} 
+                      onChange={(e) => {
+                        setCrmSearch(e.target.value);
+                        setSelectedCrmCustomer(null);
+                      }} 
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '2px' }}>
+                    {customers.filter(c => 
+                      c.nom.toLowerCase().includes(crmSearch.toLowerCase()) ||
+                      c.prenom.toLowerCase().includes(crmSearch.toLowerCase()) ||
+                      c.telephone.includes(crmSearch)
+                    ).map(c => {
+                      return (
+                        <div 
+                          key={c.id} 
+                          style={{ 
+                            background: 'var(--bg-app)', padding: '0.65rem 0.8rem', borderRadius: '12px', 
+                            display: 'flex', flexDirection: 'column', gap: '0.45rem', border: '1px solid var(--border-color)' 
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>{c.prenom} {c.nom}</span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>Tél : {c.telephone}</span>
+                          </div>
+                          
+                          {c.active_subscription ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.35rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem' }}>
+                                <strong style={{ color: 'var(--primary)' }}>{c.active_subscription.name}</strong>
+                                <span style={{ fontWeight: 600 }}>{c.active_subscription.remaining_clothes} / {c.active_subscription.total_clothes} vêt.</span>
+                              </div>
+                              
+                              {(() => {
+                                const remaining = c.active_subscription.remaining_clothes;
+                                const total = c.active_subscription.total_clothes;
+                                const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                                return (
+                                  <div className="progress-bar-track">
+                                    <div className="progress-bar-fill" style={{ width: `${percentUsed}%`, background: 'var(--primary)' }}></div>
+                                  </div>
+                                );
+                              })()}
+                              
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.1rem' }}>
+                                <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>
+                                  Expire le : {new Date(c.active_subscription.expires_at).toLocaleDateString('fr-FR')}
+                                </span>
+                                <button 
+                                  type="button" 
+                                  className="btn btn-outline" 
+                                  onClick={() => handleUnsubscribeCrm(c.id)}
+                                  style={{ padding: '0.2rem 0.45rem', fontSize: '0.62rem', color: 'var(--status-late)', borderColor: '#f5c6c6', background: 'var(--status-late-light)', borderRadius: '6px' }}
+                                >
+                                  Résilier
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.35rem' }}>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Aucun forfait actif.</div>
+                              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                <CustomSelect
+                                  value={selectedCrmSubId && selectedCrmCustomer?.id === c.id ? selectedCrmSubId : ''}
+                                  onChange={(val) => {
+                                    setSelectedCrmCustomer(c);
+                                    setSelectedCrmSubId(val);
+                                  }}
+                                  placeholder="-- Choisir --"
+                                  options={catalog.filter(i => i.service === 'abonnement').map(sub => ({
+                                    value: sub.id,
+                                    label: `${sub.article} (${sub.prix} F)`
+                                  }))}
+                                  style={{ flex: 1 }}
+                                />
+                                <button 
+                                  type="button" 
+                                  className="btn btn-primary" 
+                                  onClick={() => handleSubscribeCrm(c.id, selectedCrmSubId && selectedCrmCustomer?.id === c.id ? selectedCrmSubId : '')}
+                                  style={{ padding: '0.28rem 0.55rem', fontSize: '0.68rem', borderRadius: '6px' }}
+                                >
+                                  Souscrire
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {gestionSubView === 'client_order_history' && selectedClientForHistory && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setGestionSubView(previousGestionSubView)} 
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                  >
+                    <ChevronLeft size={20} color="var(--primary)" />
+                  </button>
+                  <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    Historique de {selectedClientForHistory.prenom} {selectedClientForHistory.nom}
+                  </h1>
+                </div>
+
+                {/* Profil client card */}
+                <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <div style={{
+                      width: '36px', height: '36px', borderRadius: '50%', 
+                      background: 'var(--primary-light)', color: 'var(--primary)', 
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                      fontSize: '0.85rem', fontWeight: 800, flexShrink: 0
+                    }}>
+                      {selectedClientForHistory.prenom?.[0] || ''}{selectedClientForHistory.nom?.[0] || ''}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        {selectedClientForHistory.prenom} {selectedClientForHistory.nom}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                        Tél : {selectedClientForHistory.telephone}
+                      </div>
+                    </div>
+                    {selectedClientForHistory.points_fidelite !== undefined && (
+                      <div style={{ 
+                        fontSize: '0.65rem', fontWeight: 700, padding: '0.2rem 0.45rem', 
+                        borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: 'rgb(245, 158, 11)',
+                        display: 'flex', alignItems: 'center', gap: '0.15rem'
+                      }}>
+                        🏆 {selectedClientForHistory.points_fidelite} pts
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.1rem', fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ flex: 1 }}>
+                      Pliage : <strong>{selectedClientForHistory.preferences_pliage === 'Sur cintre' ? 'Sur Cintre' : 'Plié'}</strong>
+                    </div>
+                    {selectedClientForHistory.solde_dette > 0 ? (
+                      <div style={{ color: 'var(--status-late)' }}>
+                        Dette : <strong>{Number(selectedClientForHistory.solde_dette).toLocaleString()} FCFA</strong>
+                      </div>
+                    ) : (
+                      <div style={{ color: 'var(--status-ready)' }}>
+                        Aucune dette
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedClientForHistory.active_subscription && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', marginTop: '0.1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem' }}>
+                        <strong style={{ color: 'var(--primary)' }}>{selectedClientForHistory.active_subscription.name}</strong>
+                        <span style={{ fontWeight: 600 }}>{selectedClientForHistory.active_subscription.remaining_clothes} / {selectedClientForHistory.active_subscription.total_clothes} vêt.</span>
+                      </div>
+                      <div className="progress-bar-track" style={{ height: '5px' }}>
+                        <div 
+                          className="progress-bar-fill" 
+                          style={{ 
+                            width: `${Math.max(0, Math.min(100, Math.round(((selectedClientForHistory.active_subscription.total_clothes - selectedClientForHistory.active_subscription.remaining_clothes) / selectedClientForHistory.active_subscription.total_clothes) * 100)))}%`, 
+                            background: 'var(--primary)' 
+                          }}
+                        ></div>
+                      </div>
+                      <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>
+                        Expire le : {new Date(selectedClientForHistory.active_subscription.expires_at).toLocaleDateString('fr-FR')}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Liste des commandes */}
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 800, margin: '0.5rem 0 0', color: 'var(--text-primary)' }}>Commandes</h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '2px' }}>
+                  {(() => {
+                    const clientOrders = orders
+                      .filter(o => o.customer_id === selectedClientForHistory.id)
+                      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                    if (clientOrders.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: '#fff', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                          Aucune commande enregistrée pour ce client.
+                        </div>
+                      );
+                    }
+
+                    return clientOrders.map(order => {
+                      const isExpress = order.niveau_urgence === 'Express';
+                      const remaining = order.prix_total - order.avance_payee;
+
+                      return (
+                        <div 
+                          key={order.id} 
+                          className="mobile-order-row"
+                          style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.8rem', background: '#fff' }}
+                        >
+                          {/* Header row */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <strong style={{ fontSize: '0.72rem', color: 'var(--text-primary)' }}>{order.identifiant_unique_marquage}</strong>
+                              <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>{formatDateTime(order.created_at)}</span>
+                            </div>
+                            <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.52rem', padding: '0.1rem 0.35rem' }}>
+                              {statusLabels[order.statut]}
+                            </span>
+                          </div>
+
+                          {/* Urgence */}
+                          <div style={{ fontSize: '0.68rem', display: 'flex', flexDirection: 'column', gap: '0.12rem', width: '100%', textAlign: 'left' }}>
+                            <div>Urgence: <span style={{ fontWeight: 700, color: isExpress ? 'var(--status-late)' : 'var(--text-primary)' }}>{order.niveau_urgence}</span></div>
+                          </div>
+
+                          {/* Items and Services */}
+                          <div style={{ background: 'rgba(0, 0, 0, 0.02)', padding: '0.4rem', borderRadius: '8px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', width: '100%', textAlign: 'left', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.6rem' }}>Détails articles :</div>
+                            {order.items && order.items.length > 0 ? (
+                              order.items.map((it, idx) => (
+                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '0.25rem' }}>
+                                  <span>• {it.quantite}x {it.article} ({serviceLabels[it.service] || it.service})</span>
+                                </div>
+                              ))
+                            ) : (
+                              <div style={{ paddingLeft: '0.25rem' }}>• {order.type_article} ({serviceLabels[order.type_service] || order.type_service})</div>
+                            )}
+                          </div>
+
+                          {/* Financial info */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.65rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.35rem', width: '100%', textAlign: 'left' }}>
+                            <div>Total: <strong>{(order.prix_total || 0).toLocaleString()} F</strong></div>
+                            <div>Acompte: <strong style={{ color: 'var(--status-ready)' }}>{(order.avance_payee || 0).toLocaleString()} F</strong></div>
+                            <div>Réglement: <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{(order.mode_reglement || 'Non défini').replace(/_/g, ' ')}</span></div>
+                            <div style={{ color: remaining > 0 ? 'var(--status-late)' : 'var(--status-ready)' }}>
+                              Solde: <strong>{(remaining || 0).toLocaleString()} F</strong>
+                            </div>
+                          </div>
+
+                          {/* Action footer */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.3rem', marginTop: '0.1rem', width: '100%' }}>
+                            <button 
+                              type="button"
+                              className="btn btn-outline" 
+                              style={{ padding: '0.22rem 0.55rem', fontSize: '0.62rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              onClick={() => setCreatedOrder(order)}
+                            >
+                              <Printer size={10} /> Voir Ticket
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
 
           </div>
         )}
@@ -2604,7 +3694,7 @@ export default function MobileView() {
                 <input 
                   type="text" 
                   className="input-control" 
-                  style={{ paddingLeft: '2.2rem', width: '100%', padding: '0.4rem', fontSize: '0.75rem' }}
+                  style={{ padding: '0.4rem', paddingLeft: '2.2rem', width: '100%', fontSize: '0.75rem' }}
                   placeholder="Rechercher code, client, linge..."
                   value={historySearchQuery}
                   onChange={(e) => setHistorySearchQuery(e.target.value)}
@@ -2630,8 +3720,8 @@ export default function MobileView() {
                       borderRadius: '20px',
                       whiteSpace: 'nowrap',
                       border: historyFilterStatus === filter.id ? '1px solid var(--secondary)' : '1px solid var(--border-color)',
-                      background: historyFilterStatus === filter.id ? 'var(--primary-gradient)' : 'rgba(255, 255, 255, 0.05)',
-                      color: '#fff',
+                      background: historyFilterStatus === filter.id ? 'var(--primary-gradient)' : 'rgba(0, 0, 0, 0.04)',
+                      color: historyFilterStatus === filter.id ? '#fff' : 'var(--text-secondary)',
                       fontWeight: 600,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease'
@@ -2692,21 +3782,21 @@ export default function MobileView() {
                         {order.items && order.items.length > 0 ? (
                           order.items.map((it, idx) => (
                             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '0.25rem' }}>
-                              <span>• {it.quantite}x {it.article} ({serviceLabels[it.service]})</span>
+                              <span>• {it.quantite}x {it.article} ({serviceLabels[it.service] || it.service})</span>
                             </div>
                           ))
                         ) : (
-                          <div style={{ paddingLeft: '0.25rem' }}>• {order.type_article} ({serviceLabels[order.type_service]})</div>
+                          <div style={{ paddingLeft: '0.25rem' }}>• {order.type_article} ({serviceLabels[order.type_service] || order.type_service})</div>
                         )}
                       </div>
 
                       {/* Financial info */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.65rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.35rem', width: '100%', textAlign: 'left' }}>
-                        <div>Total: <strong>{order.prix_total.toLocaleString()} F</strong></div>
-                        <div>Acompte: <strong style={{ color: 'var(--status-ready)' }}>{order.avance_payee.toLocaleString()} F</strong></div>
-                        <div>Réglement: <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{order.mode_reglement.replace(/_/g, ' ')}</span></div>
+                        <div>Total: <strong>{(order.prix_total || 0).toLocaleString()} F</strong></div>
+                        <div>Acompte: <strong style={{ color: 'var(--status-ready)' }}>{(order.avance_payee || 0).toLocaleString()} F</strong></div>
+                        <div>Réglement: <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{(order.mode_reglement || 'Non défini').replace(/_/g, ' ')}</span></div>
                         <div style={{ color: remaining > 0 ? 'var(--status-late)' : 'var(--status-ready)' }}>
-                          Solde: <strong>{remaining.toLocaleString()} F</strong>
+                          Solde: <strong>{(remaining || 0).toLocaleString()} F</strong>
                         </div>
                       </div>
 
@@ -2766,7 +3856,9 @@ export default function MobileView() {
                     </div>
                     <span className="kpi-label">Dépôts du Jour</span>
                   </div>
-                  <div className="kpi-value" style={{ fontSize: '1.2rem' }}>8 cmd</div>
+                  <div className="kpi-value" style={{ fontSize: '1.2rem' }}>
+                    {todayDeposits} cmd
+                  </div>
                 </div>
                 <div className="kpi-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.15rem' }}>
@@ -2775,7 +3867,18 @@ export default function MobileView() {
                     </div>
                     <span className="kpi-label">Score Qualité</span>
                   </div>
-                  <div className="kpi-value" style={{ fontSize: '1.2rem', color: 'var(--status-ready)' }}>99.2 %</div>
+                  {qualityScore !== null ? (
+                    <div className="kpi-value" style={{
+                      fontSize: '1.2rem',
+                      color: Number(qualityScore) >= 85 ? 'var(--status-ready)' : Number(qualityScore) >= 65 ? 'var(--status-pending)' : 'var(--status-late)'
+                    }}>
+                      {qualityScore} %
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: 1.3 }}>
+                      Données insuffisantes
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2821,59 +3924,7 @@ export default function MobileView() {
                   </label>
                 </div>
 
-                {/* Traitement Express Inputs */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.6rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Délai Express (heures)</label>
-                    <input 
-                      type="number" 
-                      className="input-control" 
-                      style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.02)', border: '1px solid var(--border-color)' }}
-                      min="1"
-                      max="168"
-                      value={expressHours}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setExpressHours(val);
-                        localStorage.setItem('klin_up_express_hours', String(val));
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Majoration Express (%)</label>
-                    <input 
-                      type="number" 
-                      className="input-control" 
-                      style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.02)', border: '1px solid var(--border-color)' }}
-                      min="0"
-                      max="200"
-                      value={expressMarkup}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setExpressMarkup(val);
-                        localStorage.setItem('klin_up_express_markup', String(val));
-                      }}
-                    />
-                  </div>
-                </div>
 
-                {/* Traitement Normal Input */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.6rem' }}>
-                  <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Délai Normal (heures)</label>
-                  <input 
-                    type="number" 
-                    className="input-control" 
-                    style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.02)', border: '1px solid var(--border-color)' }}
-                    min="1"
-                    max="720"
-                    value={normalHours}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setNormalHours(val);
-                      localStorage.setItem('klin_up_normal_hours', String(val));
-                    }}
-                  />
-                </div>
               </div>
             </div>
 
@@ -2920,9 +3971,10 @@ export default function MobileView() {
               onClick={() => {
                 setActiveTab('accueil');
                 setAccueilSubView('main');
+                setGestionSubView('main');
               }}
             >
-              <Home size={24} />
+              <div className="nav-icon-wrap"><Home size={22} /></div>
               <span>Accueil</span>
             </button>
             <button 
@@ -2930,9 +3982,10 @@ export default function MobileView() {
               onClick={() => {
                 setActiveTab('gestion');
                 setAccueilSubView('main');
+                setGestionSubView('main');
               }}
             >
-              <Layers size={24} />
+              <div className="nav-icon-wrap"><Layers size={22} /></div>
               <span>Gestion</span>
             </button>
             <div className="scan-item">
@@ -2952,9 +4005,10 @@ export default function MobileView() {
               onClick={() => {
                 setActiveTab('historique');
                 setAccueilSubView('main');
+                setGestionSubView('main');
               }}
             >
-              <FileText size={24} />
+              <div className="nav-icon-wrap"><FileText size={22} /></div>
               <span>Historique</span>
             </button>
             <button 
@@ -2962,14 +4016,12 @@ export default function MobileView() {
               onClick={() => {
                 setActiveTab('profile');
                 setAccueilSubView('main');
+                setGestionSubView('main');
               }}
             >
-              <User size={24} />
+              <div className="nav-icon-wrap"><User size={22} /></div>
               <span>Compte</span>
             </button>
-          </div>
-          <div className="iphone-indicator">
-            <div className="indicator-line"></div>
           </div>
         </div>
       )}
