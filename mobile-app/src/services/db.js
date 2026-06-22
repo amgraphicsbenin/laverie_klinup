@@ -106,6 +106,9 @@ function persist() {
 // Initialisation de la base Supabase
 async function initDb() {
   try {
+    if (!supabase) {
+      throw new Error("Client Supabase non configuré ou non initialisé.");
+    }
     const [staffRes, custRes, orderRes, logsRes, catalogRes, reqsRes] = await Promise.all([
       supabase.from('staff').select('*'),
       supabase.from('customers').select('*'),
