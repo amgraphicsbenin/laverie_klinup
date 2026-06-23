@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { db } from '../services/db';
 import { countries } from '../utils/countriesData';
+
+const AndroidPrint = registerPlugin('AndroidPrint');
 import logoDark from '../assets/logo_dark.png';
 import logoGold from '../assets/logo_gold.png';
 import {
@@ -4553,7 +4556,7 @@ export default function MobileView() {
                   onClick={() => {
                     const element = document.getElementById('receipt-print-area');
                     if (!element) return;
-                    if (window.AndroidPrint) {
+                    if (Capacitor.isNativePlatform()) {
                       const htmlContent = `
                         <html>
                           <head>
@@ -4568,7 +4571,7 @@ export default function MobileView() {
                           </body>
                         </html>
                       `;
-                      window.AndroidPrint.printReceipt(htmlContent);
+                      AndroidPrint.printReceipt({ html: htmlContent });
                     } else {
                       window.print();
                     }
@@ -4592,11 +4595,11 @@ export default function MobileView() {
                       jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
                     };
 
-                    if (window.AndroidPrint) {
+                    if (Capacitor.isNativePlatform()) {
                       if (window.html2pdf) {
                         window.html2pdf().set(opt).from(element).output('datauristring').then((dataUri) => {
                           const base64 = dataUri.split(',')[1];
-                          window.AndroidPrint.savePdf(base64, filename);
+                          AndroidPrint.savePdf({ base64Data: base64, fileName: filename });
                         }).catch((err) => {
                           alert("Erreur lors de la génération du PDF : " + err.message);
                         });
