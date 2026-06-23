@@ -1479,3 +1479,25 @@ html {
 .keypad-btn.action-btn:active {
   transform: scale(0.92);
 }
+
+/* Print Styling - ensures only the receipt is visible when printing */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #receipt-print-area, #receipt-print-area * {
+    visibility: visible;
+  }
+  #receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    border: none;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}

@@ -4550,7 +4550,29 @@ export default function MobileView() {
                 <button 
                   className="btn btn-outline" 
                   style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', padding: '0.42rem', fontSize: '0.72rem', borderRadius: '8px' }}
-                  onClick={() => alert("Impression du reçu en cours !")}
+                  onClick={() => {
+                    const element = document.getElementById('receipt-print-area');
+                    if (!element) return;
+                    if (window.AndroidPrint) {
+                      const htmlContent = `
+                        <html>
+                          <head>
+                            <meta charset="utf-8">
+                            <style>
+                              body { margin: 0; padding: 10px; background: #fff; font-family: sans-serif; }
+                              img { max-width: 100%; height: auto; }
+                            </style>
+                          </head>
+                          <body>
+                            ${element.outerHTML}
+                          </body>
+                        </html>
+                      `;
+                      window.AndroidPrint.printReceipt(htmlContent);
+                    } else {
+                      window.print();
+                    }
+                  }}
                 >
                   <Printer size={12} /> Imprimer
                 </button>
@@ -4559,17 +4581,34 @@ export default function MobileView() {
                   style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', padding: '0.42rem', fontSize: '0.72rem', borderRadius: '8px' }}
                   onClick={() => {
                     const element = document.getElementById('receipt-print-area');
-                    if (element && window.html2pdf) {
-                      const opt = {
-                        margin:       0.3,
-                        filename:     `Facture_${createdOrder.identifiant_unique_marquage}.pdf`,
-                        image:        { type: 'jpeg', quality: 0.98 },
-                        html2canvas:  { scale: 2, useCORS: true, logging: false },
-                        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-                      };
-                      window.html2pdf().set(opt).from(element).save();
+                    if (!element) return;
+                    
+                    const filename = `Facture_${createdOrder.identifiant_unique_marquage}.pdf`;
+                    const opt = {
+                      margin:       0.3,
+                      filename:     filename,
+                      image:        { type: 'jpeg', quality: 0.98 },
+                      html2canvas:  { scale: 2, useCORS: true, logging: false },
+                      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+                    };
+
+                    if (window.AndroidPrint) {
+                      if (window.html2pdf) {
+                        window.html2pdf().set(opt).from(element).output('datauristring').then((dataUri) => {
+                          const base64 = dataUri.split(',')[1];
+                          window.AndroidPrint.savePdf(base64, filename);
+                        }).catch((err) => {
+                          alert("Erreur lors de la génération du PDF : " + err.message);
+                        });
+                      } else {
+                        alert("Le module PDF est en cours de chargement. Veuillez réessayer.");
+                      }
                     } else {
-                      alert("Le module PDF est en cours de chargement. Veuillez réessayer.");
+                      if (window.html2pdf) {
+                        window.html2pdf().set(opt).from(element).save();
+                      } else {
+                        alert("Le module PDF est en cours de chargement. Veuillez réessayer.");
+                      }
                     }
                   }}
                 >
