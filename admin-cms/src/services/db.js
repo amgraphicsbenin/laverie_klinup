@@ -971,5 +971,7 @@ export const db = {
       return staffMember;
     }
     return null;
-  }
+  },
+
+  isRemote: () => isUsingRemote
 };

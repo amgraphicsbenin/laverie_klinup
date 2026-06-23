@@ -2492,6 +2492,32 @@ export default function AdminView({ activeTab, searchQuery }) {
               </button>
             </div>
 
+            <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700 }}>État de la Connexion</h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0, 0, 0, 0.02)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base de données principale</span>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                    {db.isRemote() ? "Connecté en temps réel au cloud Supabase" : "Exécution sur le stockage local (LocalStorage de secours)"}
+                  </span>
+                </div>
+                <span 
+                  style={{ 
+                    fontSize: '0.65rem', 
+                    fontWeight: 800, 
+                    padding: '0.15rem 0.6rem', 
+                    borderRadius: '20px', 
+                    background: db.isRemote() ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)', 
+                    color: db.isRemote() ? '#10b981' : '#f59e0b',
+                    border: db.isRemote() ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  {db.isRemote() ? 'Supabase Cloud' : 'Mode Local'}
+                </span>
+              </div>
+            </div>
+
           </form>
         </div>
       )}

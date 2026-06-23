@@ -482,6 +482,27 @@ function App() {
                 <Bell size={16} />
               </div>
 
+              {/* Status de la Base de Données */}
+              <span 
+                title={db.isRemote() ? "Connecté à Supabase Cloud" : "Mode Local / Hors-ligne (Supabase déconnecté)"}
+                style={{ 
+                  fontSize: '0.68rem', 
+                  fontWeight: 800, 
+                  padding: '0.2rem 0.6rem', 
+                  borderRadius: '6px', 
+                  background: db.isRemote() ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)', 
+                  color: db.isRemote() ? '#10b981' : '#d97706',
+                  border: db.isRemote() ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(245, 158, 11, 0.2)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.3px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}
+              >
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: db.isRemote() ? '#10b981' : '#f59e0b', display: 'inline-block' }} />
+                {db.isRemote() ? 'Supabase' : 'Local'}
+              </span>
 
               {/* Profil Utilisateur Donezo Header Style */}
               <div className="topbar-profile">

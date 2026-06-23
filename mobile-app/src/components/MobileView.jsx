@@ -2599,6 +2599,24 @@ export default function MobileView() {
                   />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {!db.isRemote() && (
+                    <span 
+                      title="L'application fonctionne sur le stockage local de l'appareil (les variables d'environnement Supabase manquent ou le serveur est injoignable)."
+                      style={{ 
+                        fontSize: '0.5rem', 
+                        fontWeight: 800, 
+                        padding: '0.12rem 0.35rem', 
+                        borderRadius: '6px', 
+                        background: 'rgba(245, 158, 11, 0.12)', 
+                        color: '#d97706',
+                        border: '1px solid rgba(245, 158, 11, 0.2)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.3px'
+                      }}
+                    >
+                      Local
+                    </span>
+                  )}
                   <button 
                     className="action-circle-btn" 
                     style={{ position: 'relative' }}
@@ -4056,6 +4074,28 @@ export default function MobileView() {
                   </label>
                 </div>
 
+                {/* Database Connection Mode */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem', marginTop: '0.2rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)' }}>Base de données</span>
+                    <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>Statut de synchronisation</span>
+                  </div>
+                  <span 
+                    style={{ 
+                      fontSize: '0.62rem', 
+                      fontWeight: 800, 
+                      padding: '0.15rem 0.5rem', 
+                      borderRadius: '20px', 
+                      background: db.isRemote() ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)', 
+                      color: db.isRemote() ? '#10b981' : '#f59e0b',
+                      border: db.isRemote() ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.2px'
+                    }}
+                  >
+                    {db.isRemote() ? 'Supabase Cloud' : 'Mode Local'}
+                  </span>
+                </div>
 
               </div>
             </div>
