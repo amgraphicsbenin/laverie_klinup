@@ -536,18 +536,26 @@ export default function MobileView() {
     setArticleServices(prev => ({ ...prev, [cloth]: service }));
   };
 
-  const handleStartDelivery = (order, finalStatus) => {
-    setDelivFinalStatus(finalStatus);
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Informations copiées dans le presse-papier !");
+    }).catch(err => {
+      console.error("Clipboard copy failed: ", err);
+    });
+  };
+
+  const handleCompleteDelivery = (order, originalStatus) => {
+    setDelivFinalStatus('restitue');
     const remainingToPay = order.prix_total - order.avance_payee;
     if (remainingToPay <= 0) {
       if (confirm(`Confirmer la restitution de la commande ${order.identifiant_unique_marquage} ?`)) {
-        db.updateOrderStatus(order.id, finalStatus);
+        db.updateOrderStatus(order.id, 'restitue');
         refreshData();
 
         // Notification WhatsApp livraison directe (déjà payé)
         const customer = customers.find(c => c.id === order.customer_id);
         if (customer) {
-          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été marquée comme '${finalStatus === 'a_livrer' ? 'À livrer' : 'À récupérer'}'. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
           sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
         }
       }
@@ -983,6 +991,10 @@ export default function MobileView() {
         } else if (nextStatus === 'pret') {
           const remaining = order.prix_total - order.avance_payee;
           text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer.\nReste à payer: ${remaining.toLocaleString()} FCFA.\nÀ bientôt chez KLIN UP !`;
+        } else if (nextStatus === 'a_livrer') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en cours de livraison à votre adresse.`;
+        } else if (nextStatus === 'a_recuperer') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en attente de récupération à la laverie.`;
         } else if (nextStatus === 'restitue') {
           text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
         } else if (nextStatus === 'annule') {
@@ -1025,12 +1037,12 @@ export default function MobileView() {
     pret: 'Prêt',
     restitue: 'Livré',
     a_livrer: 'À livrer',
-    a_recuperer: 'À récupérer',
+    a_recuperer: 'En attente de récupération',
     annule: 'Annulé'
   };
 
   const isOrderLate = (order) => {
-    if (order.statut === 'restitue' || order.statut === 'a_livrer' || order.statut === 'a_recuperer' || order.statut === 'annule') return false;
+    if (order.statut === 'restitue' || order.statut === 'annule') return false;
     return new Date(order.due_date) < new Date();
   };
 
@@ -1063,13 +1075,13 @@ export default function MobileView() {
   };
 
   // --- STATS DYNAMIQUE ---
-  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule').length;
-  const completedOrdersCount = orders.filter(o => o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer').length;
+  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule').length;
+  const completedOrdersCount = orders.filter(o => o.statut === 'restitue').length;
   const totalRevenue = orders.filter(o => o.statut !== 'annule').reduce((sum, o) => sum + o.avance_payee, 0);
 
   // Active / Search orders filter on home
   const filteredHomeOrders = orders.filter(o => {
-    if (o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer' || o.statut === 'annule') return false;
+    if (o.statut === 'restitue' || o.statut === 'annule') return false;
     if (homeSearchQuery) {
       const q = homeSearchQuery.toLowerCase();
       const client = customers.find(c => c.id === o.customer_id);
@@ -1085,7 +1097,7 @@ export default function MobileView() {
 
   // Atelier filters
   const filteredAtelierOrders = orders.filter(o => {
-    if (o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer' || o.statut === 'annule') return false;
+    if (o.statut === 'restitue' || o.statut === 'annule') return false;
     if (atelierFilter === 'urgent') return o.niveau_urgence === 'Express';
     if (atelierFilter === 'retard') return isOrderLate(o);
     return true;
@@ -1798,7 +1810,7 @@ export default function MobileView() {
   };
 
   const renderActivesDetailView = () => {
-    const activeOrdersList = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule')
+    const activeOrdersList = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule')
       .sort((a, b) => {
         if (a.niveau_urgence === 'Express' && b.niveau_urgence !== 'Express') return -1;
         if (a.niveau_urgence !== 'Express' && b.niveau_urgence === 'Express') return 1;
@@ -1851,7 +1863,7 @@ export default function MobileView() {
   const renderLivreesDetailView = () => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const completedOrders = orders.filter(o => (o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer') && new Date(o.updated_at || o.created_at) >= startOfMonth);
+    const completedOrders = orders.filter(o => o.statut === 'restitue' && new Date(o.updated_at || o.created_at) >= startOfMonth);
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
@@ -1941,7 +1953,7 @@ export default function MobileView() {
   };
 
   const renderRetardDetailView = () => {
-    const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule');
+    const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
     const lateOrdersList = activeOrders.filter(o => isOrderLate(o));
 
     return (
@@ -1987,7 +1999,7 @@ export default function MobileView() {
   };
 
   const renderPipelineDetailView = () => {
-    const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule');
+    const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
     const pipeline = [
       { label: 'Reçu / En attente de tri', key: 'en_attente', color: 'var(--status-pending)', desc: 'Nouveaux vêtements déposés nécessitant un tri et un marquage.' },
       { label: 'En Lavage', key: 'en_cours_lavage', color: 'var(--status-washing)', desc: 'Articles actuellement en machine de lavage.' },
@@ -2479,8 +2491,8 @@ export default function MobileView() {
 
           const now = new Date();
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule');
-          const completedThisMonth = orders.filter(o => (o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer') && new Date(o.updated_at || o.created_at) >= startOfMonth);
+          const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
+          const completedThisMonth = orders.filter(o => o.statut === 'restitue' && new Date(o.updated_at || o.created_at) >= startOfMonth);
           const lateOrders = activeOrders.filter(o => isOrderLate(o));
           const expressOrders = activeOrders.filter(o => o.niveau_urgence === 'Express');
           const revenueTotal = orders.filter(o => o.statut !== 'annule').reduce((s, o) => s + (o.prix_total || 0), 0);
@@ -2978,7 +2990,20 @@ export default function MobileView() {
                               </span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'end', gap: '0.2rem' }}>
-                              <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.55rem', padding: '0.1rem 0.35rem' }}>
+                              <span 
+                                className={`badge badge-${order.statut}`} 
+                                style={{ 
+                                  fontSize: '0.55rem', 
+                                  padding: '0.1rem 0.35rem',
+                                  cursor: (order.statut === 'a_livrer' || order.statut === 'a_recuperer') ? 'pointer' : 'default'
+                                }}
+                                onClick={(e) => {
+                                  if (order.statut === 'a_livrer' || order.statut === 'a_recuperer') {
+                                    e.stopPropagation();
+                                    handleCompleteDelivery(order, order.statut);
+                                  }
+                                }}
+                              >
                                 {statusLabels[order.statut]}
                               </span>
                               {isLate && (
@@ -2993,6 +3018,30 @@ export default function MobileView() {
                             <span>Dépôt: {formatDateTime(order.created_at)}</span>
                             <span>Éch: {formatDateTime(order.due_date)}</span>
                           </div>
+
+                          {order.statut === 'a_livrer' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'var(--primary-light)', padding: '0.45rem 0.6rem', borderRadius: '10px', marginTop: '0.25rem' }}>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700, display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                                <span>📍 Adresse :</span>
+                                <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{client?.adresse || 'Non renseignée'}</span>
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700, display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                                <span>📞 Téléphone :</span>
+                                <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{client ? `+${client.indicatif || '229'} ${client.telephone}` : 'Non renseigné'}</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                style={{ padding: '0.2rem 0.45rem', fontSize: '0.6rem', borderRadius: '6px', width: 'fit-content', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.2rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyToClipboard(`Client: ${client ? `${client.prenom} ${client.nom}` : ''}\nTél: ${client ? `+${client.indicatif || '229'} ${client.telephone}` : ''}\nAdresse: ${client?.adresse || 'Non renseignée'}`);
+                                }}
+                              >
+                                Copier
+                              </button>
+                            </div>
+                          )}
 
                           {/* Action buttons */}
                           <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.15rem' }}>
@@ -3019,18 +3068,36 @@ export default function MobileView() {
                                 <button 
                                   className="btn btn-primary" 
                                   style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
-                                  onClick={() => handleStartDelivery(order, 'a_livrer')}
+                                  onClick={() => handleStatusChange(order.id, 'a_livrer')}
                                 >
                                   <DollarSign size={10} /> À livrer
                                 </button>
                                 <button 
                                   className="btn btn-secondary" 
                                   style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
-                                  onClick={() => handleStartDelivery(order, 'a_recuperer')}
+                                  onClick={() => handleStatusChange(order.id, 'a_recuperer')}
                                 >
                                   <CheckCircle size={10} /> À récupérer
                                 </button>
                               </>
+                            )}
+                            {order.statut === 'a_livrer' && (
+                              <button 
+                                className="btn btn-primary" 
+                                style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                                onClick={() => handleCompleteDelivery(order, 'a_livrer')}
+                              >
+                                <DollarSign size={10} /> Valider la livraison
+                              </button>
+                            )}
+                            {order.statut === 'a_recuperer' && (
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                                onClick={() => handleCompleteDelivery(order, 'a_recuperer')}
+                              >
+                                <CheckCircle size={10} /> En attente de récupération
+                              </button>
                             )}
                             
                             <button 

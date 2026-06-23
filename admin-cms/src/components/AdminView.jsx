@@ -366,9 +366,9 @@ export default function AdminView({ activeTab, searchQuery }) {
   const earnedRevenue = nonCancelledOrders.reduce((sum, o) => sum + o.prix_total, 0);
 
   const totalOrdersCount = orders.length;
-  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'a_livrer' && o.statut !== 'a_recuperer' && o.statut !== 'annule').length;
+  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule').length;
 
-  const completedOrdersCount = orders.filter(o => o.statut === 'restitue' || o.statut === 'a_livrer' || o.statut === 'a_recuperer').length;
+  const completedOrdersCount = orders.filter(o => o.statut === 'restitue').length;
   const pendingOrdersCount = orders.filter(o => o.statut === 'en_attente').length;
 
   const statusDisplayLabels = {
@@ -376,7 +376,7 @@ export default function AdminView({ activeTab, searchQuery }) {
     en_cours_lavage: 'En cours',
     pret: 'Prêt',
     a_livrer: 'À livrer',
-    a_recuperer: 'À récupérer',
+    a_recuperer: 'En attente de récupération',
     restitue: 'Restitué',
     annule: 'Annulé'
   };
@@ -534,8 +534,16 @@ export default function AdminView({ activeTab, searchQuery }) {
   };
 
   const isOrderLate = (order) => {
-    if (order.statut === 'restitue' || order.statut === 'a_livrer' || order.statut === 'a_recuperer' || order.statut === 'annule') return false;
+    if (order.statut === 'restitue' || order.statut === 'annule') return false;
     return new Date(order.due_date) < new Date();
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Informations copiées dans le presse-papier !");
+    }).catch(err => {
+      console.error("Clipboard copy failed: ", err);
+    });
   };
 
   const handleUpdateQty = (cloth, delta) => {
@@ -698,7 +706,7 @@ export default function AdminView({ activeTab, searchQuery }) {
         // Notification WhatsApp livraison directe (déjà payé)
         const customer = customers.find(c => c.id === order.customer_id);
         if (customer) {
-          const finalStatusLabel = finalStatus === 'a_livrer' ? 'mise en livraison' : 'récupérée';
+          const finalStatusLabel = finalStatus === 'a_livrer' ? 'mise en livraison' : finalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
           const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${finalStatusLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
           sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
         }
@@ -722,7 +730,7 @@ export default function AdminView({ activeTab, searchQuery }) {
     // Notification WhatsApp solde livraison
     const customer = customers.find(c => c.id === delivOrder.customer_id);
     if (customer) {
-      const finalStatusLabel = delivFinalStatus === 'a_livrer' ? 'mise en livraison' : 'récupérée';
+      const finalStatusLabel = delivFinalStatus === 'a_livrer' ? 'mise en livraison' : delivFinalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
       const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la ${finalStatusLabel} de votre commande ${delivOrder.identifiant_unique_marquage} et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
       sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
     }
@@ -768,6 +776,10 @@ export default function AdminView({ activeTab, searchQuery }) {
         } else if (nextStatus === 'pret') {
           const remaining = order.prix_total - order.avance_payee;
           text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer.\nReste à payer: ${remaining.toLocaleString()} FCFA.\nÀ bientôt chez KLIN UP !`;
+        } else if (nextStatus === 'a_livrer') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en cours de livraison à votre adresse.`;
+        } else if (nextStatus === 'a_recuperer') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en attente de récupération à la laverie.`;
         } else if (nextStatus === 'restitue') {
           text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
         } else if (nextStatus === 'annule') {
@@ -1203,7 +1215,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                 const statusLabels = {
                   en_attente: 'En attente de tri',
                   en_cours_lavage: 'Lavage / Séchage',
-                  pret: 'Prêt à livrer'
+                  pret: 'Prêt à livrer',
+                  a_livrer: 'À livrer',
+                  a_recuperer: 'En attente de récupération'
                 };
 
                 return filteredAtelierOrders.map(order => {
@@ -1248,7 +1262,19 @@ export default function AdminView({ activeTab, searchQuery }) {
                           </p>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'end', gap: '0.2rem' }}>
-                          <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.65rem' }}>
+                          <span 
+                            className={`badge badge-${order.statut}`} 
+                            style={{ 
+                              fontSize: '0.65rem',
+                              cursor: (order.statut === 'a_livrer' || order.statut === 'a_recuperer') ? 'pointer' : 'default'
+                            }}
+                            onClick={(e) => {
+                              if (order.statut === 'a_livrer' || order.statut === 'a_recuperer') {
+                                e.stopPropagation();
+                                handleStartDelivery(order, 'restitue');
+                              }
+                            }}
+                          >
                             {statusLabels[order.statut] || order.statut.replace(/_/g, ' ')}
                           </span>
                           {isLate && (
@@ -1263,6 +1289,30 @@ export default function AdminView({ activeTab, searchQuery }) {
                         <span>Dépôt: {formatDateTime(order.created_at)}</span>
                         <span>Échéance: {formatDateTime(order.due_date)}</span>
                       </div>
+
+                      {order.statut === 'a_livrer' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'var(--primary-light)', padding: '0.45rem 0.6rem', borderRadius: '10px', marginTop: '0.1rem' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700, display: 'flex', gap: '0.25rem' }}>
+                            <span>📍 Adresse :</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{customer?.adresse || 'Non renseignée'}</span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700, display: 'flex', gap: '0.25rem' }}>
+                            <span>📞 Téléphone :</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{customer ? `+${customer.indicatif || '229'} ${customer.telephone}` : 'Non renseigné'}</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ padding: '0.2rem 0.45rem', fontSize: '0.65rem', borderRadius: '6px', width: 'fit-content', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.2rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyToClipboard(`Client: ${customer ? `${customer.prenom} ${customer.nom}` : ''}\nTél: ${customer ? `+${customer.indicatif || '229'} ${customer.telephone}` : ''}\nAdresse: ${customer?.adresse || 'Non renseignée'}`);
+                            }}
+                          >
+                            Copier
+                          </button>
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
                         <div>
@@ -1306,7 +1356,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                               type="button"
                               className="btn btn-primary" 
                               style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                              onClick={() => handleStartDelivery(order, 'a_livrer')}
+                              onClick={() => handleStatusChange(order.id, 'a_livrer')}
                             >
                               <ShoppingBag size={12} /> À livrer
                             </button>
@@ -1314,11 +1364,31 @@ export default function AdminView({ activeTab, searchQuery }) {
                               type="button"
                               className="btn btn-primary" 
                               style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                              onClick={() => handleStartDelivery(order, 'a_recuperer')}
+                              onClick={() => handleStatusChange(order.id, 'a_recuperer')}
                             >
                               <CheckCircle size={12} /> À récupérer
                             </button>
                           </>
+                        )}
+                        {order.statut === 'a_livrer' && (
+                          <button 
+                            type="button"
+                            className="btn btn-primary" 
+                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                            onClick={() => handleStartDelivery(order, 'restitue')}
+                          >
+                            <ShoppingBag size={12} /> Valider la livraison
+                          </button>
+                        )}
+                        {order.statut === 'a_recuperer' && (
+                          <button 
+                            type="button"
+                            className="btn btn-primary" 
+                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                            onClick={() => handleStartDelivery(order, 'restitue')}
+                          >
+                            <CheckCircle size={12} /> En attente de récupération
+                          </button>
                         )}
                         
                         <button 
