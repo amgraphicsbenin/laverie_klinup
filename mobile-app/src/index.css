@@ -1083,7 +1083,18 @@ select.input-control option {
   animation: elasticPop 0.5s var(--ease-elastic);
 }
 
-.card:hover, .metric-mini-card:hover, .kpi-card:hover {
+.card.interactive:hover,
+.card.clickable:hover,
+.card[style*="cursor: pointer"]:hover,
+.card[style*="cursor:pointer"]:hover,
+.metric-mini-card.interactive:hover,
+.metric-mini-card.clickable:hover,
+.metric-mini-card[style*="cursor: pointer"]:hover,
+.metric-mini-card[style*="cursor:pointer"]:hover,
+.kpi-card.interactive:hover,
+.kpi-card.clickable:hover,
+.kpi-card[style*="cursor: pointer"]:hover,
+.kpi-card[style*="cursor:pointer"]:hover {
   transform: translateY(-4px) scale(1.02);
   background: var(--bg-card-hover);
   border-color: var(--glass-border-hover);
@@ -1100,7 +1111,19 @@ select.input-control option {
   transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
 
-.card:active, .metric-mini-card:active, .kpi-card:active, .mobile-order-row:active {
+.card.interactive:active,
+.card.clickable:active,
+.card[style*="cursor: pointer"]:active,
+.card[style*="cursor:pointer"]:active,
+.metric-mini-card.interactive:active,
+.metric-mini-card.clickable:active,
+.metric-mini-card[style*="cursor: pointer"]:active,
+.metric-mini-card[style*="cursor:pointer"]:active,
+.kpi-card.interactive:active,
+.kpi-card.clickable:active,
+.kpi-card[style*="cursor: pointer"]:active,
+.kpi-card[style*="cursor:pointer"]:active,
+.mobile-order-row:active {
   transform: scale(0.95) !important;
   transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
