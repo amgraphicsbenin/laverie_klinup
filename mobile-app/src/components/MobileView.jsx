@@ -3051,7 +3051,7 @@ export default function MobileView() {
                                 style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
                                 onClick={() => handleStatusChange(order.id, 'en_cours_lavage')}
                               >
-                                <RotateCw size={11} className="spin-washing" /> Lancer Lavage
+                                Lancer Lavage
                               </button>
                             )}
                             {order.statut === 'en_cours_lavage' && (
@@ -3060,7 +3060,7 @@ export default function MobileView() {
                                 style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
                                 onClick={() => handleStatusChange(order.id, 'pret')}
                               >
-                                <CheckCircle size={11} /> Marquer Prêt
+                                Marquer Prêt
                               </button>
                             )}
                             {order.statut === 'pret' && (
@@ -3070,14 +3070,14 @@ export default function MobileView() {
                                   style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
                                   onClick={() => handleStatusChange(order.id, 'a_livrer')}
                                 >
-                                  <DollarSign size={10} /> À livrer
+                                  À livrer
                                 </button>
                                 <button 
                                   className="btn btn-secondary" 
                                   style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
                                   onClick={() => handleStatusChange(order.id, 'a_recuperer')}
                                 >
-                                  <CheckCircle size={10} /> À récupérer
+                                  À récupérer
                                 </button>
                               </>
                             )}
@@ -3087,7 +3087,7 @@ export default function MobileView() {
                                 style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
                                 onClick={() => handleCompleteDelivery(order, 'a_livrer')}
                               >
-                                <DollarSign size={10} /> Valider la livraison
+                                Valider la livraison
                               </button>
                             )}
                             {order.statut === 'a_recuperer' && (
@@ -3096,7 +3096,7 @@ export default function MobileView() {
                                 style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
                                 onClick={() => handleCompleteDelivery(order, 'a_recuperer')}
                               >
-                                <CheckCircle size={10} /> En attente de récupération
+                                En attente de récupération
                               </button>
                             )}
                             
