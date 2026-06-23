@@ -203,12 +203,12 @@ export const db = {
     listeners.forEach(l => l());
   },
 
-  getStaff: () => memoryDb.staff,
-  getCustomers: () => memoryDb.customers,
-  getOrders: () => memoryDb.orders,
-  getLogs: () => memoryDb.logs,
-  getCatalog: () => memoryDb.catalog,
-  getCurrentUser: () => memoryDb.current_user,
+  getStaff: () => [...memoryDb.staff],
+  getCustomers: () => [...memoryDb.customers],
+  getOrders: () => [...memoryDb.orders],
+  getLogs: () => [...memoryDb.logs],
+  getCatalog: () => [...memoryDb.catalog],
+  getCurrentUser: () => memoryDb.current_user ? { ...memoryDb.current_user } : null,
 
   setCurrentUser: (user) => {
     memoryDb.current_user = user;
@@ -870,7 +870,7 @@ export const db = {
     return user.role === 'super_admin';
   },
 
-  getPinResetRequests: () => memoryDb.pin_reset_requests || [],
+  getPinResetRequests: () => memoryDb.pin_reset_requests ? [...memoryDb.pin_reset_requests] : [],
 
   createPinResetRequest: (email) => {
     if (!memoryDb.pin_reset_requests) {
