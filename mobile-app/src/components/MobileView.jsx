@@ -72,7 +72,7 @@ const CustomSelect = ({ value, onChange, options, placeholder, disabled, style, 
   const selectedOption = options.find(o => String(o.value) === String(value));
 
   return (
-    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', ...style }}>
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', zIndex: isOpen ? 100 : 1, ...style }}>
       <button
         type="button"
         disabled={disabled}
@@ -2747,7 +2747,7 @@ export default function MobileView() {
               </div>
 
               {/* ACTIVITÉ PÉRIODIQUE */}
-              <div className="card" style={{ padding: '0.85rem' }}>
+              <div className="card" style={{ padding: '0.85rem', position: 'relative', zIndex: showPeriodDropdown ? 10 : 1 }}>
                 <div className="section-header" style={{ position: 'relative' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }} onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}>
                     <h4 style={{ margin: 0 }}>Activité — <span style={{ color: 'var(--primary)', borderBottom: '1px dashed var(--primary)' }}>{getPeriodLabel(activityPeriod)}</span></h4>
