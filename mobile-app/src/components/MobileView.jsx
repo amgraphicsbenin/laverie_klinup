@@ -200,27 +200,87 @@ export default function MobileView() {
     return localStorage.getItem('klin_up_whatsapp_enabled') !== 'false';
   });
 
-  const [notifications, setNotifications] = useState([
-    { id: '1', text: 'Commande Express reçue pour Marie-Antoinette', type: 'info', read: false, date: 'Il y a 10 min' },
-    { id: '2', text: 'Machine N°1 (12kg) : Lavage terminé', type: 'success', read: false, date: 'Il y a 30 min' },
-    { id: '3', text: 'Commande KLIN-908122 en retard de livraison', type: 'warning', read: false, date: 'Il y a 2h' },
-    { id: '4', text: 'Abonnement VIP souscrit par Pierre Diallo', type: 'info', read: true, date: 'Hier' }
-  ]);
+  const getRelativeTime = (dateStr) => {
+    if (!dateStr) return '';
+    const now = new Date();
+    const past = new Date(dateStr);
+    const diffMs = now - past;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "À l'instant";
+    if (diffMins < 60) return `Il y a ${diffMins} min`;
+    if (diffHours < 24) return `Il y a ${diffHours} h`;
+    if (diffDays === 1) return 'Hier';
+    return `${past.getDate().toString().padStart(2, '0')}/${(past.getMonth() + 1).toString().padStart(2, '0')}/${past.getFullYear()}`;
+  };
+
+  const loadNotificationsFromLogs = () => {
+    const logs = db.getLogs();
+    const readIds = JSON.parse(localStorage.getItem('klin_up_read_notifications') || '[]');
+    const deletedIds = JSON.parse(localStorage.getItem('klin_up_deleted_notifications') || '[]');
+
+    return logs
+      .filter(log => !deletedIds.includes(log.id))
+      .map(log => {
+        let type = 'info';
+        if (log.action === 'CREATION_COMMANDE' || log.action === 'PAIEMENT') {
+          type = 'success';
+        } else if (log.action === 'ANNULATION' || log.action === 'SUPPRESSION') {
+          type = 'warning';
+        }
+
+        return {
+          id: log.id,
+          text: log.details,
+          type,
+          read: readIds.includes(log.id),
+          date: getRelativeTime(log.timestamp)
+        };
+      });
+  };
+
+  const [notifications, setNotifications] = useState(() => loadNotificationsFromLogs());
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
 
   const markAsRead = (id) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    const readIds = JSON.parse(localStorage.getItem('klin_up_read_notifications') || '[]');
+    if (!readIds.includes(id)) {
+      readIds.push(id);
+      localStorage.setItem('klin_up_read_notifications', JSON.stringify(readIds));
+    }
+    setNotifications(loadNotificationsFromLogs());
   };
 
   const deleteNotification = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    const deletedIds = JSON.parse(localStorage.getItem('klin_up_deleted_notifications') || '[]');
+    if (!deletedIds.includes(id)) {
+      deletedIds.push(id);
+      localStorage.setItem('klin_up_deleted_notifications', JSON.stringify(deletedIds));
+    }
+    setNotifications(loadNotificationsFromLogs());
   };
 
   const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    const readIds = JSON.parse(localStorage.getItem('klin_up_read_notifications') || '[]');
+    notifications.forEach(n => {
+      if (!readIds.includes(n.id)) {
+        readIds.push(n.id);
+      }
+    });
+    localStorage.setItem('klin_up_read_notifications', JSON.stringify(readIds));
+    setNotifications(loadNotificationsFromLogs());
   };
 
   const clearAllNotifications = () => {
+    const deletedIds = JSON.parse(localStorage.getItem('klin_up_deleted_notifications') || '[]');
+    notifications.forEach(n => {
+      if (!deletedIds.includes(n.id)) {
+        deletedIds.push(n.id);
+      }
+    });
+    localStorage.setItem('klin_up_deleted_notifications', JSON.stringify(deletedIds));
     setNotifications([]);
   };
   
@@ -792,12 +852,14 @@ export default function MobileView() {
     setOrders(db.getOrders());
     setCatalog(db.getCatalog());
     setCurrentUser(db.getCurrentUser());
+    setNotifications(loadNotificationsFromLogs());
 
     const unsubscribe = db.subscribe(() => {
       setCustomers(db.getCustomers());
       setOrders(db.getOrders());
       setCatalog(db.getCatalog());
       setCurrentUser(db.getCurrentUser());
+      setNotifications(loadNotificationsFromLogs());
     });
     return () => unsubscribe();
   }, [activeTab]);
