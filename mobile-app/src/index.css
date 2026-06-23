@@ -833,12 +833,13 @@ button, input, select, textarea { font-family: inherit; }
 
 /* ---- Badges ---- */
 .badge {
-  display: inline-flex; align-items: center;
+  display: inline-flex; align-items: center; justify-content: center;
   padding: 3px 8px;
   font-size: 0.6rem; font-weight: 700;
   border-radius: var(--radius-pill);
   letter-spacing: 0.3px;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 .badge-en_attente { background: var(--status-pending-light); color: var(--status-pending); border: 1px solid rgba(255, 208, 115, 0.25); }
 .badge-en_cours_lavage { background: var(--status-washing-light); color: var(--status-washing); border: 1px solid rgba(124, 181, 255, 0.25); }
