@@ -59,9 +59,18 @@
   --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-spring-soft: cubic-bezier(0.175, 0.885, 0.32, 1.15);
 
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.03);
-  --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.07);
+  /* Spacing Grid (Baseline 8px) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+
+  /* Modernized soft shadows (Apple/Stripe ultra-smooth feel) */
+  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.02), 0 1px 2px rgba(15, 23, 42, 0.015);
+  --shadow-md: 0 8px 24px -4px rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.02);
+  --shadow-lg: 0 16px 32px -6px rgba(15, 23, 42, 0.06), 0 8px 20px -4px rgba(15, 23, 42, 0.03);
 
   --radius-sm: 12px;
   --radius-md: 16px;
@@ -586,11 +595,11 @@ button, input, select, textarea { font-family: inherit; }
 /* ---- Cards (Solide & Opaque) ---- */
 .card, .metric-mini-card, .kpi-card, .mobile-order-row {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(0, 0, 0, 0.05);
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: var(--space-lg);
   color: var(--text-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
   animation: slideUpWithFade 0.6s var(--ease-spring-soft) both;
 }
 
@@ -598,9 +607,9 @@ button, input, select, textarea { font-family: inherit; }
   background: #ffffff;
   color: var(--text-primary);
   border-radius: var(--radius-lg);
-  border: 1px solid #e5e7eb;
-  padding: 20px 18px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  padding: var(--space-xl) var(--space-lg);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -619,11 +628,12 @@ button, input, select, textarea { font-family: inherit; }
 
 /* Mini metric / stats card */
 .metric-mini-card {
-  padding: 12px 14px;
+  padding: var(--space-md) var(--space-lg);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-xs);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .metric-mini-card h5 {
@@ -646,12 +656,10 @@ button, input, select, textarea { font-family: inherit; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px;
+  padding: var(--space-md) var(--space-lg);
   margin-bottom: 0;
   border-radius: var(--radius-md);
-  box-shadow: 
-    inset 0 1px 2px rgba(255, 255, 255, 0.2),
-    0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .mobile-order-icon {
@@ -739,8 +747,8 @@ button, input, select, textarea { font-family: inherit; }
 .btn {
   display: inline-flex;
   align-items: center; justify-content: center;
-  gap: 6px;
-  padding: 10px 18px;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
   font-size: 0.8rem;
   font-weight: 700;
   border-radius: var(--radius-sm);
@@ -756,26 +764,26 @@ button, input, select, textarea { font-family: inherit; }
   background: #3b82f6;
   color: #ffffff;
   border: 1px solid #2563eb;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+  box-shadow: var(--shadow-sm);
   transition: all 0.5s var(--ease-elastic);
 }
 
 .btn-primary:hover {
   background: #2563eb;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .btn-secondary {
   background: #eff6ff;
   color: var(--primary);
   border: 1px solid #bfdbfe;
-  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
+  box-shadow: var(--shadow-sm);
   transition: all 0.5s var(--ease-spring-soft);
 }
 
 .btn-secondary:hover {
   background: #dbeafe;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.15);
+  box-shadow: var(--shadow-md);
 }
 
 .btn-outline {
@@ -786,16 +794,19 @@ button, input, select, textarea { font-family: inherit; }
 .btn-outline:hover {
   background: rgba(0, 0, 0, 0.02);
   border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-danger {
   background: var(--status-late-light);
   color: var(--status-late);
   border: 1px solid rgba(255, 142, 142, 0.25);
+  box-shadow: var(--shadow-sm);
 }
 .btn-danger:hover {
   background: var(--status-late);
   color: #fff;
+  box-shadow: var(--shadow-md);
 }
 
 /* Circular Buttons */
@@ -807,7 +818,7 @@ button, input, select, textarea { font-family: inherit; }
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   color: var(--text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
   transition: all 0.5s var(--ease-elastic);
   position: relative;
 }
@@ -816,18 +827,18 @@ button, input, select, textarea { font-family: inherit; }
   background: #f3f4f6;
   color: var(--primary);
   border-color: #bfdbfe;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+  box-shadow: var(--shadow-md);
 }
 
 .action-circle-btn.filled {
   background: #ffffff;
   color: var(--primary);
   border: 1px solid #e5e7eb;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .action-circle-btn.filled:hover {
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  box-shadow: var(--shadow-md);
   border-color: #bfdbfe;
 }
 
@@ -865,7 +876,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .input-control {
-  padding: 10px 14px;
+  padding: var(--space-md) var(--space-lg);
   font-size: 0.8rem;
   border-radius: var(--radius-sm);
   border: 1px solid #e5e7eb;
@@ -873,14 +884,14 @@ button, input, select, textarea { font-family: inherit; }
   color: var(--text-primary);
   outline: none;
   transition: all 0.4s var(--ease-spring-soft);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .input-control:focus {
   border-color: var(--primary);
   background: #ffffff;
-  transform: scale(1.02);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .input-control:hover:not(:focus) {
@@ -913,10 +924,11 @@ select.input-control option {
 
 /* ---- KPI Cards Layout ---- */
 .kpi-card {
-  padding: 12px 14px;
+  padding: var(--space-md) var(--space-lg);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-xs);
+  box-shadow: var(--shadow-sm);
 }
 
 .kpi-card .kpi-label {
