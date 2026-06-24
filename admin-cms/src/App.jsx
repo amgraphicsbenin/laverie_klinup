@@ -1,26 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './services/db';
 import AdminView from './components/AdminView';
-import { 
-  Sun, 
-  Moon, 
-  ShieldAlert, 
-  ShieldCheck,
-  LayoutDashboard, 
-  ListFilter, 
-  History, 
-  ShieldX,
-  Search,
-  Bell,
-  Mail,
-  HelpCircle,
-  Settings,
-  ShoppingBag,
-  Users,
-  Lock,
-  LogOut,
-  X
-} from 'lucide-react';
+// Composant utilitaire pour les icônes Google Material Symbols
+const MIcon = ({ name, size = 20, style = {}, className = '', filled = false }) => (
+  <span
+    className={`material-symbols-rounded${className ? ' ' + className : ''}`}
+    style={{
+      fontSize: size,
+      lineHeight: 1,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontVariationSettings: `'FILL' ${filled ? 1 : 0}, 'wght' 400, 'GRAD' 0, 'opsz' 24`,
+      userSelect: 'none',
+      ...style
+    }}
+  >
+    {name}
+  </span>
+);
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -131,7 +129,7 @@ function App() {
       <div className="lockscreen-container">
         <div className="lockscreen-logo-area">
           <div style={{ background: 'rgba(255,255,255,0.08)', padding: '1rem', borderRadius: '20px', display: 'inline-flex', marginBottom: '1rem', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <Lock size={36} color="#ffffff" strokeWidth={1.5} />
+            <MIcon name="lock" size={36} style={{ color: '#ffffff' }} />
           </div>
           <h2 className="lockscreen-title">KLIN UP</h2>
           <p className="lockscreen-subtitle">Plateforme Laverie Admin CMS</p>
@@ -290,7 +288,7 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>Réinitialiser le PIN</h3>
                 <button type="button" onClick={() => setShowResetPinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                  <X size={20} />
+                  <MIcon name="close" size={20} />
                 </button>
               </div>
               
@@ -351,28 +349,28 @@ function App() {
                 className={`menu-item ${adminMenu === 'dashboard' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('dashboard')}
               >
-                <LayoutDashboard size={18} />
+                <MIcon name="dashboard" size={20} />
                 Vue d'Ensemble
               </li>
               <li 
                 className={`menu-item ${adminMenu === 'orders_management' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('orders_management')}
               >
-                <ShoppingBag size={18} />
+                <MIcon name="shopping_bag" size={20} />
                 Gestion Commandes
               </li>
               <li 
                 className={`menu-item ${adminMenu === 'crm_management' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('crm_management')}
               >
-                <Users size={18} />
+                <MIcon name="group" size={20} />
                 Clients CRM
               </li>
               <li 
                 className={`menu-item ${adminMenu === 'catalog' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('catalog')}
               >
-                <ListFilter size={18} />
+                <MIcon name="price_change" size={20} />
                 Catalogue Tarifs
               </li>
               {isSuperAdmin && (
@@ -381,14 +379,14 @@ function App() {
                     className={`menu-item ${adminMenu === 'staff_management' ? 'active' : ''}`}
                     onClick={() => setAdminMenu('staff_management')}
                   >
-                    <ShieldCheck size={18} />
+                    <MIcon name="admin_panel_settings" size={20} />
                     Gestion des Accès
                   </li>
                   <li 
                     className={`menu-item ${adminMenu === 'logs' ? 'active' : ''}`}
                     onClick={() => setAdminMenu('logs')}
                   >
-                    <History size={18} />
+                    <MIcon name="history" size={20} />
                     Journal d'Audit
                   </li>
                 </>
@@ -401,15 +399,15 @@ function App() {
                 className={`menu-item ${adminMenu === 'settings' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('settings')}
               >
-                <Settings size={18} />
+                <MIcon name="settings" size={20} />
                 Paramètres
               </li>
               <li className="menu-item" onClick={() => alert('Support / Aide en ligne')}>
-                <HelpCircle size={18} />
+                <MIcon name="help" size={20} />
                 Aide
               </li>
               <li className="menu-item" onClick={() => setShowLogoutConfirm(true)}>
-                <LogOut size={18} />
+                <MIcon name="logout" size={20} />
                 Déconnexion
               </li>
             </ul>
@@ -463,7 +461,7 @@ function App() {
             <div className="topbar-actions">
               {/* Recherche pill avec badge raccourci */}
               <div className="search-pill-wrapper">
-                <Search size={16} className="search-pill-icon" />
+                <MIcon name="search" size={18} className="search-pill-icon" />
                 <input 
                   type="text" 
                   placeholder="Rechercher..." 
@@ -475,11 +473,11 @@ function App() {
 
               {/* Raccourcis Icônes */}
               <div className="topbar-icon-btn" title="Messages" onClick={() => alert('Boîte de réception vide.')}>
-                <Mail size={16} />
+                <MIcon name="mail" size={18} />
               </div>
               
               <div className="topbar-icon-btn" title="Notifications" onClick={() => alert('Aucune nouvelle notification.')}>
-                <Bell size={16} />
+                <MIcon name="notifications" size={18} />
               </div>
 
               {/* Status de la Base de Données */}
@@ -527,7 +525,7 @@ function App() {
           <div style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
             <div className="card" style={{ maxWidth: '480px', padding: '2.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center' }}>
               <div style={{ background: 'var(--status-late-light)', padding: '1rem', borderRadius: '50%', color: 'var(--status-late)' }}>
-                <ShieldX size={48} />
+                <MIcon name="gpp_bad" size={48} />
               </div>
               <h2 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 700 }}>Espace Réservé</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6' }}>

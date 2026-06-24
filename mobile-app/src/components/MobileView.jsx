@@ -55,6 +55,25 @@ import {
   Check
 } from 'lucide-react';
 
+// Composant utilitaire — Google Material Symbols Rounded
+const MIcon = ({ name, size = 22, style = {}, className = '', filled = false }) => (
+  <span
+    className={`material-symbols-rounded${className ? ' ' + className : ''}`}
+    style={{
+      fontSize: size,
+      lineHeight: 1,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontVariationSettings: `'FILL' ${filled ? 1 : 0}, 'wght' 400, 'GRAD' 0, 'opsz' 24`,
+      userSelect: 'none',
+      ...style
+    }}
+  >
+    {name}
+  </span>
+);
+
 const CustomSelect = ({ value, onChange, options, placeholder, disabled, style, dropdownStyle, buttonStyle }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -1822,8 +1841,8 @@ export default function MobileView() {
     }, {});
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button 
             type="button"
             onClick={() => setAccueilSubView('main')}
@@ -1880,8 +1899,8 @@ export default function MobileView() {
       });
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button 
             type="button"
             onClick={() => setAccueilSubView('main')}
@@ -1928,8 +1947,8 @@ export default function MobileView() {
     const completedOrders = orders.filter(o => o.statut === 'restitue' && new Date(o.updated_at || o.created_at) >= startOfMonth);
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button 
             type="button"
             onClick={() => setAccueilSubView('main')}
@@ -1973,8 +1992,8 @@ export default function MobileView() {
     const expressOrdersList = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule' && o.niveau_urgence === 'Express');
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button 
             type="button"
             onClick={() => setAccueilSubView('main')}
@@ -2019,8 +2038,8 @@ export default function MobileView() {
     const lateOrdersList = activeOrders.filter(o => isOrderLate(o));
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button 
             type="button"
             onClick={() => setAccueilSubView('main')}
@@ -2069,8 +2088,8 @@ export default function MobileView() {
     ];
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button 
             type="button"
             onClick={() => setAccueilSubView('main')}
@@ -2109,8 +2128,8 @@ export default function MobileView() {
     const maxBar = Math.max(...actData.map(d => d.count), 1);
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button 
             type="button"
             onClick={() => setAccueilSubView('main')}
@@ -2197,9 +2216,9 @@ export default function MobileView() {
 
     // 3. Render
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
         {/* Header with back button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button 
             type="button"
             onClick={() => {
@@ -2584,7 +2603,7 @@ export default function MobileView() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
 
               {/* HEADER — Logo + Action Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', paddingBottom: '4px' }}>
+              <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {/* Crop transparent Photoshop padding: ~27% top, ~42% content, ~31% bottom */}
                 <div style={{ width: '125px', height: '50px', overflow: 'hidden', flexShrink: 0 }}>
                   <img
@@ -2988,7 +3007,7 @@ export default function MobileView() {
             {gestionSubView === 'main' && (
               <>
                 {/* Header */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingTop: '8px' }}>
+                <div className="mobile-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                   <div>
                     <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.4px', margin: 0 }}>Gestion</h1>
                     <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Suivi et traitement</p>
@@ -3658,7 +3677,7 @@ export default function MobileView() {
 
             {gestionSubView === 'client_order_history' && selectedClientForHistory && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button 
                     type="button" 
                     onClick={() => setGestionSubView(previousGestionSubView)} 
@@ -3741,7 +3760,7 @@ export default function MobileView() {
                 {/* Liste des commandes */}
                 <h3 style={{ fontSize: '0.85rem', fontWeight: 800, margin: '0.5rem 0 0', color: 'var(--text-primary)' }}>Commandes</h3>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '2px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   {(() => {
                     const clientOrders = orders
                       .filter(o => o.customer_id === selectedClientForHistory.id)
@@ -3832,7 +3851,7 @@ export default function MobileView() {
            ======================================================== */}
         {activeTab === 'historique' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ paddingTop: '8px' }}>
+            <div className="mobile-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
               <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.4px', margin: 0 }}>Historique</h1>
               <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Archives des commandes</p>
             </div>
@@ -3973,7 +3992,7 @@ export default function MobileView() {
            ======================================================== */}
         {activeTab === 'profile' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-            <div style={{ paddingTop: '8px' }}>
+            <div className="mobile-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
               <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.4px', margin: 0 }}>Compte</h1>
               <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Profil & Préférences</p>
             </div>
@@ -4146,7 +4165,9 @@ export default function MobileView() {
                 setGestionSubView('main');
               }}
             >
-              <div className="nav-icon-wrap"><Home size={22} /></div>
+              <div className="nav-icon-wrap">
+                <MIcon name="home" size={22} filled={activeTab === 'accueil'} />
+              </div>
               <span>Accueil</span>
             </button>
             <button 
@@ -4157,7 +4178,9 @@ export default function MobileView() {
                 setGestionSubView('main');
               }}
             >
-              <div className="nav-icon-wrap"><Layers size={22} /></div>
+              <div className="nav-icon-wrap">
+                <MIcon name="layers" size={22} filled={activeTab === 'gestion'} />
+              </div>
               <span>Gestion</span>
             </button>
             <div className="scan-item">
@@ -4169,7 +4192,7 @@ export default function MobileView() {
                   setShowOrderRegistrationModal(true);
                 }}
               >
-                <Plus size={24} />
+                <MIcon name="add" size={26} />
               </button>
             </div>
             <button 
@@ -4180,7 +4203,9 @@ export default function MobileView() {
                 setGestionSubView('main');
               }}
             >
-              <div className="nav-icon-wrap"><FileText size={22} /></div>
+              <div className="nav-icon-wrap">
+                <MIcon name="receipt_long" size={22} filled={activeTab === 'historique'} />
+              </div>
               <span>Historique</span>
             </button>
             <button 
@@ -4191,7 +4216,9 @@ export default function MobileView() {
                 setGestionSubView('main');
               }}
             >
-              <div className="nav-icon-wrap"><User size={22} /></div>
+              <div className="nav-icon-wrap">
+                <MIcon name="account_circle" size={22} filled={activeTab === 'profile'} />
+              </div>
               <span>Compte</span>
             </button>
           </div>
