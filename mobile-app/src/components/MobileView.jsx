@@ -52,7 +52,8 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronLeft,
-  Check
+  Check,
+  Key
 } from 'lucide-react';
 
 // Composant utilitaire — Google Material Symbols Rounded
@@ -352,6 +353,8 @@ export default function MobileView() {
   const [showResetPinModal, setShowResetPinModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
+  const [showQualityStatsModal, setShowQualityStatsModal] = useState(false);
 
   // États pour la gestion des profils clients (Création, Modification, Suppression)
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -517,9 +520,13 @@ export default function MobileView() {
   // Filtres Historique
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyFilterStatus, setHistoryFilterStatus] = useState('all');
+  const [historyFilterScope, setHistoryFilterScope] = useState('all'); // all, mine
 
   // Filtered orders list for the history tab
   const filteredHistoryOrders = orders.filter(o => {
+    // Filter by scope
+    if (historyFilterScope === 'mine' && currentUser && o.created_by_id !== currentUser.id) return false;
+
     // Filter by status
     if (historyFilterStatus !== 'all' && o.statut !== historyFilterStatus) return false;
 
@@ -599,6 +606,65 @@ export default function MobileView() {
     const penalty = (cancelledCount * 5) + (lateCount * 10);
     const rawScore = Math.max(0, 100 - (penalty / totalHandled) * 100);
     return Math.min(100, rawScore).toFixed(1);
+  })();
+
+  const qualityStats = (() => {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 3600 * 1000);
+    const recentOrders = myOrders.filter(o => o.created_at && new Date(o.created_at) >= ninetyDaysAgo);
+
+    let total = recentOrders.length;
+    let onTime = 0;
+    let late = 0;
+    let cancelled = 0;
+    let active = 0;
+    let totalProcessingTimeMs = 0;
+    let completedCountForAvg = 0;
+
+    const now = new Date();
+
+    recentOrders.forEach(o => {
+      if (o.statut === 'annule') {
+        cancelled++;
+      } else if (o.statut === 'restitue') {
+        const due = o.due_date ? new Date(o.due_date) : null;
+        const paidAt = o.solde_paid_at ? new Date(o.solde_paid_at) : null;
+        if (due && paidAt && paidAt <= due) {
+          onTime++;
+        } else if (due && paidAt && paidAt > due) {
+          late++;
+        } else {
+          onTime++;
+        }
+        
+        if (o.created_at && o.solde_paid_at) {
+          const diff = new Date(o.solde_paid_at) - new Date(o.created_at);
+          if (diff > 0) {
+            totalProcessingTimeMs += diff;
+            completedCountForAvg++;
+          }
+        }
+      } else {
+        // En cours
+        active++;
+        const due = o.due_date ? new Date(o.due_date) : null;
+        if (due && now > due) {
+          late++;
+        }
+      }
+    });
+
+    const avgProcessingTimeHours = completedCountForAvg > 0 
+      ? (totalProcessingTimeMs / completedCountForAvg / 3600000).toFixed(1)
+      : null;
+
+    return {
+      total,
+      onTime,
+      late,
+      cancelled,
+      active,
+      avgProcessingTimeHours
+    };
   })();
   // ─────────────────────────────────────────────────────────────────────
 
@@ -3858,6 +3924,46 @@ export default function MobileView() {
 
             {/* Search and filter */}
             <div className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              {/* Scope filter (All vs Mine) */}
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.45rem', gap: '0.55rem' }}>
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    padding: '0.35rem',
+                    fontSize: '0.68rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: historyFilterScope === 'all' ? 'var(--primary-light)' : 'transparent',
+                    color: historyFilterScope === 'all' ? 'var(--primary)' : 'var(--text-secondary)',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => setHistoryFilterScope('all')}
+                >
+                  Toutes les commandes
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    padding: '0.35rem',
+                    fontSize: '0.68rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: historyFilterScope === 'mine' ? 'var(--primary-light)' : 'transparent',
+                    color: historyFilterScope === 'mine' ? 'var(--primary)' : 'var(--text-secondary)',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => setHistoryFilterScope('mine')}
+                >
+                  Mes dépôts
+                </button>
+              </div>
+
               <div style={{ position: 'relative' }}>
                 <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input 
@@ -3998,7 +4104,11 @@ export default function MobileView() {
             </div>
 
             {/* Profile card — finance style */}
-            <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.9rem' }}>
+            <div 
+              className="card interactive clickable" 
+              style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.9rem', cursor: 'pointer' }}
+              onClick={() => setShowUserDetailsModal(true)}
+            >
               <div className="user-avatar" style={{ width: '48px', height: '48px', fontSize: '1.1rem' }}>
                 {currentUser.prenom.charAt(0)}{currentUser.nom.charAt(0)}
               </div>
@@ -4018,7 +4128,14 @@ export default function MobileView() {
                 <span className="see-all">Voir tout</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
-                <div className="kpi-card">
+                <div 
+                  className="kpi-card interactive clickable" 
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => {
+                    setHistoryFilterScope('mine');
+                    setActiveTab('historique');
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.15rem' }}>
                     <div className="kpi-icon" style={{ background: 'var(--primary-light)', width: '28px', height: '28px', borderRadius: '8px' }}>
                       <Sliders size={13} color="var(--primary)" />
@@ -4029,7 +4146,11 @@ export default function MobileView() {
                     {todayDeposits} cmd
                   </div>
                 </div>
-                <div className="kpi-card">
+                <div 
+                  className="kpi-card interactive clickable" 
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setShowQualityStatsModal(true)}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.15rem' }}>
                     <div className="kpi-icon" style={{ background: 'var(--status-ready-light)', width: '28px', height: '28px', borderRadius: '8px' }}>
                       <Award size={13} color="var(--status-ready)" />
@@ -4201,6 +4322,7 @@ export default function MobileView() {
                 setActiveTab('historique');
                 setAccueilSubView('main');
                 setGestionSubView('main');
+                setHistoryFilterScope('all');
               }}
             >
               <div className="nav-icon-wrap">
@@ -4918,6 +5040,139 @@ export default function MobileView() {
                 Envoyer la demande
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL DÉTAILS DE L'UTILISATEUR ================= */}
+      {showUserDetailsModal && (
+        <div 
+          className="modal-overlay center-align" 
+          style={{ zIndex: 1000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowUserDetailsModal(false); }}
+        >
+          <div className="modal-dialog" style={{ maxWidth: '320px', background: '#ffffff', color: '#18181b', padding: '1.25rem', borderRadius: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+              <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>Détails de l'utilisateur</h3>
+              <button type="button" onClick={() => setShowUserDetailsModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={15} color="var(--text-muted)" />
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.85rem', marginBottom: '1.25rem' }}>
+              <div className="user-avatar" style={{ width: '64px', height: '64px', fontSize: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {currentUser.prenom.charAt(0)}{currentUser.nom.charAt(0)}
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <h4 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, fontFamily: 'var(--font-title)' }}>{currentUser.prenom} {currentUser.nom}</h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize', margin: '2px 0 0' }}>
+                  {currentUser.role.replace(/_/g, ' ')}
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.75rem', background: '#f9fafb', padding: '0.85rem', borderRadius: '12px', marginBottom: '1.25rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Identifiant :</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{currentUser.id}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Email :</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{currentUser.email}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Date de création :</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{new Date(currentUser.created_at).toLocaleDateString('fr-FR')}</span>
+              </div>
+            </div>
+
+            <button 
+              type="button" 
+              className="btn btn-outline" 
+              style={{ 
+                padding: '0.6rem', 
+                borderRadius: '10px', 
+                fontSize: '0.75rem', 
+                width: '100%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: '0.4rem',
+                borderColor: 'var(--primary)',
+                color: 'var(--primary)',
+                fontWeight: 700,
+                background: 'transparent'
+              }}
+              onClick={() => {
+                setShowUserDetailsModal(false);
+                setResetEmail(currentUser.email);
+                setShowResetPinModal(true);
+              }}
+            >
+              <Key size={14} />
+              Réinitialiser le PIN
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL STATISTIQUES DE QUALITÉ ================= */}
+      {showQualityStatsModal && (
+        <div 
+          className="modal-overlay center-align" 
+          style={{ zIndex: 1000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowQualityStatsModal(false); }}
+        >
+          <div className="modal-dialog" style={{ maxWidth: '320px', background: '#ffffff', color: '#18181b', padding: '1.25rem', borderRadius: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+              <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>Performance & Délais</h3>
+              <button type="button" onClick={() => setShowQualityStatsModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={15} color="var(--text-muted)" />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', padding: '1rem', background: 'var(--primary-light)', borderRadius: '14px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
+              <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.5px' }}>Score de Qualité Global</span>
+              <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--primary)', fontFamily: 'var(--font-title)', lineHeight: 1 }}>
+                {qualityScore !== null ? `${qualityScore} %` : 'N/A'}
+              </span>
+              <span style={{ fontSize: '0.58rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '2px' }}>
+                Basé sur les performances de vos dépôts des 90 derniers jours.
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.75rem', background: '#f9fafb', padding: '0.85rem', borderRadius: '12px', marginBottom: '1.25rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Temps moyen de gestion :</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 800 }}>
+                  {qualityStats.avgProcessingTimeHours 
+                    ? (parseFloat(qualityStats.avgProcessingTimeHours) < 24 
+                        ? `${qualityStats.avgProcessingTimeHours} h` 
+                        : `${(parseFloat(qualityStats.avgProcessingTimeHours) / 24).toFixed(1)} jour(s)`)
+                    : 'Aucun dépôt livré'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Commandes à temps :</span>
+                <span style={{ color: 'var(--status-ready)', fontWeight: 800 }}>{qualityStats.onTime} cmd(s)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Commandes en retard :</span>
+                <span style={{ color: 'var(--status-late)', fontWeight: 800 }}>{qualityStats.late} cmd(s)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Commandes annulées :</span>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 800 }}>{qualityStats.cancelled} cmd(s)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Volume total géré :</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 800 }}>{qualityStats.total} commande(s)</span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', lineHeight: 1.4, textAlign: 'center', padding: '0 0.5rem' }}>
+              ℹ️ Pour maintenir un score élevé, assurez-vous de traiter et de finaliser les commandes avant leur date d'échéance programmée.
+            </div>
           </div>
         </div>
       )}
