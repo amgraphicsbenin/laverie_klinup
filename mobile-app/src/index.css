@@ -14,7 +14,7 @@
   --max-bold: 600;
 
   /* Palette Claire & Effet Liquide (Blanc dominant, accents bleus discrets) */
-  --bg-app: #f9fafc; /* Blanc cassé doux dominant */
+  --bg-app: #ffffff; /* Blanc pur dominant */
   --bg-card: rgba(255, 255, 255, 0.65); /* Verre blanc pour le contraste sur fond clair */
   --bg-card-hover: rgba(255, 255, 255, 0.82);
   --border-color: rgba(0, 0, 0, 0.05);

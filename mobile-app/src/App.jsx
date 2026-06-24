@@ -6,7 +6,7 @@ function App() {
   useEffect(() => {
     const configureStatusBar = async () => {
       try {
-        await StatusBar.setBackgroundColor({ color: '#f9fafc' });
+        await StatusBar.setBackgroundColor({ color: '#ffffff' });
         await StatusBar.setStyle({ style: Style.Light });
       } catch (error) {
         console.log('Capacitor StatusBar is not available or not running on a native device.', error);
