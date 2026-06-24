@@ -320,7 +320,7 @@ export default function MobileView() {
   const [showCAValues, setShowCAValues] = useState(true);
 
   // Détermine si l'utilisateur peut voir le CA en fonction de son rôle
-  const isCAAccessible = currentUser ? (currentUser.role === 'super_admin' || currentUser.role === 'manager') : false;
+  const isCAAccessible = currentUser ? (currentUser.role === 'super_admin' || currentUser.role === 'manager' || currentUser.role === 'agent_accueil') : false;
   const canViewCA = isCAAccessible;
 
   // États d'authentification par email & code PIN de 6 chiffres
