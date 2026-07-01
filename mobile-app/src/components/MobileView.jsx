@@ -214,6 +214,7 @@ export default function MobileView() {
   const [activityPeriod, setActivityPeriod] = useState('7_days'); // 3_days, 7_days, 1_month, 3_months, 6_months, 12_months
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [loyaltySearchQuery, setLoyaltySearchQuery] = useState('');
+  const [dbIsRemote, setDbIsRemote] = useState(() => db.isRemote());
   
   // Paramètres fonctionnels
   const [enableWhatsAppNotifications, setEnableWhatsAppNotifications] = useState(() => {
@@ -945,6 +946,7 @@ export default function MobileView() {
       setCatalog(db.getCatalog());
       setCurrentUser(db.getCurrentUser());
       setNotifications(loadNotificationsFromLogs());
+      setDbIsRemote(db.isRemote());
     });
     return () => unsubscribe();
   }, [activeTab]);
@@ -2449,8 +2451,48 @@ export default function MobileView() {
       <div className="liquid-orb-2"></div>
 
       {/* Main Container */}
-      <div className="mobile-content" style={{ padding: (isCalmyClientMode || !currentUser) ? 0 : undefined }}>
-        {isCalmyClientMode ? (
+      <div className="mobile-content" style={{ padding: (isCalmyClientMode || !currentUser || !dbIsRemote) ? 0 : undefined }}>
+        {!dbIsRemote ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', gap: '1.5rem', background: '#fff', height: '100%', minHeight: '620px', width: '100%', boxSizing: 'border-box' }}>
+            <div style={{ fontSize: '3.5rem', lineHeight: 1 }}>🔌</div>
+            <h2 style={{ color: '#ef4444', margin: 0, fontSize: '1.25rem', textAlign: 'center', fontWeight: 800 }}>Erreur de connexion</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', textAlign: 'center', maxWidth: 260, lineHeight: 1.5, margin: 0 }}>
+              Impossible de communiquer avec la base de données Supabase. L'application nécessite une connexion internet active pour fonctionner.
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                alert("Tentative de reconnexion...");
+                const res = await db.testConnection();
+                if (res.success) {
+                  alert("Succès ! Connexion établie avec le cloud Supabase. L'application est maintenant en ligne !");
+                } else {
+                  alert("Échec de connexion : " + res.error);
+                }
+              }}
+              style={{
+                background: 'var(--primary)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '0.75rem 2.2rem',
+                fontSize: '0.88rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                width: '100%',
+                maxWidth: '220px'
+              }}
+            >
+              <RotateCw size={16} />
+              Réessayer
+            </button>
+          </div>
+        ) : isCalmyClientMode ? (
           renderCalmyClientView()
         ) : !currentUser ? (
           <div className="lockscreen-container">
@@ -2699,7 +2741,7 @@ export default function MobileView() {
                           alert("Lancement du test de diagnostic...");
                           const res = await db.testConnection();
                           if (res.success) {
-                            alert("Succès ! " + res.message + "\n\nVeuillez redémarrer l'application pour appliquer.");
+                            alert("Succès ! " + res.message + "\n\nL'application s'est reconnectée à Supabase et est maintenant en ligne !");
                           } else {
                             alert("Échec du diagnostic !\n\nErreur : " + res.error + "\n\nConseils : Vérifiez votre connexion internet.");
                           }
@@ -4250,7 +4292,7 @@ export default function MobileView() {
                           alert("Lancement du test de diagnostic...");
                           const res = await db.testConnection();
                           if (res.success) {
-                            alert("Succès ! " + res.message + "\n\nVeuillez redémarrer l'application pour synchroniser les données.");
+                            alert("Succès ! " + res.message + "\n\nL'application s'est reconnectée à Supabase et est maintenant en ligne !");
                           } else {
                             alert("Échec du diagnostic !\n\nErreur : " + res.error + "\n\nConseils : Vérifiez la connexion Internet de votre téléphone.");
                           }

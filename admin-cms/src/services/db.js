@@ -257,9 +257,11 @@ function withTimeout(promise, ms, label) {
 }
 
 // Initialisation de la base Supabase — robuste pour l'Admin
-async function initDb() {
+async function initDb(isRetry = false) {
   // Toujours charger les données locales en premier pour un démarrage rapide
-  loadFromLocalStorage();
+  if (!isRetry) {
+    loadFromLocalStorage();
+  }
 
   if (!supabase) {
     console.warn("[DB] Client Supabase non disponible. Mode hors-ligne.");
@@ -268,7 +270,7 @@ async function initDb() {
 
   // Tentatives de connexion avec retry
   let attempt = 0;
-  const maxAttempts = 3;
+  const maxAttempts = isRetry ? 1 : 3; // Réduire à 1 tentative lors d'une reconnexion manuelle ou automatique
   const retryDelayMs = 3000;
 
   while (attempt < maxAttempts) {
@@ -338,9 +340,38 @@ async function initDb() {
       } else {
         console.warn("[DB] Toutes les tentatives ont échoué. Mode hors-ligne.");
         db.notify();
+        startAutoReconnect();
       }
     }
   }
+}
+
+// Tentative de reconnexion automatique toutes les 30 secondes si on est hors-ligne
+let reconnectInterval = null;
+function startAutoReconnect() {
+  if (reconnectInterval) return; // Eviter les doublons
+  reconnectInterval = setInterval(async () => {
+    if (isUsingRemote) {
+      clearInterval(reconnectInterval);
+      reconnectInterval = null;
+      return;
+    }
+    console.log("[DB] Tentative de reconnexion automatique à Supabase...");
+    try {
+      if (!supabase) return;
+      const { error } = await supabase.from('staff').select('id').limit(1);
+      if (!error) {
+        console.log("[DB] Connexion réseau rétablie avec Supabase. Initialisation...");
+        await initDb(true);
+        if (isUsingRemote) {
+          clearInterval(reconnectInterval);
+          reconnectInterval = null;
+        }
+      }
+    } catch (e) {
+      // Ignorer les erreurs de connexion temporaires
+    }
+  }, 30000);
 }
 
 // Synchronisation périodique : rafraîchit les données depuis Supabase sans passer hors-ligne
@@ -1274,5 +1305,23 @@ export const db = {
     return null;
   },
 
-  isRemote: () => isUsingRemote
+  isRemote: () => isUsingRemote,
+
+  testConnection: async () => {
+    if (!supabase) {
+      return { success: false, error: "Client Supabase non initialisé (clés absentes ou incorrectes)." };
+    }
+    try {
+      const { data, error } = await supabase.from('staff').select('id').limit(1);
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      if (!isUsingRemote) {
+        await initDb(true);
+      }
+      return { success: true, message: "Connexion établie avec succès avec le cloud Supabase !" };
+    } catch (e) {
+      return { success: false, error: e.message || "Erreur de connexion réseau." };
+    }
+  }
 };

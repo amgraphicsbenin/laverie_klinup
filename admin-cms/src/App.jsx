@@ -43,6 +43,7 @@ function App() {
   // Notifications states & helper functions
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [dbTick, setDbTick] = useState(0);
+  const [dbIsRemote, setDbIsRemote] = useState(() => db.isRemote());
   const [readNotifIds, setReadNotifIds] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('klin_up_read_notif_ids')) || [];
@@ -208,11 +209,13 @@ function App() {
   useEffect(() => {
     setCurrentUser(db.getCurrentUser());
     setStaffList(db.getStaff());
+    setDbIsRemote(db.isRemote());
 
     const unsubscribe = db.subscribe(() => {
       setCurrentUser(db.getCurrentUser());
       setStaffList(db.getStaff());
       setDbTick(prev => prev + 1);
+      setDbIsRemote(db.isRemote());
     });
     return () => unsubscribe();
   }, []);
@@ -292,6 +295,84 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedLoginUser, pinCode, pinError, isUnlocking]);
+
+  if (!dbIsRemote) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'var(--bg-app, #f8fafc)',
+        fontFamily: 'var(--font-main, sans-serif)',
+        padding: '2rem'
+      }}>
+        <div className="card" style={{
+          maxWidth: '420px',
+          width: '100%',
+          padding: '2.5rem',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '1.5rem',
+          background: 'var(--bg-card, #ffffff)',
+          borderRadius: '16px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+          border: '1px solid var(--border-color, #e2e8f0)'
+        }}>
+          <div style={{
+            fontSize: '3rem',
+            lineHeight: 1
+          }}>🔌</div>
+          <h2 style={{
+            color: '#ef4444',
+            margin: 0,
+            fontSize: '1.3rem',
+            fontWeight: 800,
+            fontFamily: 'var(--font-title, sans-serif)'
+          }}>Erreur de connexion</h2>
+          <p style={{
+            color: 'var(--text-secondary, #64748b)',
+            fontSize: '0.88rem',
+            lineHeight: 1.5,
+            margin: 0
+          }}>
+            Impossible de communiquer avec la base de données Supabase. L'administration requiert une connexion internet active pour fonctionner.
+          </p>
+          <button
+            type="button"
+            onClick={async () => {
+              alert("Tentative de reconnexion...");
+              const res = await db.testConnection();
+              if (res.success) {
+                alert("Succès ! Connexion établie avec le cloud Supabase. L'administration est maintenant en ligne !");
+              } else {
+                alert("Échec de connexion : " + res.error);
+              }
+            }}
+            className="btn btn-primary"
+            style={{
+              width: '100%',
+              padding: '0.75rem 1.5rem',
+              fontSize: '0.88rem',
+              fontWeight: 700,
+              borderRadius: '10px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <MIcon name="sync" size={16} />
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (
