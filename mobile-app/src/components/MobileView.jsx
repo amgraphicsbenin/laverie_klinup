@@ -956,7 +956,7 @@ export default function MobileView() {
 
   // Extract unique clothes from catalog for Caisses dropdown
   const catalogClothes = catalog.length > 0 
-    ? [...new Set(catalog.filter(c => c.categorie !== 'abonnement').map(c => c.article))] 
+    ? [...new Set(catalog.filter(c => c.categorie !== 'abonnement' && c.categorie !== 'system_setting' && c.service !== 'system').map(c => c.article))] 
     : ['Chemise', 'Pantalon', 'Robe', 'Combinaison', 'Jupe', 'Pull', 'Culotte', 'T-shirt', 'Polo', 'Blouson', 'Veste', 'Costume', 'Jeans'];
 
   const getTotalClothesCount = () => {
@@ -4452,7 +4452,7 @@ export default function MobileView() {
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Linge & Services</label>
                 <div style={{ 
-                  maxHeight: '200px', overflowY: 'auto', 
+                  maxHeight: '360px', overflowY: 'auto', 
                   border: '1px solid var(--border-color)', borderRadius: '12px', padding: '0.35rem',
                   display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'var(--bg-app)', marginTop: '0.25rem'
                 }}>
