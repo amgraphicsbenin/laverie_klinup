@@ -2692,8 +2692,22 @@ export default function MobileView() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   {!db.isRemote() && (
                     <span 
-                      title="L'application fonctionne sur le stockage local de l'appareil (les variables d'environnement Supabase manquent ou le serveur est injoignable)."
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const confirmDiag = confirm("L'application est actuellement en mode local (impossible de se connecter à Supabase). Voulez-vous lancer un test de diagnostic de connexion ?");
+                        if (confirmDiag) {
+                          alert("Lancement du test de diagnostic...");
+                          const res = await db.testConnection();
+                          if (res.success) {
+                            alert("Succès ! " + res.message + "\n\nVeuillez redémarrer l'application pour appliquer.");
+                          } else {
+                            alert("Échec du diagnostic !\n\nErreur : " + res.error + "\n\nConseils : Vérifiez votre connexion internet.");
+                          }
+                        }
+                      }}
+                      title="L'application fonctionne sur le stockage local de l'appareil (les variables d'environnement Supabase manquent ou le serveur est injoignable). Cliquez pour lancer un diagnostic."
                       style={{ 
+                        cursor: 'pointer',
                         fontSize: '0.5rem', 
                         fontWeight: 800, 
                         padding: '0.12rem 0.35rem', 
@@ -4227,7 +4241,24 @@ export default function MobileView() {
                     <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>Statut de synchronisation</span>
                   </div>
                   <span 
+                    onClick={async () => {
+                      if (db.isRemote()) {
+                        alert("Connexion active : L'application est connectée avec succès au cloud Supabase.");
+                      } else {
+                        const confirmDiag = confirm("L'application est actuellement en mode local. Voulez-vous lancer un test de diagnostic de connexion Supabase ?");
+                        if (confirmDiag) {
+                          alert("Lancement du test de diagnostic...");
+                          const res = await db.testConnection();
+                          if (res.success) {
+                            alert("Succès ! " + res.message + "\n\nVeuillez redémarrer l'application pour synchroniser les données.");
+                          } else {
+                            alert("Échec du diagnostic !\n\nErreur : " + res.error + "\n\nConseils : Vérifiez la connexion Internet de votre téléphone.");
+                          }
+                        }
+                      }
+                    }}
                     style={{ 
+                      cursor: 'pointer',
                       fontSize: '0.62rem', 
                       fontWeight: 800, 
                       padding: '0.15rem 0.5rem', 
