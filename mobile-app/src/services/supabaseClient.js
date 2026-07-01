@@ -13,11 +13,37 @@ if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('votre-project-id')
   );
 } else {
   try {
-    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        // Désactiver la détection automatique du flux OAuth qui bloque sur Android WebView
+        detectSessionInUrl: false,
+        // Utiliser localStorage pour la persistance de session (compatible Capacitor)
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+      global: {
+        // Options fetch explicites pour Android/Capacitor : pas de cache
+        fetch: (url, options = {}) => {
+          return fetch(url, {
+            ...options,
+            cache: 'no-store',
+          });
+        },
+      },
+      realtime: {
+        // Paramètres Realtime adaptés pour les connexions mobiles instables
+        params: {
+          eventsPerSecond: 2,
+        },
+        timeout: 30000,
+      },
+    });
+    console.log("[SUPABASE] ✅ Client initialisé avec succès.");
   } catch (error) {
     console.error("[SUPABASE] Erreur lors de la création du client Supabase :", error);
   }
 }
 
 export const supabase = supabaseInstance;
+
 

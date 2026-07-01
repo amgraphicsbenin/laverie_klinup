@@ -254,45 +254,125 @@ function persist() {
   saveData('klin_up_pin_reset_requests', memoryDb.pin_reset_requests || []);
 }
 
-// Initialisation de la base Supabase
+// Helper: ajouter un timeout à une promesse
+function withTimeout(promise, ms, label) {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`[TIMEOUT] ${label} dépasse ${ms}ms`)), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
+// Initialisation de la base Supabase — robuste pour Android/Capacitor
 async function initDb() {
-  try {
-    if (!supabase) {
-      throw new Error("Client Supabase non configuré ou non initialisé.");
-    }
-    const [staffRes, custRes, orderRes, logsRes, catalogRes, reqsRes] = await Promise.all([
-      supabase.from('staff').select('*'),
-      supabase.from('customers').select('*'),
-      supabase.from('orders').select('*'),
-      supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }),
-      supabase.from('catalog').select('*'),
-      supabase.from('pin_reset_requests').select('*')
-    ]);
+  // Toujours charger les données locales en premier pour un démarrage rapide
+  loadFromLocalStorage();
 
-    if (staffRes.error) console.error("Error loading staff:", staffRes.error.message);
-    if (custRes.error) console.error("Error loading customers:", custRes.error.message);
-    if (orderRes.error) console.error("Error loading orders:", orderRes.error.message);
-    if (logsRes.error) console.error("Error loading logs:", logsRes.error.message);
-    if (catalogRes.error) console.error("Error loading catalog:", catalogRes.error.message);
-    if (reqsRes.error) console.error("Error loading pin_reset_requests:", reqsRes.error.message);
-
-    memoryDb.staff = staffRes.data && staffRes.data.length > 0 ? staffRes.data : DEFAULT_STAFF;
-    memoryDb.customers = custRes.data || [];
-    memoryDb.orders = orderRes.data || [];
-    memoryDb.logs = logsRes.data || [];
-    memoryDb.catalog = catalogRes.data && catalogRes.data.length > 0 ? catalogRes.data : DEFAULT_CATALOG;
-    memoryDb.pin_reset_requests = reqsRes.data || [];
-    
-    memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
-    isUsingRemote = true;
-    db.notify();
-
-    // Démarrage des abonnements temps réel
-    setupRealtime();
-  } catch (err) {
-    console.warn("[DB] Supabase hors ligne ou non configuré, repli sur localStorage :", err.message);
-    loadFromLocalStorage();
+  if (!supabase) {
+    console.warn("[DB] Client Supabase non disponible. Mode hors-ligne.");
+    return;
   }
+
+  // Tentatives de connexion avec retry
+  let attempt = 0;
+  const maxAttempts = 3;
+  const retryDelayMs = 3000;
+
+  while (attempt < maxAttempts) {
+    attempt++;
+    console.log(`[DB] Tentative de connexion Supabase ${attempt}/${maxAttempts}...`);
+
+    try {
+      // Utiliser Promise.allSettled pour ne pas bloquer si une table échoue
+      const TIMEOUT_MS = 15000;
+      const [staffRes, custRes, orderRes, logsRes, catalogRes, reqsRes] = await Promise.allSettled([
+        withTimeout(supabase.from('staff').select('*'), TIMEOUT_MS, 'staff'),
+        withTimeout(supabase.from('customers').select('*'), TIMEOUT_MS, 'customers'),
+        withTimeout(supabase.from('orders').select('*'), TIMEOUT_MS, 'orders'),
+        withTimeout(supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }), TIMEOUT_MS, 'activity_logs'),
+        withTimeout(supabase.from('catalog').select('*'), TIMEOUT_MS, 'catalog'),
+        withTimeout(supabase.from('pin_reset_requests').select('*'), TIMEOUT_MS, 'pin_reset_requests'),
+      ]);
+
+      // Vérifier si au moins la table principale (staff) a répondu correctement
+      const staffOk = staffRes.status === 'fulfilled' && !staffRes.value?.error;
+      const custOk = custRes.status === 'fulfilled' && !custRes.value?.error;
+      const orderOk = orderRes.status === 'fulfilled' && !orderRes.value?.error;
+
+      if (!staffOk && !custOk && !orderOk) {
+        throw new Error("Les tables principales sont inaccessibles.");
+      }
+
+      // Appliquer les résultats disponibles (les tables qui ont échoué gardent leurs valeurs locales)
+      if (staffRes.status === 'fulfilled' && !staffRes.value?.error && staffRes.value?.data?.length > 0) {
+        memoryDb.staff = staffRes.value.data;
+      }
+      if (custRes.status === 'fulfilled' && !custRes.value?.error) {
+        memoryDb.customers = custRes.value.data || [];
+      }
+      if (orderRes.status === 'fulfilled' && !orderRes.value?.error) {
+        memoryDb.orders = orderRes.value.data || [];
+      }
+      if (logsRes.status === 'fulfilled' && !logsRes.value?.error) {
+        memoryDb.logs = logsRes.value.data || [];
+      }
+      if (catalogRes.status === 'fulfilled' && !catalogRes.value?.error && catalogRes.value?.data?.length > 0) {
+        memoryDb.catalog = catalogRes.value.data;
+      }
+      if (reqsRes.status === 'fulfilled' && !reqsRes.value?.error) {
+        memoryDb.pin_reset_requests = reqsRes.value.data || [];
+      }
+
+      // Conserver l'utilisateur courant depuis le stockage local
+      memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
+      isUsingRemote = true;
+
+      console.log("[DB] ✅ Connecté à Supabase avec succès.");
+      db.notify();
+
+      // Démarrage des abonnements temps réel (non-bloquant, erreurs ignorées)
+      try { setupRealtime(); } catch (e) { console.warn("[DB] Realtime non disponible:", e.message); }
+
+      // Sync périodique toutes les 60s pour rattraper les mises à jour manquées
+      startPeriodicSync();
+      return; // Succès, sortir de la boucle
+
+    } catch (err) {
+      console.warn(`[DB] Tentative ${attempt} échouée : ${err.message}`);
+      if (attempt < maxAttempts) {
+        console.log(`[DB] Retry dans ${retryDelayMs / 1000}s...`);
+        await new Promise(r => setTimeout(r, retryDelayMs));
+      } else {
+        console.warn("[DB] Toutes les tentatives ont échoué. Mode hors-ligne (localStorage).");
+        // Les données locales déjà chargées, juste notifier
+        db.notify();
+      }
+    }
+  }
+}
+
+// Synchronisation périodique : rafraîchit les données depuis Supabase sans passer hors-ligne
+let syncInterval = null;
+async function startPeriodicSync() {
+  if (syncInterval) return; // Eviter les doublons
+  syncInterval = setInterval(async () => {
+    if (!supabase || !isUsingRemote) return;
+    try {
+      const [custRes, orderRes, logsRes, reqsRes] = await Promise.allSettled([
+        withTimeout(supabase.from('customers').select('*'), 10000, 'sync-customers'),
+        withTimeout(supabase.from('orders').select('*'), 10000, 'sync-orders'),
+        withTimeout(supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }), 10000, 'sync-logs'),
+        withTimeout(supabase.from('pin_reset_requests').select('*'), 10000, 'sync-reqs'),
+      ]);
+      let changed = false;
+      if (custRes.status === 'fulfilled' && !custRes.value?.error) { memoryDb.customers = custRes.value.data || []; changed = true; }
+      if (orderRes.status === 'fulfilled' && !orderRes.value?.error) { memoryDb.orders = orderRes.value.data || []; changed = true; }
+      if (logsRes.status === 'fulfilled' && !logsRes.value?.error) { memoryDb.logs = logsRes.value.data || []; changed = true; }
+      if (reqsRes.status === 'fulfilled' && !reqsRes.value?.error) { memoryDb.pin_reset_requests = reqsRes.value.data || []; changed = true; }
+      if (changed) { persist(); db.notify(); }
+    } catch (e) {
+      // Sync silencieuse, pas de basculement hors-ligne
+    }
+  }, 60000); // Toutes les 60 secondes
 }
 
 // Abonnements Supabase Realtime
