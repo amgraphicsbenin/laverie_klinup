@@ -35,8 +35,10 @@ import {
   DollarSign,
   Trash2,
   UserPlus,
-  ShieldCheck
+  ShieldCheck,
+  Download
 } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 
 export default function AdminView({ activeTab, searchQuery }) {
   const [catalog, setCatalog] = useState([]);
@@ -75,6 +77,22 @@ export default function AdminView({ activeTab, searchQuery }) {
   // Modale de création de commande
   const [showOrderRegistrationModal, setShowOrderRegistrationModal] = useState(false);
 
+  // Modale de détails avancés des cartes KPI du Dashboard
+  const [activeDetailsCard, setActiveDetailsCard] = useState(null); // 'ca', 'completed', 'active', 'pending'
+  const [kpiDateFrom, setKpiDateFrom] = useState('');
+  const [kpiDateTo, setKpiDateTo] = useState('');
+  const [tempKpiDateFrom, setTempKpiDateFrom] = useState('');
+  const [tempKpiDateTo, setTempKpiDateTo] = useState('');
+
+  useEffect(() => {
+    if (activeDetailsCard) {
+      setTempKpiDateFrom('');
+      setTempKpiDateTo('');
+      setKpiDateFrom('');
+      setKpiDateTo('');
+    }
+  }, [activeDetailsCard]);
+
   // Filtres Historique
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyFilterStatus, setHistoryFilterStatus] = useState('all');
@@ -111,7 +129,7 @@ export default function AdminView({ activeTab, searchQuery }) {
       const expHours = catalog.find(item => item.id === 'setting_express_hours')?.prix;
       const normHours = catalog.find(item => item.id === 'setting_normal_hours')?.prix;
       const expMarkup = catalog.find(item => item.id === 'setting_express_markup')?.prix;
-      
+
       if (expHours !== undefined) setInputExpressHours(String(expHours));
       if (normHours !== undefined) setInputNormalHours(String(normHours));
       if (expMarkup !== undefined) setInputExpressMarkup(String(expMarkup));
@@ -153,8 +171,8 @@ export default function AdminView({ activeTab, searchQuery }) {
     }
   };
 
-  const handleUnsubscribeCrm = (customerId) => {
-    if (confirm("Êtes-vous sûr de vouloir résilier cet abonnement ?")) {
+  const handleUnsubscribeCrm = async (customerId) => {
+    if (await confirm("Êtes-vous sûr de vouloir résilier cet abonnement ?")) {
       const updated = db.unsubscribeCustomer(customerId);
       if (updated) {
         refreshAdminData();
@@ -172,9 +190,11 @@ export default function AdminView({ activeTab, searchQuery }) {
   // Category sub-tab for catalog
   const [catalogCategory, setCatalogCategory] = useState('individuel'); // 'individuel' or 'abonnement'
 
-  // Stopwatch/Time Tracker state
   const [timerSeconds, setTimerSeconds] = useState(5048); // 01:24:08 by default
   const [isTimerRunning, setIsTimerRunning] = useState(true);
+
+  // Chart period filter
+  const [chartPeriod, setChartPeriod] = useState('7_days'); // '7_days', '30_days', 'all'
 
   // Catalog edit state
   const [editingItem, setEditingItem] = useState(null);
@@ -228,7 +248,7 @@ export default function AdminView({ activeTab, searchQuery }) {
       setEditStaffEmail(selectedMember.email || `${selectedMember.prenom.toLowerCase()}.${selectedMember.nom.toLowerCase()}@klinup.com`);
       setEditStaffTel(selectedMember.telephone || '');
       setEditStaffStatut(selectedMember.statut || 'actif');
-      
+
       const defaultPerms = {
         can_view_dashboard: selectedMember.role === 'super_admin' || selectedMember.role === 'manager',
         can_manage_orders: true,
@@ -303,8 +323,8 @@ export default function AdminView({ activeTab, searchQuery }) {
     refreshAdminData();
   };
 
-  const handleDeleteStaff = (id) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer définitivement cet employé ?")) {
+  const handleDeleteStaff = async (id) => {
+    if (await confirm("Êtes-vous sûr de vouloir supprimer définitivement cet employé ?")) {
       db.deleteStaff(id);
       setSelectedStaffId('');
       refreshAdminData();
@@ -388,23 +408,519 @@ export default function AdminView({ activeTab, searchQuery }) {
     abonnement: 'Abonnement'
   };
 
+  // --- DATE FILTER HELPER FOR KPI PANELS ---
+  const filterOrdersByKpiDate = (ordersList) => {
+    if (!kpiDateFrom && !kpiDateTo) return ordersList;
+    const from = kpiDateFrom ? new Date(kpiDateFrom + 'T00:00:00') : null;
+    const to = kpiDateTo ? new Date(kpiDateTo + 'T23:59:59') : null;
+    return ordersList.filter(o => {
+      const d = new Date(o.created_at);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+  };
+
+  // --- EXPORT KPI VERS EXCEL (CSV BOM UTF-8) ---
+  const exportKpiToExcel = () => {
+    const timestamp = new Date().toLocaleDateString('fr-FR').replace(/\//g, '-');
+    let filename = '';
+    let headers = [];
+    let rows = [];
+
+    const filteredForExport = filterOrdersByKpiDate(orders);
+    const filteredNonCancelled = filteredForExport.filter(o => o.statut !== 'annule');
+    const filteredRevenue = filteredNonCancelled.reduce((sum, o) => sum + o.prix_total, 0);
+    const dateRangeLabel = kpiDateFrom || kpiDateTo
+      ? ` (${kpiDateFrom || '...'} au ${kpiDateTo || '...'})` : '';
+
+    if (activeDetailsCard === 'ca') {
+      filename = `KPI_Chiffre_Affaires_${timestamp}.csv`;
+      const totalDebt = customers.reduce((sum, c) => sum + Number(c.solde_dette || 0), 0);
+      headers = ['Indicateur', 'Valeur'];
+      rows = [
+        [`Période filtrée${dateRangeLabel}`, ''],
+        ['Revenu Filtré (F CFA)', filteredRevenue],
+        ['Encours Dette Clients (F CFA)', totalDebt],
+        [''],
+        ['Service', 'Montant (F CFA)', 'Part (%)'],
+        ...Object.entries({ lavage_simple: 0, nettoyage_a_sec: 0, repassage: 0, abonnement: 0, autre: 0 }).map(([svc]) => {
+          let amount = 0;
+          filteredNonCancelled.forEach(o => {
+            const s = o.type_service || 'autre';
+            if (s === svc) amount += o.prix_total;
+          });
+          const pct = filteredRevenue > 0 ? ((amount / filteredRevenue) * 100).toFixed(1) : 0;
+          return [serviceLabels[svc] || svc, amount, pct];
+        }),
+        [''],
+        ['--- Transactions (période filtrée) ---'],
+        ['Date', 'Code', 'Client', 'Article', 'Service', 'Total (F)', 'Avance (F)', 'Mode Règlement'],
+        ...filteredForExport.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map(o => {
+          const c = customers.find(x => x.id === o.customer_id);
+          return [
+            new Date(o.created_at).toLocaleDateString('fr-FR'),
+            o.identifiant_unique_marquage,
+            c ? `${c.prenom} ${c.nom}` : 'Client B2B',
+            o.type_article,
+            serviceLabels[o.type_service] || o.type_service,
+            o.prix_total,
+            o.avance_payee,
+            o.mode_reglement
+          ];
+        })
+      ];
+      rows = [headers, ...rows.slice(1)];
+      rows[0] = headers;
+
+    } else if (activeDetailsCard === 'completed') {
+      filename = `KPI_Commandes_Livrees_${timestamp}.csv`;
+      const completedOrders = filteredForExport.filter(o => o.statut === 'restitue');
+      headers = ['Code', 'Client', 'Téléphone', 'Article', 'Service', 'Urgence', 'Montant (F CFA)', 'Avance (F CFA)', 'Date Dépôt'];
+      rows = completedOrders.map(o => {
+        const c = customers.find(x => x.id === o.customer_id);
+        return [
+          o.identifiant_unique_marquage,
+          c ? `${c.prenom} ${c.nom}` : 'Client B2B',
+          c ? c.telephone : '',
+          o.type_article,
+          serviceLabels[o.type_service] || o.type_service,
+          o.niveau_urgence || 'Normal',
+          o.prix_total,
+          o.avance_payee,
+          new Date(o.created_at).toLocaleDateString('fr-FR')
+        ];
+      });
+
+    } else if (activeDetailsCard === 'active') {
+      filename = `KPI_Commandes_Actives_${timestamp}.csv`;
+      const activeOrders = filteredForExport.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
+      headers = ['Code', 'Client', 'Téléphone', 'Article', 'Service', 'Urgence', 'Statut', 'Montant (F CFA)', 'Avance (F CFA)', 'Date Dépôt'];
+      rows = activeOrders.map(o => {
+        const c = customers.find(x => x.id === o.customer_id);
+        return [
+          o.identifiant_unique_marquage,
+          c ? `${c.prenom} ${c.nom}` : 'Client B2B',
+          c ? c.telephone : '',
+          o.type_article,
+          serviceLabels[o.type_service] || o.type_service,
+          o.niveau_urgence || 'Normal',
+          statusDisplayLabels[o.statut] || o.statut,
+          o.prix_total,
+          o.avance_payee,
+          new Date(o.created_at).toLocaleDateString('fr-FR')
+        ];
+      });
+
+    } else if (activeDetailsCard === 'pending') {
+      filename = `KPI_Commandes_En_Attente_${timestamp}.csv`;
+      const pendingOrders = filteredForExport.filter(o => o.statut === 'en_attente');
+      headers = ['Code', 'Client', 'Téléphone', 'Article', 'Service', 'Urgence', 'Montant (F CFA)', 'Date Dépôt'];
+      rows = pendingOrders.map(o => {
+        const c = customers.find(x => x.id === o.customer_id);
+        return [
+          o.identifiant_unique_marquage,
+          c ? `${c.prenom} ${c.nom}` : 'Client B2B',
+          c ? c.telephone : '',
+          o.type_article,
+          serviceLabels[o.type_service] || o.type_service,
+          o.niveau_urgence || 'Normal',
+          o.prix_total,
+          new Date(o.created_at).toLocaleDateString('fr-FR')
+        ];
+      });
+    }
+
+    // Build CSV content with UTF-8 BOM (for correct Excel French accent rendering)
+    const escape = (val) => {
+      const s = String(val ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csvRows = [headers, ...rows].map(r => Array.isArray(r) ? r.map(escape).join(',') : escape(r));
+    const csvContent = '\uFEFF' + csvRows.join('\n');
+
+    // Trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const renderCAReport = (filteredOrders) => {
+    const totalDebt = customers.reduce((sum, c) => sum + Number(c.solde_dette || 0), 0);
+    const filteredNonCancelled = filteredOrders.filter(o => o.statut !== 'annule');
+    const filteredRevenue = filteredNonCancelled.reduce((sum, o) => sum + o.prix_total, 0);
+
+    // Revenue breakdown by type_service
+    const revenueByService = {
+      lavage_simple: 0,
+      nettoyage_a_sec: 0,
+      repassage: 0,
+      abonnement: 0,
+      autre: 0
+    };
+
+    filteredNonCancelled.forEach(o => {
+      const svc = o.type_service || 'autre';
+      if (revenueByService[svc] !== undefined) {
+        revenueByService[svc] += o.prix_total;
+      } else {
+        revenueByService['autre'] += o.prix_total;
+      }
+    });
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="card" style={{ padding: '1rem', background: 'var(--primary-light)', border: '1px solid rgba(59, 130, 246, 0.2)', transition: 'none', transform: 'none', boxShadow: 'none' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Revenu (période filtrée)</span>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0.2rem 0 0', color: 'var(--secondary)' }}>{filteredRevenue.toLocaleString()} F CFA</h3>
+            {(kpiDateFrom || kpiDateTo) && <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>{filteredNonCancelled.length} commandes</span>}
+          </div>
+          <div className="card" style={{ padding: '1rem', background: 'var(--accent-light)', border: '1px solid rgba(217, 70, 239, 0.2)', transition: 'none', transform: 'none', boxShadow: 'none' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Encours Dette Clients</span>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0.2rem 0 0', color: 'var(--accent)' }}>{totalDebt.toLocaleString()} F CFA</h3>
+          </div>
+        </div>
+
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', transition: 'none', transform: 'none', boxShadow: 'none' }}>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>Répartition par type de service</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {Object.entries(revenueByService).map(([svcKey, amount]) => {
+              const label = serviceLabels[svcKey] || svcKey;
+              const percentage = filteredRevenue > 0 ? ((amount / filteredRevenue) * 100).toFixed(1) : 0;
+              return (
+                <div key={svcKey} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 600 }}>
+                    <span>{label}</span>
+                    <span>{amount.toLocaleString()} F ({percentage}%)</span>
+                  </div>
+                  <div style={{ height: '6px', background: 'var(--bg-app)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${percentage}%`, background: 'var(--primary)', borderRadius: '3px' }}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', transition: 'none', transform: 'none', boxShadow: 'none' }}>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>Transactions ({filteredOrders.length} résultats)</h4>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Client</th>
+                  <th>Article / Service</th>
+                  <th>Total</th>
+                  <th>Avance</th>
+                  <th>Règlement</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredOrders.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map(o => {
+                  const customer = customers.find(c => c.id === o.customer_id);
+                  const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
+                  return (
+                    <tr key={o.id}>
+                      <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(o.created_at).toLocaleDateString('fr-FR')}</td>
+                      <td>{clientName}</td>
+                      <td>{o.type_article} ({serviceLabels[o.type_service] || o.type_service})</td>
+                      <td style={{ fontWeight: 700 }}>{o.prix_total.toLocaleString()} F</td>
+                      <td>{o.avance_payee.toLocaleString()} F</td>
+                      <td>
+                        <span className="badge badge-restitue" style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                          {o.mode_reglement}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // --- Completed orders list content ---
+  const renderCompletedOrdersList = (filteredOrders) => {
+    const completedOrders = filteredOrders.filter(o => o.statut === 'restitue');
+    return (
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Client</th>
+              <th>Article</th>
+              <th>Service</th>
+              <th>Urgence</th>
+              <th>Montant</th>
+              <th>Date de Dépôt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {completedOrders.length === 0 ? (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune commande livrée pour la période sélectionnée.</td>
+              </tr>
+            ) : (
+              completedOrders.map(o => {
+                const customer = customers.find(c => c.id === o.customer_id);
+                const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
+                return (
+                  <tr key={o.id}>
+                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{o.identifiant_unique_marquage}</td>
+                    <td>{clientName}</td>
+                    <td>{o.type_article}</td>
+                    <td>{serviceLabels[o.type_service] || o.type_service}</td>
+                    <td><span className="badge" style={{ background: o.niveau_urgence === 'Express' ? 'var(--status-late-light)' : 'var(--primary-light)', color: o.niveau_urgence === 'Express' ? 'var(--status-late)' : 'var(--primary)' }}>{o.niveau_urgence || 'Normal'}</span></td>
+                    <td style={{ fontWeight: 700 }}>{o.prix_total.toLocaleString()} F</td>
+                    <td>{new Date(o.created_at).toLocaleDateString('fr-FR')}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  // --- Active orders list content ---
+  const renderActiveOrdersList = (filteredOrders) => {
+    const activeOrders = filteredOrders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
+    return (
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Client</th>
+              <th>Article</th>
+              <th>Urgence</th>
+              <th>Statut</th>
+              <th>Montant</th>
+              <th>Date de Dépôt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeOrders.length === 0 ? (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune commande active pour la période sélectionnée.</td>
+              </tr>
+            ) : (
+              activeOrders.map(o => {
+                const customer = customers.find(c => c.id === o.customer_id);
+                const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
+                const badgeClass = `badge badge-${o.statut}`;
+                return (
+                  <tr key={o.id}>
+                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{o.identifiant_unique_marquage}</td>
+                    <td>{clientName}</td>
+                    <td>{o.type_article}</td>
+                    <td>
+                      <span className="badge" style={{
+                        background: o.niveau_urgence === 'Express' ? 'var(--status-late-light)' : 'var(--primary-light)',
+                        color: o.niveau_urgence === 'Express' ? 'var(--status-late)' : 'var(--primary)'
+                      }}>
+                        {o.niveau_urgence}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={badgeClass}>
+                        {statusDisplayLabels[o.statut] || o.statut}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 700 }}>{o.prix_total.toLocaleString()} F</td>
+                    <td>{new Date(o.created_at).toLocaleDateString('fr-FR')}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  // --- Pending orders list content ---
+  const renderPendingOrdersList = (filteredOrders) => {
+    const pendingOrders = filteredOrders.filter(o => o.statut === 'en_attente');
+    return (
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Client</th>
+              <th>Article</th>
+              <th>Urgence</th>
+              <th>Montant</th>
+              <th>Date de Dépôt</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pendingOrders.length === 0 ? (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune commande en attente pour la période sélectionnée.</td>
+              </tr>
+            ) : (
+              pendingOrders.map(o => {
+                const customer = customers.find(c => c.id === o.customer_id);
+                const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
+                return (
+                  <tr key={o.id}>
+                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{o.identifiant_unique_marquage}</td>
+                    <td>{clientName}</td>
+                    <td>{o.type_article}</td>
+                    <td><span className="badge" style={{ background: o.niveau_urgence === 'Express' ? 'var(--status-late-light)' : 'var(--primary-light)', color: o.niveau_urgence === 'Express' ? 'var(--status-late)' : 'var(--primary)' }}>{o.niveau_urgence || 'Normal'}</span></td>
+                    <td style={{ fontWeight: 700 }}>{o.prix_total.toLocaleString()} F</td>
+                    <td>{new Date(o.created_at).toLocaleDateString('fr-FR')}</td>
+                    <td>
+                      <button
+                        className="btn btn-primary"
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                        onClick={() => {
+                          db.updateOrderStatus(o.id, 'en_cours_lavage');
+                          refreshAdminData();
+                        }}
+                      >
+                        Démarrer Lavage
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   // --- CALCUL DU RESTITUTION RATE DYNAMIQUE ---
   const restitutionRate = totalOrdersCount > 0 ? Math.round((completedOrdersCount / totalOrdersCount) * 100) : 0;
   const strokeDashoffset = 188.5 - (restitutionRate / 100) * 188.5;
 
-  // --- CALCUL DU CHART METIER (VOLUME DE LINGE TRAITE) ---
-  const daysOfWeek = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-  const baseLavage = [4, 14, 22, 12, 5, 8, 3];
-  const baseRepassage = [2, 8, 12, 6, 3, 5, 1];
+  // --- STATISTIQUES SUPPLÉMENTAIRES (KPI LAVERIE) ---
+  const nonCancelledOrdersCount = nonCancelledOrders.length;
+  const averageOrderValue = nonCancelledOrdersCount > 0 ? Math.round(earnedRevenue / nonCancelledOrdersCount) : 0;
+  const activeSubscriptionsCount = customers.filter(c => c.active_subscription).length;
 
-  orders.forEach((o, index) => {
-    const day = new Date(o.created_at || Date.now()).getDay();
-    if (o.type_service === 'lavage_simple') {
-      baseLavage[day] += 2;
-    } else if (o.type_service === 'repassage') {
-      baseRepassage[day] += 2;
+  const serviceCounts = {};
+  nonCancelledOrders.forEach(o => {
+    const svc = o.type_service || 'autre';
+    serviceCounts[svc] = (serviceCounts[svc] || 0) + 1;
+  });
+  let mostPopularService = 'Aucun';
+  let maxCount = 0;
+  Object.entries(serviceCounts).forEach(([svc, count]) => {
+    if (count > maxCount) {
+      maxCount = count;
+      mostPopularService = serviceLabels[svc] || svc;
     }
   });
+
+  // --- CALCUL DU CHART METIER (VOLUME DE LINGE TRAITE) ---
+  let daysOfWeek = [];
+  let baseLavage = [];
+  let baseRepassage = [];
+
+  const now = new Date();
+
+  // Helper to count articles in an order
+  const getOrderClothesCount = (order) => {
+    if (Array.isArray(order.detail_articles) && order.detail_articles.length > 0) {
+      return order.detail_articles.reduce((sum, item) => sum + Number(item.quantite || 0), 0);
+    }
+    return 3; // default fallback if empty
+  };
+
+  if (chartPeriod === '7_days') {
+    const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+    baseLavage = [3, 8, 12, 6, 2, 4, 1];
+    baseRepassage = [1, 4, 6, 3, 1, 2, 0];
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const label = i === 0 ? "Auj." : `${dayNames[d.getDay()]} ${d.getDate()}`;
+      daysOfWeek.push(label);
+    }
+
+    orders.forEach(o => {
+      const orderDate = new Date(o.created_at || Date.now());
+      const diffTime = now - orderDate;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays >= 0 && diffDays < 7) {
+        const idx = 6 - diffDays;
+        const count = getOrderClothesCount(o);
+        if (o.type_service === 'lavage_simple' || o.type_service === 'nettoyage_a_sec') {
+          baseLavage[idx] += count;
+        } else if (o.type_service === 'repassage') {
+          baseRepassage[idx] += count;
+        }
+      }
+    });
+
+  } else if (chartPeriod === '30_days') {
+    daysOfWeek = ['J-30', 'J-25', 'J-20', 'J-15', 'J-10', 'J-5', 'Auj.'];
+    baseLavage = [18, 35, 42, 28, 16, 22, 10];
+    baseRepassage = [8, 18, 20, 12, 7, 10, 4];
+
+    orders.forEach(o => {
+      const orderDate = new Date(o.created_at || Date.now());
+      const diffTime = now - orderDate;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays >= 0 && diffDays < 30) {
+        const idx = 6 - Math.floor(diffDays / 5);
+        const count = getOrderClothesCount(o);
+        if (o.type_service === 'lavage_simple' || o.type_service === 'nettoyage_a_sec') {
+          baseLavage[idx] += count;
+        } else if (o.type_service === 'repassage') {
+          baseRepassage[idx] += count;
+        }
+      }
+    });
+
+  } else {
+    const monthNames = ['Janv', 'Févr', 'Mars', 'Avril', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
+    baseLavage = [85, 120, 145, 95, 110, 130, 75];
+    baseRepassage = [40, 55, 70, 45, 50, 60, 35];
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(now.getMonth() - i);
+      daysOfWeek.push(monthNames[d.getMonth()]);
+    }
+
+    orders.forEach(o => {
+      const orderDate = new Date(o.created_at || Date.now());
+      const diffMonths = (now.getFullYear() - orderDate.getFullYear()) * 12 + (now.getMonth() - orderDate.getMonth());
+      
+      if (diffMonths >= 0 && diffMonths < 7) {
+        const idx = 6 - diffMonths;
+        const count = getOrderClothesCount(o);
+        if (o.type_service === 'lavage_simple' || o.type_service === 'nettoyage_a_sec') {
+          baseLavage[idx] += count;
+        } else if (o.type_service === 'repassage') {
+          baseRepassage[idx] += count;
+        }
+      }
+    });
+  }
 
   // --- FILTRES CATALOGUE ---
   const filteredCatalog = catalog.filter(item => {
@@ -498,7 +1014,7 @@ export default function AdminView({ activeTab, searchQuery }) {
   };
 
   const renderArrowBtn = () => (
-    <button className="kpi-arrow-btn" type="button" onClick={() => alert('Détails de la statistique')}>
+    <button className="kpi-arrow-btn" type="button">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
         <line x1="7" y1="17" x2="17" y2="7" />
         <polyline points="7 7 17 7 17 17" />
@@ -588,7 +1104,7 @@ export default function AdminView({ activeTab, searchQuery }) {
   const handleCreateCustomer = (e) => {
     e.preventDefault();
     if (!newCustNom || !newCustPrenom || !newCustTel || !newCustAdresse) return;
-    
+
     try {
       const newCustomer = db.addCustomer({
         nom: newCustNom,
@@ -598,7 +1114,7 @@ export default function AdminView({ activeTab, searchQuery }) {
         preferences_pliage: newCustPref,
         adresse: newCustAdresse
       });
-      
+
       refreshAdminData();
       setSelectedCustomerId(newCustomer.id);
       setShowNewCustomerModal(false);
@@ -675,7 +1191,7 @@ export default function AdminView({ activeTab, searchQuery }) {
       if (customer) {
         let text = '';
         const formattedDueDate = formatDateTime(newOrder.due_date);
-        
+
         if (newOrder.is_subscription_order && newOrder.subscription_details) {
           const det = newOrder.subscription_details;
           if (det.immediate_subscription) {
@@ -695,11 +1211,11 @@ export default function AdminView({ activeTab, searchQuery }) {
     }
   };
 
-  const handleStartDelivery = (order, finalStatus = 'restitue') => {
+  const handleStartDelivery = async (order, finalStatus = 'restitue') => {
     setDelivFinalStatus(finalStatus);
     const remainingToPay = order.prix_total - order.avance_payee;
     if (remainingToPay <= 0) {
-      if (confirm(`Confirmer la finalisation de la commande ${order.identifiant_unique_marquage} ?`)) {
+      if (await confirm(`Confirmer la finalisation de la commande ${order.identifiant_unique_marquage} ?`)) {
         db.updateOrderStatus(order.id, finalStatus);
         refreshAdminData();
 
@@ -722,7 +1238,7 @@ export default function AdminView({ activeTab, searchQuery }) {
   const handleConfirmDelivery = (e) => {
     e.preventDefault();
     if (!delivOrder) return;
-    
+
     db.deliverOrderWithPayment(delivOrder.id, Number(delivAmountPaid || 0), delivPaymentMethod, delivFinalStatus);
     refreshAdminData();
     setShowDeliveryPaymentModal(false);
@@ -744,10 +1260,10 @@ export default function AdminView({ activeTab, searchQuery }) {
 
     db.updateCustomerDebt(selectedCrmCustomer.id, -Number(debtPaymentAmount));
     db.logAction('RÈGLEMENT_DETTE', `Client ${selectedCrmCustomer.prenom} ${selectedCrmCustomer.nom} a réglé ${debtPaymentAmount} FCFA de sa dette`);
-    
+
     refreshAdminData();
     setShowDebtPaymentModal(false);
-    
+
     const updatedCustomers = db.getCustomers();
     const updatedCustomer = updatedCustomers.find(c => c.id === selectedCrmCustomer.id);
     setSelectedCrmCustomer(updatedCustomer);
@@ -792,8 +1308,8 @@ export default function AdminView({ activeTab, searchQuery }) {
     }
   };
 
-  const handleCancelOrder = (orderId) => {
-    if (confirm("Êtes-vous sûr de vouloir annuler cette commande ?")) {
+  const handleCancelOrder = async (orderId) => {
+    if (await confirm("Êtes-vous sûr de vouloir annuler cette commande ?")) {
       const order = orders.find(o => o.id === orderId);
       db.cancelOrder(orderId);
       refreshAdminData();
@@ -811,8 +1327,8 @@ export default function AdminView({ activeTab, searchQuery }) {
 
 
 
-  const catalogClothes = catalog.length > 0 
-    ? [...new Set(catalog.filter(c => c.categorie !== 'abonnement').map(c => c.article))] 
+  const catalogClothes = catalog.length > 0
+    ? [...new Set(catalog.filter(c => c.categorie !== 'abonnement').map(c => c.article))]
     : ['Chemise', 'Pantalon', 'Robe', 'Combinaison', 'Jupe', 'Pull', 'Culotte', 'T-shirt', 'Polo', 'Blouson', 'Veste', 'Costume', 'Jeans'];
 
   const activeCustomer = customers.find(c => c.id === selectedCustomerId);
@@ -829,7 +1345,7 @@ export default function AdminView({ activeTab, searchQuery }) {
           <div className="kpi-container">
 
             {/* Chiffre d'Affaires - Forest Green Theme */}
-            <div className="card kpi-card green-theme">
+            <div className="card kpi-card green-theme" style={{ cursor: 'pointer' }} onClick={() => setActiveDetailsCard('ca')}>
               <div className="kpi-card-header">
                 <span>Chiffre d'Affaires (CA)</span>
                 {renderArrowBtn()}
@@ -844,7 +1360,7 @@ export default function AdminView({ activeTab, searchQuery }) {
             </div>
 
             {/* Commandes Livrées - White Theme */}
-            <div className="card kpi-card white-theme">
+            <div className="card kpi-card white-theme" style={{ cursor: 'pointer' }} onClick={() => setActiveDetailsCard('completed')}>
               <div className="kpi-card-header">
                 <span>Commandes Livrées</span>
                 {renderArrowBtn()}
@@ -859,7 +1375,7 @@ export default function AdminView({ activeTab, searchQuery }) {
             </div>
 
             {/* Commandes Actives - White Theme */}
-            <div className="card kpi-card white-theme">
+            <div className="card kpi-card white-theme" style={{ cursor: 'pointer' }} onClick={() => setActiveDetailsCard('active')}>
               <div className="kpi-card-header">
                 <span>Commandes Actives</span>
                 {renderArrowBtn()}
@@ -874,7 +1390,7 @@ export default function AdminView({ activeTab, searchQuery }) {
             </div>
 
             {/* Commandes en Attente - White Theme */}
-            <div className="card kpi-card white-theme">
+            <div className="card kpi-card white-theme" style={{ cursor: 'pointer' }} onClick={() => setActiveDetailsCard('pending')}>
               <div className="kpi-card-header">
                 <span>Commandes en Attente</span>
                 {renderArrowBtn()}
@@ -895,13 +1411,34 @@ export default function AdminView({ activeTab, searchQuery }) {
             {/* Project Analytics Weekly Bar Chart (Volume de linge) */}
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Volume de Linge Traité</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Volume de Linge Traité</h3>
+                  <CustomSelect 
+                    value={chartPeriod} 
+                    onChange={(e) => setChartPeriod(e.target.value)}
+                    style={{
+                      padding: '0.2rem 0.5rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-app)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="7_days">7 derniers jours</option>
+                    <option value="30_days">30 derniers jours</option>
+                    <option value="all">Tout l'historique</option>
+                  </CustomSelect>
+                </div>
                 <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.72rem', fontWeight: 600 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                     <span style={{ width: '8px', height: '8px', background: 'var(--primary)', borderRadius: '50%' }}></span> Lavage
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ width: '8px', height: '8px', background: '#20b885', borderRadius: '50%' }}></span> Repassage
+                    <span style={{ width: '8px', height: '8px', background: 'var(--secondary)', borderRadius: '50%' }}></span> Repassage
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                     <span style={{ width: '8px', height: '8px', background: '#e2e8e2', border: '1px solid var(--border-color)', borderRadius: '50%' }}></span> Attente
@@ -936,7 +1473,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                                     top: '-26px',
                                     left: '50%',
                                     transform: 'translateX(-50%)',
-                                    background: '#20b885',
+                                    background: 'var(--secondary)',
                                     color: '#fff',
                                     fontSize: '0.65rem',
                                     fontWeight: '700',
@@ -970,7 +1507,7 @@ export default function AdminView({ activeTab, searchQuery }) {
               </div>
               <button
                 className="btn btn-primary"
-                style={{ background: '#0e6245', display: 'flex', gap: '0.5rem' }}
+                style={{ display: 'flex', gap: '0.5rem' }}
                 onClick={() => alert('Cycle de maintenance démarré sur la Machine N°2.')}
               >
                 <Video size={16} />
@@ -1006,7 +1543,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                   return (
                     <div className="team-item" key={s.id}>
                       <div className="team-item-left">
-                        <div className="user-avatar" style={{ background: isSuper ? '#0e6245' : isMgr ? '#20b885' : '#64748b', width: '32px', height: '32px', fontSize: '0.75rem' }}>
+                        <div className="user-avatar" style={{ background: isSuper ? 'var(--primary)' : isMgr ? 'var(--secondary)' : '#64748b', width: '32px', height: '32px', fontSize: '0.75rem' }}>
                           {s.prenom.charAt(0)}{s.nom.charAt(0)}
                         </div>
                         <div className="team-item-info">
@@ -1034,67 +1571,95 @@ export default function AdminView({ activeTab, searchQuery }) {
             {/* Grid 2-column for SVG semi-circle Gauge & Time Tracker */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
 
-              {/* Taux de Livraison (Semi-circle Gauge) */}
-              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', justifyContent: 'space-between' }}>
-                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Taux de Livraison</h3>
+              {/* Taux de Livraison (Horizontal Progress Bar Layout) */}
+              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', justifyContent: 'space-between', padding: '1.25rem' }}>
+                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  Taux de Livraison
+                </h3>
 
-                <div className="gauge-container">
-                  <svg className="gauge-svg" viewBox="0 0 160 100">
-                    <path d="M20 90 A 60 60 0 0 1 140 90" fill="none" stroke="var(--border-color)" strokeWidth="12" strokeLinecap="round" />
-
-                    <path
-                      d="M20 90 A 60 60 0 0 1 140 90"
-                      fill="none"
-                      stroke="var(--primary)"
-                      strokeWidth="12"
-                      strokeLinecap="round"
-                      strokeDasharray="188.5"
-                      strokeDashoffset={strokeDashoffset}
-                    />
-                  </svg>
-
-                  <div className="gauge-center-text">
-                    <h4>{restitutionRate}%</h4>
-                    <span>Livrées</span>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <span style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>
+                    {restitutionRate}%
+                  </span>
+                  <span className="badge" style={{
+                    background: restitutionRate >= 90 ? 'var(--success-light)' : 'var(--warning-light)',
+                    color: restitutionRate >= 90 ? 'var(--success)' : 'var(--warning)',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    padding: '0.25rem 0.6rem',
+                    borderRadius: '20px'
+                  }}>
+                    {restitutionRate >= 90 ? 'Optimal' : restitutionRate >= 50 ? 'Satisfaisant' : 'Attention'}
+                  </span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', fontWeight: 600, borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                    <span style={{ width: '6px', height: '6px', background: 'var(--primary)', borderRadius: '50%' }}></span> Livrées
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Proportion des commandes terminées et restituées avec succès au client par rapport au volume total.
+                </p>
+
+                <div style={{ width: '100%', height: '12px', background: 'rgba(226, 232, 240, 0.8)', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
+                  <div style={{
+                    width: `${restitutionRate}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #3b82f6 0%, #d946ef 100%)',
+                    borderRadius: '6px',
+                    boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
+                    transition: 'width 0.8s ease-in-out'
+                  }} />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 600, borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', color: 'var(--text-secondary)' }}>
+                  <div>
+                    Livrées: <strong style={{ color: 'var(--text-primary)' }}>{completedOrdersCount}</strong>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                    <span style={{ width: '6px', height: '6px', background: '#20b885', borderRadius: '50%' }}></span> Prêtes
+                  <div>
+                    En attente/Cours: <strong style={{ color: 'var(--text-primary)' }}>{totalOrdersCount - completedOrdersCount}</strong>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                    <span style={{ width: '6px', height: '6px', background: '#e2e8e2', border: '1px solid var(--border-color)', borderRadius: '50%' }}></span> Tri
+                  <div>
+                    Total: <strong style={{ color: 'var(--text-primary)' }}>{totalOrdersCount}</strong>
                   </div>
                 </div>
               </div>
 
-              {/* Time Tracker Stopwatch widget (Chronomètre d'Atelier) */}
-              <div className="time-tracker-card">
-                <span className="time-tracker-title">Chronomètre d'Atelier</span>
-                <div className="time-tracker-display">{formatStopwatch(timerSeconds)}</div>
+              {/* Performance Ventes & Services KPI Card */}
+              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'space-between', padding: '1.25rem' }}>
+                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  Performance Services
+                </h3>
 
-                <div className="time-tracker-controls">
-                  <button
-                    className={`time-tracker-btn ${isTimerRunning ? 'active' : ''}`}
-                    onClick={() => setIsTimerRunning(!isTimerRunning)}
-                    title={isTimerRunning ? 'Pause' : 'Play'}
-                  >
-                    {isTimerRunning ? <Pause size={14} /> : <Play size={14} />}
-                  </button>
-                  <button
-                    className="time-tracker-btn"
-                    onClick={() => {
-                      setIsTimerRunning(false);
-                      setTimerSeconds(0);
-                    }}
-                    title="Stop/Reset"
-                  >
-                    <Square size={12} fill="currentColor" />
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', margin: '0.25rem 0' }}>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Panier Moyen
+                    </span>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1.2, marginTop: '0.1rem' }}>
+                      {averageOrderValue.toLocaleString()} F CFA
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.25rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
+                        Service Populaire
+                      </span>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.1rem' }}>
+                        {mostPopularService}
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
+                        Abonnés Actifs
+                      </span>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.1rem' }}>
+                        {activeSubscriptionsCount} clients
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: 600, borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', color: 'var(--text-secondary)' }}>
+                  <span>Volume total: {nonCancelledOrdersCount} commandes</span>
+                  <span style={{ color: 'var(--success)', fontWeight: 700 }}>+15% ce mois-ci</span>
                 </div>
               </div>
 
@@ -1119,13 +1684,13 @@ export default function AdminView({ activeTab, searchQuery }) {
                 const isExpress = order.niveau_urgence === 'Express';
 
                 // Status Bullet Color mapping
-                let bulletBg = '#f59e0b'; // pending/en_attente
-                if (order.statut === 'en_cours_lavage') bulletBg = '#00d2c4';
-                if (order.statut === 'pret') bulletBg = '#10b981';
-                if (order.statut === 'restitue') bulletBg = '#64748b';
-                if (order.statut === 'a_livrer') bulletBg = '#3b82f6';
-                if (order.statut === 'a_recuperer') bulletBg = '#10b981';
-                if (order.statut === 'annule') bulletBg = '#ef4444';
+                let bulletBg = 'var(--status-pending)'; // pending/en_attente
+                if (order.statut === 'en_cours_lavage') bulletBg = 'var(--status-washing)';
+                if (order.statut === 'pret') bulletBg = 'var(--status-ready)';
+                if (order.statut === 'restitue') bulletBg = 'var(--status-delivered)';
+                if (order.statut === 'a_livrer') bulletBg = 'var(--primary)';
+                if (order.statut === 'a_recuperer') bulletBg = 'var(--status-ready)';
+                if (order.statut === 'annule') bulletBg = 'var(--status-late)';
 
                 return (
                   <div className="project-item" key={order.id}>
@@ -1159,7 +1724,7 @@ export default function AdminView({ activeTab, searchQuery }) {
          ======================================================== */}
       {activeTab === 'orders_management' && (
         <div className="grid-2" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: '1.5rem', alignItems: 'start' }}>
-          
+
           {/* COLONNE GAUCHE : SUIVI D'ATELIER (WORKSHOP TRACKING) */}
           <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
@@ -1167,25 +1732,25 @@ export default function AdminView({ activeTab, searchQuery }) {
                 Suivi d'Atelier & Caisse Terrain
               </h3>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button 
+                <button
                   type="button"
-                  className={`btn ${atelierFilter === 'all' ? 'btn-primary' : 'btn-outline'}`} 
+                  className={`btn ${atelierFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
                   onClick={() => setAtelierFilter('all')}
                   style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderRadius: '8px' }}
                 >
                   Tous
                 </button>
-                <button 
+                <button
                   type="button"
-                  className={`btn ${atelierFilter === 'urgent' ? 'btn-primary' : 'btn-outline'}`} 
+                  className={`btn ${atelierFilter === 'urgent' ? 'btn-primary' : 'btn-outline'}`}
                   onClick={() => setAtelierFilter('urgent')}
                   style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderRadius: '8px' }}
                 >
                   Urgent
                 </button>
-                <button 
+                <button
                   type="button"
-                  className={`btn ${atelierFilter === 'retard' ? 'btn-primary' : 'btn-outline'}`} 
+                  className={`btn ${atelierFilter === 'retard' ? 'btn-primary' : 'btn-outline'}`}
                   onClick={() => setAtelierFilter('retard')}
                   style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderRadius: '8px' }}
                 >
@@ -1229,12 +1794,12 @@ export default function AdminView({ activeTab, searchQuery }) {
                   const remainingToPay = order.prix_total - order.avance_payee;
 
                   return (
-                    <div 
-                      key={order.id} 
-                      className={`card ${isExpress ? 'pulse-express' : ''}`} 
-                      style={{ 
-                        padding: '1rem', 
-                        borderRadius: '16px', 
+                    <div
+                      key={order.id}
+                      className={`card ${isExpress ? 'pulse-express' : ''}`}
+                      style={{
+                        padding: '1rem',
+                        borderRadius: '16px',
                         border: '1px solid var(--border-color)',
                         display: 'flex',
                         flexDirection: 'column',
@@ -1262,9 +1827,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                           </p>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'end', gap: '0.2rem' }}>
-                          <span 
-                            className={`badge badge-${order.statut}`} 
-                            style={{ 
+                          <span
+                            className={`badge badge-${order.statut}`}
+                            style={{
                               fontSize: '0.65rem',
                               cursor: (order.statut === 'a_livrer' || order.statut === 'a_recuperer') ? 'pointer' : 'default'
                             }}
@@ -1331,9 +1896,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                       {/* Action buttons */}
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
                         {order.statut === 'en_attente' && (
-                          <button 
+                          <button
                             type="button"
-                            className="btn btn-primary" 
+                            className="btn btn-primary"
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                             onClick={() => handleStatusChange(order.id, 'en_cours_lavage')}
                           >
@@ -1341,9 +1906,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                           </button>
                         )}
                         {order.statut === 'en_cours_lavage' && (
-                          <button 
+                          <button
                             type="button"
-                            className="btn btn-secondary" 
+                            className="btn btn-secondary"
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                             onClick={() => handleStatusChange(order.id, 'pret')}
                           >
@@ -1352,17 +1917,17 @@ export default function AdminView({ activeTab, searchQuery }) {
                         )}
                         {order.statut === 'pret' && (
                           <>
-                            <button 
+                            <button
                               type="button"
-                              className="btn btn-primary" 
+                              className="btn btn-primary"
                               style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                               onClick={() => handleStatusChange(order.id, 'a_livrer')}
                             >
                               À livrer
                             </button>
-                            <button 
+                            <button
                               type="button"
-                              className="btn btn-primary" 
+                              className="btn btn-primary"
                               style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                               onClick={() => handleStatusChange(order.id, 'a_recuperer')}
                             >
@@ -1371,9 +1936,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                           </>
                         )}
                         {order.statut === 'a_livrer' && (
-                          <button 
+                          <button
                             type="button"
-                            className="btn btn-primary" 
+                            className="btn btn-primary"
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                             onClick={() => handleStartDelivery(order, 'restitue')}
                           >
@@ -1381,19 +1946,19 @@ export default function AdminView({ activeTab, searchQuery }) {
                           </button>
                         )}
                         {order.statut === 'a_recuperer' && (
-                          <button 
+                          <button
                             type="button"
-                            className="btn btn-primary" 
+                            className="btn btn-primary"
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                             onClick={() => handleStartDelivery(order, 'restitue')}
                           >
                             En attente de récupération
                           </button>
                         )}
-                        
-                        <button 
+
+                        <button
                           type="button"
-                          className="btn btn-outline" 
+                          className="btn btn-outline"
                           style={{ padding: '0.45rem', color: 'var(--danger)', borderColor: 'var(--border-color)', borderRadius: '8px' }}
                           title="Annuler la commande"
                           onClick={() => handleCancelOrder(order.id)}
@@ -1414,9 +1979,9 @@ export default function AdminView({ activeTab, searchQuery }) {
               <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
                 Historique des Commandes
               </h3>
-              <button 
+              <button
                 type="button"
-                className="btn btn-primary" 
+                className="btn btn-primary"
                 onClick={() => setShowOrderRegistrationModal(true)}
                 style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px' }}
               >
@@ -1437,7 +2002,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                   onChange={(e) => setHistorySearchQuery(e.target.value)}
                 />
               </div>
-              <select
+              <CustomSelect
                 className="input-control"
                 style={{ borderRadius: '10px', fontSize: '0.8rem', width: '120px', padding: '0.25rem 0.5rem' }}
                 value={historyFilterStatus}
@@ -1451,7 +2016,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                 <option value="a_recuperer">À récupérer</option>
                 <option value="restitue">Livré</option>
                 <option value="annule">Annulé</option>
-              </select>
+              </CustomSelect>
             </div>
 
             <div style={{ overflowY: 'auto', maxHeight: '550px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1461,10 +2026,10 @@ export default function AdminView({ activeTab, searchQuery }) {
                   const customer = customers.find(c => c.id === o.customer_id);
                   const clientName = customer ? `${customer.prenom} ${customer.nom}`.toLowerCase() : '';
                   const code = o.identifiant_unique_marquage.toLowerCase();
-                  
+
                   const matchesSearch = clientName.includes(query) || code.includes(query);
                   const matchesStatus = historyFilterStatus === 'all' || o.statut === historyFilterStatus;
-                  
+
                   return matchesSearch && matchesStatus;
                 }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
@@ -1482,12 +2047,12 @@ export default function AdminView({ activeTab, searchQuery }) {
                   const serviceName = serviceLabels[order.type_service] || order.type_service;
 
                   return (
-                    <div 
-                      key={order.id} 
-                      style={{ 
-                        padding: '0.75rem', 
-                        borderRadius: '12px', 
-                        border: '1px solid var(--border-color)', 
+                    <div
+                      key={order.id}
+                      style={{
+                        padding: '0.75rem',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
                         background: 'var(--bg-app)',
                         display: 'flex',
                         flexDirection: 'column',
@@ -1527,16 +2092,16 @@ export default function AdminView({ activeTab, searchQuery }) {
          ======================================================== */}
       {activeTab === 'crm_management' && (
         <div className="grid-2" style={{ gridTemplateColumns: '0.8fr 1.2fr', gap: '1.5rem', alignItems: 'start' }}>
-          
+
           {/* COLONNE GAUCHE : LISTE DES CLIENTS + RECHERCHE */}
           <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', alignItems: 'center' }}>
               <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
                 Fiches Clients
               </h3>
-              <button 
+              <button
                 type="button"
-                className="btn btn-primary" 
+                className="btn btn-primary"
                 onClick={() => setShowNewCustomerModal(true)}
                 style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
               >
@@ -1559,7 +2124,7 @@ export default function AdminView({ activeTab, searchQuery }) {
             <div style={{ overflowY: 'auto', maxHeight: '550px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {(() => {
                 const query = crmSearch.toLowerCase();
-                const filteredCrm = customers.filter(c => 
+                const filteredCrm = customers.filter(c =>
                   c.nom.toLowerCase().includes(query) ||
                   c.prenom.toLowerCase().includes(query) ||
                   c.telephone.includes(query)
@@ -1576,12 +2141,12 @@ export default function AdminView({ activeTab, searchQuery }) {
                 return filteredCrm.map(c => {
                   const isSelected = selectedCrmCustomer?.id === c.id;
                   return (
-                    <div 
-                      key={c.id} 
-                      style={{ 
-                        padding: '0.85rem', 
-                        borderRadius: '12px', 
-                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)', 
+                    <div
+                      key={c.id}
+                      style={{
+                        padding: '0.85rem',
+                        borderRadius: '12px',
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
                         background: isSelected ? 'var(--primary-light)' : 'var(--bg-app)',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease'
@@ -1613,7 +2178,7 @@ export default function AdminView({ activeTab, searchQuery }) {
           <div className="card" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
             {selectedCrmCustomer ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%' }}>
-                
+
                 {/* Header profil */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
                   <div className="user-avatar" style={{ background: 'var(--primary)', color: '#fff', width: '48px', height: '48px', fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
@@ -1642,9 +2207,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                       {selectedCrmCustomer.solde_dette.toLocaleString()} F
                     </strong>
                     {selectedCrmCustomer.solde_dette > 0 && (
-                      <button 
+                      <button
                         type="button"
-                        className="btn btn-primary" 
+                        className="btn btn-primary"
                         onClick={() => {
                           setDebtPaymentAmount(selectedCrmCustomer.solde_dette.toString());
                           setShowDebtPaymentModal(true);
@@ -1682,7 +2247,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                           Solde : {selectedCrmCustomer.active_subscription.remaining_clothes} / {selectedCrmCustomer.active_subscription.total_clothes} vêtements
                         </span>
                       </div>
-                      
+
                       {/* Barre de progression premium */}
                       {(() => {
                         const remaining = selectedCrmCustomer.active_subscription.remaining_clothes;
@@ -1706,7 +2271,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                         <span>Expire le : {new Date(selectedCrmCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}</span>
                       </div>
 
-                      <button 
+                      <button
                         type="button"
                         className="btn btn-outline"
                         onClick={() => handleUnsubscribeCrm(selectedCrmCustomer.id)}
@@ -1717,7 +2282,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <select
+                      <CustomSelect
                         className="input-control"
                         style={{ flexGrow: 1, padding: '0.4rem', fontSize: '0.75rem', borderRadius: '8px' }}
                         value={selectedCrmSubId}
@@ -1727,7 +2292,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                         {catalog.filter(item => item.service === 'abonnement').map(sub => (
                           <option key={sub.id} value={sub.id}>{sub.article} ({sub.prix.toLocaleString()} F/mois)</option>
                         ))}
-                      </select>
+                      </CustomSelect>
                       <button
                         type="button"
                         className="btn btn-primary"
@@ -1743,7 +2308,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                 {/* Historique individuel */}
                 <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
                   <h4 style={{ fontSize: '0.9rem', fontWeight: 800, margin: 0 }}>Historique des Commandes</h4>
-                  
+
                   <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                     <table>
                       <thead>
@@ -1783,9 +2348,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                                 </span>
                               </td>
                               <td>
-                                <button 
+                                <button
                                   type="button"
-                                  className="btn btn-outline" 
+                                  className="btn btn-outline"
                                   style={{ padding: '0.25rem 0.5rem', fontSize: '0.68rem', borderRadius: '6px' }}
                                   onClick={() => setCreatedOrder(o)}
                                 >
@@ -1977,7 +2542,7 @@ export default function AdminView({ activeTab, searchQuery }) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Filter size={15} color="var(--text-muted)" />
-              <select
+              <CustomSelect
                 className="input-control"
                 style={{ borderRadius: '12px', fontSize: '0.8rem', padding: '0.5rem 1rem' }}
                 value={logFilterAction}
@@ -1990,7 +2555,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                 <option value="ANNULATION_COMMANDE">Annulations</option>
                 <option value="RÈGLEMENT_DETTE">Règlements Dette</option>
                 <option value="MODIFICATION_TARIF">Changements Tarifs</option>
-              </select>
+              </CustomSelect>
             </div>
           </div>
 
@@ -2055,19 +2620,19 @@ export default function AdminView({ activeTab, searchQuery }) {
          ======================================================== */}
       {activeTab === 'staff_management' && (
         <div className="grid-2" style={{ gridTemplateColumns: '0.8fr 1.2fr', gap: '1.5rem', alignItems: 'start' }}>
-          
+
           {/* COLONNE GAUCHE : LISTE DES EMPLOYÉS & DEMANDES DE PIN */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            
+
             {/* Membres de l'Équipe */}
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', alignItems: 'center' }}>
                 <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
                   Membres de l'Équipe
                 </h3>
-                <button 
+                <button
                   type="button"
-                  className="btn btn-primary" 
+                  className="btn btn-primary"
                   onClick={() => setShowNewStaffModal(true)}
                   style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
                 >
@@ -2084,12 +2649,12 @@ export default function AdminView({ activeTab, searchQuery }) {
                   const isSuspended = s.statut === 'suspendu';
 
                   return (
-                    <div 
-                      key={s.id} 
-                      style={{ 
-                        padding: '0.85rem', 
-                        borderRadius: '12px', 
-                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)', 
+                    <div
+                      key={s.id}
+                      style={{
+                        padding: '0.85rem',
+                        borderRadius: '12px',
+                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
                         background: isSelected ? 'var(--primary-light)' : 'var(--bg-app)',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
@@ -2101,13 +2666,13 @@ export default function AdminView({ activeTab, searchQuery }) {
                         <strong style={{ fontSize: '0.85rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>
                           {s.prenom} {s.nom}
                         </strong>
-                        <span 
-                          className="badge" 
-                          style={{ 
+                        <span
+                          className="badge"
+                          style={{
                             fontSize: '0.65rem',
                             padding: '0.15rem 0.4rem',
                             borderRadius: '6px',
-                            background: isSuper ? '#0e6245' : isMgr ? '#20b885' : '#64748b',
+                            background: isSuper ? 'var(--primary)' : isMgr ? 'var(--secondary)' : '#64748b',
                             color: '#fff'
                           }}
                         >
@@ -2144,12 +2709,12 @@ export default function AdminView({ activeTab, searchQuery }) {
                   </div>
                 ) : (
                   db.getPinResetRequests().filter(r => r.status === 'pending').map(req => (
-                    <div 
-                      key={req.id} 
-                      style={{ 
-                        padding: '0.75rem', 
-                        borderRadius: '10px', 
-                        border: '1px solid var(--border-color)', 
+                    <div
+                      key={req.id}
+                      style={{
+                        padding: '0.75rem',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-color)',
                         background: 'var(--bg-app)',
                         display: 'flex',
                         flexDirection: 'column',
@@ -2165,7 +2730,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                           {new Date(req.created_at).toLocaleDateString('fr-FR')}
                         </span>
                       </div>
-                      
+
                       <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
                         <button
                           type="button"
@@ -2187,8 +2752,8 @@ export default function AdminView({ activeTab, searchQuery }) {
                           type="button"
                           className="btn btn-outline"
                           style={{ flex: 1, padding: '0.3rem', fontSize: '0.7rem', borderRadius: '6px', color: 'var(--status-late)', borderColor: '#fee2e2' }}
-                          onClick={() => {
-                            if (confirm("Rejeter cette demande de réinitialisation ?")) {
+                          onClick={async () => {
+                            if (await confirm("Rejeter cette demande de réinitialisation ?")) {
                               db.rejectPinResetRequest(req.id);
                               refreshAdminData();
                             }
@@ -2208,10 +2773,10 @@ export default function AdminView({ activeTab, searchQuery }) {
           <div className="card" style={{ minHeight: '450px', display: 'flex', flexDirection: 'column' }}>
             {selectedMember ? (
               <form onSubmit={handleSaveStaff} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                
+
                 {/* Header Profil */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                  <div className="user-avatar" style={{ background: selectedMember.role === 'super_admin' ? '#0e6245' : selectedMember.role === 'manager' ? '#20b885' : '#64748b', color: '#fff', width: '48px', height: '48px', fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
+                  <div className="user-avatar" style={{ background: selectedMember.role === 'super_admin' ? 'var(--primary)' : selectedMember.role === 'manager' ? 'var(--secondary)' : '#64748b', color: '#fff', width: '48px', height: '48px', fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
                     {selectedMember.prenom.charAt(0)}{selectedMember.nom.charAt(0)}
                   </div>
                   <div style={{ flexGrow: 1 }}>
@@ -2222,9 +2787,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                       Rôle principal : <strong style={{ color: 'var(--primary)' }}>{selectedMember.role === 'super_admin' ? 'Super Administrateur' : selectedMember.role === 'manager' ? 'Manager Caisse' : "Agent d'accueil"}</strong>
                     </p>
                   </div>
-                  <button 
-                    type="button" 
-                    className="btn btn-outline" 
+                  <button
+                    type="button"
+                    className="btn btn-outline"
                     style={{ padding: '0.45rem', color: 'var(--status-late)', borderColor: '#fee2e2' }}
                     onClick={() => handleDeleteStaff(selectedMember.id)}
                     title="Supprimer le profil"
@@ -2237,22 +2802,22 @@ export default function AdminView({ activeTab, searchQuery }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
                     <label>Prénom</label>
-                    <input 
-                      type="text" 
-                      className="input-control" 
-                      required 
-                      value={editStaffPrenom} 
-                      onChange={(e) => setEditStaffPrenom(e.target.value)} 
+                    <input
+                      type="text"
+                      className="input-control"
+                      required
+                      value={editStaffPrenom}
+                      onChange={(e) => setEditStaffPrenom(e.target.value)}
                     />
                   </div>
                   <div className="form-group">
                     <label>Nom</label>
-                    <input 
-                      type="text" 
-                      className="input-control" 
-                      required 
-                      value={editStaffNom} 
-                      onChange={(e) => setEditStaffNom(e.target.value)} 
+                    <input
+                      type="text"
+                      className="input-control"
+                      required
+                      value={editStaffNom}
+                      onChange={(e) => setEditStaffNom(e.target.value)}
                     />
                   </div>
                 </div>
@@ -2260,22 +2825,22 @@ export default function AdminView({ activeTab, searchQuery }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.75rem' }}>
                   <div className="form-group">
                     <label>Email professionnel</label>
-                    <input 
-                      type="email" 
-                      className="input-control" 
-                      required 
-                      value={editStaffEmail} 
-                      onChange={(e) => setEditStaffEmail(e.target.value)} 
+                    <input
+                      type="email"
+                      className="input-control"
+                      required
+                      value={editStaffEmail}
+                      onChange={(e) => setEditStaffEmail(e.target.value)}
                     />
                   </div>
                   <div className="form-group">
                     <label>Téléphone</label>
-                    <input 
-                      type="text" 
-                      className="input-control" 
-                      placeholder="Non renseigné" 
-                      value={editStaffTel} 
-                      onChange={(e) => setEditStaffTel(e.target.value)} 
+                    <input
+                      type="text"
+                      className="input-control"
+                      placeholder="Non renseigné"
+                      value={editStaffTel}
+                      onChange={(e) => setEditStaffTel(e.target.value)}
                     />
                   </div>
                 </div>
@@ -2283,7 +2848,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group">
                     <label>Rôle Système</label>
-                    <select 
+                    <CustomSelect
                       className="input-control"
                       value={editStaffRole}
                       onChange={(e) => handleRoleChangeInForm(e.target.value)}
@@ -2291,36 +2856,36 @@ export default function AdminView({ activeTab, searchQuery }) {
                       <option value="super_admin">Super Administrateur (CMS)</option>
                       <option value="manager">Manager Caisse (CMS)</option>
                       <option value="agent_accueil">Agent d'accueil (Mobile App)</option>
-                    </select>
+                    </CustomSelect>
                   </div>
                   <div className="form-group">
                     <label>Statut d'Accès</label>
-                    <select 
+                    <CustomSelect
                       className="input-control"
                       value={editStaffStatut}
                       onChange={(e) => setEditStaffStatut(e.target.value)}
                     >
                       <option value="actif">Compte Actif (Autorisé)</option>
                       <option value="suspendu">Compte Suspendu (Bloqué)</option>
-                    </select>
+                    </CustomSelect>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.75rem', alignItems: 'end' }}>
                   <div className="form-group">
                     <label>Code PIN actuel</label>
-                    <input 
-                      type="text" 
-                      className="input-control" 
+                    <input
+                      type="text"
+                      className="input-control"
                       readOnly
                       disabled
-                      value={selectedMember.code_pin || 'Non défini'} 
+                      value={selectedMember.code_pin || 'Non défini'}
                       style={{ background: '#f1f5f9', cursor: 'not-allowed', fontWeight: 'bold', letterSpacing: '2px', textAlign: 'center' }}
                     />
                   </div>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
                     style={{ padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, width: '100%' }}
                     onClick={() => {
                       const newPin = Math.floor(100000 + Math.random() * 900000).toString();
@@ -2343,67 +2908,67 @@ export default function AdminView({ activeTab, searchQuery }) {
                     Configurez précisément les droits d'accès de cet utilisateur au sein de la plateforme.
                   </p>
 
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '1fr 1fr', 
-                    gap: '0.65rem', 
-                    background: 'var(--bg-app)', 
-                    padding: '0.75rem', 
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '0.65rem',
+                    background: 'var(--bg-app)',
+                    padding: '0.75rem',
                     borderRadius: '12px',
                     border: '1px solid var(--border-color)'
                   }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!editStaffPermissions.can_view_dashboard} 
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_view_dashboard: e.target.checked }))} 
+                      <input
+                        type="checkbox"
+                        checked={!!editStaffPermissions.can_view_dashboard}
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_view_dashboard: e.target.checked }))}
                       />
                       Accès Tableau de Bord
                     </label>
-                    
+
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!editStaffPermissions.can_manage_orders} 
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_orders: e.target.checked }))} 
+                      <input
+                        type="checkbox"
+                        checked={!!editStaffPermissions.can_manage_orders}
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_orders: e.target.checked }))}
                       />
                       Gérer les Commandes
                     </label>
-                    
+
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!editStaffPermissions.can_manage_crm} 
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_crm: e.target.checked }))} 
+                      <input
+                        type="checkbox"
+                        checked={!!editStaffPermissions.can_manage_crm}
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_crm: e.target.checked }))}
                       />
                       Consulter le CRM Clients
                     </label>
-                    
+
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!editStaffPermissions.can_edit_catalog} 
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_edit_catalog: e.target.checked }))} 
+                      <input
+                        type="checkbox"
+                        checked={!!editStaffPermissions.can_edit_catalog}
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_edit_catalog: e.target.checked }))}
                       />
                       Modifier les Tarifs
                     </label>
-                    
+
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!editStaffPermissions.can_view_logs} 
+                      <input
+                        type="checkbox"
+                        checked={!!editStaffPermissions.can_view_logs}
                         disabled={editStaffRole !== 'super_admin'}
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_view_logs: e.target.checked }))} 
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_view_logs: e.target.checked }))}
                       />
                       Voir Journal d'Audit
                     </label>
-                    
+
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!editStaffPermissions.can_manage_staff} 
+                      <input
+                        type="checkbox"
+                        checked={!!editStaffPermissions.can_manage_staff}
                         disabled={editStaffRole !== 'super_admin'}
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_staff: e.target.checked }))} 
+                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_staff: e.target.checked }))}
                       />
                       Gérer le Personnel
                     </label>
@@ -2441,32 +3006,32 @@ export default function AdminView({ activeTab, searchQuery }) {
           </div>
 
           <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
                 <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Délai Express (heures)</label>
-                <input 
-                  type="number" 
-                  className="input-control" 
+                <input
+                  type="number"
+                  className="input-control"
                   required
                   min="1"
                   max="168"
-                  value={inputExpressHours} 
-                  onChange={(e) => setInputExpressHours(e.target.value)} 
+                  value={inputExpressHours}
+                  onChange={(e) => setInputExpressHours(e.target.value)}
                 />
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Temps de traitement en urgence (ex: 6)</span>
               </div>
 
               <div className="form-group">
                 <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Majoration Express (%)</label>
-                <input 
-                  type="number" 
-                  className="input-control" 
+                <input
+                  type="number"
+                  className="input-control"
                   required
                   min="0"
                   max="200"
-                  value={inputExpressMarkup} 
-                  onChange={(e) => setInputExpressMarkup(e.target.value)} 
+                  value={inputExpressMarkup}
+                  onChange={(e) => setInputExpressMarkup(e.target.value)}
                 />
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Taux additionnel sur les prix de base (ex: 50)</span>
               </div>
@@ -2474,14 +3039,14 @@ export default function AdminView({ activeTab, searchQuery }) {
 
             <div className="form-group" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '1rem' }}>
               <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Délai de Livraison Normal (heures)</label>
-              <input 
-                type="number" 
-                className="input-control" 
+              <input
+                type="number"
+                className="input-control"
                 required
                 min="1"
                 max="720"
-                value={inputNormalHours} 
-                onChange={(e) => setInputNormalHours(e.target.value)} 
+                value={inputNormalHours}
+                onChange={(e) => setInputNormalHours(e.target.value)}
               />
               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Temps de traitement standard de laverie (ex: 48)</span>
             </div>
@@ -2501,13 +3066,13 @@ export default function AdminView({ activeTab, searchQuery }) {
                     {db.isRemote() ? "Connecté en temps réel au cloud Supabase" : "Exécution sur le stockage local (LocalStorage de secours)"}
                   </span>
                 </div>
-                <span 
-                  style={{ 
-                    fontSize: '0.65rem', 
-                    fontWeight: 800, 
-                    padding: '0.15rem 0.6rem', 
-                    borderRadius: '20px', 
-                    background: db.isRemote() ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)', 
+                <span
+                  style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 800,
+                    padding: '0.15rem 0.6rem',
+                    borderRadius: '20px',
+                    background: db.isRemote() ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
                     color: db.isRemote() ? '#10b981' : '#f59e0b',
                     border: db.isRemote() ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)',
                     textTransform: 'uppercase'
@@ -2531,67 +3096,67 @@ export default function AdminView({ activeTab, searchQuery }) {
             <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
               Ajouter un Employé
             </h3>
-            
+
             <form onSubmit={handleCreateStaff} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div className="form-group">
                   <label>Prénom</label>
-                  <input 
-                    type="text" 
-                    className="input-control" 
-                    placeholder="Prénom" 
+                  <input
+                    type="text"
+                    className="input-control"
+                    placeholder="Prénom"
                     required
-                    value={newStaffPrenom} 
-                    onChange={(e) => setNewStaffPrenom(e.target.value)} 
+                    value={newStaffPrenom}
+                    onChange={(e) => setNewStaffPrenom(e.target.value)}
                   />
                 </div>
                 <div className="form-group">
                   <label>Nom</label>
-                  <input 
-                    type="text" 
-                    className="input-control" 
-                    placeholder="Nom" 
+                  <input
+                    type="text"
+                    className="input-control"
+                    placeholder="Nom"
                     required
-                    value={newStaffNom} 
-                    onChange={(e) => setNewStaffNom(e.target.value)} 
+                    value={newStaffNom}
+                    onChange={(e) => setNewStaffNom(e.target.value)}
                   />
                 </div>
               </div>
 
               <div className="form-group">
                 <label>Email Professionnel</label>
-                <input 
-                  type="email" 
-                  className="input-control" 
-                  placeholder="nom.prenom@klinup.com" 
+                <input
+                  type="email"
+                  className="input-control"
+                  placeholder="nom.prenom@klinup.com"
                   required
-                  value={newStaffEmail} 
-                  onChange={(e) => setNewStaffEmail(e.target.value)} 
+                  value={newStaffEmail}
+                  onChange={(e) => setNewStaffEmail(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
                 <label>Téléphone</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  placeholder="Ex: +229 97979797" 
-                  value={newStaffTel} 
-                  onChange={(e) => setNewStaffTel(e.target.value)} 
+                <input
+                  type="text"
+                  className="input-control"
+                  placeholder="Ex: +229 97979797"
+                  value={newStaffTel}
+                  onChange={(e) => setNewStaffTel(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
                 <label>Rôle Principal</label>
-                <select 
+                <CustomSelect
                   className="input-control"
-                  value={newStaffRole} 
+                  value={newStaffRole}
                   onChange={(e) => setNewStaffRole(e.target.value)}
                 >
                   <option value="agent_accueil">Agent d'accueil (Mobile App)</option>
                   <option value="manager">Manager Caisse (CMS)</option>
                   <option value="super_admin">Super Administrateur (CMS)</option>
-                </select>
+                </CustomSelect>
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
@@ -2619,14 +3184,14 @@ export default function AdminView({ activeTab, searchQuery }) {
               {/* Category choice */}
               <div className="form-group">
                 <label>Catégorie de tarif</label>
-                <select
+                <CustomSelect
                   className="input-control"
                   value={newArtCategory}
                   onChange={(e) => setNewArtCategory(e.target.value)}
                 >
                   <option value="individuel">Vêtement individuel</option>
                   <option value="abonnement">Formule d'abonnement</option>
-                </select>
+                </CustomSelect>
               </div>
 
               <div className="form-group">
@@ -2645,7 +3210,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                 // Input elements for Clothing items
                 <div className="form-group">
                   <label>Service requis</label>
-                  <select
+                  <CustomSelect
                     className="input-control"
                     value={newArtService}
                     onChange={(e) => setNewArtService(e.target.value)}
@@ -2653,7 +3218,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                     <option value="lavage_simple">Lavage Simple</option>
                     <option value="nettoyage_a_sec">Nettoyage à sec</option>
                     <option value="repassage">Repassage</option>
-                  </select>
+                  </CustomSelect>
                 </div>
               ) : (
                 // Input elements for Subscriptions
@@ -2700,23 +3265,23 @@ export default function AdminView({ activeTab, searchQuery }) {
             <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
               Modifier l'Abonnement
             </h3>
-            
+
             <form onSubmit={handleSaveSub} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div className="form-group">
                 <label>Nom de la formule d'abonnement</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
+                <input
+                  type="text"
+                  className="input-control"
                   required
-                  value={editSubName} 
-                  onChange={(e) => setEditSubName(e.target.value)} 
+                  value={editSubName}
+                  onChange={(e) => setEditSubName(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
                 <label>Avantages & Conditions (séparés par un | )</label>
-                <textarea 
-                  className="input-control" 
+                <textarea
+                  className="input-control"
                   rows="3"
                   required
                   value={editSubDescription}
@@ -2726,12 +3291,12 @@ export default function AdminView({ activeTab, searchQuery }) {
 
               <div className="form-group">
                 <label>Tarif mensuel (FCFA)</label>
-                <input 
-                  type="number" 
-                  className="input-control" 
+                <input
+                  type="number"
+                  className="input-control"
                   required
-                  value={editSubPrice} 
-                  onChange={(e) => setEditSubPrice(e.target.value)} 
+                  value={editSubPrice}
+                  onChange={(e) => setEditSubPrice(e.target.value)}
                 />
               </div>
 
@@ -2754,9 +3319,9 @@ export default function AdminView({ activeTab, searchQuery }) {
               <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0 }}>
                 Enregistrer une Commande
               </h3>
-              <button 
+              <button
                 type="button"
-                className="btn btn-outline" 
+                className="btn btn-outline"
                 style={{ padding: '0.25rem', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 onClick={() => setShowOrderRegistrationModal(false)}
               >
@@ -2765,22 +3330,22 @@ export default function AdminView({ activeTab, searchQuery }) {
             </div>
 
             <form onSubmit={handleCreateOrder} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', flexGrow: 1, paddingRight: '0.25rem' }}>
-              
+
               {/* Client Selection */}
               <div className="form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Sélection du Client</label>
-                  <button 
+                  <button
                     type="button"
-                    className="btn btn-secondary" 
+                    className="btn btn-secondary"
                     style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '6px' }}
                     onClick={() => setShowNewCustomerModal(true)}
                   >
                     + Nouveau Client
                   </button>
                 </div>
-                <select 
-                  className="input-control" 
+                <CustomSelect
+                  className="input-control"
                   style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem', borderRadius: '8px' }}
                   value={selectedCustomerId}
                   onChange={(e) => setSelectedCustomerId(e.target.value)}
@@ -2790,7 +3355,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                   {customers.map(c => (
                     <option key={c.id} value={c.id}>{c.prenom} {c.nom} ({c.telephone})</option>
                   ))}
-                </select>
+                </CustomSelect>
 
                 {activeCustomer && (
                   <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', background: 'var(--primary-light)', borderRadius: '8px', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
@@ -2805,10 +3370,10 @@ export default function AdminView({ activeTab, searchQuery }) {
                     )}
                     {/* Zone d'abonnement dynamique */}
                     {activeCustomer.active_subscription ? (
-                      <div style={{ marginTop: '0.4rem', borderTop: '1px dashed rgba(14, 98, 69, 0.2)', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <div style={{ marginTop: '0.4rem', borderTop: '1px dashed rgba(59, 130, 246, 0.2)', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: subscribePlanId ? 'not-allowed' : 'pointer', fontWeight: 700, color: 'var(--primary)' }}>
-                            <input 
+                            <input
                               type="checkbox"
                               checked={payWithSubscription}
                               disabled={!!subscribePlanId}
@@ -2831,7 +3396,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                         {/* Menu de renouvellement / changement */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.2rem' }}>
                           <span style={{ fontWeight: 600, fontSize: '0.7rem' }}>Renouveler / Changer d'abonnement :</span>
-                          <select 
+                          <CustomSelect
                             className="input-control"
                             style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px', width: '100%', background: 'var(--bg-card)' }}
                             value={subscribePlanId}
@@ -2841,14 +3406,14 @@ export default function AdminView({ activeTab, searchQuery }) {
                             {catalog.filter(c => c.categorie === 'abonnement').map(p => (
                               <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
                             ))}
-                          </select>
+                          </CustomSelect>
                         </div>
                       </div>
                     ) : (
-                      <div style={{ marginTop: '0.4rem', borderTop: '1px dashed rgba(14, 98, 69, 0.2)', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <div style={{ marginTop: '0.4rem', borderTop: '1px dashed rgba(59, 130, 246, 0.2)', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                           <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>Souscrire immédiatement à un abonnement :</span>
-                          <select 
+                          <CustomSelect
                             className="input-control"
                             style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px', width: '100%', background: 'var(--bg-card)' }}
                             value={subscribePlanId}
@@ -2858,7 +3423,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                             {catalog.filter(c => c.categorie === 'abonnement').map(p => (
                               <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
                             ))}
-                          </select>
+                          </CustomSelect>
                         </div>
                       </div>
                     )}
@@ -2866,130 +3431,164 @@ export default function AdminView({ activeTab, searchQuery }) {
                 )}
               </div>
 
-              {/* Clothes & Services Selection */}
+              {/* Clothes & Services Selection — NEW Design */}
               <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Type de Linge & Services</label>
-                <div style={{ 
-                  maxHeight: '220px', 
-                  overflowY: 'auto', 
-                  border: '1px solid var(--border-color)', 
-                  borderRadius: '12px', 
-                  padding: '0.5rem',
-                  display: 'flex',
-                  flexDirection: 'column',
+                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Type de Linge &amp; Services</label>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
                   gap: '0.5rem',
-                  background: 'var(--bg-app)',
-                  marginTop: '0.3rem'
+                  marginTop: '0.4rem',
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                  paddingRight: '2px'
                 }}>
                   {catalogClothes.map(cloth => {
                     const qty = articleQuantities[cloth] || 0;
                     const selectedSvc = articleServices[cloth] || 'lavage_simple';
-                    
+                    const isSelected = qty > 0;
+
                     const servicesForCloth = catalog.filter(c => c.categorie !== 'abonnement' && c.article === cloth);
                     const activeServices = servicesForCloth.length > 0 ? servicesForCloth : [
                       { service: 'lavage_simple', prix: 1500 },
                       { service: 'nettoyage_a_sec', prix: 3000 },
                       { service: 'repassage', prix: 1000 }
                     ];
-
                     const activeServiceObj = activeServices.find(s => s.service === selectedSvc) || activeServices[0];
                     const unitPrice = activeServiceObj ? activeServiceObj.prix : 1500;
-                    
+
+                    // Service icon mapping
+                    const svcIcons = { lavage_simple: '🫧', nettoyage_a_sec: '✨', repassage: '♨️' };
+
                     return (
-                      <div key={cloth} style={{ 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: '0.35rem', 
-                        padding: '0.5rem 0.75rem', 
-                        background: qty > 0 ? 'var(--primary-light)' : 'var(--bg-card)', 
-                        borderRadius: '10px',
-                        border: qty > 0 ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                        transition: 'all 0.15s ease'
+                      <div key={cloth} style={{
+                        gridColumn: isSelected ? 'span 3' : 'span 1',
+                        display: 'flex',
+                        flexDirection: isSelected ? 'row' : 'column',
+                        alignItems: isSelected ? 'center' : 'stretch',
+                        padding: isSelected ? '0.6rem 0.8rem' : '0.65rem 0.5rem',
+                        background: isSelected ? 'var(--primary-light)' : 'var(--bg-card)',
+                        borderRadius: '12px',
+                        border: isSelected ? '1.5px solid var(--primary)' : '1.5px solid var(--border-color)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        gap: isSelected ? '0.75rem' : '0.3rem',
+                        boxShadow: isSelected ? '0 2px 8px rgba(59,130,246,0.10)' : 'none',
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.8rem', fontWeight: qty > 0 ? 800 : 600, color: 'var(--text-primary)' }}>{cloth}</span>
-                          
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <button 
-                              type="button" 
-                              style={{ 
-                                width: '24px', 
-                                height: '24px', 
-                                borderRadius: '50%', 
-                                border: '1px solid var(--border-color)', 
-                                background: 'var(--bg-card)', 
-                                color: 'var(--text-primary)', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                cursor: qty === 0 ? 'not-allowed' : 'pointer', 
-                                opacity: qty === 0 ? 0.35 : 1,
-                                fontSize: '0.9rem',
-                                fontWeight: 'bold',
-                                padding: 0
-                              }}
-                              disabled={qty === 0}
-                              onClick={() => handleUpdateQty(cloth, -1)}
-                            >
-                              -
-                            </button>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 800, minWidth: '15px', textAlign: 'center' }}>{qty}</span>
-                            <button 
-                              type="button" 
-                              style={{ 
-                                width: '24px', 
-                                height: '24px', 
-                                borderRadius: '50%', 
-                                border: '1px solid var(--primary)', 
-                                background: 'var(--primary-light)', 
-                                color: 'var(--primary)', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                cursor: 'pointer',
-                                fontSize: '0.9rem',
-                                fontWeight: 'bold',
-                                padding: 0
-                              }}
+
+                        {/* LEFT: Item name & qty controls */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: isSelected ? '0.5rem' : '0',
+                          flexDirection: isSelected ? 'row' : 'column',
+                          flexShrink: 0,
+                          flex: isSelected ? '0 0 auto' : '1'
+                        }}>
+                          {/* Quantity badge + item name (collapsed: column, expanded: row) */}
+                          {!isSelected && (
+                            <button
+                              type="button"
                               onClick={() => handleUpdateQty(cloth, 1)}
+                              style={{
+                                width: '36px', height: '36px',
+                                borderRadius: '50%',
+                                border: '2px solid var(--border-color)',
+                                background: 'var(--bg-app)',
+                                color: 'var(--text-muted)',
+                                fontSize: '1.2rem', fontWeight: 700,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
                             >
                               +
                             </button>
-                          </div>
+                          )}
+
+                          {isSelected && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQty(cloth, -1)}
+                                style={{
+                                  width: '26px', height: '26px', borderRadius: '50%',
+                                  border: '1.5px solid var(--border-color)',
+                                  background: 'var(--bg-card)', color: 'var(--text-secondary)',
+                                  fontSize: '0.95rem', fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  cursor: 'pointer',
+                                }}
+                              >−</button>
+                              <span style={{
+                                minWidth: '28px', textAlign: 'center',
+                                fontSize: '0.95rem', fontWeight: 800,
+                                color: 'var(--primary)',
+                                background: 'white',
+                                borderRadius: '8px',
+                                padding: '0.1rem 0.35rem',
+                                border: '1px solid rgba(59,130,246,0.2)',
+                              }}>{qty}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQty(cloth, 1)}
+                                style={{
+                                  width: '26px', height: '26px', borderRadius: '50%',
+                                  border: '1.5px solid var(--primary)',
+                                  background: 'var(--primary)', color: 'white',
+                                  fontSize: '0.95rem', fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  cursor: 'pointer',
+                                }}
+                              >+</button>
+                            </div>
+                          )}
+
+                          <span style={{
+                            fontSize: isSelected ? '0.85rem' : '0.72rem',
+                            fontWeight: isSelected ? 700 : 600,
+                            color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
+                            textAlign: 'center',
+                            lineHeight: 1.2,
+                          }}>{cloth}</span>
                         </div>
 
-                        {qty > 0 && (
-                          <div style={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center', 
-                            gap: '0.4rem', 
-                            borderTop: '1px dashed rgba(14, 98, 69, 0.2)', 
-                            paddingTop: '0.3rem', 
-                            marginTop: '0.1rem' 
-                          }}>
-                            <select 
-                              style={{ 
-                                padding: '0.2rem 0.4rem', 
-                                fontSize: '0.72rem', 
-                                border: '1px solid var(--border-color)', 
-                                borderRadius: '6px', 
-                                width: '60%', 
-                                background: 'var(--bg-card)', 
-                                color: 'var(--text-primary)',
-                                outline: 'none'
-                              }}
-                              value={selectedSvc}
-                              onChange={(e) => handleUpdateService(cloth, e.target.value)}
-                            >
-                              {activeServices.map(s => (
-                                <option key={s.service} value={s.service}>{serviceLabels[s.service] || s.service} ({s.prix} F)</option>
-                              ))}
-                            </select>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)' }}>
-                              {(unitPrice * qty).toLocaleString()} F
-                            </span>
+                        {/* RIGHT (when expanded): service pills + subtotal */}
+                        {isSelected && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, flexWrap: 'wrap' }}>
+                            {activeServices.map(s => {
+                              const isActiveSvc = selectedSvc === s.service;
+                              return (
+                                <button
+                                  key={s.service}
+                                  type="button"
+                                  onClick={() => handleUpdateService(cloth, s.service)}
+                                  style={{
+                                    padding: '0.2rem 0.55rem',
+                                    borderRadius: '20px',
+                                    border: isActiveSvc ? '1.5px solid var(--primary)' : '1.5px solid var(--border-color)',
+                                    background: isActiveSvc ? 'var(--primary)' : 'var(--bg-card)',
+                                    color: isActiveSvc ? 'white' : 'var(--text-secondary)',
+                                    fontSize: '0.68rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >{svcIcons[s.service] || ''} {serviceLabels[s.service] || s.service}</button>
+                              );
+                            })}
                           </div>
+                        )}
+
+                        {/* Subtotal on the far right when selected */}
+                        {isSelected && (
+                          <span style={{
+                            fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)',
+                            whiteSpace: 'nowrap', marginLeft: 'auto', flexShrink: 0,
+                          }}>
+                            {(unitPrice * qty).toLocaleString()} F
+                          </span>
                         )}
                       </div>
                     );
@@ -2997,27 +3596,28 @@ export default function AdminView({ activeTab, searchQuery }) {
                 </div>
               </div>
 
+
               {/* Form Settings Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
                   <label style={{ fontSize: '0.75rem' }}>Urgence</label>
-                  <select 
-                    className="input-control" 
+                  <CustomSelect
+                    className="input-control"
                     style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                    value={niveauUrgence} 
+                    value={niveauUrgence}
                     onChange={(e) => setNiveauUrgence(e.target.value)}
                   >
                     <option value="Normal">Normal</option>
                     <option value="Express">Express (+50%)</option>
-                  </select>
+                  </CustomSelect>
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
                   <label style={{ fontSize: '0.75rem' }}>Règlement</label>
-                  <select 
-                    className="input-control" 
+                  <CustomSelect
+                    className="input-control"
                     style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                    value={(payWithSubscription && !subscribePlanId) ? 'abonnement' : modeReglement} 
+                    value={(payWithSubscription && !subscribePlanId) ? 'abonnement' : modeReglement}
                     disabled={payWithSubscription && !subscribePlanId}
                     onChange={(e) => setModeReglement(e.target.value)}
                   >
@@ -3030,16 +3630,16 @@ export default function AdminView({ activeTab, searchQuery }) {
                         <option value="avance_solde">Avance/Crédit</option>
                       </>
                     )}
-                  </select>
+                  </CustomSelect>
                 </div>
               </div>
 
               {(!payWithSubscription || !!subscribePlanId) && (
                 <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
                   <label style={{ fontSize: '0.75rem' }}>Acompte Versé (FCFA)</label>
-                  <input 
-                    type="number" 
-                    className="input-control" 
+                  <input
+                    type="number"
+                    className="input-control"
                     style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
                     placeholder="Ex: 2000"
                     value={avancePayee}
@@ -3056,19 +3656,19 @@ export default function AdminView({ activeTab, searchQuery }) {
                     {getCalculatedPrice().toLocaleString()} FCFA
                   </div>
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button 
-                    type="button" 
-                    className="btn btn-outline" 
+                  <button
+                    type="button"
+                    className="btn btn-outline"
                     onClick={() => setShowOrderRegistrationModal(false)}
                     style={{ padding: '0.45rem 1rem', fontSize: '0.78rem', borderRadius: '8px' }}
                   >
                     Annuler
                   </button>
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary" 
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
                     style={{ padding: '0.45rem 1.25rem', fontSize: '0.78rem', borderRadius: '8px' }}
                   >
                     Enregistrer
@@ -3090,37 +3690,37 @@ export default function AdminView({ activeTab, searchQuery }) {
             <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
               Nouveau Client
             </h3>
-            
+
             <form onSubmit={handleCreateCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div className="form-group">
                 <label>Nom</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  placeholder="Nom de famille" 
+                <input
+                  type="text"
+                  className="input-control"
+                  placeholder="Nom de famille"
                   required
-                  value={newCustNom} 
-                  onChange={(e) => setNewCustNom(e.target.value)} 
+                  value={newCustNom}
+                  onChange={(e) => setNewCustNom(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
                 <label>Prénom</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  placeholder="Prénom" 
+                <input
+                  type="text"
+                  className="input-control"
+                  placeholder="Prénom"
                   required
-                  value={newCustPrenom} 
-                  onChange={(e) => setNewCustPrenom(e.target.value)} 
+                  value={newCustPrenom}
+                  onChange={(e) => setNewCustPrenom(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
                 <label>Pays (Indicatif)</label>
-                <select 
+                <CustomSelect
                   className="input-control"
-                  value={newCustIndicatif} 
+                  value={newCustIndicatif}
                   onChange={(e) => setNewCustIndicatif(e.target.value)}
                 >
                   {countries.map((c) => (
@@ -3128,42 +3728,42 @@ export default function AdminView({ activeTab, searchQuery }) {
                       {c.flag} {c.name} (+{c.code})
                     </option>
                   ))}
-                </select>
+                </CustomSelect>
               </div>
 
               <div className="form-group">
                 <label>Téléphone</label>
-                <input 
-                  type="tel" 
-                  className="input-control" 
-                  placeholder="Ex: 97979797" 
+                <input
+                  type="tel"
+                  className="input-control"
+                  placeholder="Ex: 97979797"
                   required
-                  value={newCustTel} 
-                  onChange={(e) => setNewCustTel(e.target.value)} 
+                  value={newCustTel}
+                  onChange={(e) => setNewCustTel(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
                 <label>Préférence pliage</label>
-                <select 
+                <CustomSelect
                   className="input-control"
-                  value={newCustPref} 
+                  value={newCustPref}
                   onChange={(e) => setNewCustPref(e.target.value)}
                 >
                   <option value="Plié">Plié</option>
                   <option value="Sur cintre">Sur cintre</option>
-                </select>
+                </CustomSelect>
               </div>
 
               <div className="form-group">
                 <label>Adresse physique</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  placeholder="Adresse (domicile ou bureau)" 
+                <input
+                  type="text"
+                  className="input-control"
+                  placeholder="Adresse (domicile ou bureau)"
                   required
-                  value={newCustAdresse} 
-                  onChange={(e) => setNewCustAdresse(e.target.value)} 
+                  value={newCustAdresse}
+                  onChange={(e) => setNewCustAdresse(e.target.value)}
                 />
               </div>
 
@@ -3192,17 +3792,60 @@ export default function AdminView({ activeTab, searchQuery }) {
               <span>Dette totale :</span>
               <strong>{selectedCrmCustomer.solde_dette.toLocaleString()} F</strong>
             </div>
-            
+
+            {(() => {
+              const activeUnpaidOrders = orders.filter(
+                o => o.customer_id === selectedCrmCustomer.id &&
+                     o.statut !== 'restitue' &&
+                     o.statut !== 'annule' &&
+                     (o.prix_total - o.avance_payee) > 0
+              );
+              if (activeUnpaidOrders.length === 0) return null;
+              
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.2rem' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Commandes en cours liées à la dette :
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {activeUnpaidOrders.map(o => {
+                      const rest = o.prix_total - o.avance_payee;
+                      return (
+                        <div key={o.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.75rem', background: 'var(--bg-app)', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700 }}>{o.identifiant_unique_marquage}</span>
+                            <span className={`badge badge-${o.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
+                              {statusDisplayLabels[o.statut] || o.statut.replace(/_/g, ' ')}
+                            </span>
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>
+                            {o.type_article}
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                            Service: {serviceLabels[o.type_service] || o.type_service}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.3rem', marginTop: '0.1rem', fontSize: '0.72rem' }}>
+                            <span>Total : <strong>{o.prix_total.toLocaleString()} F</strong></span>
+                            <span>Reste : <strong style={{ color: 'var(--accent)' }}>{rest.toLocaleString()} F</strong></span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             <form onSubmit={handlePayDebt} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div className="form-group">
                 <label>Montant payé (FCFA)</label>
-                <input 
-                  type="number" 
-                  className="input-control" 
+                <input
+                  type="number"
+                  className="input-control"
                   max={selectedCrmCustomer.solde_dette}
                   required
-                  value={debtPaymentAmount} 
-                  onChange={(e) => setDebtPaymentAmount(e.target.value)} 
+                  value={debtPaymentAmount}
+                  onChange={(e) => setDebtPaymentAmount(e.target.value)}
                 />
               </div>
 
@@ -3224,7 +3867,7 @@ export default function AdminView({ activeTab, searchQuery }) {
             <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
               Livrer & Encaisser
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '10px' }}>
               <div>Code: <strong>{delivOrder.identifiant_unique_marquage}</strong></div>
               <div>Prix Total: <strong>{delivOrder.prix_total} F</strong></div>
@@ -3238,25 +3881,25 @@ export default function AdminView({ activeTab, searchQuery }) {
             <form onSubmit={handleConfirmDelivery} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div className="form-group">
                 <label>Mode de Règlement</label>
-                <select 
+                <CustomSelect
                   className="input-control"
-                  value={delivPaymentMethod} 
+                  value={delivPaymentMethod}
                   onChange={(e) => setDelivPaymentMethod(e.target.value)}
                 >
                   <option value="especes">Espèces</option>
                   <option value="mobile_money">Mobile Money</option>
-                </select>
+                </CustomSelect>
               </div>
 
               <div className="form-group">
                 <label>Montant encaissé (FCFA)</label>
-                <input 
-                  type="number" 
-                  className="input-control" 
+                <input
+                  type="number"
+                  className="input-control"
                   max={delivOrder.prix_total - delivOrder.avance_payee}
                   required
-                  value={delivAmountPaid} 
-                  onChange={(e) => setDelivAmountPaid(e.target.value)} 
+                  value={delivAmountPaid}
+                  onChange={(e) => setDelivAmountPaid(e.target.value)}
                 />
               </div>
 
@@ -3275,7 +3918,7 @@ export default function AdminView({ activeTab, searchQuery }) {
       {createdOrder && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
           <div className="card" style={{ width: '100%', maxWidth: '340px', background: '#fff', color: '#000', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
-            
+
             <div id="receipt-print-area-admin" style={{
               background: '#ffffff',
               padding: '24px 20px',
@@ -3322,7 +3965,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                 )}
               </div>
 
-               {createdOrder.is_subscription_order && createdOrder.subscription_details && (
+              {createdOrder.is_subscription_order && createdOrder.subscription_details && (
                 <div style={{ padding: '8px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
                   <div style={{ fontWeight: '800', color: '#16a34a', borderBottom: '1px dashed #bbf7d0', paddingBottom: '3px', marginBottom: '2px' }}>
                     Suivi Solde Abonnement
@@ -3348,10 +3991,10 @@ export default function AdminView({ activeTab, searchQuery }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#555555' }}>Total Commande :</span>
                   <span style={{ fontWeight: '700', color: '#000000' }}>
-                    {createdOrder.is_subscription_order 
-                      ? (createdOrder.subscription_details.immediate_subscription 
-                        ? `${(createdOrder.prix_total || 0).toLocaleString()} FCFA` 
-                        : '0 FCFA (Abonnement)') 
+                    {createdOrder.is_subscription_order
+                      ? (createdOrder.subscription_details.immediate_subscription
+                        ? `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`
+                        : '0 FCFA (Abonnement)')
                       : `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`}
                   </span>
                 </div>
@@ -3381,27 +4024,27 @@ export default function AdminView({ activeTab, searchQuery }) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
-                <button 
+                <button
                   type="button"
-                  className="btn btn-outline" 
+                  className="btn btn-outline"
                   style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
                   onClick={() => alert("Impression du reçu en cours !")}
                 >
                   <Printer size={12} /> Imprimer
                 </button>
-                <button 
+                <button
                   type="button"
-                  className="btn btn-outline" 
+                  className="btn btn-outline"
                   style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
                   onClick={() => {
                     const element = document.getElementById('receipt-print-area-admin');
                     if (element && window.html2pdf) {
                       const opt = {
-                        margin:       0.3,
-                        filename:     `Facture_${createdOrder.identifiant_unique_marquage}.pdf`,
-                        image:        { type: 'jpeg', quality: 0.98 },
-                        html2canvas:  { scale: 2, useCORS: true, logging: false },
-                        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+                        margin: 0.3,
+                        filename: `Facture_${createdOrder.identifiant_unique_marquage}.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2, useCORS: true, logging: false },
+                        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
                       };
                       window.html2pdf().set(opt).from(element).save();
                     } else {
@@ -3412,14 +4055,159 @@ export default function AdminView({ activeTab, searchQuery }) {
                   ↓ Télécharger
                 </button>
               </div>
-              <button 
+              <button
                 type="button"
-                className="btn btn-primary" 
+                className="btn btn-primary"
                 style={{ width: '100%', background: '#000', color: '#fff', border: 'none', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
                 onClick={() => setCreatedOrder(null)}
               >
                 Fermer
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeDetailsCard && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '750px', maxHeight: '90vh', overflow: 'hidden', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+              <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {activeDetailsCard === 'ca' && <TrendingUp size={20} className="text-primary" />}
+                {activeDetailsCard === 'completed' && <CheckCircle size={20} style={{ color: 'var(--status-ready)' }} />}
+                {activeDetailsCard === 'active' && <Clock size={20} style={{ color: 'var(--primary)' }} />}
+                {activeDetailsCard === 'pending' && <AlertCircle size={20} style={{ color: 'var(--status-pending)' }} />}
+                {activeDetailsCard === 'ca' && "Détails Financiers (Chiffre d'Affaires)"}
+                {activeDetailsCard === 'completed' && "Détails des Commandes Livrées"}
+                {activeDetailsCard === 'active' && "Détails des Commandes Actives"}
+                {activeDetailsCard === 'pending' && "Détails des Commandes en Attente"}
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={exportKpiToExcel}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    padding: '0.35rem 0.8rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid #16a34a',
+                    background: 'rgba(22, 163, 74, 0.08)',
+                    color: '#16a34a',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.background = '#16a34a'; e.currentTarget.style.color = 'white'; }}
+                  onMouseOut={e => { e.currentTarget.style.background = 'rgba(22, 163, 74, 0.08)'; e.currentTarget.style.color = '#16a34a'; }}
+                >
+                  <Download size={14} />
+                  Exporter Excel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ padding: '0.25rem', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  onClick={() => setActiveDetailsCard(null)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Date Filter Bar */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap',
+              padding: '0.6rem 0.8rem',
+              background: 'var(--bg-app)',
+              borderRadius: '12px',
+              border: '1px solid var(--border-color)',
+            }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>📅 Filtrer par date :</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <input
+                  type="date"
+                  className="input-control"
+                  style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', borderRadius: '8px', width: '135px' }}
+                  value={tempKpiDateFrom}
+                  onChange={e => setTempKpiDateFrom(e.target.value)}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>au</span>
+                <input
+                  type="date"
+                  className="input-control"
+                  style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', borderRadius: '8px', width: '135px' }}
+                  value={tempKpiDateTo}
+                  onChange={e => setTempKpiDateTo(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: 'auto' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKpiDateFrom(tempKpiDateFrom);
+                    setKpiDateTo(tempKpiDateTo);
+                  }}
+                  style={{
+                    padding: '0.35rem 0.95rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid var(--primary)',
+                    background: 'var(--primary)',
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.background = 'var(--primary-dark)'; }}
+                  onMouseOut={e => { e.currentTarget.style.background = 'var(--primary)'; }}
+                >
+                  Appliquer
+                </button>
+                {(tempKpiDateFrom || tempKpiDateTo || kpiDateFrom || kpiDateTo) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTempKpiDateFrom('');
+                      setTempKpiDateTo('');
+                      setKpiDateFrom('');
+                      setKpiDateTo('');
+                    }}
+                    style={{
+                      padding: '0.35rem 0.95rem',
+                      borderRadius: '8px',
+                      border: '1.5px solid #ef4444',
+                      background: 'rgba(239, 68, 68, 0.08)',
+                      color: '#ef4444',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = 'white'; }}
+                    onMouseOut={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'; e.currentTarget.style.color = '#ef4444'; }}
+                  >
+                    Réinitialiser
+                  </button>
+                )}
+              </div>
+              {(kpiDateFrom || kpiDateTo) && (
+                <span style={{ fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 700, background: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>
+                  {filterOrdersByKpiDate(orders).length} résultat(s)
+                </span>
+              )}
+            </div>
+
+            <div style={{ overflowY: 'auto', flexGrow: 1, paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {(() => { const fo = filterOrdersByKpiDate(orders); return (<>
+                {activeDetailsCard === 'ca' && renderCAReport(fo)}
+                {activeDetailsCard === 'completed' && renderCompletedOrdersList(fo)}
+                {activeDetailsCard === 'active' && renderActiveOrdersList(fo)}
+                {activeDetailsCard === 'pending' && renderPendingOrdersList(fo)}
+              </>); })()}
             </div>
           </div>
         </div>

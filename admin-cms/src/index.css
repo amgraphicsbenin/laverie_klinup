@@ -1,66 +1,67 @@
 /* ========================================================
-   DESIGN SYSTEM PREMIUM & AESTHETICS - DONEZO BRAND STYLE
+   DESIGN SYSTEM PREMIUM & AESTHETICS - KLIN UP BRAND STYLE
    ======================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
   /* Police */
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-title: 'Outfit', sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-title: 'Inter', sans-serif;
 
-  /* Palette de couleurs Donezo - Mode Clair */
-  --primary: #0e6245;          /* Vert Forêt Donezo */
-  --primary-hover: #0b4c35;
-  --primary-light: #e8f5e9;    /* Vert Menthe/Sauge Clair */
+  /* Palette de couleurs KLIN UP - Mode Clair (harmonie avec l'app mobile) */
+  --primary: #3b82f6;          /* Bleu principal KLIN UP */
+  --primary-hover: #2563eb;
+  --primary-light: rgba(59, 130, 246, 0.08); /* Fond bleu ultra-léger */
+  --primary-gradient: linear-gradient(135deg, #5da1fc 0%, #3b82f6 100%);
   
-  --secondary: #00d2c4;        /* Cyan */
-  --secondary-hover: #0891b2;
-  --secondary-light: #ecfeff;
+  --secondary: #2563eb;        /* Bleu actif */
+  --secondary-hover: #1d4ed8;
+  --secondary-light: rgba(37, 99, 235, 0.08);
 
-  --accent: #f43f5e;           /* Rose d'accentuation */
-  --accent-light: #fff1f2;
+  --accent: #d946ef;           /* Rose/Violet accent */
+  --accent-light: rgba(217, 70, 239, 0.08);
 
-  --success: #10b981;          /* Vert émeraude */
-  --success-light: #ecfdf5;
+  --success: #16a34a;          /* Vert */
+  --success-light: rgba(22, 163, 74, 0.08);
 
-  --warning: #f59e0b;          /* Orange/Ambre */
-  --warning-light: #fef3c7;
+  --warning: #d97706;          /* Orange */
+  --warning-light: rgba(217, 119, 6, 0.08);
 
-  --danger: #ef4444;           /* Rouge */
-  --danger-light: #fef2f2;
+  --danger: #dc2626;           /* Rouge */
+  --danger-light: rgba(220, 38, 38, 0.08);
 
-  /* Statuts de lavage */
+  /* Statuts de lavage (adaptés au fond clair) */
   --status-pending: var(--warning);
   --status-pending-light: var(--warning-light);
-  --status-washing: var(--primary);
-  --status-washing-light: var(--primary-light);
+  --status-washing: var(--secondary);
+  --status-washing-light: var(--secondary-light);
   --status-ready: var(--success);
   --status-ready-light: var(--success-light);
-  --status-delivered: #64748b;
-  --status-delivered-light: #f1f5f9;
+  --status-delivered: #71717a;
+  --status-delivered-light: rgba(113, 113, 122, 0.08);
   --status-late: var(--danger);
   --status-late-light: var(--danger-light);
 
   /* Neutres */
-  --bg-app: #f4f7f6;           /* Fond doux gris-vert très clair */
+  --bg-app: #f8fafc;           /* Blanc bleu-gris ultra-doux */
   --bg-card: #ffffff;
   --bg-sidebar: #ffffff;
-  --text-primary: #1e211e;     /* Charcoal foncé */
-  --text-secondary: #4b554b;   /* Charcoal moyen */
-  --text-muted: #94a394;       /* Charcoal clair */
+  --text-primary: #18181b;     /* Gris anthracite profond */
+  --text-secondary: #52525b;   /* Gris moyen */
+  --text-muted: #8e8e93;       /* Gris clair */
   --text-on-dark: #ffffff;
-  --border-color: #e2e8e2;     /* Bordures douces assorties */
+  --border-color: rgba(0, 0, 0, 0.05); /* Bordures douces assorties */
   
   /* Ombres & Angles */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.02);
-  --shadow-card: 0 4px 15px rgba(14, 98, 69, 0.015);
-  --shadow-md: 0 8px 24px rgba(14, 98, 69, 0.035);
-  --shadow-lg: 0 16px 36px rgba(14, 98, 69, 0.06);
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.025);
+  --shadow-card: 0 4px 15px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 8px 20px rgba(15, 23, 42, 0.07), 0 3px 8px rgba(15, 23, 42, 0.035);
+  --shadow-lg: 0 16px 36px rgba(15, 23, 42, 0.10), 0 6px 16px rgba(15, 23, 42, 0.05);
 
   --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-card: 20px;         /* Coins arrondis type Donezo */
+  --radius-card: 20px;         /* Coins arrondis */
   --radius-input: 12px;
 }
 
@@ -165,7 +166,7 @@ button, input, select, textarea {
   width: 260px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
-  padding: 2rem 1.25rem;
+  padding: 0.75rem 1.25rem 2rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -182,7 +183,7 @@ button, input, select, textarea {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 2.25rem;
+  margin-bottom: 0.5rem;
   padding-left: 0.5rem;
 }
 
@@ -209,7 +210,7 @@ button, input, select, textarea {
   color: var(--text-muted);
   margin-bottom: 0.5rem;
   padding-left: 0.75rem;
-  margin-top: 1rem;
+  margin-top: 0.25rem;
 }
 
 .menu-list {
@@ -271,7 +272,7 @@ button, input, select, textarea {
   font-size: 0.8rem;
   color: #fff;
   font-family: var(--font-title);
-  box-shadow: 0 3px 6px rgba(14, 98, 69, 0.15);
+  box-shadow: 0 3px 6px rgba(59, 130, 246, 0.15);
 }
 
 .user-info h4 {
@@ -292,7 +293,7 @@ button, input, select, textarea {
 
 /* Carte Promotionnelle Mobile App Sidebar */
 .sidebar-promo-card {
-  background: #0b4c35;
+  background: var(--primary-gradient);
   color: #ffffff;
   border-radius: 16px;
   padding: 1.15rem;
@@ -300,6 +301,7 @@ button, input, select, textarea {
   position: relative;
   overflow: hidden;
   background-image: radial-gradient(circle at 100% 0%, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.05) 50%, transparent 50%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 
 .sidebar-promo-card h4 {
@@ -310,7 +312,7 @@ button, input, select, textarea {
 
 .sidebar-promo-card p {
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
   margin-bottom: 0.85rem;
 }
 
@@ -318,7 +320,7 @@ button, input, select, textarea {
   display: inline-block;
   padding: 0.45rem 1rem;
   background: #ffffff;
-  color: #0b4c35;
+  color: var(--primary);
   border: none;
   border-radius: 8px;
   font-size: 0.75rem;
@@ -328,10 +330,12 @@ button, input, select, textarea {
   transition: all 0.2s ease;
   width: 100%;
   text-transform: uppercase;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .sidebar-promo-btn:hover {
   background: var(--primary-light);
+  color: var(--primary-hover);
 }
 
 /* Zone de contenu principale */
@@ -373,29 +377,36 @@ button, input, select, textarea {
   gap: 1.25rem;
 }
 
-/* Champ de recherche Donezo */
+/* Champ de recherche Premium Interaction */
 .search-pill-wrapper {
   position: relative;
   display: flex;
   align-items: center;
-  width: 280px;
+  width: 260px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-pill-wrapper:focus-within {
+  width: 320px;
 }
 
 .search-pill-wrapper input {
   width: 100%;
-  padding: 0.6rem 2.5rem 0.6rem 2rem;
-  border-radius: 12px;
+  padding: 0.6rem 2.8rem 0.6rem 2.4rem;
+  border-radius: 14px;
   background: var(--bg-card);
-  border: 1px solid var(--border-color);
+  border: 1.5px solid var(--border-color);
   font-size: 0.82rem;
   color: var(--text-primary);
   outline: none;
-  transition: all 0.25s ease;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .search-pill-wrapper input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(14, 98, 69, 0.08);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08), 0 0 0 3px rgba(59, 130, 246, 0.05);
+  background: #ffffff;
 }
 
 .search-pill-icon {
@@ -404,21 +415,14 @@ button, input, select, textarea {
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
+  transition: color 0.3s ease;
+  pointer-events: none;
 }
 
-.search-shortcut-badge {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 0.65rem;
-  background: var(--bg-app);
-  color: var(--text-secondary);
-  padding: 0.15rem 0.35rem;
-  border-radius: 6px;
-  font-weight: 700;
-  border: 1px solid var(--border-color);
+.search-pill-wrapper input:focus + .search-pill-icon {
+  color: var(--primary);
 }
+
 
 /* Raccourcis Icônes Donezo */
 .topbar-icon-btn {
@@ -571,10 +575,10 @@ button, input, select, textarea {
 }
 
 .kpi-card.green-theme {
-  background: var(--primary);
+  background: var(--primary-gradient);
   color: #ffffff;
   border: none;
-  box-shadow: 0 8px 25px rgba(14, 98, 69, 0.15);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.20);
 }
 
 .kpi-card.green-theme .kpi-card-header span {
@@ -655,7 +659,7 @@ button, input, select, textarea {
 }
 
 .column-bar.filled-secondary {
-  background: #20b885;
+  background: var(--secondary);
 }
 
 .column-bar.striped {
@@ -682,13 +686,15 @@ button, input, select, textarea {
 }
 
 .gauge-svg {
-  width: 160px;
-  height: 90px;
+  width: 110px;
+  height: 110px;
 }
 
 .gauge-center-text {
   position: absolute;
-  top: 50px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -709,9 +715,9 @@ button, input, select, textarea {
   font-weight: 500;
 }
 
-/* Time Tracker Widget Donezo */
+/* Time Tracker Widget KLIN UP */
 .time-tracker-card {
-  background: #0b4c35;
+  background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);
   background-image: radial-gradient(circle at 100% 100%, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.03) 40%, transparent 40%),
                     radial-gradient(circle at 0% 0%, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.03) 60%, transparent 60%);
   color: #ffffff;
@@ -725,13 +731,13 @@ button, input, select, textarea {
   height: 100%;
   min-height: 150px;
   border: none;
-  box-shadow: 0 8px 25px rgba(11, 76, 53, 0.15);
+  box-shadow: 0 8px 25px rgba(37, 99, 235, 0.15);
 }
 
 .time-tracker-title {
   font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .time-tracker-display {
@@ -763,12 +769,12 @@ button, input, select, textarea {
 
 .time-tracker-btn:hover {
   background: #ffffff;
-  color: #0b4c35;
+  color: var(--secondary);
 }
 
 .time-tracker-btn.active {
   background: #ffffff;
-  color: #0b4c35;
+  color: var(--secondary);
 }
 
 /* Boutons */
@@ -840,7 +846,7 @@ tr:last-child td {
 }
 
 tr:hover td {
-  background: rgba(14, 98, 69, 0.012);
+  background: rgba(59, 130, 246, 0.015);
 }
 
 .badge {
@@ -920,7 +926,7 @@ tr:hover td {
 
 .input-control:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(14, 98, 69, 0.08);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
 }
 
 /* Grid Layouts */
@@ -1244,3 +1250,89 @@ tr:hover td {
     padding: 1rem 1.25rem;
   }
 }
+
+/* Modals Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Custom Select Menu */
+.custom-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.custom-select-trigger:focus-within,
+.custom-select-wrapper.open .custom-select-trigger {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+}
+
+.custom-select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-input);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: scaleIn 0.15s ease-out;
+}
+
+.custom-select-option {
+  padding: 0.55rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.15s ease;
+}
+
+.custom-select-option:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.custom-select-option.selected {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+
+
+
