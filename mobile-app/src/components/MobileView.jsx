@@ -214,9 +214,11 @@ export default function MobileView() {
   const [currentUser, setCurrentUser] = useState(() => db.getCurrentUser());
   const [showCAValues, setShowCAValues] = useState(true);
 
-  // Détermine si l'utilisateur peut voir le CA en fonction de son rôle
-  const isCAAccessible = currentUser ? (currentUser.role === 'super_admin' || currentUser.role === 'manager' || currentUser.role === 'agent_accueil') : false;
-  const canViewCA = isCAAccessible;
+  // Détermine si l'utilisateur peut toggler/voir les valeurs CA (admin, manager, accueil)
+  const canToggleCA = currentUser ? (currentUser.role === 'super_admin' || currentUser.role === 'manager' || currentUser.role === 'agent_accueil') : false;
+  // Alias de compatibilité — la carte CA s'affiche toujours pour tous les rôles
+  const isCAAccessible = canToggleCA;
+  const canViewCA = canToggleCA;
 
   // États d'authentification par email & code PIN de 6 chiffres
   const [selectedLoginUser, setSelectedLoginUser] = useState(null);
@@ -2967,31 +2969,27 @@ export default function MobileView() {
                 </div>
               </div>
 
-              {/* ALERTE RETARDS */}
-                         {/* TOTAL SPEND — Style Finance Card (Adaptive) */}
+              {/* TOTAL SPEND — Style Finance Card (Adaptive) */}
               <div 
                 className="dashboard-main-card" 
                 style={{ borderRadius: '20px', padding: '1.2rem 1.1rem', cursor: 'pointer' }}
                 onClick={(e) => {
                   if (e.target.closest('.eye-toggle-btn')) return;
-                  setAccueilSubView(isCAAccessible ? 'ca_detail' : 'actives_detail');
+                  setAccueilSubView(canToggleCA ? 'ca_detail' : 'actives_detail');
                 }}
               >
-                {/* Carte Chiffre d'Affaires — toujours visible, valeurs masquées si accès limité */}
+                {/* Carte Chiffre d'Affaires — identique pour tous les rôles */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
                   <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 600 }}>Chiffre d'Affaires Total</div>
-                  {!isCAAccessible && (
-                    <div style={{ fontSize: '0.6rem', color: 'var(--status-late)', fontWeight: 600 }}>Accès limité</div>
-                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.5rem' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '2rem', fontWeight: 900, fontFamily: 'var(--font-title)', letterSpacing: '-1px', lineHeight: 1.1, color: isCAAccessible ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                      {isCAAccessible ? (showCAValues ? `${revenueTotal.toLocaleString()} ` : '•••••• ') : '── '}
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{isCAAccessible ? 'FCFA' : 'Non autorisé'}</span>
+                    <div style={{ fontSize: '2rem', fontWeight: 900, fontFamily: 'var(--font-title)', letterSpacing: '-1px', lineHeight: 1.1, color: 'var(--text-primary)' }}>
+                      {canToggleCA ? (showCAValues ? `${revenueTotal.toLocaleString()} ` : '•••••• ') : '•••••• '}
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>FCFA</span>
                     </div>
                   </div>
-                  {isCAAccessible && (
+                  {canToggleCA && (
                     <button
                       type="button"
                       className="eye-toggle-btn"
@@ -3024,55 +3022,30 @@ export default function MobileView() {
                   {last7.map((d, i) => (<div key={i} style={{ flex: 1, textAlign: 'center', fontSize: '0.46rem', color: 'var(--text-muted)', fontWeight: 500 }}>{d.label}</div>))}
                 </div>
 
-                {/* Income / Expenses row */}
+                {/* Encaissé / Reste dû — identique pour tous, valeurs masquées si pas de droit */}
                 <div style={{ display: 'flex', gap: '0.8rem', marginTop: '0.8rem', paddingTop: '0.7rem', borderTop: '1px solid var(--border-color)' }}>
-                  {isCAAccessible ? (
-                    <>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--status-ready-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <ArrowUpRight size={13} color="var(--status-ready)" />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>Encaissé</div>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
-                            {showCAValues ? encaisseTotal.toLocaleString() : '••••••'}
-                          </div>
-                        </div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--status-ready-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ArrowUpRight size={13} color="var(--status-ready)" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>Encaissé</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
+                        {canToggleCA ? (showCAValues ? encaisseTotal.toLocaleString() : '••••••') : '••••••'}
                       </div>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--status-late-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <ArrowDownRight size={13} color="var(--status-late)" />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>Reste dû</div>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
-                            {showCAValues ? resteTotal.toLocaleString() : '••••••'}
-                          </div>
-                        </div>
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--status-late-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ArrowDownRight size={13} color="var(--status-late)" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>Reste dû</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
+                        {canToggleCA ? (showCAValues ? resteTotal.toLocaleString() : '••••••') : '••••••'}
                       </div>
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--status-pending-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Zap size={13} color="var(--status-pending)" />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>Urgentes</div>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>{expressOrders.length}</div>
-                        </div>
-                      </div>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--status-late-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <TriangleAlert size={13} color="var(--status-late)" />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>En retard</div>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>{lateOrders.length}</div>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -3082,22 +3055,14 @@ export default function MobileView() {
                   { label: 'Actives', value: activeOrders.length, color: 'var(--primary)', bg: 'var(--primary-light)', icon: <Activity size={14} color="var(--primary)" />, sub: 'commandes en cours', subView: 'actives_detail' },
                   { label: 'Livrées', value: completedThisMonth.length, color: 'var(--status-ready)', bg: 'var(--status-ready-light)', icon: <CheckCircle size={14} color="var(--status-ready)" />, sub: 'ce mois-ci', subView: 'livrees_detail' },
                   { label: 'Express', value: expressOrders.length, color: 'var(--status-pending)', bg: 'var(--status-pending-light)', icon: <Zap size={14} color="var(--status-pending)" />, sub: 'urgentes', subView: 'express_detail' },
-                  isCAAccessible ? {
+                  {
                     label: 'CA Mois',
-                    value: showCAValues ? (revenueMonth >= 1000 ? `${(revenueMonth/1000).toFixed(0)}k` : revenueMonth) : '••••••',
+                    value: canToggleCA ? (showCAValues ? (revenueMonth >= 1000 ? `${(revenueMonth/1000).toFixed(0)}k` : revenueMonth) : '••••••') : '••••••',
                     color: 'var(--secondary)',
                     bg: 'var(--secondary-light)',
                     icon: <TrendingUp size={14} color="var(--secondary)" />,
                     sub: 'FCFA',
-                    subView: 'ca_detail'
-                  } : { 
-                    label: 'En Retard', 
-                    value: lateOrders.length, 
-                    color: 'var(--status-late)', 
-                    bg: 'var(--status-late-light)', 
-                    icon: <TriangleAlert size={14} color="var(--status-late)" />, 
-                    sub: 'à livrer',
-                    subView: 'retard_detail'
+                    subView: canToggleCA ? 'ca_detail' : 'actives_detail'
                   },
                 ].map((kpi, i) => {
                   const isColoredCard = kpi.label === 'Actives' || kpi.label === 'Livrées';
