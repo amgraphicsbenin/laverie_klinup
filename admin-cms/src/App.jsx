@@ -348,6 +348,7 @@ function App() {
               const res = await db.testConnection();
               if (res.success) {
                 alert("Succès ! Connexion établie avec le cloud Supabase. L'administration est maintenant en ligne !");
+                setDbIsRemote(true);
               } else {
                 alert("Échec de connexion : " + res.error);
               }
@@ -369,6 +370,7 @@ function App() {
             <MIcon name="sync" size={16} />
             Réessayer
           </button>
+
         </div>
       </div>
     );

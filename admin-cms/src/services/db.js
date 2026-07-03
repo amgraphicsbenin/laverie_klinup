@@ -205,6 +205,9 @@ let memoryDb = {
 };
 
 const listeners = new Set();
+const notifyListeners = () => {
+  listeners.forEach(l => l());
+};
 let isUsingRemote = false;
 
 // --- PERSISTENCE HELPERS (LOCALSTORAGE FALLBACK) ---
@@ -234,18 +237,114 @@ const saveData = (key, data) => {
 };
 
 function loadFromLocalStorage() {
-  memoryDb.staff = DEFAULT_STAFF;
-  memoryDb.customers = DEFAULT_CUSTOMERS;
-  memoryDb.orders = DEFAULT_ORDERS;
-  memoryDb.logs = DEFAULT_LOGS;
-  memoryDb.catalog = DEFAULT_CATALOG;
+  memoryDb.staff = loadData(STORAGE_KEYS.STAFF, DEFAULT_STAFF);
+  memoryDb.customers = loadData(STORAGE_KEYS.CUSTOMERS, DEFAULT_CUSTOMERS);
+  memoryDb.orders = loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
+  memoryDb.logs = loadData(STORAGE_KEYS.LOGS, DEFAULT_LOGS);
+  memoryDb.catalog = loadData(STORAGE_KEYS.CATALOG, DEFAULT_CATALOG);
   memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
-  memoryDb.pin_reset_requests = [];
-  db.notify();
+  memoryDb.pin_reset_requests = loadData('klin_up_pin_reset_requests', []);
+  notifyListeners();
 }
 
 function persist() {
+  saveData(STORAGE_KEYS.STAFF, memoryDb.staff);
+  saveData(STORAGE_KEYS.CUSTOMERS, memoryDb.customers);
+  saveData(STORAGE_KEYS.ORDERS, memoryDb.orders);
+  saveData(STORAGE_KEYS.LOGS, memoryDb.logs);
+  saveData(STORAGE_KEYS.CATALOG, memoryDb.catalog);
   saveData(STORAGE_KEYS.CURRENT_USER, memoryDb.current_user);
+  saveData('klin_up_pin_reset_requests', memoryDb.pin_reset_requests);
+}
+
+function addToSyncQueue(action, table, recordId, data) {
+  const queue = loadData('klin_up_sync_queue', []);
+  queue.push({
+    id: 'sq_' + Math.random().toString(36).substr(2, 9),
+    action,
+    table,
+    recordId,
+    data,
+    timestamp: new Date().toISOString()
+  });
+  saveData('klin_up_sync_queue', queue);
+}
+
+async function syncOfflineQueue() {
+  if (!supabase) return;
+  const queue = loadData('klin_up_sync_queue', []);
+  if (queue.length === 0) return;
+  
+  console.log(`[DB] 🔄 Début de synchronisation de la file d'attente hors-ligne (${queue.length} opérations)...`);
+  
+  let successCount = 0;
+  for (const item of queue) {
+    try {
+      let res;
+      if (item.action === 'insert') {
+        res = await supabase.from(item.table).insert(item.data);
+      } else if (item.action === 'update') {
+        res = await supabase.from(item.table).update(item.data).eq('id', item.recordId);
+      } else if (item.action === 'delete') {
+        res = await supabase.from(item.table).delete().eq('id', item.recordId);
+      }
+      
+      if (res && res.error) {
+        console.warn(`[DB] Erreur lors de la sync hors-ligne de l'opération ${item.id}:`, res.error.message);
+        if (res.error.message.includes('network') || res.error.message.includes('Fetch')) {
+          throw new Error("Réseau indisponible lors de la sync");
+        }
+      }
+      successCount++;
+    } catch (err) {
+      console.warn(`[DB] Interruption de la synchronisation de la file d'attente : ${err.message}`);
+      const remaining = queue.slice(successCount);
+      saveData('klin_up_sync_queue', remaining);
+      return;
+    }
+  }
+  
+  saveData('klin_up_sync_queue', []);
+  console.log(`[DB] ✅ Synchronisation de la file d'attente terminée.`);
+}
+
+async function performMutation(action, table, recordId, data, rollbackFn) {
+  if (!isUsingRemote) {
+    addToSyncQueue(action, table, recordId, data);
+    return;
+  }
+  
+  try {
+    let res;
+    if (action === 'insert') {
+      res = await supabase.from(table).insert(data);
+    } else if (action === 'update') {
+      res = await supabase.from(table).update(data).eq('id', recordId);
+    } else if (action === 'delete') {
+      res = await supabase.from(table).delete().eq('id', recordId);
+    }
+    
+    if (res && res.error) {
+      const errMsg = res.error.message || '';
+      const isNetworkError = errMsg.includes('Failed to fetch') || errMsg.includes('network') || errMsg.includes('load');
+      if (isNetworkError) {
+        console.warn(`[DB] Mutation échouée pour raison réseau, mise en file d'attente.`);
+        isUsingRemote = false;
+        db.notify();
+        addToSyncQueue(action, table, recordId, data);
+        startAutoReconnect();
+      } else {
+        console.error(`[DB] Erreur de validation de base de données :`, res.error.message);
+        if (rollbackFn) rollbackFn(res.error);
+      }
+    }
+  } catch (err) {
+    console.warn(`[DB] Exception réseau lors de la mutation, mise en file d'attente :`, err.message);
+    isUsingRemote = false;
+    db.notify();
+    addToSyncQueue(action, table, recordId, data);
+    startAutoReconnect();
+  }
 }
 
 // Helper: ajouter un timeout à une promesse
@@ -256,21 +355,17 @@ function withTimeout(promise, ms, label) {
   return Promise.race([promise, timeout]);
 }
 
-// Initialisation de la base Supabase — robuste pour l'Admin
+// Initialisation de la base Supabase — Supabase obligatoire (pas de fallback local)
 async function initDb(isRetry = false) {
-  // Toujours charger les données locales en premier pour un démarrage rapide
-  if (!isRetry) {
-    loadFromLocalStorage();
-  }
-
   if (!supabase) {
-    console.warn("[DB] Client Supabase non disponible. Mode hors-ligne.");
+    console.warn("[DB] Client Supabase non disponible. Impossible de démarrer l'application.");
+    db.notify();
     return;
   }
 
   // Tentatives de connexion avec retry
   let attempt = 0;
-  const maxAttempts = isRetry ? 1 : 3; // Réduire à 1 tentative lors d'une reconnexion manuelle ou automatique
+  const maxAttempts = isRetry ? 1 : 3;
   const retryDelayMs = 3000;
 
   while (attempt < maxAttempts) {
@@ -298,7 +393,7 @@ async function initDb(isRetry = false) {
         throw new Error("Les tables principales sont inaccessibles.");
       }
 
-      // Appliquer les résultats disponibles (les tables qui ont échoué gardent leurs valeurs locales)
+      // Appliquer les résultats depuis Supabase
       if (staffRes.status === 'fulfilled' && !staffRes.value?.error && staffRes.value?.data?.length > 0) {
         memoryDb.staff = staffRes.value.data;
       }
@@ -318,19 +413,24 @@ async function initDb(isRetry = false) {
         memoryDb.pin_reset_requests = reqsRes.value.data || [];
       }
 
-      // Conserver l'utilisateur courant depuis le stockage local
+      // Récupérer l'utilisateur courant depuis localStorage (stockage de session)
       memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
       isUsingRemote = true;
 
       console.log("[DB] ✅ Connecté à Supabase avec succès.");
+      
+      // Essayer de synchroniser la file d'attente hors-ligne
+      await syncOfflineQueue();
+
+      persist(); // Sauvegarder les données récupérées en local
       db.notify();
 
       // Démarrage des abonnements temps réel (non-bloquant, erreurs ignorées)
       try { setupRealtime(); } catch (e) { console.warn("[DB] Realtime non disponible:", e.message); }
 
-      // Sync périodique toutes les 60s pour rattraper les mises à jour manquées
+      // Sync périodique toutes les 60s
       startPeriodicSync();
-      return; // Succès, sortir de la boucle
+      return; // Saccès, sortir de la boucle
 
     } catch (err) {
       console.warn(`[DB] Tentative ${attempt} échouée : ${err.message}`);
@@ -338,7 +438,8 @@ async function initDb(isRetry = false) {
         console.log(`[DB] Retry dans ${retryDelayMs / 1000}s...`);
         await new Promise(r => setTimeout(r, retryDelayMs));
       } else {
-        console.warn("[DB] Toutes les tentatives ont échoué. Mode hors-ligne.");
+        console.warn("[DB] Toutes les tentatives ont échoué. Mantenant la tentative de reconnexion automatique...");
+        // Rester en mode déconnecté, l'UI affichera l'erreur
         db.notify();
         startAutoReconnect();
       }
@@ -394,7 +495,7 @@ async function startPeriodicSync() {
       if (reqsRes.status === 'fulfilled' && !reqsRes.value?.error) { memoryDb.pin_reset_requests = reqsRes.value.data || []; changed = true; }
       if (changed) { persist(); db.notify(); }
     } catch (e) {
-      // Sync silencieuse
+      // Sync silencieuse, pas de basculement hors-ligne
     }
   }, 60000); // Toutes les 60 secondes
 }
@@ -447,6 +548,7 @@ function setupRealtime() {
   });
 }
 
+loadFromLocalStorage();
 initDb();
 
 export const db = {
@@ -455,7 +557,7 @@ export const db = {
     return () => listeners.delete(listener);
   },
   notify: () => {
-    listeners.forEach(l => l());
+    notifyListeners();
   },
 
   getStaff: () => [...memoryDb.staff],
@@ -489,18 +591,11 @@ export const db = {
     persist();
     db.notify();
 
-    if (isUsingRemote) {
-      supabase.from('activity_logs').insert(newLog).then(({ error }) => {
-        if (error) console.error("Error logging action to Supabase:", error.message);
-      });
-    }
+    performMutation('insert', 'activity_logs', newLog.id, newLog);
     return newLog;
   },
 
   addCustomer: (customer) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const cleanPhone = customer.telephone.trim();
     const phoneExists = memoryDb.customers.some(c => c.telephone.trim() === cleanPhone);
     if (phoneExists) {
@@ -523,20 +618,15 @@ export const db = {
     persist();
     db.notify();
 
-    supabase.from('customers').insert(newCustomer).then(({ error }) => {
-      if (error) {
-        memoryDb.customers = memoryDb.customers.filter(c => c.id !== newCustomer.id);
-        db.notify();
-        alert("Erreur Supabase lors de la création du client : " + error.message);
-      }
+    performMutation('insert', 'customers', newCustomer.id, newCustomer, () => {
+      memoryDb.customers = memoryDb.customers.filter(c => c.id !== newCustomer.id);
+      persist();
+      db.notify();
     });
     return newCustomer;
   },
 
   updateCustomer: (id, updatedFields) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const customer = memoryDb.customers.find(c => c.id === id);
     if (customer) {
       if (updatedFields.telephone) {
@@ -558,20 +648,20 @@ export const db = {
       persist();
       db.notify();
 
-      supabase.from('customers').update({
+      const updateData = {
         nom: customer.nom,
         prenom: customer.prenom,
         telephone: customer.telephone,
         adresse: customer.adresse,
         preferences_pliage: customer.preferences_pliage
-      }).eq('id', id).then(({ error }) => {
-        if (error) {
-          const current = memoryDb.customers.find(c => c.id === id);
-          if (current) {
-            Object.assign(current, original);
-            db.notify();
-          }
-          alert("Erreur Supabase lors de la modification du client : " + error.message);
+      };
+
+      performMutation('update', 'customers', id, updateData, () => {
+        const current = memoryDb.customers.find(c => c.id === id);
+        if (current) {
+          Object.assign(current, original);
+          persist();
+          db.notify();
         }
       });
       return customer;
@@ -580,9 +670,6 @@ export const db = {
   },
 
   deleteCustomer: (id) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const idx = memoryDb.customers.findIndex(c => c.id === id);
     if (idx !== -1) {
       const customer = memoryDb.customers[idx];
@@ -591,12 +678,10 @@ export const db = {
       persist();
       db.notify();
 
-      supabase.from('customers').delete().eq('id', id).then(({ error }) => {
-        if (error) {
-          memoryDb.customers.push(customer);
-          db.notify();
-          alert("Erreur Supabase lors de la suppression du client : " + error.message);
-        }
+      performMutation('delete', 'customers', id, null, () => {
+        memoryDb.customers.push(customer);
+        persist();
+        db.notify();
       });
       return true;
     }
@@ -604,9 +689,6 @@ export const db = {
   },
 
   updateCustomerDebt: (customerId, amount) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const customer = memoryDb.customers.find(c => c.id === customerId);
     if (customer) {
       const originalDebt = customer.solde_dette;
@@ -615,12 +697,10 @@ export const db = {
       persist();
       db.notify();
 
-      supabase.from('customers').update({ solde_dette: customer.solde_dette }).eq('id', customerId).then(({ error }) => {
-        if (error) {
-          customer.solde_dette = originalDebt;
-          db.notify();
-          alert("Erreur Supabase lors de la modification de la dette client : " + error.message);
-        }
+      performMutation('update', 'customers', customerId, { solde_dette: customer.solde_dette }, () => {
+        customer.solde_dette = originalDebt;
+        persist();
+        db.notify();
       });
     }
   },
@@ -634,11 +714,11 @@ export const db = {
       persist();
       db.notify();
 
-      if (isUsingRemote) {
-        supabase.from('catalog').update({ prix: item.prix }).eq('id', id).then(({ error }) => {
-          if (error) console.error("Error updating catalog price on Supabase:", error.message);
-        });
-      }
+      performMutation('update', 'catalog', id, { prix: item.prix }, () => {
+        item.prix = oldPrice;
+        persist();
+        db.notify();
+      });
     }
   },
 
@@ -648,6 +728,7 @@ export const db = {
       const oldName = item.article;
       const oldPrice = item.prix;
       const oldDesc = item.description || '';
+      const original = { ...item };
       
       if (updatedFields.article !== undefined) item.article = updatedFields.article;
       if (updatedFields.prix !== undefined) item.prix = Number(updatedFields.prix);
@@ -660,15 +741,17 @@ export const db = {
       persist();
       db.notify();
 
-      if (isUsingRemote) {
-        supabase.from('catalog').update({
-          article: item.article,
-          prix: item.prix,
-          description: item.description
-        }).eq('id', id).then(({ error }) => {
-          if (error) console.error("Error updating catalog item on Supabase:", error.message);
-        });
-      }
+      const updateData = {
+        article: item.article,
+        prix: item.prix,
+        description: item.description
+      };
+
+      performMutation('update', 'catalog', id, updateData, () => {
+        Object.assign(item, original);
+        persist();
+        db.notify();
+      });
       return item;
     }
   },
@@ -687,18 +770,15 @@ export const db = {
     persist();
     db.notify();
 
-    if (isUsingRemote) {
-      supabase.from('catalog').insert(newItem).then(({ error }) => {
-        if (error) console.error("Error inserting catalog item to Supabase:", error.message);
-      });
-    }
+    performMutation('insert', 'catalog', newItem.id, newItem, () => {
+      memoryDb.catalog = memoryDb.catalog.filter(i => i.id !== newItem.id);
+      persist();
+      db.notify();
+    });
     return newItem;
   },
 
   createOrder: (orderData) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const customer = memoryDb.customers.find(c => c.id === orderData.customer_id);
     const originalCustomerState = customer ? JSON.parse(JSON.stringify(customer)) : null;
     
@@ -845,33 +925,27 @@ export const db = {
     persist();
     db.notify();
 
-    supabase.from('orders').insert(newOrder).then(({ error }) => {
-      if (error) {
-        memoryDb.orders = memoryDb.orders.filter(o => o.id !== newOrder.id);
-        if (customer && originalCustomerState) {
-          Object.assign(customer, originalCustomerState);
-        }
-        db.notify();
-        alert("Erreur Supabase lors de la création de la commande : " + error.message);
+    performMutation('insert', 'orders', newOrder.id, newOrder, () => {
+      memoryDb.orders = memoryDb.orders.filter(o => o.id !== newOrder.id);
+      if (customer && originalCustomerState) {
+        Object.assign(customer, originalCustomerState);
       }
+      persist();
+      db.notify();
     });
 
     if (customer) {
-      supabase.from('customers').update({
+      const updateData = {
         solde_dette: customer.solde_dette,
         points_fidelite: customer.points_fidelite,
         active_subscription: customer.active_subscription
-      }).eq('id', customer.id).then(({ error }) => {
-        if (error) console.error("Error updating customer on Supabase:", error.message);
-      });
+      };
+      performMutation('update', 'customers', customer.id, updateData);
     }
     return newOrder;
   },
 
   updateOrderStatus: (orderId, newStatus) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
@@ -881,6 +955,26 @@ export const db = {
 
     const oldStatus = order.statut;
     order.statut = newStatus;
+
+    let typeLivraison = order.subscription_details?.type_livraison;
+    if (newStatus === 'a_recuperer') {
+      typeLivraison = 'recuperation';
+    } else if (newStatus === 'a_livrer' || newStatus === 'en_cours_livraison') {
+      typeLivraison = 'livraison';
+    } else if (newStatus === 'restitue') {
+      if (oldStatus === 'a_recuperer') {
+        typeLivraison = 'recuperation';
+      } else if (oldStatus === 'en_cours_livraison' || oldStatus === 'a_livrer') {
+        typeLivraison = 'livraison';
+      }
+    }
+
+    if (typeLivraison) {
+      order.subscription_details = {
+        ...(order.subscription_details || {}),
+        type_livraison: typeLivraison
+      };
+    }
 
     if (newStatus === 'restitue' || newStatus === 'a_livrer' || newStatus === 'a_recuperer') {
       order.solde_paid_at = new Date().toISOString();
@@ -892,11 +986,9 @@ export const db = {
           customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
           db.logAction('PAIEMENT_FINAL', `Règlement du solde restant (${remainingToPay} FCFA) par le client ${customer.prenom} ${customer.nom} lors de la restitution`);
           
-          supabase.from('customers').update({
+          performMutation('update', 'customers', customer.id, {
             solde_dette: customer.solde_dette,
             points_fidelite: customer.points_fidelite
-          }).eq('id', customer.id).then(({ error }) => {
-            if (error) console.error("Error updating customer on Supabase:", error.message);
           });
         }
       }
@@ -906,26 +998,24 @@ export const db = {
     persist();
     db.notify();
 
-    supabase.from('orders').update({
+    const updateData = {
       statut: order.statut,
-      solde_paid_at: order.solde_paid_at
-    }).eq('id', orderId).then(({ error }) => {
-      if (error) {
-        Object.assign(order, originalOrderState);
-        if (customer && originalCustomerState) {
-          Object.assign(customer, originalCustomerState);
-        }
-        db.notify();
-        alert("Erreur Supabase lors du changement de statut : " + error.message);
+      solde_paid_at: order.solde_paid_at,
+      subscription_details: order.subscription_details
+    };
+
+    performMutation('update', 'orders', orderId, updateData, () => {
+      Object.assign(order, originalOrderState);
+      if (customer && originalCustomerState) {
+        Object.assign(customer, originalCustomerState);
       }
+      persist();
+      db.notify();
     });
     return order;
   },
 
   deliverOrderWithPayment: (orderId, amountPaid, paymentMethod, finalStatus = 'restitue') => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
@@ -940,16 +1030,30 @@ export const db = {
     order.avance_payee = Number(order.avance_payee) + Number(amountPaid);
     order.solde_paid_at = new Date().toISOString();
 
+    let typeLivraison = order.subscription_details?.type_livraison;
+    if (finalStatus === 'restitue') {
+      if (oldStatus === 'a_recuperer') {
+        typeLivraison = 'recuperation';
+      } else if (oldStatus === 'en_cours_livraison' || oldStatus === 'a_livrer') {
+        typeLivraison = 'livraison';
+      }
+    }
+
+    if (typeLivraison) {
+      order.subscription_details = {
+        ...(order.subscription_details || {}),
+        type_livraison: typeLivraison
+      };
+    }
+
     if (customer && amountPaid > 0) {
       customer.solde_dette = Math.max(0, Number(customer.solde_dette) - Number(amountPaid));
       const newPoints = Math.floor(amountPaid / 1000) * 1;
       customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
       
-      supabase.from('customers').update({
+      performMutation('update', 'customers', customer.id, {
         solde_dette: customer.solde_dette,
         points_fidelite: customer.points_fidelite
-      }).eq('id', customer.id).then(({ error }) => {
-        if (error) console.error("Error updating customer debt on Supabase:", error.message);
       });
     }
 
@@ -961,28 +1065,26 @@ export const db = {
     persist();
     db.notify();
 
-    supabase.from('orders').update({
+    const updateData = {
       statut: order.statut,
       mode_reglement: order.mode_reglement,
       avance_payee: order.avance_payee,
-      solde_paid_at: order.solde_paid_at
-    }).eq('id', orderId).then(({ error }) => {
-      if (error) {
-        Object.assign(order, originalOrderState);
-        if (customer && originalCustomerState) {
-          Object.assign(customer, originalCustomerState);
-        }
-        db.notify();
-        alert("Erreur Supabase lors du règlement final : " + error.message);
+      solde_paid_at: order.solde_paid_at,
+      subscription_details: order.subscription_details
+    };
+
+    performMutation('update', 'orders', orderId, updateData, () => {
+      Object.assign(order, originalOrderState);
+      if (customer && originalCustomerState) {
+        Object.assign(customer, originalCustomerState);
       }
+      persist();
+      db.notify();
     });
     return order;
   },
 
   cancelOrder: (orderId) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
@@ -996,25 +1098,20 @@ export const db = {
     const unpaid = order.prix_total - order.avance_payee;
     if (unpaid > 0 && customer) {
       customer.solde_dette = Math.max(0, Number(customer.solde_dette) - unpaid);
-      
-      supabase.from('customers').update({ solde_dette: customer.solde_dette }).eq('id', customer.id).then(({ error }) => {
-        if (error) console.error("Error updating customer debt on Supabase:", error.message);
-      });
+      performMutation('update', 'customers', customer.id, { solde_dette: customer.solde_dette });
     }
 
     db.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage} annulée par l'administrateur`);
     persist();
     db.notify();
 
-    supabase.from('orders').update({ statut: 'annule' }).eq('id', orderId).then(({ error }) => {
-      if (error) {
-        Object.assign(order, originalOrderState);
-        if (customer && originalCustomerState) {
-          Object.assign(customer, originalCustomerState);
-        }
-        db.notify();
-        alert("Erreur Supabase lors de l'annulation de la commande : " + error.message);
+    performMutation('update', 'orders', orderId, { statut: 'annule' }, () => {
+      Object.assign(order, originalOrderState);
+      if (customer && originalCustomerState) {
+        Object.assign(customer, originalCustomerState);
       }
+      persist();
+      db.notify();
     });
     return order;
   },
@@ -1043,17 +1140,18 @@ export const db = {
     persist();
     db.notify();
 
-    if (isUsingRemote) {
-      supabase.from('staff').insert(newMember).then(({ error }) => {
-        if (error) console.error("Error inserting staff member to Supabase:", error.message);
-      });
-    }
+    performMutation('insert', 'staff', newMember.id, newMember, () => {
+      memoryDb.staff = memoryDb.staff.filter(s => s.id !== newMember.id);
+      persist();
+      db.notify();
+    });
     return newMember;
   },
 
   updateStaff: (id, updatedFields) => {
     const member = memoryDb.staff.find(s => s.id === id);
     if (member) {
+      const original = { ...member };
       if (updatedFields.nom !== undefined) member.nom = updatedFields.nom;
       if (updatedFields.prenom !== undefined) member.prenom = updatedFields.prenom;
       if (updatedFields.role !== undefined) member.role = updatedFields.role;
@@ -1066,19 +1164,21 @@ export const db = {
       persist();
       db.notify();
 
-      if (isUsingRemote) {
-        supabase.from('staff').update({
-          nom: member.nom,
-          prenom: member.prenom,
-          role: member.role,
-          email: member.email,
-          telephone: member.telephone,
-          statut: member.statut,
-          permissions: member.permissions
-        }).eq('id', id).then(({ error }) => {
-          if (error) console.error("Error updating staff member on Supabase:", error.message);
-        });
-      }
+      const updateData = {
+        nom: member.nom,
+        prenom: member.prenom,
+        role: member.role,
+        email: member.email,
+        telephone: member.telephone,
+        statut: member.statut,
+        permissions: member.permissions
+      };
+
+      performMutation('update', 'staff', id, updateData, () => {
+        Object.assign(member, original);
+        persist();
+        db.notify();
+      });
       return member;
     }
   },
@@ -1092,20 +1192,17 @@ export const db = {
       persist();
       db.notify();
 
-      if (isUsingRemote) {
-        supabase.from('staff').delete().eq('id', id).then(({ error }) => {
-          if (error) console.error("Error deleting staff member from Supabase:", error.message);
-        });
-      }
+      performMutation('delete', 'staff', id, null, () => {
+        memoryDb.staff.push(member);
+        persist();
+        db.notify();
+      });
       return true;
     }
     return false;
   },
 
   subscribeCustomer: (customerId, catalogItemId) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const customer = memoryDb.customers.find(c => c.id === customerId);
     const subPlan = memoryDb.catalog.find(c => c.id === catalogItemId && c.service === 'abonnement');
     if (customer && subPlan) {
@@ -1132,21 +1229,16 @@ export const db = {
       persist();
       db.notify();
 
-      supabase.from('customers').update({ active_subscription: customer.active_subscription }).eq('id', customerId).then(({ error }) => {
-        if (error) {
-          customer.active_subscription = originalSubState;
-          db.notify();
-          alert("Erreur Supabase lors de la souscription : " + error.message);
-        }
+      performMutation('update', 'customers', customerId, { active_subscription: customer.active_subscription }, () => {
+        customer.active_subscription = originalSubState;
+        persist();
+        db.notify();
       });
       return customer;
     }
   },
 
   unsubscribeCustomer: (customerId) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     const customer = memoryDb.customers.find(c => c.id === customerId);
     if (customer && customer.active_subscription) {
       const originalSubState = { ...customer.active_subscription };
@@ -1156,12 +1248,10 @@ export const db = {
       persist();
       db.notify();
 
-      supabase.from('customers').update({ active_subscription: null }).eq('id', customerId).then(({ error }) => {
-        if (error) {
-          customer.active_subscription = originalSubState;
-          db.notify();
-          alert("Erreur Supabase lors du désabonnement : " + error.message);
-        }
+      performMutation('update', 'customers', customerId, { active_subscription: null }, () => {
+        customer.active_subscription = originalSubState;
+        persist();
+        db.notify();
       });
       return customer;
     }
@@ -1200,9 +1290,6 @@ export const db = {
   getPinResetRequests: () => memoryDb.pin_reset_requests ? [...memoryDb.pin_reset_requests] : [],
 
   createPinResetRequest: (email) => {
-    if (!isUsingRemote) {
-      throw new Error("Erreur de connexion : Impossible de communiquer avec Supabase. Action impossible hors-ligne.");
-    }
     if (!memoryDb.pin_reset_requests) {
       memoryDb.pin_reset_requests = [];
     }
@@ -1219,12 +1306,10 @@ export const db = {
     persist();
     db.notify();
 
-    supabase.from('pin_reset_requests').insert(newRequest).then(({ error }) => {
-      if (error) {
-        memoryDb.pin_reset_requests = memoryDb.pin_reset_requests.filter(r => r.id !== newRequest.id);
-        db.notify();
-        alert("Erreur Supabase lors de la demande de réinitialisation : " + error.message);
-      }
+    performMutation('insert', 'pin_reset_requests', newRequest.id, newRequest, () => {
+      memoryDb.pin_reset_requests = memoryDb.pin_reset_requests.filter(r => r.id !== newRequest.id);
+      persist();
+      db.notify();
     });
     return newRequest;
   },
@@ -1243,15 +1328,8 @@ export const db = {
         persist();
         db.notify();
 
-        if (isUsingRemote) {
-          supabase.from('staff').update({ code_pin: newPin }).eq('id', staffMember.id).then(({ error }) => {
-            if (error) console.error("Error updating staff pin on Supabase:", error.message);
-          });
-          
-          supabase.from('pin_reset_requests').update({ status: 'approved', resolved_pin: newPin }).eq('id', requestId).then(({ error }) => {
-            if (error) console.error("Error updating pin reset request on Supabase:", error.message);
-          });
-        }
+        performMutation('update', 'staff', staffMember.id, { code_pin: newPin });
+        performMutation('update', 'pin_reset_requests', requestId, { status: 'approved', resolved_pin: newPin });
         return { req, newPin, staffMember };
       } else {
         req.status = 'rejected';
@@ -1259,11 +1337,7 @@ export const db = {
         persist();
         db.notify();
 
-        if (isUsingRemote) {
-          supabase.from('pin_reset_requests').update({ status: 'rejected' }).eq('id', requestId).then(({ error }) => {
-            if (error) console.error("Error updating pin reset request on Supabase:", error.message);
-          });
-        }
+        performMutation('update', 'pin_reset_requests', requestId, { status: 'rejected' });
         return null;
       }
     }
@@ -1279,11 +1353,7 @@ export const db = {
       persist();
       db.notify();
 
-      if (isUsingRemote) {
-        supabase.from('pin_reset_requests').update({ status: 'rejected' }).eq('id', requestId).then(({ error }) => {
-          if (error) console.error("Error updating pin reset request on Supabase:", error.message);
-        });
-      }
+      performMutation('update', 'pin_reset_requests', requestId, { status: 'rejected' });
     }
   },
 
@@ -1295,11 +1365,7 @@ export const db = {
       persist();
       db.notify();
 
-      if (isUsingRemote) {
-        supabase.from('staff').update({ code_pin: newPin }).eq('id', userId).then(({ error }) => {
-          if (error) console.error("Error resetting staff pin on Supabase:", error.message);
-        });
-      }
+      performMutation('update', 'staff', userId, { code_pin: newPin });
       return staffMember;
     }
     return null;

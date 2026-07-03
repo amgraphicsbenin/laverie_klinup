@@ -832,6 +832,11 @@ button, input, select, textarea { font-family: inherit; }
   outline: none;
   position: relative;
   overflow: hidden;
+  transition: transform 0.22s var(--ease-emphasized),
+              box-shadow 0.22s var(--ease-emphasized),
+              background-color 0.22s var(--ease-emphasized),
+              border-color 0.22s var(--ease-emphasized),
+              color 0.22s var(--ease-emphasized);
 }
 
 .btn-primary {
@@ -839,7 +844,6 @@ button, input, select, textarea { font-family: inherit; }
   color: #ffffff;
   border: 1px solid #2563eb;
   box-shadow: var(--shadow-sm);
-  transition: all 0.5s var(--ease-elastic);
 }
 
 .btn-primary:hover {
@@ -852,7 +856,6 @@ button, input, select, textarea { font-family: inherit; }
   color: var(--primary);
   border: 1px solid #bfdbfe;
   box-shadow: var(--shadow-sm);
-  transition: all 0.5s var(--ease-spring-soft);
 }
 
 .btn-secondary:hover {
@@ -928,10 +931,12 @@ button, input, select, textarea { font-family: inherit; }
 }
 .badge-en_attente { background: var(--status-pending-light); color: var(--status-pending); border: 1px solid rgba(255, 208, 115, 0.25); }
 .badge-en_cours_lavage { background: var(--status-washing-light); color: var(--status-washing); border: 1px solid rgba(124, 181, 255, 0.25); }
+.badge-en_cours_repassage { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.2); }
 .badge-pret { background: var(--status-ready-light); color: var(--status-ready); border: 1px solid rgba(107, 241, 182, 0.25); }
 .badge-restitue { background: var(--status-delivered-light); color: var(--status-delivered); border: 1px solid rgba(208, 211, 217, 0.25); }
 .badge-a_livrer { background: rgba(43, 130, 240, 0.1); color: #2B82F0; border: 1px solid rgba(43, 130, 240, 0.2); }
 .badge-a_recuperer { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+.badge-en_cours_livraison { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); }
 .badge-en_retard { background: var(--status-late-light); color: var(--status-late); border: 1px solid rgba(255, 142, 142, 0.25); }
 .badge-annule { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); text-decoration: line-through; }
 
@@ -1145,7 +1150,6 @@ select.input-control option {
 }
 
 /* Premium Elastic transitions */
-.btn,
 .action-circle-btn,
 .eye-toggle-btn,
 .mobile-nav-btn,
@@ -1161,8 +1165,8 @@ select.input-control option {
 
 /* Hovers avec effets élastiques */
 .btn:hover {
-  transform: translateY(-3px) scale(1.05);
-  animation: glow-pulse 1.5s ease-in-out;
+  transform: translateY(-1.5px);
+  box-shadow: var(--shadow-md);
 }
 
 .action-circle-btn:hover, .eye-toggle-btn:hover {
@@ -1187,8 +1191,15 @@ select.input-control option {
   border-color: var(--glass-border-hover);
   box-shadow: var(--shadow-lg);
 }
+
 /* Active downscales avec animation élastique (tactile physics) */
-.btn:active, .action-circle-btn:active, .eye-toggle-btn:active, .mobile-nav-btn:active {
+.btn:active {
+  transform: translateY(0.5px) scale(0.985) !important;
+  transition: transform 0.12s var(--ease-emphasized) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.action-circle-btn:active, .eye-toggle-btn:active, .mobile-nav-btn:active {
   transform: scale(0.96) !important;
   transition: transform 150ms var(--ease-spring-back) !important;
 }

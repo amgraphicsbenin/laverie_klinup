@@ -392,13 +392,24 @@ export default function AdminView({ activeTab, searchQuery }) {
   const pendingOrdersCount = orders.filter(o => o.statut === 'en_attente').length;
 
   const statusDisplayLabels = {
-    en_attente: 'En attente',
-    en_cours_lavage: 'En cours',
+    en_attente: 'En attente de traitement',
+    en_cours_lavage: 'En attente de repassage',
+    en_cours_repassage: 'Repassé',
     pret: 'Prêt',
-    a_livrer: 'À livrer',
-    a_recuperer: 'En attente de récupération',
-    restitue: 'Restitué',
+    a_recuperer: 'En attente de Récupération',
+    a_livrer: 'En attente de Livraison',
+    en_cours_livraison: 'En cours de livraison',
+    restitue: 'Livré / Récupéré',
     annule: 'Annulé'
+  };
+
+  const getOrderStatusLabel = (order) => {
+    if (!order) return '';
+    if (order.statut === 'restitue') {
+      const type = order.subscription_details?.type_livraison || (order.mode_reglement === 'livraison' ? 'livraison' : 'recuperation');
+      return type === 'recuperation' ? 'Récupéré' : 'Livré';
+    }
+    return statusDisplayLabels[order.statut] || order.statut;
   };
 
   const serviceLabels = {
@@ -505,7 +516,7 @@ export default function AdminView({ activeTab, searchQuery }) {
           o.type_article,
           serviceLabels[o.type_service] || o.type_service,
           o.niveau_urgence || 'Normal',
-          statusDisplayLabels[o.statut] || o.statut,
+          getOrderStatusLabel(o),
           o.prix_total,
           o.avance_payee,
           new Date(o.created_at).toLocaleDateString('fr-FR')
@@ -737,7 +748,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                     </td>
                     <td>
                       <span className={badgeClass}>
-                        {statusDisplayLabels[o.statut] || o.statut}
+                        {getOrderStatusLabel(o)}
                       </span>
                     </td>
                     <td style={{ fontWeight: 700 }}>{o.prix_total.toLocaleString()} F</td>
@@ -1542,9 +1553,11 @@ export default function AdminView({ activeTab, searchQuery }) {
                 {staff.map(s => {
                   const isSuper = s.role === 'super_admin';
                   const isMgr = s.role === 'manager';
-                  const roleLabel = isSuper ? 'Super Admin' : isMgr ? 'Manager' : "Agent d'accueil";
-                  const taskLabel = isSuper ? "Supervision générale d'atelier" : isMgr ? "Gestion Caisse & Tarifs" : "Accueil & Marquage";
-                  const isOnline = s.role !== 'agent_accueil'; // simulate Pierre Diallo offline/mobile active
+                  const isLivreur = s.role === 'livreur';
+                  const isAtelier = s.role === 'agent_lavage_repassage';
+                  const roleLabel = isSuper ? 'Super Admin' : isMgr ? 'Manager' : isLivreur ? 'Livreur' : isAtelier ? 'Lavage & Repassage' : "Agent d'accueil";
+                  const taskLabel = isSuper ? "Supervision générale d'atelier" : isMgr ? "Gestion Caisse & Tarifs" : isLivreur ? "Livraison & Distribution" : isAtelier ? "Atelier & Production" : "Accueil & Marquage";
+                  const isOnline = s.role !== 'agent_accueil' && s.role !== 'livreur' && s.role !== 'agent_lavage_repassage'; // simulate Pierre Diallo offline/mobile active
 
                   return (
                     <div className="team-item" key={s.id}>
@@ -1714,7 +1727,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {isExpress && <span className="badge badge-en_retard" style={{ fontSize: '0.6rem', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>Express</span>}
                       <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.65rem' }}>
-                        {statusDisplayLabels[order.statut] || order.statut.replace(/_/g, ' ')}
+                        {getOrderStatusLabel(order)}
                       </span>
                     </div>
                   </div>
@@ -1784,11 +1797,13 @@ export default function AdminView({ activeTab, searchQuery }) {
                 }
 
                 const statusLabels = {
-                  en_attente: 'En attente de tri',
-                  en_cours_lavage: 'Lavage / Séchage',
-                  pret: 'Prêt à livrer',
-                  a_livrer: 'À livrer',
-                  a_recuperer: 'En attente de récupération'
+                  en_attente: 'En attente de traitement',
+                  en_cours_lavage: 'En attente de repassage',
+                  en_cours_repassage: 'Repassé',
+                  pret: 'Prêt',
+                  a_livrer: 'En attente de Livraison',
+                  a_recuperer: 'En attente de Récupération',
+                  en_cours_livraison: 'En cours de livraison'
                 };
 
                 return filteredAtelierOrders.map(order => {
@@ -1837,10 +1852,13 @@ export default function AdminView({ activeTab, searchQuery }) {
                             className={`badge badge-${order.statut}`}
                             style={{
                               fontSize: '0.65rem',
-                              cursor: (order.statut === 'a_livrer' || order.statut === 'a_recuperer') ? 'pointer' : 'default'
+                              cursor: (order.statut === 'a_livrer' || order.statut === 'a_recuperer' || order.statut === 'en_cours_livraison') ? 'pointer' : 'default'
                             }}
                             onClick={(e) => {
-                              if (order.statut === 'a_livrer' || order.statut === 'a_recuperer') {
+                              if (order.statut === 'a_livrer') {
+                                e.stopPropagation();
+                                handleStatusChange(order.id, 'en_cours_livraison');
+                              } else if (order.statut === 'a_recuperer' || order.statut === 'en_cours_livraison') {
                                 e.stopPropagation();
                                 handleStartDelivery(order, 'restitue');
                               }
@@ -1908,7 +1926,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                             onClick={() => handleStatusChange(order.id, 'en_cours_lavage')}
                           >
-                            Lancer Lavage
+                            Lancer le traitement
                           </button>
                         )}
                         {order.statut === 'en_cours_lavage' && (
@@ -1916,9 +1934,19 @@ export default function AdminView({ activeTab, searchQuery }) {
                             type="button"
                             className="btn btn-secondary"
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
+                            onClick={() => handleStatusChange(order.id, 'en_cours_repassage')}
+                          >
+                            Lancer le repassage
+                          </button>
+                        )}
+                        {order.statut === 'en_cours_repassage' && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                             onClick={() => handleStatusChange(order.id, 'pret')}
                           >
-                            Marquer Prêt
+                            Marquer comme prêt
                           </button>
                         )}
                         {order.statut === 'pret' && (
@@ -1946,9 +1974,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                             type="button"
                             className="btn btn-primary"
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                            onClick={() => handleStartDelivery(order, 'restitue')}
+                            onClick={() => handleStatusChange(order.id, 'en_cours_livraison')}
                           >
-                            Valider la livraison
+                            Livrer
                           </button>
                         )}
                         {order.statut === 'a_recuperer' && (
@@ -1958,7 +1986,17 @@ export default function AdminView({ activeTab, searchQuery }) {
                             style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                             onClick={() => handleStartDelivery(order, 'restitue')}
                           >
-                            En attente de récupération
+                            Récupérer
+                          </button>
+                        )}
+                        {order.statut === 'en_cours_livraison' && (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', border: 'none' }}
+                            onClick={() => handleStartDelivery(order, 'restitue')}
+                          >
+                            Marquer comme livré
                           </button>
                         )}
 
@@ -2070,7 +2108,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>{order.identifiant_unique_marquage}</span>
                         <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
-                          {statusDisplayLabels[order.statut] || order.statut.replace(/_/g, ' ')}
+                          {getOrderStatusLabel(order)}
                         </span>
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: 600 }}>
@@ -2350,7 +2388,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                               <td style={{ fontWeight: 600 }}>{o.prix_total.toLocaleString()} F</td>
                               <td>
                                 <span className={`badge badge-${o.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
-                                  {statusDisplayLabels[o.statut] || o.statut.replace(/_/g, ' ')}
+                                  {getOrderStatusLabel(o)}
                                 </span>
                               </td>
                               <td>
@@ -2651,7 +2689,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                   const isSelected = selectedStaffId === s.id;
                   const isSuper = s.role === 'super_admin';
                   const isMgr = s.role === 'manager';
-                  const roleLabel = isSuper ? 'Admin' : isMgr ? 'Manager' : "Accueil";
+                  const roleLabel = isSuper ? 'Admin' : isMgr ? 'Manager' : s.role === 'livreur' ? 'Livreur' : s.role === 'agent_lavage_repassage' ? 'Atelier' : "Accueil";
                   const isSuspended = s.statut === 'suspendu';
 
                   return (
@@ -2782,7 +2820,7 @@ export default function AdminView({ activeTab, searchQuery }) {
 
                 {/* Header Profil */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                  <div className="user-avatar" style={{ background: selectedMember.role === 'super_admin' ? 'var(--primary)' : selectedMember.role === 'manager' ? 'var(--secondary)' : '#64748b', color: '#fff', width: '48px', height: '48px', fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
+                  <div className="user-avatar" style={{ background: selectedMember.role === 'super_admin' ? 'var(--primary)' : selectedMember.role === 'manager' ? 'var(--secondary)' : selectedMember.role === 'livreur' ? '#3b82f6' : selectedMember.role === 'agent_lavage_repassage' ? '#8b5cf6' : '#64748b', color: '#fff', width: '48px', height: '48px', fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
                     {selectedMember.prenom.charAt(0)}{selectedMember.nom.charAt(0)}
                   </div>
                   <div style={{ flexGrow: 1 }}>
@@ -2790,7 +2828,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                       {selectedMember.prenom} {selectedMember.nom}
                     </h4>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0' }}>
-                      Rôle principal : <strong style={{ color: 'var(--primary)' }}>{selectedMember.role === 'super_admin' ? 'Super Administrateur' : selectedMember.role === 'manager' ? 'Manager Caisse' : "Agent d'accueil"}</strong>
+                      Rôle principal : <strong style={{ color: 'var(--primary)' }}>{selectedMember.role === 'super_admin' ? 'Super Administrateur' : selectedMember.role === 'manager' ? 'Manager Caisse' : selectedMember.role === 'livreur' ? 'Livreur' : selectedMember.role === 'agent_lavage_repassage' ? 'Agent Lavage/Repassage' : "Agent d'accueil"}</strong>
                     </p>
                   </div>
                   <button
@@ -2862,6 +2900,8 @@ export default function AdminView({ activeTab, searchQuery }) {
                       <option value="super_admin">Super Administrateur (CMS)</option>
                       <option value="manager">Manager Caisse (CMS)</option>
                       <option value="agent_accueil">Agent d'accueil (Mobile App)</option>
+                      <option value="livreur">Livreur (Mobile App)</option>
+                      <option value="agent_lavage_repassage">Agent de lavage / Repassage (Mobile App)</option>
                     </CustomSelect>
                   </div>
                   <div className="form-group">
@@ -3162,6 +3202,8 @@ export default function AdminView({ activeTab, searchQuery }) {
                   <option value="agent_accueil">Agent d'accueil (Mobile App)</option>
                   <option value="manager">Manager Caisse (CMS)</option>
                   <option value="super_admin">Super Administrateur (CMS)</option>
+                  <option value="livreur">Livreur (Mobile App)</option>
+                  <option value="agent_lavage_repassage">Agent de lavage / Repassage (Mobile App)</option>
                 </CustomSelect>
               </div>
 
@@ -3821,7 +3863,7 @@ export default function AdminView({ activeTab, searchQuery }) {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontWeight: 700 }}>{o.identifiant_unique_marquage}</span>
                             <span className={`badge badge-${o.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
-                              {statusDisplayLabels[o.statut] || o.statut.replace(/_/g, ' ')}
+                              {getOrderStatusLabel(o)}
                             </span>
                           </div>
                           <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>
