@@ -14,7 +14,9 @@ const DEFAULT_STAFF = [
   { id: 'u1', nom: 'Gomez', prenom: 'Jean-Luc', role: 'super_admin', email: 'jean-luc.gomez@klinup.com', code_pin: '111111', created_at: new Date().toISOString() },
   { id: 'u2', nom: 'Koffi', prenom: 'Marie-Antoinette', role: 'manager', email: 'marie.koffi@klinup.com', code_pin: '222222', created_at: new Date().toISOString() },
   { id: 'u3', nom: 'Diallo', prenom: 'Pierre', role: 'agent_accueil', email: 'pierre.diallo@klinup.com', code_pin: '333333', created_at: new Date().toISOString() },
-  { id: 'u4', nom: 'Koutomi', prenom: 'André', role: 'super_admin', email: 'andre.koutomi98@gmail.com', code_pin: '000000', created_at: new Date().toISOString() }
+  { id: 'u4', nom: 'Koutomi', prenom: 'André', role: 'super_admin', email: 'andre.koutomi98@gmail.com', code_pin: '000000', created_at: new Date().toISOString() },
+  { id: 'u5', nom: 'Sosso', prenom: 'Paul', role: 'livreur', email: 'paul.sosso@klinup.com', code_pin: '444444', created_at: new Date().toISOString() },
+  { id: 'u6', nom: 'Kole', prenom: 'Moussa', role: 'agent_lavage_repassage', email: 'moussa.kole@klinup.com', code_pin: '555555', created_at: new Date().toISOString() }
 ];
 
 const DEFAULT_CUSTOMERS = [];

@@ -11,8 +11,11 @@ export default function VueKanban({
   handleStatusChange,
   handleCompleteDelivery,
   handleCancelOrder,
-  copyToClipboard
+  copyToClipboard,
+  currentUser
 }) {
+  const userRole = currentUser?.role || 'agent_accueil';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
       {filteredAtelierOrders.length === 0 ? (
@@ -25,6 +28,11 @@ export default function VueKanban({
           const client = customers.find(c => c.id === order.customer_id);
           const isLate = isOrderLate(order);
           const isExpress = order.niveau_urgence === 'Express';
+
+          const isBadgeClickable = 
+            (userRole === 'super_admin' || userRole === 'manager' || userRole === 'agent_accueil') 
+              ? (order.statut === 'a_livrer' || order.statut === 'a_recuperer')
+              : (userRole === 'livreur' && order.statut === 'a_livrer');
 
           return (
             <div 
@@ -50,10 +58,10 @@ export default function VueKanban({
                     style={{ 
                       fontSize: '0.55rem', 
                       padding: '0.1rem 0.35rem',
-                      cursor: (order.statut === 'a_livrer' || order.statut === 'a_recuperer') ? 'pointer' : 'default'
+                      cursor: isBadgeClickable ? 'pointer' : 'default'
                     }}
                     onClick={(e) => {
-                      if (order.statut === 'a_livrer' || order.statut === 'a_recuperer') {
+                      if (isBadgeClickable) {
                         e.stopPropagation();
                         handleCompleteDelivery(order, order.statut);
                       }
@@ -100,43 +108,65 @@ export default function VueKanban({
 
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.15rem' }}>
-                {order.statut === 'en_attente' && (
-                  <button 
-                    className="btn btn-primary" 
-                    style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
-                    onClick={() => handleStatusChange(order.id, 'en_cours_lavage')}
-                  >
-                    Lancer Lavage
-                  </button>
-                )}
-                {order.statut === 'en_cours_lavage' && (
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
-                    onClick={() => handleStatusChange(order.id, 'pret')}
-                  >
-                    Marquer Prêt
-                  </button>
-                )}
-                {order.statut === 'pret' && (
+                {/* 1. Atelier/Treatment Buttons */}
+                {(userRole === 'super_admin' || userRole === 'manager' || userRole === 'agent_lavage_repassage') && (
                   <>
-                    <button 
-                      className="btn btn-primary" 
-                      style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
-                      onClick={() => handleStatusChange(order.id, 'a_livrer')}
-                    >
-                      À livrer
-                    </button>
-                    <button 
-                      className="btn btn-secondary" 
-                      style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
-                      onClick={() => handleStatusChange(order.id, 'a_recuperer')}
-                    >
-                      À récupérer
-                    </button>
+                    {order.statut === 'en_attente' && (
+                      <button 
+                        className="btn btn-primary" 
+                        style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
+                        onClick={() => handleStatusChange(order.id, 'en_cours_lavage')}
+                      >
+                        Lancer le traitement
+                      </button>
+                    )}
+                    {order.statut === 'en_cours_lavage' && (
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px', background: '#8b5cf6', color: '#fff' }}
+                        onClick={() => handleStatusChange(order.id, 'en_cours_repassage')}
+                      >
+                        Lancer le repassage
+                      </button>
+                    )}
+                    {order.statut === 'en_cours_repassage' && (
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px' }}
+                        onClick={() => handleStatusChange(order.id, 'pret')}
+                      >
+                        Marquer comme prêt
+                      </button>
+                    )}
                   </>
                 )}
-                {order.statut === 'a_livrer' && (
+
+                {/* 2. Dispatch/Delivery Assignment Buttons */}
+                {(userRole === 'super_admin' || userRole === 'manager' || userRole === 'agent_accueil') && (
+                  <>
+                    {order.statut === 'pret' && (
+                      <>
+                        <button 
+                          className="btn btn-primary" 
+                          style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                          onClick={() => handleStatusChange(order.id, 'a_livrer')}
+                        >
+                          À livrer
+                        </button>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ flex: 1, padding: '0.4rem', fontSize: '0.66rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                          onClick={() => handleStatusChange(order.id, 'a_recuperer')}
+                        >
+                          À récupérer
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* 3. Delivery Finalization Buttons */}
+                {order.statut === 'a_livrer' && (userRole === 'super_admin' || userRole === 'manager' || userRole === 'agent_accueil' || userRole === 'livreur') && (
                   <button 
                     className="btn btn-primary" 
                     style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px', background: '#2B82F0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
@@ -145,7 +175,7 @@ export default function VueKanban({
                     Valider la livraison
                   </button>
                 )}
-                {order.statut === 'a_recuperer' && (
+                {order.statut === 'a_recuperer' && (userRole === 'super_admin' || userRole === 'manager' || userRole === 'agent_accueil') && (
                   <button 
                     className="btn btn-secondary" 
                     style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', borderRadius: '8px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
@@ -155,13 +185,16 @@ export default function VueKanban({
                   </button>
                 )}
                 
-                <button 
-                  className="btn btn-outline" 
-                  style={{ padding: '0.4rem', color: 'var(--status-late)', borderRadius: '8px' }}
-                  onClick={() => handleCancelOrder(order.id)}
-                >
-                  <X size={11} />
-                </button>
+                {/* 4. Cancel Button */}
+                {(userRole === 'super_admin' || userRole === 'manager') && (
+                  <button 
+                    className="btn btn-outline" 
+                    style={{ padding: '0.4rem', color: 'var(--status-late)', borderRadius: '8px' }}
+                    onClick={() => handleCancelOrder(order.id)}
+                  >
+                    <X size={11} />
+                  </button>
+                )}
               </div>
             </div>
           );

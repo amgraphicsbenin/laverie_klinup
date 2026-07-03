@@ -245,6 +245,7 @@ export default function MobileView() {
   const [previousGestionSubView, setPreviousGestionSubView] = useState('main');
 
   const handleOpenCreateCustomer = () => {
+    if (currentUser && currentUser.role === 'agent_lavage_repassage') return;
     setEditingCustomer(null);
     setCustNom('');
     setCustPrenom('');
@@ -255,6 +256,7 @@ export default function MobileView() {
   };
 
   const handleOpenEditCustomer = (cust) => {
+    if (currentUser && currentUser.role === 'agent_lavage_repassage') return;
     setEditingCustomer(cust);
     setCustNom(cust.nom);
     setCustPrenom(cust.prenom);
@@ -817,6 +819,13 @@ export default function MobileView() {
   ]);
 
   // Load initial data
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'agent_lavage_repassage') {
+      setActiveTab('gestion');
+      setGestionSubView('main');
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     setCustomers(db.getCustomers());
     setOrders(db.getOrders());
@@ -2777,7 +2786,13 @@ export default function MobileView() {
                   {selectedLoginUser.prenom[0]}{selectedLoginUser.nom[0]}
                 </div>
                 <h3 className="pin-user-name">{selectedLoginUser.prenom} {selectedLoginUser.nom}</h3>
-                <p className="pin-user-role">{selectedLoginUser.role === 'super_admin' ? 'Super Administrateur' : selectedLoginUser.role === 'manager' ? 'Gestionnaire' : "Agent d'accueil"}</p>
+                <p className="pin-user-role">
+                  {selectedLoginUser.role === 'super_admin' ? 'Super Administrateur' 
+                    : selectedLoginUser.role === 'manager' ? 'Gestionnaire' 
+                    : selectedLoginUser.role === 'livreur' ? 'Livreur' 
+                    : selectedLoginUser.role === 'agent_lavage_repassage' ? 'Agent Lavage/Repassage' 
+                    : "Agent d'accueil"}
+                </p>
 
                 {/* PIN Code Indicator Dots (6 dots) */}
                 <div className={`pin-dots-row ${pinError ? 'shake' : ''}`}>
@@ -3315,24 +3330,26 @@ export default function MobileView() {
                     <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.4px', margin: 0 }}>Gestion</h1>
                     <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Suivi et traitement</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <button 
-                      type="button"
-                      className="btn btn-primary" 
-                      style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                      onClick={() => setShowOrderRegistrationModal(true)}
-                    >
-                      <Plus size={14} /> Ajouter une commande
-                    </button>
-                    <button 
-                      type="button"
-                      className="btn" 
-                      style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--status-ready)', color: '#fff', border: 'none' }}
-                      onClick={handleOpenCreateCustomer}
-                    >
-                      <Plus size={14} /> Ajouter un profil client
-                    </button>
-                  </div>
+                  {currentUser && currentUser.role !== 'agent_lavage_repassage' && (
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <button 
+                        type="button"
+                        className="btn btn-primary" 
+                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        onClick={() => setShowOrderRegistrationModal(true)}
+                      >
+                        <Plus size={14} /> Ajouter une commande
+                      </button>
+                      <button 
+                        type="button"
+                        className="btn" 
+                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--status-ready)', color: '#fff', border: 'none' }}
+                        onClick={handleOpenCreateCustomer}
+                      >
+                        <Plus size={14} /> Ajouter un profil client
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Atelier sub-filters */}
@@ -3372,180 +3389,185 @@ export default function MobileView() {
                   handleCompleteDelivery={handleCompleteDelivery}
                   handleCancelOrder={handleCancelOrder}
                   copyToClipboard={copyToClipboard}
+                  currentUser={currentUser}
                 />
 
-                {/* ================= GESTION DES PROFILS CLIENTS ================= */}
-                <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)' }}>
-                      <Users size={16} />
-                      <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>Profils Clients</h4>
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={() => setGestionSubView('all_profiles')}
-                      style={{ border: 'none', background: 'transparent', fontSize: '0.68rem', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }}
-                    >
-                      Voir tout
-                    </button>
-                  </div>
-
-                  {/* Search Bar for profiles */}
-                  <div style={{ position: 'relative' }}>
-                    <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input 
-                      type="text" 
-                      className="input-control" 
-                      style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
-                      placeholder="Rechercher un profil..." 
-                      value={profileSearch} 
-                      onChange={(e) => setProfileSearch(e.target.value)} 
-                    />
-                  </div>
-
-                  {/* List of Profiles */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
-                    {customers.filter(c => 
-                      c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
-                      c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
-                      c.telephone.includes(profileSearch)
-                    ).map(c => (
-                      <div 
-                        key={c.id} 
-                        onClick={(e) => {
-                          if (e.target.closest('button') || e.target.closest('svg')) return;
-                          setSelectedClientForHistory(c);
-                          setPreviousGestionSubView('main');
-                          setGestionSubView('client_order_history');
-                        }}
-                        style={{ 
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-                          background: 'var(--bg-app)', padding: '0.55rem 0.7rem', borderRadius: '12px', 
-                          border: '1px solid var(--border-color)', gap: '0.4rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
-                          <div style={{
-                            width: '26px', height: '26px', borderRadius: '50%', 
-                            background: 'var(--primary-light)', color: 'var(--primary)', 
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                            fontSize: '0.7rem', fontWeight: 800, flexShrink: 0
-                          }}>
-                            {c.prenom[0]}{c.nom[0]}
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: '0.72rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {c.prenom} {c.nom}
-                            </div>
-                            <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>
-                              {c.telephone}
-                            </div>
-                          </div>
+                {currentUser && currentUser.role !== 'agent_lavage_repassage' && (
+                  <>
+                    {/* ================= GESTION DES PROFILS CLIENTS ================= */}
+                    <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)' }}>
+                          <Users size={16} />
+                          <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>Profils Clients</h4>
                         </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <span style={{ 
-                            fontSize: '0.55rem', fontWeight: 700, padding: '0.15rem 0.35rem', 
-                            borderRadius: '6px', background: c.preferences_pliage === 'Sur cintre' ? 'rgba(0,210,196,0.1)' : 'var(--primary-light)', 
-                            color: c.preferences_pliage === 'Sur cintre' ? 'var(--secondary)' : 'var(--primary)',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            {c.preferences_pliage === 'Sur cintre' ? 'Cintre' : 'Plié'}
-                          </span>
-                          <button 
-                            type="button"
-                            onClick={() => handleOpenEditCustomer(c)}
-                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--primary)', padding: '0.15rem', display: 'flex' }}
-                            title="Modifier"
-                          >
-                            <Edit2 size={11} />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setShowDeleteCustomerConfirm(c)}
-                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-late)', padding: '0.15rem', display: 'flex' }}
-                            title="Supprimer"
-                          >
-                            <Trash2 size={11} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {customers.filter(c => 
-                      c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
-                      c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
-                      c.telephone.includes(profileSearch)
-                    ).length === 0 && (
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', padding: '0.75rem', textAlign: 'center' }}>
-                        Aucun profil trouvé.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* CRM Abonnements */}
-                <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Award size={14} color="var(--primary)" />
-                      <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Abonnements Clients</h4>
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={() => setGestionSubView('all_subscriptions')}
-                      style={{ border: 'none', background: 'transparent', fontSize: '0.68rem', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }}
-                    >
-                      Voir tout
-                    </button>
-                  </div>
-                  
-                  <div style={{ position: 'relative' }}>
-                    <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input 
-                      type="text" 
-                      className="input-control" 
-                      style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
-                      placeholder="Rechercher client..." 
-                      value={crmSearch} 
-                      onChange={(e) => {
-                        setCrmSearch(e.target.value);
-                        setSelectedCrmCustomer(null);
-                      }} 
-                    />
-                  </div>
-
-                  {crmSearch && !selectedCrmCustomer && (
-                    <div style={{ 
-                      maxHeight: '120px', overflowY: 'auto', 
-                      border: '1px solid var(--border-color)', borderRadius: '10px',
-                      background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', gap: '2px', padding: '4px'
-                    }}>
-                      {filteredCrmCustomers.slice(0, 5).map(c => (
-                        <div 
-                          key={c.id} 
-                          onClick={() => { setSelectedCrmCustomer(c); setCrmSearch(''); }}
-                          style={{ padding: '0.4rem 0.55rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', background: '#fff', border: '1px solid var(--border-color)' }}
+                        <button 
+                          type="button"
+                          onClick={() => setGestionSubView('all_profiles')}
+                          style={{ border: 'none', background: 'transparent', fontSize: '0.68rem', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }}
                         >
-                          {c.prenom} {c.nom} ({c.telephone})
+                          Voir tout
+                        </button>
+                      </div>
+
+                      {/* Search Bar for profiles */}
+                      <div style={{ position: 'relative' }}>
+                        <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input 
+                          type="text" 
+                          className="input-control" 
+                          style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
+                          placeholder="Rechercher un profil..." 
+                          value={profileSearch} 
+                          onChange={(e) => setProfileSearch(e.target.value)} 
+                        />
+                      </div>
+
+                      {/* List of Profiles */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
+                        {customers.filter(c => 
+                          c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                          c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                          c.telephone.includes(profileSearch)
+                        ).map(c => (
+                          <div 
+                            key={c.id} 
+                            onClick={(e) => {
+                              if (e.target.closest('button') || e.target.closest('svg')) return;
+                              setSelectedClientForHistory(c);
+                              setPreviousGestionSubView('main');
+                              setGestionSubView('client_order_history');
+                            }}
+                            style={{ 
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                              background: 'var(--bg-app)', padding: '0.55rem 0.7rem', borderRadius: '12px', 
+                              border: '1px solid var(--border-color)', gap: '0.4rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                              <div style={{
+                                width: '26px', height: '26px', borderRadius: '50%', 
+                                background: 'var(--primary-light)', color: 'var(--primary)', 
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                                fontSize: '0.7rem', fontWeight: 800, flexShrink: 0
+                              }}>
+                                {c.prenom[0]}{c.nom[0]}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {c.prenom} {c.nom}
+                                </div>
+                                <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>
+                                  {c.telephone}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <span style={{ 
+                                fontSize: '0.55rem', fontWeight: 700, padding: '0.15rem 0.35rem', 
+                                borderRadius: '6px', background: c.preferences_pliage === 'Sur cintre' ? 'rgba(0,210,196,0.1)' : 'var(--primary-light)', 
+                                color: c.preferences_pliage === 'Sur cintre' ? 'var(--secondary)' : 'var(--primary)',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {c.preferences_pliage === 'Sur cintre' ? 'Cintre' : 'Plié'}
+                              </span>
+                              <button 
+                                type="button"
+                                onClick={() => handleOpenEditCustomer(c)}
+                                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--primary)', padding: '0.15rem', display: 'flex' }}
+                                title="Modifier"
+                              >
+                                <Edit2 size={11} />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => setShowDeleteCustomerConfirm(c)}
+                                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--status-late)', padding: '0.15rem', display: 'flex' }}
+                                title="Supprimer"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {customers.filter(c => 
+                          c.nom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                          c.prenom.toLowerCase().includes(profileSearch.toLowerCase()) ||
+                          c.telephone.includes(profileSearch)
+                        ).length === 0 && (
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', padding: '0.75rem', textAlign: 'center' }}>
+                            Aucun profil trouvé.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* CRM Abonnements */}
+                    <div className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <Award size={14} color="var(--primary)" />
+                          <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Abonnements Clients</h4>
                         </div>
-                      ))}
-                      {filteredCrmCustomers.length === 0 && (
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', padding: '0.5rem', textAlign: 'center' }}>Aucun client trouvé</div>
+                        <button 
+                          type="button"
+                          onClick={() => setGestionSubView('all_subscriptions')}
+                          style={{ border: 'none', background: 'transparent', fontSize: '0.68rem', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }}
+                        >
+                          Voir tout
+                        </button>
+                      </div>
+                      
+                      <div style={{ position: 'relative' }}>
+                        <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input 
+                          type="text" 
+                          className="input-control" 
+                          style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.72rem', padding: '0.35rem 1rem 0.35rem 2rem' }} 
+                          placeholder="Rechercher client..." 
+                          value={crmSearch} 
+                          onChange={(e) => {
+                            setCrmSearch(e.target.value);
+                            setSelectedCrmCustomer(null);
+                          }} 
+                        />
+                      </div>
+
+                      {crmSearch && !selectedCrmCustomer && (
+                        <div style={{ 
+                          maxHeight: '120px', overflowY: 'auto', 
+                          border: '1px solid var(--border-color)', borderRadius: '10px',
+                          background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', gap: '2px', padding: '4px'
+                        }}>
+                          {filteredCrmCustomers.slice(0, 5).map(c => (
+                            <div 
+                              key={c.id} 
+                              onClick={() => { setSelectedCrmCustomer(c); setCrmSearch(''); }}
+                              style={{ padding: '0.4rem 0.55rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', background: '#fff', border: '1px solid var(--border-color)' }}
+                            >
+                              {c.prenom} {c.nom} ({c.telephone})
+                            </div>
+                          ))}
+                          {filteredCrmCustomers.length === 0 && (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', padding: '0.5rem', textAlign: 'center' }}>Aucun client trouvé</div>
+                          )}
+                        </div>
+                      )}
+
+                      {selectedCrmCustomer && (
+                        <FicheClient
+                          selectedCrmCustomer={selectedCrmCustomer}
+                          setSelectedCrmCustomer={setSelectedCrmCustomer}
+                          catalog={catalog}
+                          db={db}
+                          refreshData={refreshData}
+                        />
                       )}
                     </div>
-                  )}
-
-                  {selectedCrmCustomer && (
-                    <FicheClient
-                      selectedCrmCustomer={selectedCrmCustomer}
-                      setSelectedCrmCustomer={setSelectedCrmCustomer}
-                      catalog={catalog}
-                      db={db}
-                      refreshData={refreshData}
-                    />
-                  )}
-                </div>
+                  </>
+                )}
               </>
             )}
 
@@ -4330,19 +4352,21 @@ export default function MobileView() {
       {currentUser && (
         <div className="mobile-footer-nav">
           <div className="menu-list">
-            <button 
-              className={`menu-item ${activeTab === 'accueil' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('accueil');
-                setAccueilSubView('main');
-                setGestionSubView('main');
-              }}
-            >
-              <div className="nav-icon-wrap">
-                <MIcon name="home" size={22} filled={activeTab === 'accueil'} />
-              </div>
-              <span>Accueil</span>
-            </button>
+            {currentUser.role !== 'agent_lavage_repassage' && (
+              <button 
+                className={`menu-item ${activeTab === 'accueil' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('accueil');
+                  setAccueilSubView('main');
+                  setGestionSubView('main');
+                }}
+              >
+                <div className="nav-icon-wrap">
+                  <MIcon name="home" size={22} filled={activeTab === 'accueil'} />
+                </div>
+                <span>Accueil</span>
+              </button>
+            )}
             <button 
               className={`menu-item ${activeTab === 'gestion' ? 'active' : ''}`}
               onClick={() => {
@@ -4356,32 +4380,36 @@ export default function MobileView() {
               </div>
               <span>Gestion</span>
             </button>
-            <div className="scan-item">
+            {currentUser.role !== 'agent_lavage_repassage' && (
+              <div className="scan-item">
+                <button 
+                  type="button"
+                  className="scan-btn"
+                  title="Scanner un vêtement"
+                  onClick={() => {
+                    setShowOrderRegistrationModal(true);
+                  }}
+                >
+                  <MIcon name="add" size={26} />
+                </button>
+              </div>
+            )}
+            {currentUser.role !== 'agent_lavage_repassage' && (
               <button 
-                type="button"
-                className="scan-btn"
-                title="Scanner un vêtement"
+                className={`menu-item ${activeTab === 'historique' ? 'active' : ''}`}
                 onClick={() => {
-                  setShowOrderRegistrationModal(true);
+                  setActiveTab('historique');
+                  setAccueilSubView('main');
+                  setGestionSubView('main');
+                  setHistoryFilterScope('all');
                 }}
               >
-                <MIcon name="add" size={26} />
+                <div className="nav-icon-wrap">
+                  <MIcon name="receipt_long" size={22} filled={activeTab === 'historique'} />
+                </div>
+                <span>Historique</span>
               </button>
-            </div>
-            <button 
-              className={`menu-item ${activeTab === 'historique' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('historique');
-                setAccueilSubView('main');
-                setGestionSubView('main');
-                setHistoryFilterScope('all');
-              }}
-            >
-              <div className="nav-icon-wrap">
-                <MIcon name="receipt_long" size={22} filled={activeTab === 'historique'} />
-              </div>
-              <span>Historique</span>
-            </button>
+            )}
             <button 
               className={`menu-item ${activeTab === 'profile' ? 'active' : ''}`}
               onClick={() => {

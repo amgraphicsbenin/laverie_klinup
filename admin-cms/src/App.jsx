@@ -487,7 +487,13 @@ function App() {
               {selectedLoginUser.prenom[0]}{selectedLoginUser.nom[0]}
             </div>
             <h3 className="pin-user-name">{selectedLoginUser.prenom} {selectedLoginUser.nom}</h3>
-            <p className="pin-user-role">{selectedLoginUser.role === 'super_admin' ? 'Super Administrateur' : selectedLoginUser.role === 'manager' ? 'Gestionnaire' : "Agent d'accueil"}</p>
+            <p className="pin-user-role">
+              {selectedLoginUser.role === 'super_admin' ? 'Super Administrateur' 
+                : selectedLoginUser.role === 'manager' ? 'Gestionnaire' 
+                : selectedLoginUser.role === 'livreur' ? 'Livreur' 
+                : selectedLoginUser.role === 'agent_lavage_repassage' ? 'Agent de lavage / Repassage' 
+                : "Agent d'accueil"}
+            </p>
 
             <div className={`pin-dots-row ${pinError ? 'shake' : ''}`}>
               {[0, 1, 2, 3, 4, 5].map(idx => (

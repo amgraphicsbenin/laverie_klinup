@@ -239,7 +239,9 @@ INSERT INTO public.staff (id, nom, prenom, role, email, code_pin, statut) VALUES
 ('u1', 'Gomez', 'Jean-Luc', 'super_admin', 'jean-luc.gomez@klinup.com', '111111', 'actif'),
 ('u2', 'Koffi', 'Marie-Antoinette', 'manager', 'marie.koffi@klinup.com', '222222', 'actif'),
 ('u3', 'Diallo', 'Pierre', 'agent_accueil', 'pierre.diallo@klinup.com', '333333', 'actif'),
-('u4', 'Koutomi', 'André', 'super_admin', 'andre.koutomi98@gmail.com', '000000', 'actif')
+('u4', 'Koutomi', 'André', 'super_admin', 'andre.koutomi98@gmail.com', '000000', 'actif'),
+('u5', 'Sosso', 'Paul', 'livreur', 'paul.sosso@klinup.com', '444444', 'actif'),
+('u6', 'Kole', 'Moussa', 'agent_lavage_repassage', 'moussa.kole@klinup.com', '555555', 'actif')
 ON CONFLICT (id) DO NOTHING;
 
 -- ========================================================
