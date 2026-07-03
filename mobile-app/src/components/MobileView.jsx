@@ -2977,42 +2977,34 @@ export default function MobileView() {
                   setAccueilSubView(isCAAccessible ? 'ca_detail' : 'actives_detail');
                 }}
               >
-                {isCAAccessible ? (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
-                      <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 600 }}>Chiffre d'Affaires Total</div>
-                      {!isCAAccessible && (
-                        <div style={{ fontSize: '0.6rem', color: 'var(--status-late)', fontWeight: 600 }}>Accès limité</div>
-                      )}
+                {/* Carte Chiffre d'Affaires — toujours visible, valeurs masquées si accès limité */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
+                  <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 600 }}>Chiffre d'Affaires Total</div>
+                  {!isCAAccessible && (
+                    <div style={{ fontSize: '0.6rem', color: 'var(--status-late)', fontWeight: 600 }}>Accès limité</div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '2rem', fontWeight: 900, fontFamily: 'var(--font-title)', letterSpacing: '-1px', lineHeight: 1.1, color: isCAAccessible ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                      {isCAAccessible ? (showCAValues ? `${revenueTotal.toLocaleString()} ` : '•••••• ') : '── '}
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{isCAAccessible ? 'FCFA' : 'Non autorisé'}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.5rem' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '2rem', fontWeight: 900, fontFamily: 'var(--font-title)', letterSpacing: '-1px', lineHeight: 1.1, color: isCAAccessible ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                          {isCAAccessible ? (showCAValues ? `${revenueTotal.toLocaleString()} ` : '•••••• ') : '── Non autorisé '}
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>FCFA</span>
-                        </div>
-                      </div>
-                      {isCAAccessible && (
-                        <button
-                          type="button"
-                          className="eye-toggle-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowCAValues(!showCAValues);
-                          }}
-                          title={showCAValues ? 'Masquer le CA' : 'Afficher le CA'}
-                        >
-                          {showCAValues ? <Eye size={18} /> : <EyeOff size={18} />}
-                        </button>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.15rem' }}>Activité de l'Atelier</div>
-                    <div style={{ fontSize: '2rem', fontWeight: 900, fontFamily: 'var(--font-title)', letterSpacing: '-1px', lineHeight: 1.1, color: 'var(--text-primary)' }}>{activeOrders.length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>active{activeOrders.length > 1 ? 's' : ''}</span></div>
-                  </>
-                )}
+                  </div>
+                  {isCAAccessible && (
+                    <button
+                      type="button"
+                      className="eye-toggle-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowCAValues(!showCAValues);
+                      }}
+                      title={showCAValues ? 'Masquer le CA' : 'Afficher le CA'}
+                    >
+                      {showCAValues ? <Eye size={18} /> : <EyeOff size={18} />}
+                    </button>
+                  )}
+                </div>
                 
                 {/* Mini line chart area */}
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '42px', marginTop: '0.8rem' }}>
