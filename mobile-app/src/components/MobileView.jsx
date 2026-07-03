@@ -303,11 +303,21 @@ export default function MobileView() {
     setShowDeleteCustomerConfirm(null);
   };
 
-  const handleEmailSubmit = (e) => {
+  const handleEmailSubmit = async (e) => {
     e.preventDefault();
     if (!loginEmail) return;
     
-    const matchedUser = db.getStaff().find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
+    let matchedUser = db.getStaff().find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
+    
+    if (!matchedUser && db.isRemote()) {
+      try {
+        await db.refreshStaff();
+        matchedUser = db.getStaff().find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
+      } catch (err) {
+        console.warn("Failed to refresh staff on login:", err);
+      }
+    }
+
     if (matchedUser) {
       if (matchedUser.statut === 'suspendu') {
         alert("Votre compte a été suspendu par un administrateur.");

@@ -561,6 +561,19 @@ export const db = {
   },
 
   getStaff: () => [...memoryDb.staff],
+  refreshStaff: async () => {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase.from('staff').select('*');
+      if (!error && data && data.length > 0) {
+        memoryDb.staff = data;
+        persist();
+        db.notify();
+      }
+    } catch (e) {
+      console.error("Failed to refresh staff:", e);
+    }
+  },
   getCustomers: () => [...memoryDb.customers],
   getOrders: () => [...memoryDb.orders],
   getLogs: () => [...memoryDb.logs],
