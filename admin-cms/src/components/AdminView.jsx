@@ -413,7 +413,7 @@ export default function AdminView({ activeTab, searchQuery }) {
   };
 
   const serviceLabels = {
-    lavage_simple: 'Lavage Simple',
+    lavage_simple: 'Traitement',
     nettoyage_a_sec: 'Nettoyage à sec',
     repassage: 'Repassage',
     abonnement: 'Abonnement'
@@ -3496,10 +3496,9 @@ export default function AdminView({ activeTab, searchQuery }) {
                     const selectedSvc = articleServices[cloth] || 'lavage_simple';
                     const isSelected = qty > 0;
 
-                    const servicesForCloth = catalog.filter(c => c.categorie !== 'abonnement' && c.article === cloth);
+                    const servicesForCloth = catalog.filter(c => c.categorie !== 'abonnement' && c.article === cloth && c.service !== 'nettoyage_a_sec');
                     const activeServices = servicesForCloth.length > 0 ? servicesForCloth : [
                       { service: 'lavage_simple', prix: 1500 },
-                      { service: 'nettoyage_a_sec', prix: 3000 },
                       { service: 'repassage', prix: 1000 }
                     ];
                     const activeServiceObj = activeServices.find(s => s.service === selectedSvc) || activeServices[0];

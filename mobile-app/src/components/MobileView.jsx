@@ -1101,7 +1101,7 @@ export default function MobileView() {
   };
 
   const serviceLabels = {
-    lavage_simple: 'Lavage Simple',
+    lavage_simple: 'Traitement',
     nettoyage_a_sec: 'Nettoyage à sec',
     repassage: 'Repassage',
     abonnement: 'Abonnement'
