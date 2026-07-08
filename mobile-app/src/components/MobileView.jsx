@@ -2686,7 +2686,7 @@ export default function MobileView() {
             /* ══════════════════════════════════════
                ÉCRAN 1 — EMAIL (style design ref)
                ══════════════════════════════════════ */
-            <div className="login-page">
+            <div className="auth-screen login-screen">
                 {/* Badge logo bleu */}
                 <div className="login-logo-badge">
                   <img src={logoDark} alt="KLIN UP" />
@@ -2737,7 +2737,7 @@ export default function MobileView() {
             /* ══════════════════════════════════════
                ÉCRAN 2 — CODE PIN (style design ref)
                ══════════════════════════════════════ */
-            <div className="pin-page">
+            <div className="auth-screen pin-screen">
                 {/* Bouton retour chevron */}
                 <button
                   type="button"

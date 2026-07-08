@@ -328,14 +328,12 @@ button, input, select, textarea { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 0;
-  background: transparent;
+  background: linear-gradient(135deg, #f5f3ff 0%, #faf8ff 100%);
   z-index: 10;
   position: relative;
   scrollbar-width: none;
   scroll-behavior: smooth;
-  /* Inertial scrolling élastique */
   -webkit-overflow-scrolling: touch;
-  overflow-y: auto;
 }
 .mobile-content::-webkit-scrollbar { display: none; }
 
@@ -1328,18 +1326,20 @@ html {
    ======================================================== */
 
 /* ── Écran Email ── */
-.login-page {
+.auth-screen {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32px 24px 28px;
-  min-height: 100%;
   width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #f5f3ff 0%, #faf8ff 100%);
-  overflow-y: auto;
-  overflow-x: hidden;
+}
+
+.auth-screen.login-screen {
+  padding: 32px 24px 28px;
   animation: slideUpWithFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.login-page {
+  /* Deprecated - kept for compatibility */
 }
 
 /* Logo icon badge purple KLIN UP */
@@ -1501,18 +1501,13 @@ html {
 }
 
 /* ── Écran PIN ── */
-.pin-page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.auth-screen.pin-screen {
   padding: 18px 24px 28px;
-  min-height: 100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #f5f3ff 0%, #faf8ff 100%);
-  overflow-y: auto;
-  overflow-x: hidden;
   animation: slideUpWithFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.pin-page {
+  /* Deprecated - kept for compatibility */
 }
 
 /* Bouton retour chevron */
