@@ -2783,34 +2783,36 @@ export default function MobileView() {
             display: 'flex',
             alignItems: 'flex-end',
             justifyContent: 'center',
-            gap: '0.75rem',
-            padding: '1.3rem 0.6rem 0.6rem',
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(255, 255, 255, 0.98) 100%)',
+            gap: '0.85rem',
+            padding: '1.5rem 0.85rem 0.85rem',
+            background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.03) 0%, rgba(255, 255, 255, 0.8) 100%)',
             borderRadius: '24px',
-            border: '1px solid rgba(245, 158, 11, 0.2)',
-            boxShadow: '0 8px 32px rgba(245, 158, 11, 0.04)',
+            border: '1px solid rgba(251, 191, 36, 0.15)',
+            boxShadow: '0 8px 32px rgba(251, 191, 36, 0.02)',
             marginBottom: '0.4rem',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)'
           }}>
-            <div style={{ position: 'absolute', top: '-50px', left: '50%', transform: 'translateX(-50%)', width: '150px', height: '150px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, rgba(255, 255, 255, 0) 70%)', zIndex: 0, pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', top: '-50px', left: '50%', transform: 'translateX(-50%)', width: '150px', height: '150px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(251, 191, 36, 0.08) 0%, rgba(255, 255, 255, 0) 70%)', zIndex: 0, pointerEvents: 'none' }} />
 
             {/* 2nd Place */}
             {loyaltyCustomers[1] && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 0, zIndex: 1 }}>
                 <div style={{ position: 'relative' }}>
                   <div style={{
-                    width: '44px',
-                    height: '44px',
+                    width: '46px',
+                    height: '46px',
                     borderRadius: '50%',
                     border: '2.5px solid #cbd5e1',
-                    boxShadow: '0 4px 12px rgba(148, 163, 184, 0.2)',
+                    boxShadow: '0 4px 12px rgba(148, 163, 184, 0.15)',
                     background: '#f1f5f9',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '0.85rem',
-                    fontWeight: 900,
+                    fontWeight: 700,
                     color: '#475569'
                   }}>
                     {loyaltyCustomers[1].prenom[0]?.toUpperCase()}{loyaltyCustomers[1].nom[0]?.toUpperCase()}
@@ -2841,21 +2843,22 @@ export default function MobileView() {
                   {loyaltyCustomers[1].orderCount} cmd
                 </span>
                 {canViewCA && (
-                  <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.55rem', color: '#64748b', fontWeight: 700 }}>
                     {showCAValues ? `${loyaltyCustomers[1].totalSpent.toLocaleString()} F` : '•••• F'}
                   </span>
                 )}
                 {/* Pedestal */}
                 <div style={{
                   width: '100%',
-                  height: '42px',
-                  background: 'linear-gradient(to top, rgba(148, 163, 184, 0.08) 0%, rgba(148, 163, 184, 0.18) 100%)',
-                  borderRadius: '10px 10px 18px 18px',
+                  height: '46px',
+                  background: 'linear-gradient(to top, rgba(148, 163, 184, 0.06) 0%, rgba(148, 163, 184, 0.18) 100%)',
+                  borderRadius: '12px 12px 20px 20px',
                   border: '1px solid rgba(148, 163, 184, 0.15)',
-                  marginTop: '0.45rem',
+                  marginTop: '0.5rem',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(148, 163, 184, 0.04)'
                 }}>
                   <span style={{ fontSize: '0.78rem' }}>🥈</span>
                 </div>
@@ -2868,17 +2871,17 @@ export default function MobileView() {
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%) rotate(-8deg)', fontSize: '1.25rem', zIndex: 3 }}>👑</span>
                   <div style={{
-                    width: '54px',
-                    height: '54px',
+                    width: '56px',
+                    height: '56px',
                     borderRadius: '50%',
                     border: '3px solid #fbbf24',
-                    boxShadow: '0 6px 18px rgba(251, 191, 36, 0.3)',
+                    boxShadow: '0 0 20px rgba(251, 191, 36, 0.25)',
                     background: '#fffbeb',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '1.05rem',
-                    fontWeight: 900,
+                    fontWeight: 700,
                     color: '#d97706'
                   }}>
                     {loyaltyCustomers[0].prenom[0]?.toUpperCase()}{loyaltyCustomers[0].nom[0]?.toUpperCase()}
@@ -2916,15 +2919,15 @@ export default function MobileView() {
                 {/* Pedestal */}
                 <div style={{
                   width: '100%',
-                  height: '62px',
-                  background: 'linear-gradient(to top, rgba(251, 191, 36, 0.08) 0%, rgba(251, 191, 36, 0.22) 100%)',
+                  height: '68px',
+                  background: 'linear-gradient(to top, rgba(251, 191, 36, 0.08) 0%, rgba(251, 191, 36, 0.24) 100%)',
                   borderRadius: '12px 12px 20px 20px',
-                  border: '1px solid rgba(251, 191, 36, 0.18)',
-                  marginTop: '0.45rem',
+                  border: '1px solid rgba(251, 191, 36, 0.2)',
+                  marginTop: '0.5rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(251, 191, 36, 0.08)'
+                  boxShadow: '0 6px 18px rgba(251, 191, 36, 0.08)'
                 }}>
                   <span style={{ fontSize: '0.95rem' }}>🥇</span>
                 </div>
@@ -2940,13 +2943,13 @@ export default function MobileView() {
                     height: '40px',
                     borderRadius: '50%',
                     border: '2.5px solid #d97706',
-                    boxShadow: '0 4px 10px rgba(217, 119, 6, 0.18)',
+                    boxShadow: '0 4px 10px rgba(217, 119, 6, 0.15)',
                     background: '#fff7ed',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '0.8rem',
-                    fontWeight: 900,
+                    fontWeight: 700,
                     color: '#c2410c'
                   }}>
                     {loyaltyCustomers[2].prenom[0]?.toUpperCase()}{loyaltyCustomers[2].nom[0]?.toUpperCase()}
@@ -2977,21 +2980,22 @@ export default function MobileView() {
                   {loyaltyCustomers[2].orderCount} cmd
                 </span>
                 {canViewCA && (
-                  <span style={{ fontSize: '0.52rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.52rem', color: '#c2410c', fontWeight: 700 }}>
                     {showCAValues ? `${loyaltyCustomers[2].totalSpent.toLocaleString()} F` : '•••• F'}
                   </span>
                 )}
                 {/* Pedestal */}
                 <div style={{
                   width: '100%',
-                  height: '32px',
-                  background: 'linear-gradient(to top, rgba(217, 119, 6, 0.05) 0%, rgba(217, 119, 6, 0.15) 100%)',
-                  borderRadius: '10px 10px 18px 18px',
-                  border: '1px solid rgba(217, 119, 6, 0.12)',
-                  marginTop: '0.45rem',
+                  height: '36px',
+                  background: 'linear-gradient(to top, rgba(217, 119, 6, 0.06) 0%, rgba(217, 119, 6, 0.15) 100%)',
+                  borderRadius: '12px 12px 20px 20px',
+                  border: '1px solid rgba(217, 119, 6, 0.15)',
+                  marginTop: '0.5rem',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 10px rgba(217, 119, 6, 0.04)'
                 }}>
                   <span style={{ fontSize: '0.72rem' }}>🥉</span>
                 </div>
@@ -3001,9 +3005,9 @@ export default function MobileView() {
         )}
 
         {/* Loyalty List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', paddingBottom: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingBottom: '10px' }}>
           {filteredCustomers.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
               Aucun client ne correspond à votre recherche.
             </div>
           ) : (
@@ -3016,16 +3020,12 @@ export default function MobileView() {
                 return (
                   <div 
                     key={c.id} 
+                    className="order-detail-card-modern"
                     style={{ 
                       display: 'flex', 
                       alignItems: 'center', 
                       gap: '0.75rem', 
-                      padding: '0.7rem 0.85rem',
-                      background: '#ffffff',
-                      borderRadius: '14px',
-                      border: '1px solid rgba(0, 0, 0, 0.06)',
-                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
-                      transition: 'transform 0.2s ease',
+                      padding: '0.8rem 1rem',
                       cursor: 'pointer'
                     }}
                   >
@@ -3034,13 +3034,13 @@ export default function MobileView() {
                       width: '24px', 
                       height: '24px', 
                       borderRadius: '50%', 
-                      background: 'rgba(0, 0, 0, 0.04)', 
+                      background: '#f1f5f9', 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
-                      fontSize: '0.65rem', 
+                      fontSize: '0.68rem', 
                       fontWeight: 800, 
-                      color: 'var(--text-secondary)', 
+                      color: '#64748b', 
                       flexShrink: 0 
                     }}>
                       {globalIndex + 1}
@@ -3048,16 +3048,17 @@ export default function MobileView() {
 
                     {/* Initials Avatar */}
                     <div style={{
-                      width: '32px', 
-                      height: '32px', 
+                      width: '34px', 
+                      height: '34px', 
                       borderRadius: '50%', 
-                      background: 'linear-gradient(135deg, var(--primary-light), rgba(26, 26, 94, 0.08))', 
+                      background: 'var(--primary-light)', 
                       color: 'var(--primary)', 
+                      border: '1px solid rgba(59, 130, 246, 0.15)',
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
-                      fontSize: '0.72rem', 
-                      fontWeight: 900, 
+                      fontSize: '0.75rem', 
+                      fontWeight: 700, 
                       flexShrink: 0
                     }}>
                       {c.prenom[0]?.toUpperCase()}{c.nom[0]?.toUpperCase()}
@@ -3065,21 +3066,21 @@ export default function MobileView() {
 
                     {/* Customer Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {c.prenom} {c.nom}
                       </div>
-                      <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '1px', fontFamily: 'var(--font-mono)' }}>
-                        {c.telephone || 'Aucun tel'}
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', fontFamily: 'monospace' }}>
+                        {c.telephone || 'Aucun téléphone'}
                       </div>
                     </div>
 
                     {/* Stats */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px', flexShrink: 0 }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', flexShrink: 0 }}>
+                      <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: '20px' }}>
                         {c.orderCount} cmd{c.orderCount > 1 ? 's' : ''}
                       </span>
                       {canViewCA && (
-                        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        <span style={{ fontSize: '0.72rem', color: c.totalSpent > 0 ? '#16a34a' : 'var(--text-muted)', fontWeight: 800 }}>
                           {showCAValues ? `${c.totalSpent.toLocaleString()} F` : '•••••• F'}
                         </span>
                       )}
