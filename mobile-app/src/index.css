@@ -285,14 +285,14 @@ button, input, select, textarea { font-family: inherit; }
 
 /* Orbes Liquides d'arrière-plan */
 .liquid-orb-1, .liquid-orb-2 {
-  display: none;
+  display: block;
   position: absolute;
   width: 320px;
   height: 320px;
   border-radius: 50%;
   filter: blur(110px);
   z-index: 0;
-  opacity: 0.12; /* Très discret sur fond clair */
+  opacity: 0.15; /* Un peu plus visible pour sublimer le fond */
   pointer-events: none;
 }
 
@@ -1324,29 +1324,864 @@ html {
 }
 
 /* ========================================================
-   LOCKSCREEN & PIN KEYPAD
+   LOGIN FLOW — Design référence (Rosebud style, couleurs KLIN UP)
    ======================================================== */
 
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-8px); }
-  40%, 80% { transform: translateX(8px); }
-}
-
-.shake { animation: shake 0.4s ease-in-out; }
-
+/* ── Écran Email ── */
 .lockscreen-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
+  align-items: stretch;
   height: 100%;
   width: 100%;
-  padding: 30px 20px;
-  background: transparent;
-  color: var(--text-primary);
+  background: linear-gradient(135deg, #f5f3ff 0%, #faf8ff 100%);
   overflow-y: auto;
-  animation: fadeIn 0.4s ease-out forwards;
+  overflow-x: hidden;
+}
+
+.login-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px 28px;
+  min-height: 100%;
+  animation: slideUpWithFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Logo icon badge purple KLIN UP */
+.login-logo-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.32);
+}
+
+.login-logo-badge img {
+  height: 32px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+/* Titre principal */
+.login-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-align: center;
+  margin: 0 0 8px;
+  line-height: 1.2;
+  letter-spacing: -0.2px;
+}
+
+/* Sous-titre */
+.login-subtitle {
+  font-size: 0.8rem;
+  color: #666666;
+  text-align: center;
+  line-height: 1.5;
+  margin: 0 0 32px;
+  max-width: 260px;
+}
+
+/* Formulaire */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 0;
+}
+
+/* Label de champ */
+.login-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+  display: block;
+  letter-spacing: 0.3px;
+}
+
+/* Wrapper champ avec marge bas */
+.login-field-wrap {
+  margin-bottom: 16px;
+}
+
+/* Groupe input + icône */
+.login-input-group {
+  position: relative;
+  width: 100%;
+}
+
+.login-input-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a0a0a0;
+  pointer-events: none;
+  transition: color 0.2s ease;
+  z-index: 1;
+}
+
+/* Input pill */
+.login-input {
+  width: 100%;
+  padding: 12px 16px 12px 44px;
+  border-radius: 12px;
+  border: 1.5px solid #e5e5e5;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-size: 0.88rem;
+  outline: none;
+  font-family: var(--font-sans);
+  transition: all 0.2s ease;
+}
+
+.login-input::placeholder {
+  color: #999999;
+}
+
+.login-input:focus {
+  border-color: #a855f7;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+}
+
+.login-input:focus ~ .login-input-icon {
+  color: #a855f7;
+}
+
+/* Bouton pill purple */
+.login-submit-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 50px;
+  border: none;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.35);
+  transition: all 0.2s ease;
+  margin-top: 8px;
+  letter-spacing: 0.3px;
+}
+
+.login-submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(168, 85, 247, 0.42);
+}
+
+.login-submit-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 3px 10px rgba(168, 85, 247, 0.25);
+}
+
+/* Lien bas de page */
+.login-link-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #666666;
+  cursor: pointer;
+  margin-top: 24px;
+  text-align: center;
+  transition: color 0.2s ease;
+  padding: 6px 8px;
+}
+
+.login-link-btn span {
+  color: #a855f7;
+  font-weight: 600;
+}
+
+.login-link-btn:hover {
+  color: #1a1a1a;
+}
+
+/* ── Écran PIN ── */
+.pin-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(135deg, #f5f3ff 0%, #faf8ff 100%);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.pin-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 18px 24px 28px;
+  min-height: 100%;
+  animation: slideUpWithFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Bouton retour chevron */
+.pin-back-btn {
+  align-self: flex-start;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #1a1a1a;
+  transition: all 0.2s ease;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.pin-back-btn:hover {
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.pin-back-btn:active {
+  transform: scale(0.92);
+}
+
+/* Logo centré PIN screen */
+.pin-logo-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  box-shadow: 0 6px 18px rgba(168, 85, 247, 0.28);
+}
+
+.pin-logo-badge img {
+  height: 28px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+/* Nom et rôle utilisateur */
+.pin-user-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-align: center;
+  margin: 0 0 4px;
+  letter-spacing: -0.2px;
+}
+
+.pin-user-role {
+  font-size: 0.75rem;
+  color: #666666;
+  text-align: center;
+  margin: 0 0 16px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+/* Avatar initiales */
+.pin-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #ffffff;
+  margin-bottom: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Sous-título PIN */
+.pin-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-align: center;
+  margin: 0 0 6px;
+  letter-spacing: -0.1px;
+}
+
+.pin-section-subtitle {
+  font-size: 0.75rem;
+  color: #666666;
+  text-align: center;
+  line-height: 1.5;
+  margin: 0 0 20px;
+  max-width: 240px;
+}
+
+/* Affichage des chiffres PIN style OTP */
+.pin-otp-display {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 240px;
+  margin-bottom: 24px;
+  justify-items: center;
+}
+
+.pin-otp-digit {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  transition: all 0.2s ease;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 2px solid transparent;
+}
+
+.pin-otp-digit.filled {
+  background: linear-gradient(135deg, #ede9fe 0%, #f5f3ff 100%);
+  color: #7c3aed;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.2);
+}
+
+.pin-otp-digit.empty::after {
+  content: '·';
+  color: #d1d5db;
+  font-size: 2rem;
+  font-weight: 300;
+}
+
+.pin-otp-digit.error {
+  background: #fef2f2;
+  color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Bouton Vérifier */
+.pin-verify-btn {
+  width: 100%;
+  max-width: 240px;
+  padding: 14px;
+  border-radius: 50px;
+  border: none;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.35);
+  transition: all 0.2s ease;
+  margin-bottom: 12px;
+  letter-spacing: 0.3px;
+}
+
+.pin-verify-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(168, 85, 247, 0.42);
+}
+
+.pin-verify-btn:active {
+  transform: scale(0.97);
+}
+
+/* Lien RESEND / reset */
+.pin-resend-link {
+  font-size: 0.75rem;
+  color: #666666;
+  text-align: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 16px;
+  letter-spacing: 0.2px;
+}
+
+.pin-resend-link span {
+  color: #a855f7;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Clavier PIN */
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 240px;
+  margin: 0 auto;
+}
+
+.keypad-btn-redesigned {
+  height: 52px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: none;
+  color: #1a1a1a;
+  font-size: 1.35rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.keypad-btn-redesigned:hover {
+  background: #f5f3ff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.keypad-btn-redesigned:active {
+  transform: scale(0.93);
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.keypad-btn-action-redesigned {
+  height: 52px;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #666666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.keypad-btn-action-redesigned:hover {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+  border-radius: 12px;
+}
+
+.keypad-btn-action-redesigned:active {
+  transform: scale(0.93);
+}
+
+@keyframes shake-otp {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.shake-otp { animation: shake-otp 0.4s ease-in-out; }
+
+
+
+/* === HEADER WAVE === */
+.login-header {
+  width: 100%;
+  background: linear-gradient(160deg, #2563eb 0%, #3b82f6 60%, #60a5fa 100%);
+  padding: 44px 24px 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-header::before {
+  content: '';
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  top: -80px;
+  right: -60px;
+  pointer-events: none;
+}
+
+.login-header::after {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.04);
+  bottom: -40px;
+  left: -30px;
+  pointer-events: none;
+}
+
+.login-header-wave {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 32px;
+  background: #f0f4ff;
+  border-radius: 32px 32px 0 0;
+}
+
+.login-logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1;
+}
+
+.login-logo-img {
+  height: 56px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  drop-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.login-header-subtitle {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.75);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  margin-top: 4px;
+}
+
+/* === BODY CARD === */
+.login-body {
+  width: 100%;
+  flex: 1;
+  background: #f0f4ff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 20px 32px;
+}
+
+.login-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 28px 24px;
+  width: 100%;
+  box-shadow: 0 4px 24px rgba(37, 99, 235, 0.08), 0 1px 4px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: slideUpWithFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.login-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* === INPUT GROUP === */
+.login-input-group {
+  position: relative;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.login-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+  transition: color 0.2s ease;
+  z-index: 1;
+}
+
+.login-input {
+  width: 100%;
+  padding: 13px 16px 13px 42px;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  outline: none;
+  font-family: var(--font-sans);
+  transition: all 0.2s ease;
+}
+
+.login-input:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.login-input:focus ~ .login-input-icon {
+  color: #3b82f6;
+}
+
+/* === BUTTONS === */
+.login-submit-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s ease;
+  margin-top: 2px;
+}
+
+.login-submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
+}
+
+.login-submit-btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+}
+
+.login-link-btn {
+  background: transparent;
+  color: #64748b;
+  border: none;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 14px;
+  text-align: center;
+  transition: color 0.2s ease;
+  padding: 4px 8px;
+}
+
+.login-link-btn:hover {
+  color: #3b82f6;
+}
+
+/* ========================================================
+   PIN VIEW — Standalone full-screen layout
+   ======================================================== */
+
+.pin-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: #f0f4ff;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.pin-screen-header {
+  width: 100%;
+  background: linear-gradient(160deg, #2563eb 0%, #3b82f6 60%, #60a5fa 100%);
+  padding: 20px 20px 56px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pin-screen-header::before {
+  content: '';
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  top: -60px;
+  right: -40px;
+  pointer-events: none;
+}
+
+.pin-screen-wave {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 36px;
+  background: #f0f4ff;
+  border-radius: 36px 36px 0 0;
+}
+
+.pin-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 1;
+  position: relative;
+}
+
+.pin-back-btn:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+.pin-user-card {
+  position: relative;
+  z-index: 2;
+  margin-top: -36px;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pin-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: #ffffff;
+  border: 3px solid #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  margin-bottom: 12px;
+}
+
+.pin-user-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.pin-user-role {
+  font-size: 0.68rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 500;
+  margin: 0 0 24px;
+}
+
+/* Dots */
+.pin-dots-row {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 28px;
+  align-items: center;
+  justify-content: center;
+}
+
+.pin-dot-redesigned {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: transparent;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pin-dot-redesigned.filled {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  transform: scale(1.15);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+.pin-dot-redesigned.error {
+  background: #ef4444;
+  border-color: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+/* Keypad */
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+}
+
+.keypad-btn-redesigned {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  color: #1e293b;
+  font-size: 1.4rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+  user-select: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  margin: 0 auto;
+}
+
+.keypad-btn-redesigned:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #3b82f6;
+}
+
+.keypad-btn-redesigned:active {
+  transform: scale(0.9);
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+
+.keypad-btn-action-redesigned {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin: 0 auto;
+}
+
+.keypad-btn-action-redesigned:hover {
+  color: #3b82f6;
+  background: #eff6ff;
+  border-radius: 50%;
+}
+
+.keypad-btn-action-redesigned:active {
+  transform: scale(0.9);
 }
 
 .lockscreen-logo-area {
@@ -1467,127 +2302,14 @@ html {
   color: var(--text-primary);
 }
 
-.pin-user-avatar {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 1.25rem;
-  color: #ffffff;
-  margin-bottom: 8px;
-  box-shadow: 0 6px 18px rgba(0, 240, 255, 0.25);
-  border: 1px solid rgba(255,255,255,0.4);
+/* Legacy classes kept for potential other uses */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
 }
+.shake { animation: shake 0.4s ease-in-out; }
 
-.pin-user-name {
-  font-size: 0.95rem;
-  font-weight: 800;
-  margin: 0;
-}
-
-.pin-user-role {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 2px 0 20px;
-}
-
-/* PIN Indicator Dots */
-.pin-dots-row {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 32px;
-  height: 18px;
-  align-items: center;
-}
-
-.pin-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.35);
-  background: transparent;
-  transition: all 0.4s var(--ease-elastic);
-}
-
-.pin-dot.filled {
-  background: var(--text-primary);
-  border-color: var(--text-primary);
-  animation: elasticPop 0.5s var(--ease-elastic);
-  box-shadow: 0 0 12px rgba(24, 24, 27, 0.5);
-}
-
-.pin-dot.error {
-  background: var(--status-late);
-  border-color: var(--status-late);
-  animation: rubberBandX 0.6s var(--ease-elastic);
-  box-shadow: 0 0 12px var(--status-late);
-}
-
-/* Keypad Grid */
-.keypad-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px 20px;
-  width: 100%;
-  max-width: 250px;
-}
-
-.keypad-btn {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  color: var(--text-primary);
-  font-size: 1.35rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  outline: none;
-  transition: all 0.5s var(--ease-elastic);
-  user-select: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  position: relative;
-  overflow: hidden;
-}
-
-.keypad-btn:hover {
-  background: #e5e7eb;
-  border-color: #d1d5db;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-}
-
-.keypad-btn:active {
-  transform: scale(0.92);
-  background: rgba(255, 255, 255, 0.4);
-  transition: transform 120ms var(--ease-spring-back);
-}
-
-.keypad-btn.action-btn {
-  background: transparent;
-  border: none;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  box-shadow: none;
-}
-
-.keypad-btn.action-btn:hover {
-  color: var(--text-primary);
-  background: transparent;
-}
-
-.keypad-btn.action-btn:active {
-  transform: scale(0.95);
-  transition: transform 120ms var(--ease-spring-back);
-}
 
 /* Print Styling - ensures only the receipt is visible when printing */
 @media print {

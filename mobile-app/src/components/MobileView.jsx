@@ -45,6 +45,7 @@ import {
   EyeOff,
   LogOut,
   Lock,
+  Mail,
   Users,
   Edit2,
   Trash2,
@@ -2680,170 +2681,202 @@ export default function MobileView() {
         {isCalmyClientMode ? (
           renderCalmyClientView()
         ) : !currentUser ? (
-          <div className="lockscreen-container">
-            <div className="lockscreen-logo-area" style={{ overflow: 'visible' }}>
-              <div style={{ background: 'var(--primary-light)', padding: '0.65rem', borderRadius: '16px', display: 'inline-flex', marginBottom: '0.2rem', border: '1px solid var(--border-color)' }}>
-                <Lock size={28} color="var(--primary)" strokeWidth={1.5} />
-              </div>
-              <div style={{ height: '70px', overflow: 'visible', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0' }}>
-                <img src={logoDark} alt="KLIN UP Logo" style={{ height: '140px', objectFit: 'contain', display: 'block', margin: '-30px auto -30px auto' }} />
-              </div>
-              <p className="lockscreen-subtitle" style={{ marginTop: '0px' }}>Plateforme Laverie Caisse & Atelier</p>
-            </div>
 
-            {!selectedLoginUser ? (
-              <form onSubmit={handleEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%', maxWidth: '280px', animation: 'fadeIn 0.3s ease-out forwards' }}>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'center', marginBottom: '0.5rem' }}>
-                  Connexion Utilisateur
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <input 
-                    type="email"
-                    required
-                    placeholder="Email de l'utilisateur"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="input-control"
-                    style={{
-                      width: '100%',
-                      padding: '0.8rem 1rem',
-                      borderRadius: '12px',
-                      textAlign: 'center'
-                    }}
-                  />
+          !selectedLoginUser ? (
+            /* ══════════════════════════════════════
+               ÉCRAN 1 — EMAIL (style design ref)
+               ══════════════════════════════════════ */
+            <div className="lockscreen-container">
+              <div className="login-page">
+                {/* Badge logo bleu */}
+                <div className="login-logo-badge">
+                  <img src={logoDark} alt="KLIN UP" />
                 </div>
 
-                <button 
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{
-                    padding: '0.75rem',
-                    borderRadius: '12px',
-                    fontSize: '0.85rem',
-                    width: '100%'
-                  }}
+                {/* Titre + sous-titre */}
+                <h1 className="login-title">Connexion KLIN&nbsp;UP</h1>
+                <p className="login-subtitle">
+                  Connectez-vous pour accéder à la plateforme laverie caisse &amp; atelier.
+                </p>
+
+                {/* Formulaire */}
+                <form
+                  className="login-form"
+                  onSubmit={handleEmailSubmit}
                 >
-                  Continuer
-                </button>
+                  <div className="login-field-wrap">
+                    <label className="login-field-label">Email</label>
+                    <div className="login-input-group">
+                      <input
+                        type="email"
+                        required
+                        placeholder="Entrez votre adresse email"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        className="login-input"
+                        autoComplete="email"
+                      />
+                      <Mail className="login-input-icon" size={16} />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="login-submit-btn">
+                    Se connecter
+                  </button>
+                </form>
 
                 <button
                   type="button"
                   onClick={() => setShowResetPinModal(true)}
-                  style={{
-                    background: 'transparent',
-                    color: 'var(--text-secondary)',
-                    border: 'none',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    marginTop: '0.5rem',
-                    textAlign: 'center',
-                    transition: 'color 0.2s ease'
-                  }}
+                  className="login-link-btn"
                 >
-                  Réinitialiser le PIN
+                  Mot de passe oublié ? <span>Réinitialiser le PIN</span>
                 </button>
+              </div>
+            </div>
 
-                <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.4rem 0' }} />
-
+          ) : (
+            /* ══════════════════════════════════════
+               ÉCRAN 2 — CODE PIN (style design ref)
+               ══════════════════════════════════════ */
+            <div className="pin-screen">
+              <div className="pin-page">
+                {/* Bouton retour chevron */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsCalmyClientMode(true);
-                    setCalmyView('dashboard');
-                  }}
-                  className="btn btn-secondary"
-                  style={{
-                    padding: '0.65rem',
-                    borderRadius: '12px',
-                    fontSize: '0.78rem',
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.35rem'
-                  }}
-                >
-                  📱 Démo Espace Client Calmy
-                </button>
-              </form>
-            ) : (
-              <div className="pin-view-container">
-                <button 
-                  type="button" 
-                  className="pin-view-back"
+                  className="pin-back-btn"
                   onClick={() => setSelectedLoginUser(null)}
+                  aria-label="Retour"
                 >
-                  ← Retour
+                  <ChevronLeft size={18} />
                 </button>
 
-                <div 
-                  className="pin-user-avatar" 
-                  style={{ 
-                    background: selectedLoginUser.role === 'super_admin' ? 'hsl(224, 76%, 48%)' : selectedLoginUser.role === 'manager' ? 'hsl(271, 76%, 53%)' : 'hsl(162, 76%, 38%)' 
+                {/* Badge logo */}
+                <div className="pin-logo-badge">
+                  <img src={logoDark} alt="KLIN UP" />
+                </div>
+
+                {/* Identité utilisateur */}
+                <div
+                  className="pin-avatar"
+                  style={{
+                    background: selectedLoginUser.role === 'super_admin'
+                      ? 'linear-gradient(135deg, #1d4ed8, #3b82f6)'
+                      : selectedLoginUser.role === 'manager'
+                      ? 'linear-gradient(135deg, #7c3aed, #a855f7)'
+                      : 'linear-gradient(135deg, #059669, #10b981)'
                   }}
                 >
                   {selectedLoginUser.prenom[0]}{selectedLoginUser.nom[0]}
                 </div>
-                <h3 className="pin-user-name">{selectedLoginUser.prenom} {selectedLoginUser.nom}</h3>
+
+                <h2 className="pin-user-name">{selectedLoginUser.prenom} {selectedLoginUser.nom}</h2>
                 <p className="pin-user-role">
-                  {selectedLoginUser.role === 'super_admin' ? 'Super Administrateur' 
-                    : selectedLoginUser.role === 'manager' ? 'Gestionnaire' 
-                    : selectedLoginUser.role === 'livreur' ? 'Livreur' 
-                    : selectedLoginUser.role === 'agent_lavage_repassage' ? 'Agent Lavage/Repassage' 
+                  {selectedLoginUser.role === 'super_admin' ? 'Super Administrateur'
+                    : selectedLoginUser.role === 'manager' ? 'Gestionnaire'
+                    : selectedLoginUser.role === 'livreur' ? 'Livreur'
+                    : selectedLoginUser.role === 'agent_lavage_repassage' ? 'Agent Lavage / Repassage'
                     : "Agent d'accueil"}
                 </p>
 
-                {/* PIN Code Indicator Dots (6 dots) */}
-                <div className={`pin-dots-row ${pinError ? 'shake' : ''}`}>
-                  {[0, 1, 2, 3, 4, 5].map(idx => (
-                    <div 
-                      key={idx} 
-                      className={`pin-dot ${pinCode.length > idx ? 'filled' : ''} ${pinError ? 'error' : ''}`}
-                    />
-                  ))}
+                {/* Section PIN */}
+                <p className="pin-section-title">Vérifiez votre identité</p>
+                <p className="pin-section-subtitle">
+                  Entrez votre code PIN à 6 chiffres pour accéder à l'espace de travail.
+                </p>
+
+                {/* Affichage OTP-style */}
+                <div className={`pin-otp-display ${pinError ? 'shake-otp' : ''}`}>
+                  {[0, 1, 2, 3, 4, 5].map(idx => {
+                    const hasDigit = pinCode.length > idx;
+                    const isError = pinError;
+                    return (
+                      <div
+                        key={idx}
+                        className={[
+                          'pin-otp-digit',
+                          hasDigit && !isError ? 'filled' : '',
+                          isError && hasDigit ? 'error' : '',
+                          !hasDigit ? 'empty' : ''
+                        ].filter(Boolean).join(' ')}
+                      >
+                        {hasDigit ? '•' : null}
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Keypad Grid */}
-                <div className="keypad-grid">
+                {/* Bouton valider — n'est actif qu'avec 6 chiffres */}
+                <button
+                  type="button"
+                  className="pin-verify-btn"
+                  onClick={() => {
+                    if (pinCode.length === 6 && selectedLoginUser) {
+                      if (selectedLoginUser.code_pin === pinCode) {
+                        db.setCurrentUser(selectedLoginUser);
+                        setSelectedLoginUser(null);
+                        setPinCode('');
+                      } else {
+                        setPinError(true);
+                        setTimeout(() => { setPinCode(''); setPinError(false); }, 800);
+                      }
+                    }
+                  }}
+                  disabled={pinCode.length < 6}
+                  style={{ opacity: pinCode.length < 6 ? 0.55 : 1, width: '100%', maxWidth: 280 }}
+                >
+                  Vérifier
+                </button>
+
+                {/* Lien reset */}
+                <button
+                  type="button"
+                  className="pin-resend-link"
+                  onClick={() => setShowResetPinModal(true)}
+                >
+                  PIN oublié ? <span>Réinitialiser</span>
+                </button>
+
+                {/* Clavier numérique */}
+                <div className="pin-keypad">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                    <button 
-                      key={num} 
-                      type="button" 
-                      className="keypad-btn"
+                    <button
+                      key={num}
+                      type="button"
+                      className="keypad-btn-redesigned"
                       onClick={() => handleKeypadPress(num.toString())}
                     >
                       {num}
                     </button>
                   ))}
-                  <button 
-                    type="button" 
-                    className="keypad-btn action-btn"
-                    onClick={() => setSelectedLoginUser(null)}
-                  >
-                    Retour
-                  </button>
-                  <button 
-                    type="button" 
-                    className="keypad-btn"
+                  {/* Rangée du bas : cellule vide, 0, effacer */}
+                  <div style={{ height: 56, borderRadius: 16, background: 'transparent' }} />
+                  <button
+                    type="button"
+                    className="keypad-btn-redesigned"
                     onClick={() => handleKeypadPress('0')}
                   >
                     0
                   </button>
-                  <button 
-                    type="button" 
-                    className="keypad-btn action-btn"
-                    style={{ fontSize: '0.85rem' }}
+                  <button
+                    type="button"
+                    className="keypad-btn-action-redesigned"
                     onClick={() => handleKeypadPress('delete')}
+                    aria-label="Effacer"
                   >
-                    Effacer
+                    <svg width="22" height="16" viewBox="0 0 22 16" fill="none">
+                      <path d="M8.5 1L1.5 8L8.5 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M14 5L19 10M19 5L14 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                    </svg>
                   </button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )
+
+
+
+
         ) : (
           <>
         {/* ========================================================
