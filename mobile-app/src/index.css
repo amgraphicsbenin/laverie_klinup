@@ -347,15 +347,7 @@ button, input, select, textarea { font-family: inherit; }
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.mobile-subview .mobile-header {
-  top: -10px;
-  margin-top: -10px;
-  padding-top: 10px;
-  margin-left: -14px;
-  margin-right: -14px;
-  padding-left: 14px;
-  padding-right: 14px;
-}
+
 
 /* Smooth scroll avec easing */
 @supports (scroll-behavior: smooth) {

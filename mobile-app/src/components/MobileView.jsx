@@ -2110,7 +2110,7 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -2130,105 +2130,107 @@ export default function MobileView() {
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-          Liste des commandes livrées/récupérées avec succès sur le mois en cours.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px' }}>
+          <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            Liste des commandes livrées/récupérées avec succès sur le mois en cours.
+          </p>
 
-        {/* Search Field */}
-        <div style={{ position: 'relative' }}>
-          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input 
-            type="text" 
-            className="input-control" 
-            style={{ 
-              paddingLeft: '2.4rem', 
-              width: '100%', 
-              borderRadius: '14px', 
-              fontSize: '0.75rem', 
-              paddingTop: '0.52rem', 
-              paddingBottom: '0.52rem',
-              background: '#ffffff',
-              border: '1px solid var(--border-color)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
-            }} 
-            placeholder="Rechercher par marquage, client, article..." 
-            value={detailSearchQuery} 
-            onChange={(e) => setDetailSearchQuery(e.target.value)} 
-          />
-          {detailSearchQuery && (
-            <button 
-              type="button"
-              onClick={() => setDetailSearchQuery('')}
-              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
+          {/* Search Field */}
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input 
+              type="text" 
+              className="input-control" 
+              style={{ 
+                paddingLeft: '2.4rem', 
+                width: '100%', 
+                borderRadius: '14px', 
+                fontSize: '0.75rem', 
+                paddingTop: '0.52rem', 
+                paddingBottom: '0.52rem',
+                background: '#ffffff',
+                border: '1px solid var(--border-color)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
+              }} 
+              placeholder="Rechercher par marquage, client, article..." 
+              value={detailSearchQuery} 
+              onChange={(e) => setDetailSearchQuery(e.target.value)} 
+            />
+            {detailSearchQuery && (
+              <button 
+                type="button"
+                onClick={() => setDetailSearchQuery('')}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '12px' }}>
-          {filteredCompleted.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
-              Aucune commande restituée trouvée.
-            </div>
-          ) : (
-            filteredCompleted.map(order => {
-              const client = customers.find(c => c.id === order.customer_id);
-              const initial = client ? `${client.prenom[0] || ''}${client.nom[0] || ''}`.toUpperCase() : '?';
-              
-              return (
-                <div 
-                  key={order.id} 
-                  className="order-detail-card-modern" 
-                  style={{ 
-                    padding: '1rem', 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '0.6rem', 
-                    borderLeft: '4px solid var(--status-ready)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--status-ready)', fontFamily: 'monospace', letterSpacing: '0.2px' }}>{order.identifiant_unique_marquage}</span>
-                    <span style={{ fontSize: '0.55rem', padding: '0.12rem 0.4rem', fontWeight: 700, color: 'var(--status-ready)', background: 'var(--status-ready-light)', borderRadius: '4px', border: '1px solid rgba(22, 163, 74, 0.15)' }}>
-                      LIVRÉ
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.6rem' }}>
-                    <div 
-                      className="client-avatar-initials"
-                      style={{
-                        background: 'var(--status-ready-light)',
-                        color: 'var(--status-ready)',
-                        borderColor: 'rgba(22, 163, 74, 0.15)'
-                      }}
-                    >
-                      {initial}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '12px' }}>
+            {filteredCompleted.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                Aucune commande restituée trouvée.
+              </div>
+            ) : (
+              filteredCompleted.map(order => {
+                const client = customers.find(c => c.id === order.customer_id);
+                const initial = client ? `${client.prenom[0] || ''}${client.nom[0] || ''}`.toUpperCase() : '?';
+                
+                return (
+                  <div 
+                    key={order.id} 
+                    className="order-detail-card-modern" 
+                    style={{ 
+                      padding: '1rem', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '0.6rem', 
+                      borderLeft: '4px solid var(--status-ready)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--status-ready)', fontFamily: 'monospace', letterSpacing: '0.2px' }}>{order.identifiant_unique_marquage}</span>
+                      <span style={{ fontSize: '0.55rem', padding: '0.12rem 0.4rem', fontWeight: 700, color: 'var(--status-ready)', background: 'var(--status-ready-light)', borderRadius: '4px', border: '1px solid rgba(22, 163, 74, 0.15)' }}>
+                        LIVRÉ
+                      </span>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {order.type_article}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.6rem' }}>
+                      <div 
+                        className="client-avatar-initials"
+                        style={{
+                          background: 'var(--status-ready-light)',
+                          color: 'var(--status-ready)',
+                          borderColor: 'rgba(22, 163, 74, 0.15)'
+                        }}
+                      >
+                        {initial}
                       </div>
-                      <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                        Client : <strong style={{ fontWeight: 600 }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {order.type_article}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          Client : <strong style={{ fontWeight: 600 }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: 'var(--status-ready)' }}>
+                        {order.prix_total?.toLocaleString()} F
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: 'var(--status-ready)' }}>
-                      {order.prix_total?.toLocaleString()} F
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: 'var(--text-muted)', background: 'var(--primary-light)', padding: '0.45rem 0.75rem', borderRadius: '10px', marginTop: '0.2rem', border: '1px solid rgba(59, 130, 246, 0.05)' }}>
+                      <span>Service: <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{serviceLabels[order.type_service] || order.type_service}</strong></span>
+                      <span>
+                        Livrée le : {formatDateTime(order.updated_at || order.created_at)}
+                      </span>
                     </div>
                   </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: 'var(--text-muted)', background: 'var(--primary-light)', padding: '0.45rem 0.75rem', borderRadius: '10px', marginTop: '0.2rem', border: '1px solid rgba(59, 130, 246, 0.05)' }}>
-                    <span>Service: <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{serviceLabels[order.type_service] || order.type_service}</strong></span>
-                    <span>
-                      Livrée le : {formatDateTime(order.updated_at || order.created_at)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
     );
