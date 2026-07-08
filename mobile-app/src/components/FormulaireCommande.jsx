@@ -40,7 +40,7 @@ export default function FormulaireCommande({
     return Object.values(articleQuantities).reduce((a, b) => a + b, 0);
   };
 
-  const getCalculatedPrice = () => {
+  const getBasePrice = () => {
     let price = 0;
     if (payWithSubscription && !subscribePlanId) {
       return 0;
@@ -61,12 +61,6 @@ export default function FormulaireCommande({
       price = Math.round(price * (1 + expressMarkup / 100));
     }
 
-    const discountPercent = Number(remisePourcentage || 0);
-    if (discountPercent > 0 && discountPercent <= 100) {
-      const discountAmount = Math.round(price * (discountPercent / 100));
-      price = Math.max(0, price - discountAmount);
-    }
-
     if (subscribePlanId) {
       const subPlan = catalog.find(c => c.id === subscribePlanId);
       if (subPlan) {
@@ -75,6 +69,16 @@ export default function FormulaireCommande({
     }
 
     return price;
+  };
+
+  const getCalculatedPrice = () => {
+    const base = getBasePrice();
+    const discountPercent = Number(remisePourcentage || 0);
+    if (discountPercent > 0 && discountPercent <= 100) {
+      const discountAmount = Math.round(base * (discountPercent / 100));
+      return Math.max(0, base - discountAmount);
+    }
+    return base;
   };
 
   const handleUpdateQty = (cloth, delta) => {
@@ -431,8 +435,20 @@ export default function FormulaireCommande({
         <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Total</span>
-            <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)' }}>
-              {getCalculatedPrice().toLocaleString()} FCFA
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'wrap' }}>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)' }}>
+                {getCalculatedPrice().toLocaleString()} FCFA
+              </div>
+              {Number(remisePourcentage) > 0 && (
+                <div style={{ fontSize: '0.68rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                  <span style={{ textDecoration: 'line-through', color: '#ef4444', fontWeight: 600 }}>
+                    {getBasePrice().toLocaleString()} F
+                  </span>
+                  <span style={{ color: 'var(--status-ready)', fontWeight: 700 }}>
+                    (-{Math.round(getBasePrice() * Number(remisePourcentage) / 100).toLocaleString()} F)
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           
