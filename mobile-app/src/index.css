@@ -2284,5 +2284,185 @@ html {
     border: none;
     background: #ffffff !important;
     color: #000000 !important;
+    text-shadow: none !important;
   }
 }
+
+/* ========================================================
+   MODERN HOME PAGE REDESIGN STYLES (ANTIGRAVITY LOOK)
+   ======================================================== */
+.modern-home-greeting {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 0.15rem;
+  letter-spacing: -0.02em;
+}
+
+.modern-home-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.dashboard-main-card-modern {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 24px !important;
+  padding: 1.4rem 1.3rem !important;
+  box-shadow: 0 20px 40px rgba(30, 58, 138, 0.22) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: all 0.4s var(--ease-spring-soft);
+}
+
+.dashboard-main-card-modern:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 48px rgba(30, 58, 138, 0.28) !important;
+}
+
+.dashboard-main-card-modern::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.35) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.dashboard-main-card-modern .eye-toggle-btn {
+  color: rgba(255, 255, 255, 0.75) !important;
+  transition: color 0.2s ease;
+}
+
+.dashboard-main-card-modern .eye-toggle-btn:hover {
+  color: #ffffff !important;
+}
+
+.kpi-card-modern {
+  cursor: pointer;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.02) !important;
+  border-radius: 18px !important;
+  padding: 1rem 1.1rem !important;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  transition: all 0.3s var(--ease-spring-soft) !important;
+}
+
+.kpi-card-modern:hover {
+  transform: translateY(-3px);
+  background: var(--bg-card-hover);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+.kpi-card-modern .kpi-icon {
+  transition: transform 0.3s var(--ease-spring-soft);
+}
+
+.kpi-card-modern:hover .kpi-icon {
+  transform: scale(1.1) rotate(3deg);
+}
+
+.pipeline-card-modern {
+  background: #ffffff !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03) !important;
+  padding: 1.2rem !important;
+  border-radius: 20px !important;
+  transition: all 0.3s var(--ease-spring-soft);
+}
+
+.pipeline-card-modern:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.05) !important;
+}
+
+.pipeline-step-node {
+  transition: all 0.3s var(--ease-spring-soft);
+}
+
+.pipeline-step-node:hover {
+  transform: translateY(-2px);
+}
+
+.pipeline-step-circle-active {
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+  animation: pulse-glow-ready 2.5s infinite;
+}
+
+.activity-card-modern {
+  background: #ffffff !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03) !important;
+  padding: 1.2rem !important;
+  border-radius: 20px !important;
+  transition: all 0.3s var(--ease-spring-soft);
+}
+
+.activity-card-modern:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.05) !important;
+}
+
+.activity-chart-bar {
+  background: linear-gradient(to top, var(--primary) 0%, #60a5fa 100%) !important;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
+  border-radius: 4px !important;
+}
+
+.top-clients-card-modern {
+  background: #ffffff !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03) !important;
+  padding: 1.2rem !important;
+  border-radius: 20px !important;
+  transition: all 0.3s var(--ease-spring-soft);
+}
+
+.top-clients-card-modern:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.05) !important;
+}
+
+.client-rank-badge {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+}
+
+.client-rank-badge-silver {
+  background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(148, 163, 184, 0.3);
+}
+
+.client-rank-badge-bronze {
+  background: linear-gradient(135deg, #fed7aa 0%, #ea580c 100%);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.3);
+}
+
+.client-avatar-initials {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(59, 130, 246, 0.1);
+}
+

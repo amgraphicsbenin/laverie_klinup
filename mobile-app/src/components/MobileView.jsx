@@ -3373,90 +3373,93 @@ export default function MobileView() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
 
               {/* HEADER — Logo + Action Buttons */}
-              <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '10px' }}>
-                <div style={{ width: '115px', height: '40px', overflow: 'hidden', flexShrink: 0 }}>
-                  <img
-                    src={logoDark}
-                    alt="KLIN UP Logo"
-                    style={{
-                      width: '115px',
-                      height: 'auto',
-                      display: 'block',
-                      marginTop: '-31px',
-                    }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  {!db.isRemote() && (
-                    <span 
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const confirmDiag = confirm("L'application est actuellement en mode local (impossible de se connecter à Supabase). Voulez-vous lancer un test de diagnostic de connexion ?");
-                        if (confirmDiag) {
-                          alert("Lancement du test de diagnostic...");
-                          const res = await db.testConnection();
-                          if (res.success) {
-                            alert("Succès ! " + res.message + "\n\nL'application s'est reconnectée à Supabase et est maintenant en ligne !");
-                          } else {
-                            alert("Échec du diagnostic !\n\nErreur : " + res.error + "\n\nConseils : Vérifiez votre connexion internet.");
+              <div className="mobile-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ width: '115px', height: '40px', overflow: 'hidden', flexShrink: 0 }}>
+                    <img
+                      src={logoDark}
+                      alt="KLIN UP Logo"
+                      style={{
+                        width: '115px',
+                        height: 'auto',
+                        display: 'block',
+                        marginTop: '-31px',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    {!db.isRemote() && (
+                      <span 
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const confirmDiag = confirm("L'application est actuellement en mode local (impossible de se connecter à Supabase). Voulez-vous lancer un test de diagnostic de connexion ?");
+                          if (confirmDiag) {
+                            alert("Lancement du test de diagnostic...");
+                            const res = await db.testConnection();
+                            if (res.success) {
+                              alert("Succès ! " + res.message + "\n\nL'application s'est reconnectée à Supabase et est maintenant en ligne !");
+                            } else {
+                              alert("Échec du diagnostic !\n\nErreur : " + res.error + "\n\nConseils : Vérifiez votre connexion internet.");
+                            }
                           }
-                        }
-                      }}
-                      title="L'application fonctionne sur le stockage local de l'appareil (les variables d'environnement Supabase manquent ou le serveur est injoignable). Cliquez pour lancer un diagnostic."
-                      style={{ 
-                        cursor: 'pointer',
-                        fontSize: '0.55rem', 
-                        fontWeight: 600, 
-                        padding: '0.15rem 0.4rem', 
-                        borderRadius: '6px', 
-                        background: 'rgba(217, 119, 6, 0.06)', 
-                        color: '#d97706',
-                        border: '1px solid rgba(217, 119, 6, 0.15)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      Local
-                    </span>
-                  )}
-                  <button 
-                    className="action-circle-btn" 
-                    style={{ 
-                      position: 'relative', 
-                      width: '34px', 
-                      height: '34px', 
-                      borderRadius: '50%', 
-                      background: '#ffffff', 
-                      border: '1px solid #f1f5f9', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      cursor: 'pointer',
-                      boxShadow: 'none',
-                      color: 'var(--text-secondary)'
-                    }}
-                    onClick={() => setShowNotificationsModal(true)}
-                  >
-                    <Bell size={15} strokeWidth={2} />
-                    {notifications.some(n => !n.read) && (
-                      <span style={{ position: 'absolute', top: '9px', right: '9px', width: '5px', height: '5px', background: 'var(--status-late)', borderRadius: '50%' }} />
+                        }}
+                        title="L'application fonctionne sur le stockage local de l'appareil (les variables d'environnement Supabase manquent ou le serveur est injoignable). Cliquez pour lancer un diagnostic."
+                        style={{ 
+                          cursor: 'pointer',
+                          fontSize: '0.55rem', 
+                          fontWeight: 600, 
+                          padding: '0.15rem 0.4rem', 
+                          borderRadius: '6px', 
+                          background: 'rgba(217, 119, 6, 0.06)', 
+                          color: '#d97706',
+                          border: '1px solid rgba(217, 119, 6, 0.15)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}
+                      >
+                        Local
+                      </span>
                     )}
-                  </button>
+                    <button 
+                      className="action-circle-btn" 
+                      style={{ 
+                        position: 'relative', 
+                        width: '34px', 
+                        height: '34px', 
+                        borderRadius: '50%', 
+                        background: '#ffffff', 
+                        border: '1px solid #f1f5f9', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        cursor: 'pointer',
+                        boxShadow: 'none',
+                        color: 'var(--text-secondary)'
+                      }}
+                      onClick={() => setShowNotificationsModal(true)}
+                    >
+                      <Bell size={15} strokeWidth={2} />
+                      {notifications.some(n => !n.read) && (
+                        <span style={{ position: 'absolute', top: '9px', right: '9px', width: '5px', height: '5px', background: 'var(--status-late)', borderRadius: '50%' }} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Welcoming header block */}
+                <div>
+                  <div className="modern-home-greeting">
+                    Bonjour, {currentUser ? currentUser.prenom : 'KLIN UP'} 👋
+                  </div>
+                  <div className="modern-home-sub">
+                    Voici l'état de votre activité aujourd'hui.
+                  </div>
                 </div>
               </div>
 
               {/* TOTAL SPEND — Style Finance Card */}
               <div 
-                className="dashboard-main-card" 
-                style={{ 
-                  borderRadius: '20px', 
-                  padding: '1.2rem 1.1rem', 
-                  cursor: 'pointer',
-                  background: 'linear-gradient(135deg, rgba(43, 130, 240, 0.06) 0%, rgba(255,255,255,0.98) 60%)',
-                  boxShadow: '0 2px 12px rgba(43, 130, 240, 0.08)',
-                  border: '1px solid rgba(43, 130, 240, 0.14)',
-                  borderLeft: '3px solid var(--primary)'
-                }}
+                className="dashboard-main-card-modern" 
                 onClick={(e) => {
                   if (e.target.closest('.eye-toggle-btn')) return;
                   setAccueilSubView(canToggleCA ? 'ca_detail' : 'actives_detail');
@@ -3464,20 +3467,20 @@ export default function MobileView() {
               >
                 {/* Carte Chiffre d'Affaires */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
-                  <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 500 }}>Chiffre d'Affaires Total</div>
+                  <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>Chiffre d'Affaires Total</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.5rem' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 600, fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--text-primary)' }}>
+                    <div style={{ fontSize: '1.85rem', fontWeight: 700, fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em', lineHeight: 1.1, color: '#ffffff' }}>
                       {canToggleCA ? (showCAValues ? `${revenueTotal.toLocaleString()} ` : '•••••• ') : '•••••• '}
-                      <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>FCFA</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'rgba(255,255,255,0.75)' }}>FCFA</span>
                     </div>
                   </div>
                   {canToggleCA && (
                     <button
                       type="button"
                       className="eye-toggle-btn"
-                      style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowCAValues(!showCAValues);
@@ -3490,39 +3493,40 @@ export default function MobileView() {
                 </div>
                 
                 {/* Mini chart area */}
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '36px', marginTop: '1rem', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: '38px', marginTop: '1rem', marginBottom: '0.4rem' }}>
                   {last7.map((d, i) => (
                     <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                       <div style={{ 
                         width: '5px', 
-                        background: i === 6 ? 'var(--primary)' : '#e2e8f0', 
+                        background: i === 6 ? '#ffffff' : 'rgba(255, 255, 255, 0.25)', 
                         borderRadius: '99px', 
-                        height: `${Math.max(4, (d.count / maxBarCount) * 32)}px`,
-                        transition: 'height 0.4s ease'
+                        height: `${Math.max(4, (d.count / maxBarCount) * 34)}px`,
+                        transition: 'height 0.4s ease',
+                        boxShadow: i === 6 ? '0 0 8px rgba(255,255,255,0.6)' : 'none'
                       }} />
                     </div>
                   ))}
                 </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {last7.map((d, i) => (<div key={i} style={{ flex: 1, textAlign: 'center', fontSize: '0.52rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase' }}>{d.label}</div>))}
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  {last7.map((d, i) => (<div key={i} style={{ flex: 1, textAlign: 'center', fontSize: '0.55rem', color: i === 6 ? '#ffffff' : 'rgba(255,255,255,0.6)', fontWeight: i === 6 ? 700 : 500, textTransform: 'uppercase' }}>{d.label}</div>))}
                 </div>
 
                 {/* Encaissé / Reste dû */}
-                <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.1rem', paddingTop: '0.9rem', borderTop: '1px solid #f1f5f9' }}>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-ready)' }} />
+                <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.2rem', paddingTop: '0.9rem', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80' }} />
                     <div>
-                      <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 500 }}>Encaissé</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '1px' }}>
+                      <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>Encaissé</div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#ffffff', marginTop: '1px' }}>
                         {canToggleCA ? (showCAValues ? `${encaisseTotal.toLocaleString()} F` : '•••••• F') : '•••••• F'}
                       </div>
                     </div>
                   </div>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-late)' }} />
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#f87171', boxShadow: '0 0 8px #f87171' }} />
                     <div>
-                      <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 500 }}>Reste dû</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '1px' }}>
+                      <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>Reste dû</div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#ffffff', marginTop: '1px' }}>
                         {canToggleCA ? (showCAValues ? `${resteTotal.toLocaleString()} F` : '•••••• F') : '•••••• F'}
                       </div>
                     </div>
@@ -3531,70 +3535,64 @@ export default function MobileView() {
               </div>
 
               {/* KPI GRID */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                 {[
-                  { label: 'Actives', value: activeOrders.length, color: 'var(--primary)', bg: 'var(--primary-light)', icon: <Activity size={14} color="var(--primary)" />, sub: 'en cours', subView: 'actives_detail' },
-                  { label: 'Livrées', value: completedThisMonth.length, color: 'var(--status-ready)', bg: 'var(--status-ready-light)', icon: <CheckCircle size={14} color="var(--status-ready)" />, sub: 'ce mois-ci', subView: 'livrees_detail' },
-                  { label: 'Express', value: expressOrders.length, color: 'var(--status-pending)', bg: 'var(--status-pending-light)', icon: <Zap size={14} color="var(--status-pending)" />, sub: 'urgentes', subView: 'express_detail' },
+                  { label: 'Actives', value: activeOrders.length, color: 'var(--primary)', bg: 'var(--primary-light)', icon: <Activity size={15} color="var(--primary)" />, sub: 'en cours', subView: 'actives_detail' },
+                  { label: 'Livrées', value: completedThisMonth.length, color: 'var(--status-ready)', bg: 'var(--status-ready-light)', icon: <CheckCircle size={15} color="var(--status-ready)" />, sub: 'ce mois-ci', subView: 'livrees_detail' },
+                  { label: 'Express', value: expressOrders.length, color: 'var(--status-pending)', bg: 'var(--status-pending-light)', icon: <Zap size={15} color="var(--status-pending)" />, sub: 'urgentes', subView: 'express_detail' },
                   {
                     label: 'CA Mois',
                     value: canToggleCA ? (showCAValues ? (revenueMonth >= 1000 ? `${(revenueMonth/1000).toFixed(0)}k` : revenueMonth) : '••••••') : '••••••',
                     color: 'var(--secondary)',
                     bg: 'var(--secondary-light)',
-                    icon: <TrendingUp size={14} color="var(--secondary)" />,
+                    icon: <TrendingUp size={15} color="var(--secondary)" />,
                     sub: 'FCFA',
                     subView: canToggleCA ? 'ca_detail' : 'actives_detail'
                   },
                 ].map((kpi, i) => {
                   const kpiCardBg = [
-                    'linear-gradient(135deg, rgba(43, 130, 240, 0.08) 0%, rgba(43, 130, 240, 0.03) 100%)',
-                    'linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.02) 100%)',
-                    'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.02) 100%)',
-                    'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.02) 100%)'
+                    'linear-gradient(135deg, rgba(43, 130, 240, 0.09) 0%, rgba(255, 255, 255, 0.98) 60%)',
+                    'linear-gradient(135deg, rgba(34, 197, 94, 0.09) 0%, rgba(255, 255, 255, 0.98) 60%)',
+                    'linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(255, 255, 255, 0.98) 60%)',
+                    'linear-gradient(135deg, rgba(99, 102, 241, 0.09) 0%, rgba(255, 255, 255, 0.98) 60%)'
                   ];
                   const kpiCardBorder = [
-                    'rgba(43, 130, 240, 0.18)',
-                    'rgba(34, 197, 94, 0.18)',
-                    'rgba(245, 158, 11, 0.18)',
-                    'rgba(99, 102, 241, 0.18)'
+                    'rgba(43, 130, 240, 0.16)',
+                    'rgba(34, 197, 94, 0.16)',
+                    'rgba(245, 158, 11, 0.16)',
+                    'rgba(99, 102, 241, 0.16)'
                   ];
                   return (
                   <div 
                     key={i} 
-                    className="kpi-card" 
+                    className="kpi-card-modern" 
                     style={{ 
-                      cursor: 'pointer',
                       background: kpiCardBg[i],
-                      border: `1px solid ${kpiCardBorder[i]}`,
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                      borderRadius: '16px',
-                      padding: '0.85rem 1rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.2rem'
+                      borderColor: kpiCardBorder[i]
                     }}
                     onClick={() => setAccueilSubView(kpi.subView)}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div className="kpi-label" style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 500 }}>{kpi.label}</div>
+                      <div className="kpi-label" style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.2px' }}>{kpi.label}</div>
                       <div 
                         className="kpi-icon" 
                         style={{ 
-                          width: '26px',
-                          height: '26px',
+                          width: '28px',
+                          height: '28px',
                           borderRadius: '8px',
                           background: kpi.bg,
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center'
+                          justifyContent: 'center',
+                          border: `1px solid ${kpiCardBorder[i]}`
                         }}
                       >
                         {kpi.icon}
                       </div>
                     </div>
-                    <div>
-                      <div className="kpi-value" style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em' }}>{kpi.value}</div>
-                      <div className="kpi-sub" style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginTop: '1px' }}>{kpi.sub}</div>
+                    <div style={{ marginTop: '0.25rem' }}>
+                      <div className="kpi-value" style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{kpi.value}</div>
+                      <div className="kpi-sub" style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>{kpi.sub}</div>
                     </div>
                   </div>
                   );
@@ -3603,52 +3601,57 @@ export default function MobileView() {
 
               {/* PIPELINE ATELIER — Stepper Horizontal */}
               <div 
-                className="card" 
-                style={{ background: 'linear-gradient(135deg, #f8faff 0%, #f1f5fb 100%)', border: '1px solid rgba(100, 130, 200, 0.18)', boxShadow: '0 2px 10px rgba(80, 110, 200, 0.06)', padding: '1rem', cursor: 'pointer', borderRadius: '16px' }}
+                className="pipeline-card-modern" 
                 onClick={() => setAccueilSubView('pipeline_detail')}
               >
-                <div className="section-header" style={{ marginBottom: '0.8rem' }}>
-                  <h4 style={{ fontSize: '0.8rem', fontWeight: 600 }}>Pipeline Atelier</h4>
-                  <span className="see-all" style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }}>Temps réel</span>
+                <div className="section-header" style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Pipeline Atelier</h4>
+                  <span className="see-all" style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary)', animation: 'pulse-glow-ready 1.5s infinite' }} />
+                    Temps réel
+                  </span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', position: 'relative', padding: '0.2rem 0' }}>
                   {pipelineCounts.map((p, idx) => (
-                    <div key={p.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                    <div className="pipeline-step-node" key={p.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
                       {/* Stepper line */}
                       {idx < 3 && (
                         <div style={{
                           position: 'absolute',
-                          top: '15px',
-                          left: 'calc(50% + 15px)',
-                          right: 'calc(-50% + 15px)',
+                          top: '16px',
+                          left: 'calc(50% + 16px)',
+                          right: 'calc(-50% + 16px)',
                           height: '2px',
                           background: '#f1f5f9',
                           zIndex: 1
                         }} />
                       )}
                       
-                      <div style={{
-                        width: '30px',
-                        height: '30px',
-                        borderRadius: '50%',
-                        background: p.count > 0 ? p.colorLight : '#ffffff',
-                        border: `1.5px solid ${p.count > 0 ? p.color : '#e2e8f0'}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 2,
-                        marginBottom: '0.35rem',
-                        transition: 'all 0.3s ease'
-                      }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: p.count > 0 ? p.color : 'var(--text-muted)' }}>
+                      <div 
+                        className={p.count > 0 ? "pipeline-step-circle-active" : ""}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: p.count > 0 ? p.colorLight : '#ffffff',
+                          border: `2px solid ${p.count > 0 ? p.color : '#e2e8f0'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 2,
+                          marginBottom: '0.4rem',
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: p.count > 0 ? p.color : 'var(--text-muted)' }}>
                           {p.count}
                         </span>
                       </div>
                       
                       <span style={{ 
-                        fontSize: '0.6rem', 
+                        fontSize: '0.62rem', 
                         color: p.count > 0 ? 'var(--text-primary)' : 'var(--text-muted)', 
-                        fontWeight: p.count > 0 ? 500 : 400,
+                        fontWeight: p.count > 0 ? 600 : 500,
                         textAlign: 'center'
                       }}>
                         {p.label}
@@ -3659,13 +3662,13 @@ export default function MobileView() {
               </div>
 
               {/* ACTIVITÉ PÉRIODIQUE */}
-              <div className="card" style={{ background: 'linear-gradient(135deg, #fefaf5 0%, #fffbf0 100%)', border: '1px solid rgba(200, 170, 100, 0.2)', boxShadow: '0 2px 10px rgba(180, 140, 60, 0.06)', padding: '1rem', position: 'relative', zIndex: showPeriodDropdown ? 10 : 1, borderRadius: '16px' }}>
-                <div className="section-header" style={{ position: 'relative', marginBottom: '0.8rem' }}>
+              <div className="activity-card-modern" style={{ position: 'relative', zIndex: showPeriodDropdown ? 10 : 1 }}>
+                <div className="section-header" style={{ position: 'relative', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }} onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}>
-                    <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600 }}>Activité — <span style={{ color: 'var(--primary)', borderBottom: '1px dashed var(--primary)' }}>{getPeriodLabel(activityPeriod)}</span></h4>
+                    <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>Activité — <span style={{ color: 'var(--primary)', borderBottom: '1px dashed var(--primary)' }}>{getPeriodLabel(activityPeriod)}</span></h4>
                     <ChevronDown size={12} color="var(--primary)" />
                   </div>
-                  <span className="see-all" style={{ cursor: 'pointer', fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }} onClick={() => setAccueilSubView('activity_detail')}>Voir plus</span>
+                  <span className="see-all" style={{ cursor: 'pointer', fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 600 }} onClick={() => setAccueilSubView('activity_detail')}>Voir plus</span>
                   
                   {showPeriodDropdown && (
                     <div style={{
@@ -3705,24 +3708,23 @@ export default function MobileView() {
                   const actData = getActivityData();
                   const maxBar = Math.max(...actData.map(d => d.count), 1);
                   return (
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '50px', marginTop: '0.5rem', padding: '0 4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '52px', marginTop: '0.5rem', padding: '0 4px' }}>
                       {actData.map((d, i) => (
                         <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <div style={{ 
+                          <div className="activity-chart-bar" style={{ 
                             width: '6px', 
-                            background: i === actData.length - 1 ? 'var(--primary)' : 'var(--primary-light)', 
-                            borderRadius: '99px', 
-                            height: `${Math.max(d.count > 0 ? 5 : 2, (d.count / maxBar) * 45)}px`, 
+                            height: `${Math.max(d.count > 0 ? 6 : 2, (d.count / maxBar) * 46)}px`, 
+                            background: i === actData.length - 1 ? 'linear-gradient(to top, var(--primary) 0%, #3b82f6 100%)' : 'rgba(59, 130, 246, 0.15)',
                             transition: 'height 0.5s ease', 
                             position: 'relative' 
                           }}>
                             {d.count > 0 && i >= actData.length - 2 && (
-                              <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.5rem', fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                              <div style={{ position: 'absolute', top: '-15px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.52rem', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
                                 {d.count}
                               </div>
                             )}
                           </div>
-                          <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 500 }}>{d.label}</span>
+                          <span style={{ fontSize: '0.52rem', color: 'var(--text-muted)', fontWeight: 600 }}>{d.label}</span>
                         </div>
                       ))}
                     </div>
@@ -3733,87 +3735,95 @@ export default function MobileView() {
               {/* TOP CLIENTS */}
               {topCustomers.length > 0 && (
                 <div 
-                  className="card" 
-                  style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.07) 0%, rgba(251, 191, 36, 0.03) 100%)', border: '1px solid rgba(245, 158, 11, 0.2)', boxShadow: '0 2px 10px rgba(200, 140, 20, 0.07)', padding: '1rem', cursor: 'pointer', borderRadius: '16px' }}
+                  className="top-clients-card-modern" 
                   onClick={() => setAccueilSubView('top_clients')}
                 >
-                  <div className="section-header" style={{ marginBottom: '0.8rem' }}>
-                    <h4 style={{ fontSize: '0.8rem', fontWeight: 600 }}>Top Clients</h4>
-                    <span className="see-all" style={{ cursor: 'pointer', fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }}>Voir tout</span>
+                  <div className="section-header" style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Top Clients</h4>
+                    <span className="see-all" style={{ cursor: 'pointer', fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 600 }}>Voir tout</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {topCustomers.map((c, idx) => (
-                      <div 
-                        key={c.id} 
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '0.6rem', 
-                          padding: '0.45rem 0.6rem', 
-                          background: idx === 0 ? 'var(--primary-light)' : 'transparent', 
-                          borderRadius: '10px',
-                          border: idx === 0 ? '1px solid rgba(59, 130, 246, 0.05)' : '1px solid transparent'
-                        }}
-                      >
-                        <div style={{ 
-                          width: '20px', 
-                          height: '20px', 
-                          borderRadius: '6px', 
-                          background: idx === 0 ? 'var(--primary)' : '#f1f5f9', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          fontSize: '0.65rem', 
-                          fontWeight: 700, 
-                          color: idx === 0 ? '#fff' : 'var(--text-secondary)', 
-                          flexShrink: 0 
-                        }}>
-                          {idx + 1}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.prenom} {c.nom}</div>
-                          <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginTop: '1px' }}>
-                            {canViewCA ? `${c.orderCount} commande${c.orderCount > 1 ? 's' : ''}` : 'Client Top'}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {topCustomers.map((c, idx) => {
+                      const rankBadges = ["client-rank-badge", "client-rank-badge-silver", "client-rank-badge-bronze"];
+                      const initials = `${c.prenom ? c.prenom.charAt(0) : ''}${c.nom ? c.nom.charAt(0) : ''}`.toUpperCase();
+                      return (
+                        <div 
+                          key={c.id} 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '0.65rem', 
+                            padding: '0.5rem 0.65rem', 
+                            background: idx === 0 ? 'var(--primary-light)' : 'rgba(0, 0, 0, 0.015)', 
+                            borderRadius: '12px',
+                            border: idx === 0 ? '1px solid rgba(59, 130, 246, 0.12)' : '1px solid rgba(0, 0, 0, 0.03)'
+                          }}
+                        >
+                          <div 
+                            className={rankBadges[idx]}
+                            style={{ 
+                              width: '22px', 
+                              height: '22px', 
+                              borderRadius: '50%', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              fontSize: '0.68rem', 
+                              flexShrink: 0 
+                            }}
+                          >
+                            {idx + 1}
                           </div>
+                          
+                          <div className="client-avatar-initials">
+                            {initials}
+                          </div>
+                          
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.prenom} {c.nom}</div>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '1px', fontWeight: 500 }}>
+                              {canViewCA ? `${c.orderCount} commande${c.orderCount > 1 ? 's' : ''}` : 'Client Privilégié'}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                            {canViewCA ? (showCAValues ? `${c.totalSpent.toLocaleString()} F` : '•••••• F') : `${c.orderCount} cmd`}
+                          </span>
                         </div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
-                          {canViewCA ? (showCAValues ? `${c.totalSpent.toLocaleString()} F` : '•••••• F') : `${c.orderCount} cmd`}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
               {/* COMMANDES EN COURS */}
               <div>
-                <div className="section-header" style={{ marginBottom: '0.8rem' }}>
-                  <h4 style={{ fontSize: '0.8rem', fontWeight: 600 }}>Commandes en cours</h4>
-                  <span className="see-all" style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }}>Voir tout</span>
+                <div className="section-header" style={{ marginBottom: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Commandes en cours</h4>
+                  <span className="see-all" style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 600 }}>Voir tout</span>
                 </div>
-                <div style={{ position: 'relative', marginBottom: '0.6rem' }}>
-                  <Search size={13} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <div style={{ position: 'relative', marginBottom: '0.65rem' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                   <input 
                     type="text" 
                     className="input-control" 
                     style={{ 
-                      paddingLeft: '2.2rem', 
+                      paddingLeft: '2.3rem', 
                       width: '100%', 
-                      borderRadius: '12px', 
-                      fontSize: '0.72rem', 
-                      padding: '0.45rem 1rem 0.45rem 2.2rem',
+                      borderRadius: '14px', 
+                      fontSize: '0.75rem', 
+                      padding: '0.5rem 1rem 0.5rem 2.3rem',
                       background: '#ffffff',
-                      border: '1px solid rgba(0,0,0,0.05)',
-                      boxShadow: 'none'
+                      border: '1px solid var(--border-color)',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.01)'
                     }} 
                     placeholder="Rechercher code, article, client..." 
                     value={homeSearchQuery} 
                     onChange={(e) => setHomeSearchQuery(e.target.value)} 
                   />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {filteredHomeOrders.length === 0 ? (
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textAlign: 'center', padding: '1.5rem', background: '#ffffff', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', padding: '1.5rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
                       Aucune commande active.
                     </p>
                   ) : filteredHomeOrders.map(order => {
@@ -3826,14 +3836,15 @@ export default function MobileView() {
                         className="mobile-order-row" 
                         key={order.id} 
                         style={{ 
-                          borderLeft: isLate ? '3px solid var(--status-late)' : '1px solid rgba(0,0,0,0.05)',
+                          borderLeft: isLate ? '4px solid var(--status-late)' : '4px solid var(--primary)',
                           background: '#ffffff',
-                          boxShadow: 'var(--shadow-sm)',
-                          padding: '0.6rem 0.8rem',
-                          borderRadius: '12px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                          padding: '0.7rem 0.9rem',
+                          borderRadius: '16px',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.6rem'
+                          gap: '0.65rem',
+                          border: '1px solid var(--border-color)'
                         }}
                       >
                         <div style={{ 
@@ -3845,29 +3856,29 @@ export default function MobileView() {
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center', 
-                          fontWeight: 600, 
-                          fontSize: '0.65rem', 
+                          fontWeight: 700, 
+                          fontSize: '0.7rem', 
                           flexShrink: 0 
                         }}>
                           {clientInitials}
                         </div>
                         <div className="mobile-order-info" style={{ flex: 1, minWidth: 0 }}>
-                          <div className="mobile-order-title" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{order.type_article}</div>
-                          <div className="mobile-order-desc" style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {clientName} · <span style={{ fontFamily: 'monospace' }}>{order.identifiant_unique_marquage}</span>
+                          <div className="mobile-order-title" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{order.type_article}</div>
+                          <div className="mobile-order-desc" style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {clientName} · <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{order.identifiant_unique_marquage}</span>
                           </div>
                         </div>
                         <div className="mobile-order-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
-                          <span className="mobile-order-price" style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          <span className="mobile-order-price" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                             +{order.prix_total.toLocaleString()} F
                           </span>
                           <span 
                             className={`badge badge-${order.statut}`} 
                             style={{ 
-                              fontSize: '0.52rem', 
-                              padding: '0.1rem 0.35rem', 
+                              fontSize: '0.55rem', 
+                              padding: '0.12rem 0.4rem', 
                               borderRadius: '4px',
-                              fontWeight: 500
+                              fontWeight: 600
                             }}
                           >
                             {getOrderStatusLabel(order)}
