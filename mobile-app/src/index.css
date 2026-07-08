@@ -2466,3 +2466,17 @@ html {
   border: 1.5px solid rgba(59, 130, 246, 0.1);
 }
 
+.order-detail-card-modern {
+  background: #ffffff !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.02) !important;
+  transition: all 0.3s var(--ease-spring-soft) !important;
+}
+
+.order-detail-card-modern:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(59, 130, 246, 0.18) !important;
+}
+

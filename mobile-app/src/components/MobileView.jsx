@@ -1958,7 +1958,7 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -1967,18 +1967,18 @@ export default function MobileView() {
                 setAccueilSubView('main');
                 setDetailSearchQuery('');
               }}
-              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+              style={{ background: '#ffffff', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', transition: 'all 0.2s ease' }}
             >
               <ArrowLeft size={18} />
             </button>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes en Cours</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes en Cours</h2>
           </div>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.25rem 0.6rem', borderRadius: '20px', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
             {activeOrdersList.length} actives
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
           Liste complète des commandes actuellement en traitement à l'atelier.
         </p>
 
@@ -1991,12 +1991,13 @@ export default function MobileView() {
             style={{ 
               paddingLeft: '2.4rem', 
               width: '100%', 
-              borderRadius: '12px', 
-              fontSize: '0.72rem', 
-              paddingTop: '0.55rem', 
-              paddingBottom: '0.55rem',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              borderRadius: '14px', 
+              fontSize: '0.75rem', 
+              paddingTop: '0.52rem', 
+              paddingBottom: '0.52rem',
+              background: '#ffffff',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
             }} 
             placeholder="Rechercher par marquage, client, article..." 
             value={detailSearchQuery} 
@@ -2013,68 +2014,73 @@ export default function MobileView() {
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingBottom: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '12px' }}>
           {filteredActive.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
               Aucune commande en cours trouvée.
             </div>
           ) : (
             filteredActive.map(order => {
               const client = customers.find(c => c.id === order.customer_id);
               const isExpress = order.niveau_urgence === 'Express';
+              const isLate = isOrderLate(order);
               const initial = client ? `${client.prenom[0] || ''}${client.nom[0] || ''}`.toUpperCase() : '?';
+              const borderLeftColor = isLate ? 'var(--status-late)' : (isExpress ? 'var(--status-pending)' : 'var(--primary)');
               
               return (
                 <div 
                   key={order.id} 
-                  className="card" 
+                  className="order-detail-card-modern" 
                   style={{ 
-                    padding: '0.9rem', 
+                    padding: '1rem', 
                     display: 'flex', 
                     flexDirection: 'column', 
-                    gap: '0.5rem', 
-                    border: '1px solid rgba(0,0,0,0.06)',
-                    borderLeft: isExpress ? '4px solid var(--status-pending)' : '4px solid var(--primary)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                    background: '#ffffff',
-                    borderRadius: '14px',
-                    transition: 'transform 0.2s ease'
+                    gap: '0.6rem', 
+                    borderLeft: `4px solid ${borderLeftColor}`,
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', fontFamily: 'monospace', letterSpacing: '0.2px' }}>{order.identifiant_unique_marquage}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {isExpress && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.5rem', fontWeight: 800, color: 'var(--status-pending)', background: 'var(--status-pending-light)', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.52rem', fontWeight: 800, color: 'var(--status-pending)', background: 'var(--status-pending-light)', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>
                           <Zap size={9} strokeWidth={3} /> EXPRESS
                         </span>
                       )}
-                      <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.52rem', padding: '0.08rem 0.35rem', fontWeight: 700 }}>
+                      <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.55rem', padding: '0.12rem 0.4rem', fontWeight: 700 }}>
                         {getOrderStatusLabel(order)}
                       </span>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.5rem' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: isExpress ? 'var(--status-pending-light)' : 'var(--primary-light)', color: isExpress ? 'var(--status-pending)' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.6rem' }}>
+                    <div 
+                      className="client-avatar-initials"
+                      style={{
+                        background: isLate ? 'var(--status-late-light)' : (isExpress ? 'var(--status-pending-light)' : 'var(--primary-light)'),
+                        color: isLate ? 'var(--status-late)' : (isExpress ? 'var(--status-pending)' : 'var(--primary)'),
+                        borderColor: isLate ? 'rgba(220, 38, 38, 0.15)' : (isExpress ? 'rgba(217, 119, 6, 0.15)' : 'rgba(59, 130, 246, 0.15)')
+                      }}
+                    >
                       {initial}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {order.type_article}
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                        Client : <strong>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Client : <strong style={{ fontWeight: 600 }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    <div style={{ textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                       {order.prix_total?.toLocaleString()} F
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.6rem', color: 'var(--text-muted)', background: '#f8fafc', padding: '0.35rem 0.6rem', borderRadius: '8px', marginTop: '0.2rem' }}>
-                    <span>Service: <strong style={{ textTransform: 'capitalize' }}>{serviceLabels[order.type_service] || order.type_service}</strong></span>
-                    <span style={{ color: isOrderLate(order) ? 'var(--status-late)' : 'var(--text-muted)', fontWeight: isOrderLate(order) ? 700 : 500 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: 'var(--text-muted)', background: 'var(--primary-light)', padding: '0.45rem 0.75rem', borderRadius: '10px', marginTop: '0.2rem', border: '1px solid rgba(59, 130, 246, 0.05)' }}>
+                    <span>Service: <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{serviceLabels[order.type_service] || order.type_service}</strong></span>
+                    <span style={{ color: isLate ? 'var(--status-late)' : 'var(--text-muted)', fontWeight: isLate ? 700 : 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      {isLate && <span style={{ display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', background: 'var(--status-late)', animation: 'pulse-glow-ready 1.5s infinite' }} />}
                       Échéance : {formatDateTime(order.due_date)}
                     </span>
                   </div>
@@ -2104,7 +2110,7 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -2113,18 +2119,18 @@ export default function MobileView() {
                 setAccueilSubView('main');
                 setDetailSearchQuery('');
               }}
-              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+              style={{ background: '#ffffff', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', transition: 'all 0.2s ease' }}
             >
               <ArrowLeft size={18} />
             </button>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes Restituées</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes Restituées</h2>
           </div>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--status-ready)', background: 'var(--status-ready-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--status-ready)', background: 'var(--status-ready-light)', padding: '0.25rem 0.6rem', borderRadius: '20px', border: '1px solid rgba(22, 163, 74, 0.15)' }}>
             {completedOrders.length} ce mois-ci
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
           Liste des commandes livrées/récupérées avec succès sur le mois en cours.
         </p>
 
@@ -2137,12 +2143,13 @@ export default function MobileView() {
             style={{ 
               paddingLeft: '2.4rem', 
               width: '100%', 
-              borderRadius: '12px', 
-              fontSize: '0.72rem', 
-              paddingTop: '0.55rem', 
-              paddingBottom: '0.55rem',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              borderRadius: '14px', 
+              fontSize: '0.75rem', 
+              paddingTop: '0.52rem', 
+              paddingBottom: '0.52rem',
+              background: '#ffffff',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
             }} 
             placeholder="Rechercher par marquage, client, article..." 
             value={detailSearchQuery} 
@@ -2159,9 +2166,9 @@ export default function MobileView() {
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingBottom: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '12px' }}>
           {filteredCompleted.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
               Aucune commande restituée trouvée.
             </div>
           ) : (
@@ -2172,45 +2179,48 @@ export default function MobileView() {
               return (
                 <div 
                   key={order.id} 
-                  className="card" 
+                  className="order-detail-card-modern" 
                   style={{ 
-                    padding: '0.9rem', 
+                    padding: '1rem', 
                     display: 'flex', 
                     flexDirection: 'column', 
-                    gap: '0.5rem', 
-                    border: '1px solid rgba(0,0,0,0.06)',
+                    gap: '0.6rem', 
                     borderLeft: '4px solid var(--status-ready)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                    background: '#ffffff',
-                    borderRadius: '14px'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--status-ready)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
-                    <span style={{ fontSize: '0.52rem', padding: '0.08rem 0.35rem', fontWeight: 700, color: 'var(--status-ready)', background: 'var(--status-ready-light)', borderRadius: '4px', border: '1px solid rgba(22, 163, 74, 0.15)' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--status-ready)', fontFamily: 'monospace', letterSpacing: '0.2px' }}>{order.identifiant_unique_marquage}</span>
+                    <span style={{ fontSize: '0.55rem', padding: '0.12rem 0.4rem', fontWeight: 700, color: 'var(--status-ready)', background: 'var(--status-ready-light)', borderRadius: '4px', border: '1px solid rgba(22, 163, 74, 0.15)' }}>
                       LIVRÉ
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.5rem' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--status-ready-light)', color: 'var(--status-ready)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.6rem' }}>
+                    <div 
+                      className="client-avatar-initials"
+                      style={{
+                        background: 'var(--status-ready-light)',
+                        color: 'var(--status-ready)',
+                        borderColor: 'rgba(22, 163, 74, 0.15)'
+                      }}
+                    >
                       {initial}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {order.type_article}
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                        Client : <strong>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Client : <strong style={{ fontWeight: 600 }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'var(--status-ready)' }}>
+                    <div style={{ textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: 'var(--status-ready)' }}>
                       {order.prix_total?.toLocaleString()} F
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.6rem', color: 'var(--text-muted)', background: '#f8fafc', padding: '0.35rem 0.6rem', borderRadius: '8px', marginTop: '0.2rem' }}>
-                    <span>Service: <strong style={{ textTransform: 'capitalize' }}>{serviceLabels[order.type_service] || order.type_service}</strong></span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: 'var(--text-muted)', background: 'var(--primary-light)', padding: '0.45rem 0.75rem', borderRadius: '10px', marginTop: '0.2rem', border: '1px solid rgba(59, 130, 246, 0.05)' }}>
+                    <span>Service: <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{serviceLabels[order.type_service] || order.type_service}</strong></span>
                     <span>
                       Livrée le : {formatDateTime(order.updated_at || order.created_at)}
                     </span>
@@ -2239,7 +2249,7 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -2248,18 +2258,18 @@ export default function MobileView() {
                 setAccueilSubView('main');
                 setDetailSearchQuery('');
               }}
-              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+              style={{ background: '#ffffff', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', transition: 'all 0.2s ease' }}
             >
               <ArrowLeft size={18} />
             </button>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes Express</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes Express</h2>
           </div>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--status-pending)', background: 'var(--status-pending-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--status-pending)', background: 'var(--status-pending-light)', padding: '0.25rem 0.6rem', borderRadius: '20px', border: '1px solid rgba(217, 119, 6, 0.15)' }}>
             {expressOrdersList.length} express
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
           Commandes express prioritaires à traiter de toute urgence à l'atelier.
         </p>
 
@@ -2272,12 +2282,13 @@ export default function MobileView() {
             style={{ 
               paddingLeft: '2.4rem', 
               width: '100%', 
-              borderRadius: '12px', 
-              fontSize: '0.72rem', 
-              paddingTop: '0.55rem', 
-              paddingBottom: '0.55rem',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              borderRadius: '14px', 
+              fontSize: '0.75rem', 
+              paddingTop: '0.52rem', 
+              paddingBottom: '0.52rem',
+              background: '#ffffff',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
             }} 
             placeholder="Rechercher par marquage, client, article..." 
             value={detailSearchQuery} 
@@ -2294,9 +2305,9 @@ export default function MobileView() {
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingBottom: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '12px' }}>
           {filteredExpress.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
               Aucune commande Express en cours trouvée.
             </div>
           ) : (
@@ -2307,45 +2318,48 @@ export default function MobileView() {
               return (
                 <div 
                   key={order.id} 
-                  className="card" 
+                  className="order-detail-card-modern" 
                   style={{ 
-                    padding: '0.9rem', 
+                    padding: '1rem', 
                     display: 'flex', 
                     flexDirection: 'column', 
-                    gap: '0.5rem', 
-                    border: '1px solid rgba(217, 119, 6, 0.25)',
+                    gap: '0.6rem', 
                     borderLeft: '4px solid var(--status-pending)',
-                    boxShadow: '0 2px 10px rgba(217, 119, 6, 0.04)',
-                    background: 'linear-gradient(135deg, #ffffff 0%, rgba(217, 119, 6, 0.01) 100%)',
-                    borderRadius: '14px'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--status-pending)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.52rem', padding: '0.08rem 0.35rem', fontWeight: 800, color: 'var(--status-pending)', background: 'var(--status-pending-light)', borderRadius: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--status-pending)', fontFamily: 'monospace', letterSpacing: '0.2px' }}>{order.identifiant_unique_marquage}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.52rem', padding: '0.12rem 0.4rem', fontWeight: 800, color: 'var(--status-pending)', background: 'var(--status-pending-light)', borderRadius: '4px' }}>
                       <Zap size={9} strokeWidth={3} /> URGENT
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid rgba(217,119,6,0.06)', paddingTop: '0.5rem' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--status-pending-light)', color: 'var(--status-pending)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.6rem' }}>
+                    <div 
+                      className="client-avatar-initials"
+                      style={{
+                        background: 'var(--status-pending-light)',
+                        color: 'var(--status-pending)',
+                        borderColor: 'rgba(217, 119, 6, 0.15)'
+                      }}
+                    >
                       {initial}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {order.type_article}
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                        Client : <strong>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Client : <strong style={{ fontWeight: 600 }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    <div style={{ textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                       {order.prix_total?.toLocaleString()} F
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.6rem', color: 'var(--status-late)', background: 'var(--status-late-light)', padding: '0.35rem 0.6rem', borderRadius: '8px', marginTop: '0.2rem', fontWeight: 700 }}>
-                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Étape: {getOrderStatusLabel(order)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: 'var(--status-late)', background: 'var(--status-late-light)', padding: '0.45rem 0.75rem', borderRadius: '10px', marginTop: '0.2rem', border: '1px solid rgba(220, 38, 38, 0.05)', fontWeight: 700 }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Étape: <strong style={{ fontWeight: 600 }}>{getOrderStatusLabel(order)}</strong></span>
                     <span>
                       Délai : {formatDateTime(order.due_date)}
                     </span>
@@ -2375,7 +2389,7 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -2384,18 +2398,18 @@ export default function MobileView() {
                 setAccueilSubView('main');
                 setDetailSearchQuery('');
               }}
-              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+              style={{ background: '#ffffff', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', transition: 'all 0.2s ease' }}
             >
               <ArrowLeft size={18} />
             </button>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes en Retard</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes en Retard</h2>
           </div>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--status-late)', background: 'var(--status-late-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--status-late)', background: 'var(--status-late-light)', padding: '0.25rem 0.6rem', borderRadius: '20px', border: '1px solid rgba(220, 38, 38, 0.15)' }}>
             {lateOrdersList.length} retard
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
           Commandes en retard dont l'échéance de livraison est maintenant dépassée.
         </p>
 
@@ -2408,12 +2422,13 @@ export default function MobileView() {
             style={{ 
               paddingLeft: '2.4rem', 
               width: '100%', 
-              borderRadius: '12px', 
-              fontSize: '0.72rem', 
-              paddingTop: '0.55rem', 
-              paddingBottom: '0.55rem',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              borderRadius: '14px', 
+              fontSize: '0.75rem', 
+              paddingTop: '0.52rem', 
+              paddingBottom: '0.52rem',
+              background: '#ffffff',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
             }} 
             placeholder="Rechercher par marquage, client, article..." 
             value={detailSearchQuery} 
@@ -2430,9 +2445,9 @@ export default function MobileView() {
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingBottom: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '12px' }}>
           {filteredLate.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
               Aucune commande en retard. Bon travail !
             </div>
           ) : (
@@ -2443,45 +2458,49 @@ export default function MobileView() {
               return (
                 <div 
                   key={order.id} 
-                  className="card" 
+                  className="order-detail-card-modern" 
                   style={{ 
-                    padding: '0.9rem', 
+                    padding: '1rem', 
                     display: 'flex', 
                     flexDirection: 'column', 
-                    gap: '0.5rem', 
-                    border: '1px solid rgba(220, 38, 38, 0.25)',
+                    gap: '0.6rem', 
+                    border_left: 'none', /* Using custom targetContent to match style */
                     borderLeft: '4px solid var(--status-late)',
-                    boxShadow: '0 2px 10px rgba(220, 38, 38, 0.04)',
-                    background: 'linear-gradient(135deg, #ffffff 0%, rgba(220, 38, 38, 0.01) 100%)',
-                    borderRadius: '14px'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--status-late)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.52rem', padding: '0.08rem 0.35rem', fontWeight: 800, color: 'var(--status-late)', background: 'var(--status-late-light)', borderRadius: '4px', border: '1px solid rgba(220, 38, 38, 0.15)' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--status-late)', fontFamily: 'monospace', letterSpacing: '0.2px' }}>{order.identifiant_unique_marquage}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.52rem', padding: '0.12rem 0.4rem', fontWeight: 800, color: 'var(--status-late)', background: 'var(--status-late-light)', borderRadius: '4px', border: '1px solid rgba(220, 38, 38, 0.15)' }}>
                       <TriangleAlert size={9} /> RETARD
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid rgba(220,38,38,0.06)', paddingTop: '0.5rem' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--status-late-light)', color: 'var(--status-late)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.6rem' }}>
+                    <div 
+                      className="client-avatar-initials"
+                      style={{
+                        background: 'var(--status-late-light)',
+                        color: 'var(--status-late)',
+                        borderColor: 'rgba(220, 38, 38, 0.15)'
+                      }}
+                    >
                       {initial}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {order.type_article}
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                        Client : <strong>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Client : <strong style={{ fontWeight: 600 }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    <div style={{ textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                       {order.prix_total?.toLocaleString()} F
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.6rem', color: 'var(--status-late)', background: 'var(--status-late-light)', padding: '0.35rem 0.6rem', borderRadius: '8px', marginTop: '0.2rem', fontWeight: 700 }}>
-                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Statut: {getOrderStatusLabel(order)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: 'var(--status-late)', background: 'var(--status-late-light)', padding: '0.45rem 0.75rem', borderRadius: '10px', marginTop: '0.2rem', border: '1px solid rgba(220, 38, 38, 0.05)', fontWeight: 700 }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Statut: <strong style={{ fontWeight: 600 }}>{getOrderStatusLabel(order)}</strong></span>
                     <span>
                       Dû le : {formatDateTime(order.due_date)}
                     </span>
