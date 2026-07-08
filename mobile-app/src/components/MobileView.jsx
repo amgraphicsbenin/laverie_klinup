@@ -1006,7 +1006,7 @@ export default function MobileView() {
       const customer = customers.find(c => c.id === selectedCustomerId);
       if (customer) {
         let text = '';
-        const formattedDueDate = formatDateTime(newOrder.due_date);
+        const formattedDueDate = formatDateOnly(newOrder.due_date);
         
         if (newOrder.is_subscription_order && newOrder.subscription_details) {
           const det = newOrder.subscription_details;
@@ -1138,6 +1138,12 @@ export default function MobileView() {
     const datePart = d.toLocaleDateString('fr-FR');
     const timePart = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     return `${datePart} à ${timePart}`;
+  };
+
+  const formatDateOnly = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('fr-FR');
   };
 
   const formatPhoneForWhatsApp = (phoneStr, indicatif = '229') => {
@@ -5007,7 +5013,7 @@ export default function MobileView() {
             });
           }}
           sendWhatsAppMessage={sendWhatsAppMessage}
-          formatDateTime={formatDateTime}
+          formatDateTime={formatDateOnly}
         />
       )}
 

@@ -1041,6 +1041,12 @@ export default function AdminView({ activeTab, searchQuery }) {
     return `${datePart} à ${timePart}`;
   };
 
+  const formatDateOnly = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('fr-FR');
+  };
+
   const formatPhoneForWhatsApp = (phoneStr, indicatif = '229') => {
     if (!phoneStr) return '';
     let cleaned = phoneStr.replace(/\D/g, '');
@@ -1201,7 +1207,7 @@ export default function AdminView({ activeTab, searchQuery }) {
       const customer = customers.find(c => c.id === selectedCustomerId);
       if (customer) {
         let text = '';
-        const formattedDueDate = formatDateTime(newOrder.due_date);
+        const formattedDueDate = formatDateOnly(newOrder.due_date);
 
         if (newOrder.is_subscription_order && newOrder.subscription_details) {
           const det = newOrder.subscription_details;
