@@ -2524,7 +2524,7 @@ export default function MobileView() {
     ];
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -2533,18 +2533,18 @@ export default function MobileView() {
                 setAccueilSubView('main');
                 setDetailSearchQuery('');
               }}
-              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+              style={{ background: '#ffffff', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', transition: 'all 0.2s ease' }}
             >
               <ArrowLeft size={18} />
             </button>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Charge de l'Atelier</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Charge de l'Atelier</h2>
           </div>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.25rem 0.6rem', borderRadius: '20px', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
             {activeOrders.length} en cours
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
           État de charge détaillé de chaque étape du traitement.
         </p>
 
@@ -2555,49 +2555,45 @@ export default function MobileView() {
             return (
               <div 
                 key={p.key} 
-                className="card" 
+                className="order-detail-card-modern" 
                 style={{ 
                   padding: '1rem', 
                   display: 'flex', 
                   flexDirection: 'column', 
                   gap: '0.6rem',
-                  border: `1px solid rgba(0,0,0,0.06)`,
                   borderLeft: `4px solid ${p.color}`,
-                  background: '#ffffff',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-                  borderRadius: '16px'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: p.bg, color: p.color, display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0, justifyContent: 'center' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: p.bg, color: p.color, display: 'flex', alignItems: 'center', flexShrink: 0, justifyContent: 'center' }}>
                       {p.icon}
                     </div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>{p.label}</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{p.label}</span>
                   </div>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 900, background: p.bg, color: p.color, padding: '0.2rem 0.55rem', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, background: p.bg, color: p.color, padding: '0.2rem 0.55rem', borderRadius: '8px', border: `1px solid rgba(255,255,255,0.1)` }}>
                     {count}
                   </span>
                 </div>
                 
-                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>{p.desc}</p>
+                <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>{p.desc}</p>
                 
                 {count > 0 && (
-                  <div style={{ marginTop: '0.5rem', background: '#f8fafc', borderRadius: '10px', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                    <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid #f1f5f9', paddingBottom: '3px' }}>Commandes dans cette étape</div>
+                  <div style={{ marginTop: '0.5rem', background: 'var(--primary-light)', border: '1px solid rgba(59, 130, 246, 0.05)', borderRadius: '12px', padding: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid rgba(59, 130, 246, 0.08)', paddingBottom: '4px', marginBottom: '2px' }}>Commandes dans cette étape</div>
                     {stepOrders.slice(0, 3).map(order => {
                       const client = customers.find(c => c.id === order.customer_id);
                       return (
                         <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.65rem' }}>
-                          <span style={{ fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
-                          <span style={{ color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--primary)', fontFamily: 'monospace' }}>{order.identifiant_unique_marquage}</span>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
                             {order.type_article} · {client ? `${client.prenom} ${client.nom[0]}.` : 'Client'}
                           </span>
                         </div>
                       );
                     })}
                     {count > 3 && (
-                      <div style={{ fontSize: '0.55rem', color: 'var(--primary)', fontWeight: 700, textAlign: 'center', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.58rem', color: 'var(--primary)', fontWeight: 700, textAlign: 'center', marginTop: '2px' }}>
                         + {count - 3} autres commandes
                       </div>
                     )}
@@ -2617,7 +2613,7 @@ export default function MobileView() {
     const maxBar = Math.max(...actData.map(d => d.count), 1);
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.95rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '6px' }}>
           <button 
             type="button"
@@ -2625,37 +2621,38 @@ export default function MobileView() {
               setAccueilSubView('main');
               setDetailSearchQuery('');
             }}
-            style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            style={{ background: '#ffffff', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', transition: 'all 0.2s ease' }}
           >
             <ArrowLeft size={18} />
           </button>
-          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Activité & Graphique</h2>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Activité & Graphique</h2>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
           Volume d'activité et commandes enregistrées sur la période sélectionnée (<strong>{getPeriodLabel(activityPeriod)}</strong>).
         </p>
 
         {/* Futuristic Glassmorphic Graph Card */}
-        <div className="card" style={{ padding: '1.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(255, 255, 255, 0.95) 100%)', border: '1px solid rgba(59, 130, 246, 0.15)', boxShadow: '0 4px 20px rgba(59, 130, 246, 0.04)' }}>
+        <div className="order-detail-card-modern" style={{ padding: '1.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: '4px solid var(--primary)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Commandes Créées</span>
-            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '12px' }}>{totalOrders} au total</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.55rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>{totalOrders} au total</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '140px', marginTop: '0.5rem', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: '6px', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '140px', marginTop: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', position: 'relative' }}>
             {actData.map((d, i) => {
               const isLast = i === actData.length - 1;
               return (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}>
                   <div style={{ 
                     width: '100%', 
-                    background: isLast ? 'var(--primary-gradient)' : 'linear-gradient(180deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.06) 100%)', 
+                    background: isLast ? 'var(--primary-gradient)' : 'linear-gradient(180deg, rgba(59,130,246,0.35) 0%, rgba(59,130,246,0.05) 100%)', 
                     borderRadius: '6px 6px 0 0', 
                     height: `${Math.max(d.count > 0 ? 6 : 2, (d.count / maxBar) * 110)}px`, 
                     transition: 'height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     position: 'relative',
-                    border: isLast ? '1px solid rgba(59, 130, 246, 0.3)' : '1px dashed rgba(59, 130, 246, 0.15)'
+                    border: isLast ? '1px solid rgba(59, 130, 246, 0.3)' : '1px dashed rgba(59, 130, 246, 0.15)',
+                    boxShadow: isLast ? '0 2px 8px rgba(59, 130, 246, 0.2)' : 'none'
                   }}>
                     {d.count > 0 && (
                       <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.55rem', fontWeight: 800, color: 'var(--primary)' }}>
@@ -2663,7 +2660,7 @@ export default function MobileView() {
                       </div>
                     )}
                   </div>
-                  <span style={{ fontSize: '0.52rem', color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>{d.label}</span>
+                  <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{d.label}</span>
                 </div>
               );
             })}
@@ -2671,15 +2668,15 @@ export default function MobileView() {
         </div>
 
         {/* Period Stats Block */}
-        <div className="card" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', border: '1px solid rgba(0,0,0,0.06)', background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)' }}>
+        <div className="order-detail-card-modern" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', borderLeft: '4px solid #8b5cf6' }}>
           <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Statistiques Additionnelles</div>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+            <div style={{ background: 'var(--primary-light)', padding: '0.65rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.05)' }}>
               <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>MOYENNE INTERVALLE</div>
               <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{(totalOrders / actData.length).toFixed(1)} <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-secondary)' }}>cmd</span></div>
             </div>
-            <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+            <div style={{ background: 'rgba(139, 92, 246, 0.05)', padding: '0.65rem', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.05)' }}>
               <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>MAX ENREGISTRÉ</div>
               <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{maxBar} <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-secondary)' }}>cmd</span></div>
             </div>
