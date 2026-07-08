@@ -2823,7 +2823,7 @@ export default function MobileView() {
                     }
                   }}
                   disabled={pinCode.length < 6}
-                  style={{ opacity: pinCode.length < 6 ? 0.55 : 1, width: '100%', maxWidth: 280 }}
+                  style={{ opacity: pinCode.length < 6 ? 0.55 : 1 }}
                 >
                   Vérifier
                 </button>
@@ -2850,7 +2850,7 @@ export default function MobileView() {
                     </button>
                   ))}
                   {/* Rangée du bas : cellule vide, 0, effacer */}
-                  <div style={{ height: 56, borderRadius: 16, background: 'transparent' }} />
+                  <div style={{ height: 52, borderRadius: 12, background: 'transparent' }} />
                   <button
                     type="button"
                     className="keypad-btn-redesigned"
@@ -4828,36 +4828,36 @@ export default function MobileView() {
 
       {/* ================= MODAL RESET PIN ================= */}
       {showResetPinModal && (
-        <div 
-          className="modal-overlay center-align" 
+        <div
+          className="modal-overlay center-align"
           style={{ zIndex: 1000 }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowResetPinModal(false); }}
         >
-          <div className="modal-dialog" style={{ maxWidth: '300px', background: '#ffffff', color: '#000000', padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
-              <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>Réinitialiser le PIN</h3>
-              <button type="button" onClick={() => setShowResetPinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={15} color="var(--text-muted)" />
+          <div className="modal-dialog" style={{ maxWidth: '300px', background: '#ffffff', color: '#1a1a1a', padding: '1.25rem', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0, 0, 0, 0.12)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.9rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '0.6rem' }}>
+              <h3 style={{ fontSize: '0.95rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: '#a855f7' }}>Réinitialiser le PIN</h3>
+              <button type="button" onClick={() => setShowResetPinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999999' }}>
+                <X size={15} />
               </button>
             </div>
-            
-            <form onSubmit={handleRequestPinResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
+
+            <form onSubmit={handleRequestPinResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <p style={{ fontSize: '0.75rem', color: '#666666', lineHeight: 1.5, margin: 0 }}>
                 Saisissez votre adresse email pour envoyer une demande de réinitialisation. L'administrateur devra approuver la demande.
               </p>
-              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Adresse Email</label>
-                <input 
-                  type="email" 
-                  className="input-control" 
-                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
-                  required 
-                  placeholder="Ex: marie.koffi@klinup.com" 
-                  value={resetEmail} 
-                  onChange={(e) => setResetEmail(e.target.value)} 
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.35rem' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#1a1a1a', letterSpacing: '0.2px' }}>Adresse Email</label>
+                <input
+                  type="email"
+                  className="input-control"
+                  style={{ padding: '0.6rem 0.75rem', fontSize: '0.8rem', borderRadius: '10px', border: '1.5px solid #e5e5e5', fontFamily: 'var(--font-sans)' }}
+                  required
+                  placeholder="Ex: marie.koffi@klinup.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
                 />
               </div>
-              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.3rem', padding: '0.48rem', fontSize: '0.75rem', borderRadius: '8px', width: '100%' }}>
+              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.2rem', padding: '0.65rem', fontSize: '0.8rem', borderRadius: '12px', width: '100%', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', color: '#ffffff', border: 'none', fontWeight: 600, boxShadow: '0 4px 12px rgba(168, 85, 247, 0.3)', cursor: 'pointer', transition: 'all 0.2s ease' }}>
                 Envoyer la demande
               </button>
             </form>
