@@ -863,6 +863,14 @@ export const db = {
       }
     }
 
+    let basePriceBeforeRemise = totalPrice;
+    let discountPercent = Number(orderData.remise_pourcentage || 0);
+    let discountAmount = 0;
+    if (discountPercent > 0 && discountPercent <= 100) {
+      discountAmount = Math.round(totalPrice * (discountPercent / 100));
+      totalPrice = Math.max(0, totalPrice - discountAmount);
+    }
+
     const advancePaid = (isSubscriptionOrder && !subscribedPlan) ? 0 : Number(orderData.avance_payee || 0);
     const unpaidBalance = totalPrice - advancePaid;
 
@@ -898,6 +906,9 @@ export const db = {
       mode_reglement: isSubscriptionOrder ? (subscribedPlan ? orderData.mode_reglement : 'abonnement') : orderData.mode_reglement,
       avance_payee: advancePaid,
       prix_total: totalPrice,
+      remise_pourcentage: discountPercent,
+      remise_montant: discountAmount,
+      prix_base_avant_remise: basePriceBeforeRemise,
       identifiant_unique_marquage: codeMarquage,
       created_at: nowStr,
       due_date: dueDate,

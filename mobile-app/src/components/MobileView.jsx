@@ -5240,8 +5240,24 @@ export default function MobileView() {
 
               {/* ---- TOTAUX ---- */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '12px' }}>
+                {createdOrder.remise_pourcentage > 0 && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#5a5a6e' }}>Prix de base :</span>
+                      <span style={{ fontWeight: '600', color: '#5a5a6e', textDecoration: 'line-through' }}>
+                        {(createdOrder.prix_base_avant_remise || 0).toLocaleString()} FCFA
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--status-ready)' }}>
+                      <span style={{ fontWeight: '600' }}>Réduction ({createdOrder.remise_pourcentage}%) :</span>
+                      <span style={{ fontWeight: '700' }}>
+                        -{(createdOrder.remise_montant || 0).toLocaleString()} FCFA
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#5a5a6e' }}>Total Commande :</span>
+                  <span style={{ color: '#5a5a6e', fontWeight: createdOrder.remise_pourcentage > 0 ? '700' : 'normal' }}>Total Commande :</span>
                   <span style={{ fontWeight: '700', color: '#0a0a0a' }}>
                     {createdOrder.is_subscription_order 
                       ? (createdOrder.subscription_details.immediate_subscription 

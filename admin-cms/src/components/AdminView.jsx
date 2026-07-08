@@ -54,6 +54,7 @@ export default function AdminView({ activeTab, searchQuery }) {
   const [niveauUrgence, setNiveauUrgence] = useState('Normal');
   const [modeReglement, setModeReglement] = useState('especes');
   const [avancePayee, setAvancePayee] = useState('');
+  const [remisePourcentage, setRemisePourcentage] = useState('');
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
 
@@ -1115,7 +1116,14 @@ export default function AdminView({ activeTab, searchQuery }) {
         total += price * qty;
       }
     });
-    return niveauUrgence === 'Express' ? Math.round(total * 1.5) : total;
+    let finalPrice = niveauUrgence === 'Express' ? Math.round(total * 1.5) : total;
+    
+    const discountPercent = Number(remisePourcentage || 0);
+    if (discountPercent > 0 && discountPercent <= 100) {
+      const discountAmount = Math.round(finalPrice * (discountPercent / 100));
+      finalPrice = Math.max(0, finalPrice - discountAmount);
+    }
+    return finalPrice;
   };
 
   const handleCreateCustomer = (e) => {
@@ -1191,7 +1199,8 @@ export default function AdminView({ activeTab, searchQuery }) {
       avance_payee: (payWithSubscription && !subscribePlanId) ? 0 : Number(avancePayee || 0),
       pay_with_subscription: payWithSubscription,
       subscribe_plan_id: subscribePlanId,
-      items: selectedItems
+      items: selectedItems,
+      remise_pourcentage: Number(remisePourcentage || 0)
     };
 
     try {
@@ -1199,6 +1208,7 @@ export default function AdminView({ activeTab, searchQuery }) {
       refreshAdminData();
       setCreatedOrder(newOrder);
       setAvancePayee('');
+      setRemisePourcentage('');
       setSubscribePlanId('');
       setArticleQuantities({});
       setShowOrderRegistrationModal(false);
@@ -3688,16 +3698,31 @@ export default function AdminView({ activeTab, searchQuery }) {
               </div>
 
               {(!payWithSubscription || !!subscribePlanId) && (
-                <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
-                  <label style={{ fontSize: '0.75rem' }}>Acompte Versé (FCFA)</label>
-                  <input
-                    type="number"
-                    className="input-control"
-                    style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                    placeholder="Ex: 2000"
-                    value={avancePayee}
-                    onChange={(e) => setAvancePayee(e.target.value)}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.75rem' }}>Acompte Versé (FCFA)</label>
+                    <input
+                      type="number"
+                      className="input-control"
+                      style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
+                      placeholder="Ex: 2000"
+                      value={avancePayee}
+                      onChange={(e) => setAvancePayee(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.75rem' }}>Réduction (%)</label>
+                    <input
+                      type="number"
+                      className="input-control"
+                      style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
+                      placeholder="Ex: 10"
+                      min="0"
+                      max="100"
+                      value={remisePourcentage}
+                      onChange={(e) => setRemisePourcentage(e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -4041,8 +4066,24 @@ export default function AdminView({ activeTab, searchQuery }) {
 
               {/* ---- TOTAUX ---- */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+                {createdOrder.remise_pourcentage > 0 && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#555555' }}>Prix de base :</span>
+                      <span style={{ fontWeight: '600', color: '#555555', textDecoration: 'line-through' }}>
+                        {(createdOrder.prix_base_avant_remise || 0).toLocaleString()} FCFA
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#16a34a' }}>
+                      <span style={{ fontWeight: '600' }}>Réduction ({createdOrder.remise_pourcentage}%) :</span>
+                      <span style={{ fontWeight: '700' }}>
+                        -{(createdOrder.remise_montant || 0).toLocaleString()} FCFA
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#555555' }}>Total Commande :</span>
+                  <span style={{ color: '#555555', fontWeight: createdOrder.remise_pourcentage > 0 ? '700' : 'normal' }}>Total Commande :</span>
                   <span style={{ fontWeight: '700', color: '#000000' }}>
                     {createdOrder.is_subscription_order
                       ? (createdOrder.subscription_details.immediate_subscription

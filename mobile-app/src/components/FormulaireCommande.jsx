@@ -21,6 +21,7 @@ export default function FormulaireCommande({
   const [niveauUrgence, setNiveauUrgence] = useState('Normal');
   const [modeReglement, setModeReglement] = useState('especes');
   const [avancePayee, setAvancePayee] = useState('');
+  const [remisePourcentage, setRemisePourcentage] = useState('');
 
   // Extract unique clothes from catalog
   const catalogClothes = catalog.length > 0
@@ -58,6 +59,12 @@ export default function FormulaireCommande({
       const expressMarkupItem = catalog.find(c => c.id === 'setting_express_markup');
       const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
       price = Math.round(price * (1 + expressMarkup / 100));
+    }
+
+    const discountPercent = Number(remisePourcentage || 0);
+    if (discountPercent > 0 && discountPercent <= 100) {
+      const discountAmount = Math.round(price * (discountPercent / 100));
+      price = Math.max(0, price - discountAmount);
     }
 
     if (subscribePlanId) {
@@ -128,7 +135,8 @@ export default function FormulaireCommande({
       avance_payee: (payWithSubscription && !subscribePlanId) ? 0 : Number(avancePayee || 0),
       pay_with_subscription: payWithSubscription,
       subscribe_plan_id: subscribePlanId,
-      items: selectedItems
+      items: selectedItems,
+      remise_pourcentage: Number(remisePourcentage || 0)
     };
 
     try {
@@ -389,16 +397,31 @@ export default function FormulaireCommande({
           </div>
 
           {(!payWithSubscription || !!subscribePlanId) && (
-            <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-              <label style={{ fontSize: '0.68rem' }}>Acompte (FCFA)</label>
-              <input 
-                type="number" 
-                className="input-control" 
-                style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                placeholder="Ex: 1000"
-                value={avancePayee}
-                onChange={(e) => setAvancePayee(e.target.value)}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.68rem' }}>Acompte (FCFA)</label>
+                <input 
+                  type="number" 
+                  className="input-control" 
+                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  placeholder="Ex: 1000"
+                  value={avancePayee}
+                  onChange={(e) => setAvancePayee(e.target.value)}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.68rem' }}>Réduction (%)</label>
+                <input 
+                  type="number" 
+                  className="input-control" 
+                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  placeholder="Ex: 10"
+                  min="0"
+                  max="100"
+                  value={remisePourcentage}
+                  onChange={(e) => setRemisePourcentage(e.target.value)}
+                />
+              </div>
             </div>
           )}
 
