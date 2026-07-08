@@ -297,14 +297,19 @@ export default function MobileView() {
         });
         alert("Profil client mis à jour avec succès !");
       } else {
-        db.addCustomer({
+        const newCustomer = db.addCustomer({
           nom: custNom.trim(),
           prenom: custPrenom.trim(),
           telephone: custTelephone.trim(),
           adresse: custAdresse.trim(),
           preferences_pliage: custPreferences
         });
-        alert("Nouveau client créé avec succès !");
+        setSuccessPopup({
+          type: 'customer',
+          title: 'Compte client créé !',
+          message: `Le client ${newCustomer.prenom} ${newCustomer.nom} a bien été enregistré.`,
+          extraInfo: `Téléphone: ${newCustomer.telephone}`
+        });
       }
       setShowCustomerModal(false);
     } catch (err) {
@@ -677,6 +682,7 @@ export default function MobileView() {
 
   // Receipt Modal
   const [createdOrder, setCreatedOrder] = useState(null);
+  const [successPopup, setSuccessPopup] = useState(null);
 
   // Settings Modal & custom Server IP
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -919,6 +925,13 @@ export default function MobileView() {
       setNewCustTel('');
       setNewCustAdresse('');
       setNewCustIndicatif('229');
+
+      setSuccessPopup({
+        type: 'customer',
+        title: 'Compte client créé !',
+        message: `Le client ${newCustomer.prenom} ${newCustomer.nom} a bien été enregistré.`,
+        extraInfo: `Téléphone: +${newCustomer.indicatif} ${newCustomer.telephone}`
+      });
     } catch (err) {
       alert(err.message);
     }
@@ -976,11 +989,18 @@ export default function MobileView() {
     try {
       const newOrder = db.createOrder(orderData);
       refreshData();
-      setCreatedOrder(newOrder);
       setAvancePayee('');
       setSubscribePlanId('');
       setArticleQuantities({});
       setShowOrderRegistrationModal(false);
+
+      setSuccessPopup({
+        type: 'order',
+        title: 'Commande Enregistrée !',
+        message: `La commande a bien été créée avec succès.`,
+        extraInfo: newOrder.identifiant_unique_marquage,
+        order: newOrder
+      });
 
       // Notification WhatsApp à l'enregistrement
       const customer = customers.find(c => c.id === selectedCustomerId);
@@ -4977,7 +4997,15 @@ export default function MobileView() {
           db={db}
           currentUser={currentUser}
           serviceLabels={serviceLabels}
-          setCreatedOrder={setCreatedOrder}
+          setCreatedOrder={(newOrder) => {
+            setSuccessPopup({
+              type: 'order',
+              title: 'Commande Enregistrée !',
+              message: `La commande a bien été créée avec succès.`,
+              extraInfo: newOrder.identifiant_unique_marquage,
+              order: newOrder
+            });
+          }}
           sendWhatsAppMessage={sendWhatsAppMessage}
           formatDateTime={formatDateTime}
         />
@@ -5318,6 +5346,135 @@ export default function MobileView() {
               >
                 Fermer
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= SUCCESS POPUP (MODAL CONFIRMATION ACCUSÉ) ================= */}
+      {successPopup && (
+        <div 
+          className="modal-overlay center-align"
+          style={{ zIndex: 1000 }}
+          onClick={() => {
+            if (successPopup.type === 'order' && successPopup.order) {
+              setCreatedOrder(successPopup.order);
+            }
+            setSuccessPopup(null);
+          }}
+        >
+          <div 
+            className="modal-dialog" 
+            style={{ 
+              maxWidth: '300px', 
+              background: '#ffffff', 
+              color: '#1a1a1a', 
+              padding: '1.25rem', 
+              borderRadius: '16px', 
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.12)',
+              textAlign: 'center'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '0.6rem' }}>
+              <h3 style={{ fontSize: '0.95rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>
+                Confirmation
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => {
+                  if (successPopup.type === 'order' && successPopup.order) {
+                    setCreatedOrder(successPopup.order);
+                  }
+                  setSuccessPopup(null);
+                }} 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999999', padding: '2px', display: 'flex', alignItems: 'center' }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Glowing Success Badge */}
+            <div style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '50%',
+              background: 'var(--primary-light)',
+              border: '2px solid var(--primary)',
+              color: 'var(--primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0.5rem auto 1.1rem auto',
+              boxShadow: '0 8px 24px rgba(59, 130, 246, 0.15)',
+              animation: 'pulse-subtle 2s infinite'
+            }}>
+              <Check size={28} strokeWidth={3} />
+            </div>
+
+            <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 0.4rem 0', fontFamily: 'var(--font-title)' }}>
+              {successPopup.title}
+            </h4>
+
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0', lineHeight: 1.45 }}>
+              {successPopup.message}
+            </p>
+
+            {successPopup.extraInfo && (
+              <div style={{ 
+                background: 'var(--primary-light)', 
+                border: '1.5px dashed rgba(59, 130, 246, 0.25)', 
+                borderRadius: '10px', 
+                padding: '0.5rem 0.75rem', 
+                fontSize: '0.72rem', 
+                color: 'var(--text-primary)',
+                fontWeight: 700,
+                marginBottom: '1.2rem',
+                fontFamily: successPopup.type === 'order' ? 'var(--font-mono)' : 'inherit',
+                letterSpacing: successPopup.type === 'order' ? '0.5px' : 'normal'
+              }}>
+                {successPopup.extraInfo}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {successPopup.type === 'order' ? (
+                <>
+                  <button 
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ width: '100%', borderRadius: '12px', padding: '0.6rem', fontSize: '0.75rem', fontWeight: 600, background: 'var(--primary-gradient)', border: 'none', color: '#ffffff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)' }}
+                    onClick={() => {
+                      setCreatedOrder(successPopup.order);
+                      setSuccessPopup(null);
+                    }}
+                  >
+                    Voir le Ticket
+                  </button>
+                  <button 
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ width: '100%', borderRadius: '12px', padding: '0.6rem', fontSize: '0.75rem', fontWeight: 600, background: '#f1f5f9', border: '1px solid #e2e8f0', color: 'var(--text-primary)', cursor: 'pointer' }}
+                    onClick={() => {
+                      setSuccessPopup(null);
+                    }}
+                  >
+                    Continuer
+                  </button>
+                </>
+              ) : (
+                <button 
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ width: '100%', borderRadius: '12px', padding: '0.6rem', fontSize: '0.75rem', fontWeight: 600, background: 'var(--primary-gradient)', border: 'none', color: '#ffffff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)' }}
+                  onClick={() => {
+                    setSuccessPopup(null);
+                  }}
+                >
+                  Fermer
+                </button>
+              )}
             </div>
           </div>
         </div>
