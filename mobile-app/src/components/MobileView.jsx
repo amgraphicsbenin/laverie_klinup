@@ -1854,7 +1854,7 @@ export default function MobileView() {
     const collectionRate = revenueTotal > 0 ? (encaisseTotal / revenueTotal) * 100 : 0;
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '8px' }}>
           <button 
             type="button"
@@ -1862,76 +1862,78 @@ export default function MobileView() {
               setAccueilSubView('main');
               setDetailSearchQuery('');
             }}
-            style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            style={{ background: '#ffffff', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', transition: 'all 0.2s ease' }}
           >
             <ArrowLeft size={18} />
           </button>
-          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Finances & CA</h2>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Finances & CA</h2>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-          Vue analytique en temps réel des transactions, taux d'encaissement et répartition des services.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 120px' }}>
+          <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            Vue analytique en temps réel des transactions, taux d'encaissement et répartition des services.
+          </p>
 
-        {/* Global Finance Card */}
-        <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'linear-gradient(135deg, rgba(43, 130, 240, 0.04) 0%, rgba(22, 163, 74, 0.02) 100%)', border: '1px solid rgba(43, 130, 240, 0.15)', boxShadow: '0 4px 20px rgba(43, 130, 240, 0.05)' }}>
-          <div>
-            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Chiffre d'Affaires Global</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', marginTop: '2px' }}>
-              {revenueTotal.toLocaleString()} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-muted)' }}>FCFA</span>
-            </div>
-          </div>
-
-          <div style={{ height: '8px', width: '100%', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden', position: 'relative' }}>
-            <div style={{ height: '100%', width: `${collectionRate}%`, background: 'linear-gradient(90deg, var(--status-ready) 0%, #34d399 100%)', borderRadius: '99px' }} />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '1rem' }}>
+          {/* Global Finance Card */}
+          <div className="order-detail-card-modern" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: '4px solid var(--primary)' }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-ready)' }} />
-                ENCAISSÉ ({collectionRate.toFixed(0)}%)
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Chiffre d'Affaires Global</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', marginTop: '2px' }}>
+                {revenueTotal.toLocaleString()} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-muted)' }}>FCFA</span>
               </div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--status-ready)', marginTop: '2px' }}>{encaisseTotal.toLocaleString()} F</div>
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-late)' }} />
-                RESTE À PERCEVOIR
-              </div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--status-late)', marginTop: '2px' }}>{resteTotal.toLocaleString()} F</div>
-            </div>
-          </div>
-        </div>
 
-        {/* Services breakdown */}
-        <div className="card" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.95rem', border: '1px solid rgba(0,0,0,0.06)', background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Répartition par type de service</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            {Object.entries(servicesRevenue).map(([srv, val]) => {
-              const pct = revenueTotal > 0 ? (val / revenueTotal) * 100 : 0;
-              let srvColor = 'var(--primary)';
-              let srvIcon = <Waves size={13} />;
-              if (srv === 'repassage_seul') { srvColor = '#8b5cf6'; srvIcon = <MIcon name="iron" size={13} style={{ color: '#8b5cf6' }} />; }
-              else if (srv === 'nettoyage_sec') { srvColor = '#14b8a6'; srvIcon = <Feather size={13} color="#14b8a6" />; }
-              
-              return (
-                <div key={srv} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
-                      {srvIcon}
-                      {serviceLabels[srv] || srv}
-                    </div>
-                    <span style={{ fontWeight: 800, color: 'var(--text-secondary)' }}>
-                      {val.toLocaleString()} F <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 500 }}>({pct.toFixed(0)}%)</span>
-                    </span>
-                  </div>
-                  <div style={{ height: '6px', width: '100%', background: '#f1f5f9', borderRadius: '99px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: srvColor, borderRadius: '99px' }} />
-                  </div>
+            <div style={{ height: '8px', width: '100%', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden', position: 'relative' }}>
+              <div style={{ height: '100%', width: `${collectionRate}%`, background: 'linear-gradient(90deg, var(--status-ready) 0%, #34d399 100%)', borderRadius: '99px' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-ready)' }} />
+                  ENCAISSÉ ({collectionRate.toFixed(0)}%)
                 </div>
-              );
-            })}
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--status-ready)', marginTop: '2px' }}>{encaisseTotal.toLocaleString()} F</div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-late)' }} />
+                  RESTE À PERCEVOIR
+                </div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--status-late)', marginTop: '2px' }}>{resteTotal.toLocaleString()} F</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Services breakdown */}
+          <div className="order-detail-card-modern" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.95rem', borderLeft: '4px solid #8b5cf6' }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Répartition par type de service</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {Object.entries(servicesRevenue).map(([srv, val]) => {
+                const pct = revenueTotal > 0 ? (val / revenueTotal) * 100 : 0;
+                let srvColor = 'var(--primary)';
+                let srvIcon = <Waves size={13} />;
+                if (srv === 'repassage_seul') { srvColor = '#8b5cf6'; srvIcon = <MIcon name="iron" size={13} style={{ color: '#8b5cf6' }} />; }
+                else if (srv === 'nettoyage_sec') { srvColor = '#14b8a6'; srvIcon = <Feather size={13} color="#14b8a6" />; }
+                
+                return (
+                  <div key={srv} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                        {srvIcon}
+                        {serviceLabels[srv] || srv}
+                      </div>
+                      <span style={{ fontWeight: 800, color: 'var(--text-secondary)' }}>
+                        {val.toLocaleString()} F <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 500 }}>({pct.toFixed(0)}%)</span>
+                      </span>
+                    </div>
+                    <div style={{ height: '6px', width: '100%', background: '#f1f5f9', borderRadius: '99px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: srvColor, borderRadius: '99px' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -1958,7 +1960,7 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -1978,9 +1980,10 @@ export default function MobileView() {
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-          Liste complète des commandes actuellement en traitement à l'atelier.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 120px' }}>
+          <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            Liste complète des commandes actuellement en traitement à l'atelier.
+          </p>
 
         {/* Search Field */}
         <div style={{ position: 'relative' }}>
@@ -2090,6 +2093,7 @@ export default function MobileView() {
           )}
         </div>
       </div>
+      </div>
     );
   };
 
@@ -2110,7 +2114,7 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -2251,7 +2255,7 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -2271,9 +2275,10 @@ export default function MobileView() {
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-          Commandes express prioritaires à traiter de toute urgence à l'atelier.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 120px' }}>
+          <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            Commandes express prioritaires à traiter de toute urgence à l'atelier.
+          </p>
 
         {/* Search Field */}
         <div style={{ position: 'relative' }}>
@@ -2372,6 +2377,7 @@ export default function MobileView() {
           )}
         </div>
       </div>
+      </div>
     );
   };
 
@@ -2391,7 +2397,7 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -2411,9 +2417,10 @@ export default function MobileView() {
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-          Commandes en retard dont l'échéance de livraison est maintenant dépassée.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 120px' }}>
+          <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            Commandes en retard dont l'échéance de livraison est maintenant dépassée.
+          </p>
 
         {/* Search Field */}
         <div style={{ position: 'relative' }}>
@@ -2513,6 +2520,7 @@ export default function MobileView() {
           )}
         </div>
       </div>
+      </div>
     );
   };
 
@@ -2526,7 +2534,7 @@ export default function MobileView() {
     ];
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -2546,9 +2554,10 @@ export default function MobileView() {
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-          État de charge détaillé de chaque étape du traitement.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 120px' }}>
+          <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            État de charge détaillé de chaque étape du traitement.
+          </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingBottom: '12px' }}>
           {pipeline.map(p => {
@@ -2606,6 +2615,7 @@ export default function MobileView() {
           })}
         </div>
       </div>
+      </div>
     );
   };
 
@@ -2615,7 +2625,7 @@ export default function MobileView() {
     const maxBar = Math.max(...actData.map(d => d.count), 1);
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 28px', minHeight: '100%' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '6px' }}>
           <button 
             type="button"
@@ -2630,9 +2640,10 @@ export default function MobileView() {
           <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Activité & Graphique</h2>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-          Volume d'activité et commandes enregistrées sur la période sélectionnée (<strong>{getPeriodLabel(activityPeriod)}</strong>).
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 120px' }}>
+          <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            Volume d'activité et commandes enregistrées sur la période sélectionnée (<strong>{getPeriodLabel(activityPeriod)}</strong>).
+          </p>
 
         {/* Futuristic Glassmorphic Graph Card */}
         <div className="order-detail-card-modern" style={{ padding: '1.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: '4px solid var(--primary)' }}>
@@ -2685,6 +2696,7 @@ export default function MobileView() {
           </div>
         </div>
       </div>
+      </div>
     );
   };
 
@@ -2709,8 +2721,8 @@ export default function MobileView() {
     });
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
-        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '4px' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
               type="button"
@@ -2718,20 +2730,21 @@ export default function MobileView() {
                 setAccueilSubView('main');
                 setLoyaltySearchQuery('');
               }}
-              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+              style={{ background: '#ffffff', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', transition: 'all 0.2s ease' }}
             >
               <ArrowLeft size={18} />
             </button>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Classement Fidélité</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Classement Fidélité</h2>
           </div>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.08)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#d97706', background: 'rgba(217, 119, 6, 0.08)', padding: '0.25rem 0.6rem', borderRadius: '20px', border: '1px solid rgba(217, 119, 6, 0.15)' }}>
             {loyaltyCustomers.length} Clients
           </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-          Découvrez nos clients les plus actifs classés selon leur volume de dépenses total.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '12px 16px 120px' }}>
+          <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            Découvrez nos clients les plus actifs classés selon leur volume de dépenses total.
+          </p>
 
         {/* Search Field */}
         <div style={{ position: 'relative' }}>
@@ -3077,6 +3090,7 @@ export default function MobileView() {
             })()
           )}
         </div>
+      </div>
       </div>
     );
   };
