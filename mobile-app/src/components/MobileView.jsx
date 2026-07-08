@@ -2686,8 +2686,7 @@ export default function MobileView() {
             /* ══════════════════════════════════════
                ÉCRAN 1 — EMAIL (style design ref)
                ══════════════════════════════════════ */
-            <div className="lockscreen-container">
-              <div className="login-page">
+            <div className="login-page">
                 {/* Badge logo bleu */}
                 <div className="login-logo-badge">
                   <img src={logoDark} alt="KLIN UP" />
@@ -2732,15 +2731,13 @@ export default function MobileView() {
                 >
                   Mot de passe oublié ? <span>Réinitialiser le PIN</span>
                 </button>
-              </div>
             </div>
 
           ) : (
             /* ══════════════════════════════════════
                ÉCRAN 2 — CODE PIN (style design ref)
                ══════════════════════════════════════ */
-            <div className="pin-screen">
-              <div className="pin-page">
+            <div className="pin-page">
                 {/* Bouton retour chevron */}
                 <button
                   type="button"
@@ -2870,7 +2867,6 @@ export default function MobileView() {
                     </svg>
                   </button>
                 </div>
-              </div>
             </div>
           )
 
