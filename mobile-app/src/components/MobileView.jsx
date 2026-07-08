@@ -2755,12 +2755,13 @@ export default function MobileView() {
             style={{ 
               paddingLeft: '2.4rem', 
               width: '100%', 
-              borderRadius: '12px', 
-              fontSize: '0.72rem', 
-              paddingTop: '0.55rem', 
-              paddingBottom: '0.55rem',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              borderRadius: '14px', 
+              fontSize: '0.75rem', 
+              paddingTop: '0.52rem', 
+              paddingBottom: '0.52rem',
+              background: '#ffffff',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
             }} 
             placeholder="Rechercher un client ou téléphone..." 
             value={loyaltySearchQuery} 
