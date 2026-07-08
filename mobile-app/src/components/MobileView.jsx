@@ -89,6 +89,7 @@ export default function MobileView() {
   const [activityPeriod, setActivityPeriod] = useState('7_days'); // 3_days, 7_days, 1_month, 3_months, 6_months, 12_months
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [loyaltySearchQuery, setLoyaltySearchQuery] = useState('');
+  const [detailSearchQuery, setDetailSearchQuery] = useState('');
   const [dbIsRemote, setDbIsRemote] = useState(() => db.isRemote());
   
   // Paramètres fonctionnels
@@ -226,6 +227,15 @@ export default function MobileView() {
   const [pinCode, setPinCode] = useState('');
   const [pinError, setPinError] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const pinInputRef = useRef(null);
+
+  useEffect(() => {
+    if (selectedLoginUser) {
+      setTimeout(() => {
+        pinInputRef.current?.focus();
+      }, 150);
+    }
+  }, [selectedLoginUser]);
   
   const [loginEmail, setLoginEmail] = useState('');
   const [showResetPinModal, setShowResetPinModal] = useState(false);
@@ -345,21 +355,14 @@ export default function MobileView() {
     setResetEmail('');
   };
 
-  const handleKeypadPress = (val) => {
+  const handlePinChange = (e) => {
     if (pinError || isUnlocking) return;
+    const val = e.target.value.replace(/[^0-9]/g, '');
+    if (val.length > 6) return;
+    setPinCode(val);
     
-    if (val === 'delete') {
-      setPinCode(prev => prev.slice(0, -1));
-      return;
-    }
-    
-    if (pinCode.length >= 6) return;
-    
-    const newCode = pinCode + val;
-    setPinCode(newCode);
-    
-    if (newCode.length === 6) {
-      if (selectedLoginUser.code_pin === newCode) {
+    if (val.length === 6) {
+      if (selectedLoginUser && selectedLoginUser.code_pin === val) {
         setIsUnlocking(true);
         setTimeout(() => {
           db.setCurrentUser(selectedLoginUser);
@@ -1822,50 +1825,87 @@ export default function MobileView() {
       return acc;
     }, {});
 
+    const collectionRate = revenueTotal > 0 ? (encaisseTotal / revenueTotal) * 100 : 0;
+
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '8px' }}>
           <button 
             type="button"
-            onClick={() => setAccueilSubView('main')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            onClick={() => {
+              setAccueilSubView('main');
+              setDetailSearchQuery('');
+            }}
+            style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </button>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Finances & CA</h2>
+          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Finances & CA</h2>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-          Analyse financière du chiffre d'affaires et de l'encaissement de la caisse.
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+          Vue analytique en temps réel des transactions, taux d'encaissement et répartition des services.
         </p>
 
-        <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Récapitulatif Global</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
-              <span>Chiffre d'Affaires</span>
-              <strong style={{ color: 'var(--primary)' }}>{revenueTotal.toLocaleString()} F</strong>
+        {/* Global Finance Card */}
+        <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'linear-gradient(135deg, rgba(43, 130, 240, 0.04) 0%, rgba(22, 163, 74, 0.02) 100%)', border: '1px solid rgba(43, 130, 240, 0.15)', boxShadow: '0 4px 20px rgba(43, 130, 240, 0.05)' }}>
+          <div>
+            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Chiffre d'Affaires Global</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', marginTop: '2px' }}>
+              {revenueTotal.toLocaleString()} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-muted)' }}>FCFA</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
-              <span>Montant Encaissé</span>
-              <strong style={{ color: 'var(--status-ready)' }}>{encaisseTotal.toLocaleString()} F</strong>
+          </div>
+
+          <div style={{ height: '8px', width: '100%', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden', position: 'relative' }}>
+            <div style={{ height: '100%', width: `${collectionRate}%`, background: 'linear-gradient(90deg, var(--status-ready) 0%, #34d399 100%)', borderRadius: '99px' }} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '1rem' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-ready)' }} />
+                ENCAISSÉ ({collectionRate.toFixed(0)}%)
+              </div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--status-ready)', marginTop: '2px' }}>{encaisseTotal.toLocaleString()} F</div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
-              <span>Restes à Percevoir</span>
-              <strong style={{ color: 'var(--status-late)' }}>{resteTotal.toLocaleString()} F</strong>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-late)' }} />
+                RESTE À PERCEVOIR
+              </div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--status-late)', marginTop: '2px' }}>{resteTotal.toLocaleString()} F</div>
             </div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Par Service</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {Object.entries(servicesRevenue).map(([srv, val]) => (
-              <div key={srv} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
-                <span style={{ textTransform: 'capitalize' }}>{serviceLabels[srv] || srv}</span>
-                <strong>{val.toLocaleString()} F</strong>
-              </div>
-            ))}
+        {/* Services breakdown */}
+        <div className="card" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.95rem', border: '1px solid rgba(0,0,0,0.06)', background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Répartition par type de service</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {Object.entries(servicesRevenue).map(([srv, val]) => {
+              const pct = revenueTotal > 0 ? (val / revenueTotal) * 100 : 0;
+              let srvColor = 'var(--primary)';
+              let srvIcon = <Waves size={13} />;
+              if (srv === 'repassage_seul') { srvColor = '#8b5cf6'; srvIcon = <MIcon name="iron" size={13} style={{ color: '#8b5cf6' }} />; }
+              else if (srv === 'nettoyage_sec') { srvColor = '#14b8a6'; srvIcon = <Feather size={13} color="#14b8a6" />; }
+              
+              return (
+                <div key={srv} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                      {srvIcon}
+                      {serviceLabels[srv] || srv}
+                    </div>
+                    <span style={{ fontWeight: 800, color: 'var(--text-secondary)' }}>
+                      {val.toLocaleString()} F <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 500 }}>({pct.toFixed(0)}%)</span>
+                    </span>
+                  </div>
+                  <div style={{ height: '6px', width: '100%', background: '#f1f5f9', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: srvColor, borderRadius: '99px' }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1880,40 +1920,138 @@ export default function MobileView() {
         return new Date(a.due_date) - new Date(b.due_date);
       });
 
+    const filteredActive = activeOrdersList.filter(o => {
+      const q = detailSearchQuery.toLowerCase();
+      const client = customers.find(c => c.id === o.customer_id);
+      const clientName = client ? `${client.prenom} ${client.nom}`.toLowerCase() : '';
+      return (
+        o.type_article.toLowerCase().includes(q) ||
+        o.identifiant_unique_marquage.toLowerCase().includes(q) ||
+        clientName.includes(q)
+      );
+    });
+
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button 
-            type="button"
-            onClick={() => setAccueilSubView('main')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Commandes en Cours</h2>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button 
+              type="button"
+              onClick={() => {
+                setAccueilSubView('main');
+                setDetailSearchQuery('');
+              }}
+              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes en Cours</h2>
+          </div>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+            {activeOrdersList.length} actives
+          </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
           Liste complète des commandes actuellement en traitement à l'atelier.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '480px' }}>
-          {activeOrdersList.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-              Aucune commande en cours.
+        {/* Search Field */}
+        <div style={{ position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input 
+            type="text" 
+            className="input-control" 
+            style={{ 
+              paddingLeft: '2.4rem', 
+              width: '100%', 
+              borderRadius: '12px', 
+              fontSize: '0.72rem', 
+              paddingTop: '0.55rem', 
+              paddingBottom: '0.55rem',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+            }} 
+            placeholder="Rechercher par marquage, client, article..." 
+            value={detailSearchQuery} 
+            onChange={(e) => setDetailSearchQuery(e.target.value)} 
+          />
+          {detailSearchQuery && (
+            <button 
+              type="button"
+              onClick={() => setDetailSearchQuery('')}
+              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingBottom: '12px' }}>
+          {filteredActive.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
+              Aucune commande en cours trouvée.
             </div>
           ) : (
-            activeOrdersList.map(order => {
+            filteredActive.map(order => {
               const client = customers.find(c => c.id === order.customer_id);
               const isExpress = order.niveau_urgence === 'Express';
+              const initial = client ? `${client.prenom[0] || ''}${client.nom[0] || ''}`.toUpperCase() : '?';
+              
               return (
-                <div key={order.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', borderLeft: isExpress ? '4px solid var(--status-pending)' : undefined }}>
+                <div 
+                  key={order.id} 
+                  className="card" 
+                  style={{ 
+                    padding: '0.9rem', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.5rem', 
+                    border: '1px solid rgba(0,0,0,0.06)',
+                    borderLeft: isExpress ? '4px solid var(--status-pending)' : '4px solid var(--primary)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                    background: '#ffffff',
+                    borderRadius: '14px',
+                    transition: 'transform 0.2s ease'
+                  }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)' }}>{order.identifiant_unique_marquage}</span>
-                    <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.52rem', padding: '0.05rem 0.25rem' }}>{getOrderStatusLabel(order)}</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {isExpress && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.5rem', fontWeight: 800, color: 'var(--status-pending)', background: 'var(--status-pending-light)', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>
+                          <Zap size={9} strokeWidth={3} /> EXPRESS
+                        </span>
+                      )}
+                      <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.52rem', padding: '0.08rem 0.35rem', fontWeight: 700 }}>
+                        {getOrderStatusLabel(order)}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{order.type_article} · <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</span></div>
-                  <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>Échéance : {formatDateTime(order.due_date)}</div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.5rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: isExpress ? 'var(--status-pending-light)' : 'var(--primary-light)', color: isExpress ? 'var(--status-pending)' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
+                      {initial}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        {order.type_article}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
+                        Client : <strong>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {order.prix_total?.toLocaleString()} F
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.6rem', color: 'var(--text-muted)', background: '#f8fafc', padding: '0.35rem 0.6rem', borderRadius: '8px', marginTop: '0.2rem' }}>
+                    <span>Service: <strong style={{ textTransform: 'capitalize' }}>{serviceLabels[order.type_service] || order.type_service}</strong></span>
+                    <span style={{ color: isOrderLate(order) ? 'var(--status-late)' : 'var(--text-muted)', fontWeight: isOrderLate(order) ? 700 : 500 }}>
+                      Échéance : {formatDateTime(order.due_date)}
+                    </span>
+                  </div>
                 </div>
               );
             })
@@ -1928,39 +2066,129 @@ export default function MobileView() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const completedOrders = orders.filter(o => o.statut === 'restitue' && new Date(o.updated_at || o.created_at) >= startOfMonth);
 
+    const filteredCompleted = completedOrders.filter(o => {
+      const q = detailSearchQuery.toLowerCase();
+      const client = customers.find(c => c.id === o.customer_id);
+      const clientName = client ? `${client.prenom} ${client.nom}`.toLowerCase() : '';
+      return (
+        o.type_article.toLowerCase().includes(q) ||
+        o.identifiant_unique_marquage.toLowerCase().includes(q) ||
+        clientName.includes(q)
+      );
+    });
+
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button 
-            type="button"
-            onClick={() => setAccueilSubView('main')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Commandes Restituées</h2>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button 
+              type="button"
+              onClick={() => {
+                setAccueilSubView('main');
+                setDetailSearchQuery('');
+              }}
+              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes Restituées</h2>
+          </div>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--status-ready)', background: 'var(--status-ready-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+            {completedOrders.length} ce mois-ci
+          </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-          Liste des commandes livrées/récupérées avec succès ce mois-ci.
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+          Liste des commandes livrées/récupérées avec succès sur le mois en cours.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '480px' }}>
-          {completedOrders.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-              Aucune commande livrée ce mois-ci.
+        {/* Search Field */}
+        <div style={{ position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input 
+            type="text" 
+            className="input-control" 
+            style={{ 
+              paddingLeft: '2.4rem', 
+              width: '100%', 
+              borderRadius: '12px', 
+              fontSize: '0.72rem', 
+              paddingTop: '0.55rem', 
+              paddingBottom: '0.55rem',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+            }} 
+            placeholder="Rechercher par marquage, client, article..." 
+            value={detailSearchQuery} 
+            onChange={(e) => setDetailSearchQuery(e.target.value)} 
+          />
+          {detailSearchQuery && (
+            <button 
+              type="button"
+              onClick={() => setDetailSearchQuery('')}
+              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingBottom: '12px' }}>
+          {filteredCompleted.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
+              Aucune commande restituée trouvée.
             </div>
           ) : (
-            completedOrders.map(order => {
+            filteredCompleted.map(order => {
               const client = customers.find(c => c.id === order.customer_id);
+              const initial = client ? `${client.prenom[0] || ''}${client.nom[0] || ''}`.toUpperCase() : '?';
+              
               return (
-                <div key={order.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div 
+                  key={order.id} 
+                  className="card" 
+                  style={{ 
+                    padding: '0.9rem', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.5rem', 
+                    border: '1px solid rgba(0,0,0,0.06)',
+                    borderLeft: '4px solid var(--status-ready)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                    background: '#ffffff',
+                    borderRadius: '14px'
+                  }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--status-ready)' }}>{order.identifiant_unique_marquage}</span>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>{order.prix_total} F</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--status-ready)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
+                    <span style={{ fontSize: '0.52rem', padding: '0.08rem 0.35rem', fontWeight: 700, color: 'var(--status-ready)', background: 'var(--status-ready-light)', borderRadius: '4px', border: '1px solid rgba(22, 163, 74, 0.15)' }}>
+                      LIVRÉ
+                    </span>
                   </div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{order.type_article} · <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</span></div>
-                  <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>Livrée le : {formatDateTime(order.updated_at || order.created_at)}</div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid #f8fafc', paddingTop: '0.5rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--status-ready-light)', color: 'var(--status-ready)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
+                      {initial}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        {order.type_article}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
+                        Client : <strong>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'var(--status-ready)' }}>
+                      {order.prix_total?.toLocaleString()} F
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.6rem', color: 'var(--text-muted)', background: '#f8fafc', padding: '0.35rem 0.6rem', borderRadius: '8px', marginTop: '0.2rem' }}>
+                    <span>Service: <strong style={{ textTransform: 'capitalize' }}>{serviceLabels[order.type_service] || order.type_service}</strong></span>
+                    <span>
+                      Livrée le : {formatDateTime(order.updated_at || order.created_at)}
+                    </span>
+                  </div>
                 </div>
               );
             })
@@ -1973,39 +2201,129 @@ export default function MobileView() {
   const renderExpressDetailView = () => {
     const expressOrdersList = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule' && o.niveau_urgence === 'Express');
 
+    const filteredExpress = expressOrdersList.filter(o => {
+      const q = detailSearchQuery.toLowerCase();
+      const client = customers.find(c => c.id === o.customer_id);
+      const clientName = client ? `${client.prenom} ${client.nom}`.toLowerCase() : '';
+      return (
+        o.type_article.toLowerCase().includes(q) ||
+        o.identifiant_unique_marquage.toLowerCase().includes(q) ||
+        clientName.includes(q)
+      );
+    });
+
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button 
-            type="button"
-            onClick={() => setAccueilSubView('main')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Commandes Express</h2>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button 
+              type="button"
+              onClick={() => {
+                setAccueilSubView('main');
+                setDetailSearchQuery('');
+              }}
+              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes Express</h2>
+          </div>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--status-pending)', background: 'var(--status-pending-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+            {expressOrdersList.length} express
+          </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-          Commandes express prioritaires à traiter en urgence.
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+          Commandes express prioritaires à traiter de toute urgence à l'atelier.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '480px' }}>
-          {expressOrdersList.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-              Aucune commande Express en cours.
+        {/* Search Field */}
+        <div style={{ position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input 
+            type="text" 
+            className="input-control" 
+            style={{ 
+              paddingLeft: '2.4rem', 
+              width: '100%', 
+              borderRadius: '12px', 
+              fontSize: '0.72rem', 
+              paddingTop: '0.55rem', 
+              paddingBottom: '0.55rem',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+            }} 
+            placeholder="Rechercher par marquage, client, article..." 
+            value={detailSearchQuery} 
+            onChange={(e) => setDetailSearchQuery(e.target.value)} 
+          />
+          {detailSearchQuery && (
+            <button 
+              type="button"
+              onClick={() => setDetailSearchQuery('')}
+              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingBottom: '12px' }}>
+          {filteredExpress.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
+              Aucune commande Express en cours trouvée.
             </div>
           ) : (
-            expressOrdersList.map(order => {
+            filteredExpress.map(order => {
               const client = customers.find(c => c.id === order.customer_id);
+              const initial = client ? `${client.prenom[0] || ''}${client.nom[0] || ''}`.toUpperCase() : '?';
+              
               return (
-                <div key={order.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', borderLeft: '4px solid var(--status-pending)' }}>
+                <div 
+                  key={order.id} 
+                  className="card" 
+                  style={{ 
+                    padding: '0.9rem', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.5rem', 
+                    border: '1px solid rgba(217, 119, 6, 0.25)',
+                    borderLeft: '4px solid var(--status-pending)',
+                    boxShadow: '0 2px 10px rgba(217, 119, 6, 0.04)',
+                    background: 'linear-gradient(135deg, #ffffff 0%, rgba(217, 119, 6, 0.01) 100%)',
+                    borderRadius: '14px'
+                  }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--status-pending)' }}>{order.identifiant_unique_marquage}</span>
-                    <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.52rem', padding: '0.05rem 0.25rem' }}>{getOrderStatusLabel(order)}</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--status-pending)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.52rem', padding: '0.08rem 0.35rem', fontWeight: 800, color: 'var(--status-pending)', background: 'var(--status-pending-light)', borderRadius: '4px' }}>
+                      <Zap size={9} strokeWidth={3} /> URGENT
+                    </span>
                   </div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{order.type_article} · <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</span></div>
-                  <div style={{ fontSize: '0.62rem', color: 'var(--status-late)', fontWeight: 700 }}>Échéance : {formatDateTime(order.due_date)}</div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid rgba(217,119,6,0.06)', paddingTop: '0.5rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--status-pending-light)', color: 'var(--status-pending)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
+                      {initial}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        {order.type_article}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
+                        Client : <strong>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {order.prix_total?.toLocaleString()} F
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.6rem', color: 'var(--status-late)', background: 'var(--status-late-light)', padding: '0.35rem 0.6rem', borderRadius: '8px', marginTop: '0.2rem', fontWeight: 700 }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Étape: {getOrderStatusLabel(order)}</span>
+                    <span>
+                      Délai : {formatDateTime(order.due_date)}
+                    </span>
+                  </div>
                 </div>
               );
             })
@@ -2019,39 +2337,129 @@ export default function MobileView() {
     const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
     const lateOrdersList = activeOrders.filter(o => isOrderLate(o));
 
+    const filteredLate = lateOrdersList.filter(o => {
+      const q = detailSearchQuery.toLowerCase();
+      const client = customers.find(c => c.id === o.customer_id);
+      const clientName = client ? `${client.prenom} ${client.nom}`.toLowerCase() : '';
+      return (
+        o.type_article.toLowerCase().includes(q) ||
+        o.identifiant_unique_marquage.toLowerCase().includes(q) ||
+        clientName.includes(q)
+      );
+    });
+
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button 
-            type="button"
-            onClick={() => setAccueilSubView('main')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Commandes en Retard</h2>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button 
+              type="button"
+              onClick={() => {
+                setAccueilSubView('main');
+                setDetailSearchQuery('');
+              }}
+              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Commandes en Retard</h2>
+          </div>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--status-late)', background: 'var(--status-late-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+            {lateOrdersList.length} retard
+          </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-          Commandes dont la date de livraison prévue est dépassée.
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+          Commandes en retard dont l'échéance de livraison est maintenant dépassée.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '480px' }}>
-          {lateOrdersList.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+        {/* Search Field */}
+        <div style={{ position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input 
+            type="text" 
+            className="input-control" 
+            style={{ 
+              paddingLeft: '2.4rem', 
+              width: '100%', 
+              borderRadius: '12px', 
+              fontSize: '0.72rem', 
+              paddingTop: '0.55rem', 
+              paddingBottom: '0.55rem',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+            }} 
+            placeholder="Rechercher par marquage, client, article..." 
+            value={detailSearchQuery} 
+            onChange={(e) => setDetailSearchQuery(e.target.value)} 
+          />
+          {detailSearchQuery && (
+            <button 
+              type="button"
+              onClick={() => setDetailSearchQuery('')}
+              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingBottom: '12px' }}>
+          {filteredLate.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
               Aucune commande en retard. Bon travail !
             </div>
           ) : (
-            lateOrdersList.map(order => {
+            filteredLate.map(order => {
               const client = customers.find(c => c.id === order.customer_id);
+              const initial = client ? `${client.prenom[0] || ''}${client.nom[0] || ''}`.toUpperCase() : '?';
+              
               return (
-                <div key={order.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', borderLeft: '4px solid var(--status-late)' }}>
+                <div 
+                  key={order.id} 
+                  className="card" 
+                  style={{ 
+                    padding: '0.9rem', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.5rem', 
+                    border: '1px solid rgba(220, 38, 38, 0.25)',
+                    borderLeft: '4px solid var(--status-late)',
+                    boxShadow: '0 2px 10px rgba(220, 38, 38, 0.04)',
+                    background: 'linear-gradient(135deg, #ffffff 0%, rgba(220, 38, 38, 0.01) 100%)',
+                    borderRadius: '14px'
+                  }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--status-late)' }}>{order.identifiant_unique_marquage}</span>
-                    <span className="badge badge-en_retard" style={{ fontSize: '0.52rem', padding: '0.05rem 0.25rem' }}>RETARD</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--status-late)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.52rem', padding: '0.08rem 0.35rem', fontWeight: 800, color: 'var(--status-late)', background: 'var(--status-late-light)', borderRadius: '4px', border: '1px solid rgba(220, 38, 38, 0.15)' }}>
+                      <TriangleAlert size={9} /> RETARD
+                    </span>
                   </div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{order.type_article} · <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</span></div>
-                  <div style={{ fontSize: '0.62rem', color: 'var(--status-late)' }}>Échéance : {formatDateTime(order.due_date)}</div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderTop: '1px solid rgba(220,38,38,0.06)', paddingTop: '0.5rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--status-late-light)', color: 'var(--status-late)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
+                      {initial}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        {order.type_article}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
+                        Client : <strong>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</strong>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {order.prix_total?.toLocaleString()} F
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.6rem', color: 'var(--status-late)', background: 'var(--status-late-light)', padding: '0.35rem 0.6rem', borderRadius: '8px', marginTop: '0.2rem', fontWeight: 700 }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Statut: {getOrderStatusLabel(order)}</span>
+                    <span>
+                      Dû le : {formatDateTime(order.due_date)}
+                    </span>
+                  </div>
                 </div>
               );
             })
@@ -2064,39 +2472,92 @@ export default function MobileView() {
   const renderPipelineDetailView = () => {
     const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
     const pipeline = [
-      { label: 'En attente de traitement', key: 'en_attente', color: 'var(--status-pending)', desc: 'Nouveaux vêtements déposés nécessitant un tri et un marquage.' },
-      { label: 'En Lavage', key: 'en_cours_lavage', color: 'var(--status-washing)', desc: 'Articles actuellement en machine de lavage / tri.' },
-      { label: 'En Repassage', key: 'en_cours_repassage', color: '#8b5cf6', desc: 'Articles prêts à être repassés et pliés.' },
-      { label: 'Prêt', key: 'pret', color: 'var(--status-ready)', desc: 'Lavage et repassage terminés. Prêt pour livraison ou retrait.' },
+      { label: 'En attente de tri', key: 'en_attente', color: 'var(--status-pending)', bg: 'var(--status-pending-light)', icon: <Inbox size={15} />, desc: 'Commandes à trier, marquer et préparer pour lavage.' },
+      { label: 'En Lavage', key: 'en_cours_lavage', color: 'var(--status-washing)', bg: 'var(--status-washing-light)', icon: <Waves size={15} />, desc: 'Articles actuellement en machine ou en cours de nettoyage.' },
+      { label: 'En Repassage', key: 'en_cours_repassage', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.08)', icon: <MIcon name="iron" size={15} style={{ color: '#8b5cf6' }} />, desc: 'Articles sortis des séchoirs, en finition de repassage.' },
+      { label: 'Prêt pour livraison', key: 'pret', color: 'var(--status-ready)', bg: 'var(--status-ready-light)', icon: <CheckCircle2 size={15} />, desc: 'Traitement terminé, vêtements rangés sur cintres.' },
     ];
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button 
-            type="button"
-            onClick={() => setAccueilSubView('main')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Pipeline Atelier</h2>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button 
+              type="button"
+              onClick={() => {
+                setAccueilSubView('main');
+                setDetailSearchQuery('');
+              }}
+              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Charge de l'Atelier</h2>
+          </div>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+            {activeOrders.length} en cours
+          </span>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-          État de charge détaillé de chaque étape du pipeline de traitement.
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+          État de charge détaillé de chaque étape du traitement.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingBottom: '12px' }}>
           {pipeline.map(p => {
-            const count = activeOrders.filter(o => o.statut === p.key).length;
+            const stepOrders = activeOrders.filter(o => o.statut === p.key);
+            const count = stepOrders.length;
             return (
-              <div key={p.key} className="card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              <div 
+                key={p.key} 
+                className="card" 
+                style={{ 
+                  padding: '1rem', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '0.6rem',
+                  border: `1px solid rgba(0,0,0,0.06)`,
+                  borderLeft: `4px solid ${p.color}`,
+                  background: '#ffffff',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+                  borderRadius: '16px'
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: p.color }}>{p.label}</span>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, background: p.color + '15', color: p.color, padding: '0.2rem 0.6rem', borderRadius: '8px' }}>{count}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: p.bg, color: p.color, display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0, justifyContent: 'center' }}>
+                      {p.icon}
+                    </div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>{p.label}</span>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 900, background: p.bg, color: p.color, padding: '0.2rem 0.55rem', borderRadius: '8px' }}>
+                    {count}
+                  </span>
                 </div>
-                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.35 }}>{p.desc}</p>
+                
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>{p.desc}</p>
+                
+                {count > 0 && (
+                  <div style={{ marginTop: '0.5rem', background: '#f8fafc', borderRadius: '10px', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid #f1f5f9', paddingBottom: '3px' }}>Commandes dans cette étape</div>
+                    {stepOrders.slice(0, 3).map(order => {
+                      const client = customers.find(c => c.id === order.customer_id);
+                      return (
+                        <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.65rem' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{order.identifiant_unique_marquage}</span>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
+                            {order.type_article} · {client ? `${client.prenom} ${client.nom[0]}.` : 'Client'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {count > 3 && (
+                      <div style={{ fontSize: '0.55rem', color: 'var(--primary)', fontWeight: 700, textAlign: 'center', marginTop: '2px' }}>
+                        + {count - 3} autres commandes
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -2111,63 +2572,71 @@ export default function MobileView() {
     const maxBar = Math.max(...actData.map(d => d.count), 1);
 
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.95rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '6px' }}>
           <button 
             type="button"
-            onClick={() => setAccueilSubView('main')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            onClick={() => {
+              setAccueilSubView('main');
+              setDetailSearchQuery('');
+            }}
+            style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </button>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Performances d'Activité</h2>
+          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Activité & Graphique</h2>
         </div>
 
-        <p style={{ margin: '0', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-          Analyse des performances pour la période sélectionnée : <strong>{getPeriodLabel(activityPeriod)}</strong>.
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+          Volume d'activité et commandes enregistrées sur la période sélectionnée (<strong>{getPeriodLabel(activityPeriod)}</strong>).
         </p>
 
-        {/* Grand Graphique */}
-        <div className="card" style={{ padding: '1.2rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+        {/* Futuristic Glassmorphic Graph Card */}
+        <div className="card" style={{ padding: '1.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(255, 255, 255, 0.95) 100%)', border: '1px solid rgba(59, 130, 246, 0.15)', boxShadow: '0 4px 20px rgba(59, 130, 246, 0.04)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Commandes Créées</span>
-            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary)' }}>{totalOrders} au total</span>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Commandes Créées</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '12px' }}>{totalOrders} au total</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '140px', marginTop: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
-            {actData.map((d, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                <div style={{ 
-                  width: '100%', 
-                  background: 'var(--primary)', 
-                  borderRadius: '4px 4px 0 0', 
-                  height: `${Math.max(d.count > 0 ? 5 : 2, (d.count / maxBar) * 120)}px`, 
-                  transition: 'height 0.5s ease',
-                  position: 'relative'
-                }}>
-                  {d.count > 0 && (
-                    <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.55rem', fontWeight: 700, color: 'var(--primary)' }}>
-                      {d.count}
-                    </div>
-                  )}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '140px', marginTop: '0.5rem', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: '6px', position: 'relative' }}>
+            {actData.map((d, i) => {
+              const isLast = i === actData.length - 1;
+              return (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}>
+                  <div style={{ 
+                    width: '100%', 
+                    background: isLast ? 'var(--primary-gradient)' : 'linear-gradient(180deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.06) 100%)', 
+                    borderRadius: '6px 6px 0 0', 
+                    height: `${Math.max(d.count > 0 ? 6 : 2, (d.count / maxBar) * 110)}px`, 
+                    transition: 'height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                    position: 'relative',
+                    border: isLast ? '1px solid rgba(59, 130, 246, 0.3)' : '1px dashed rgba(59, 130, 246, 0.15)'
+                  }}>
+                    {d.count > 0 && (
+                      <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.55rem', fontWeight: 800, color: 'var(--primary)' }}>
+                        {d.count}
+                      </div>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.52rem', color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>{d.label}</span>
                 </div>
-                <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{d.label}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        {/* Autres KPI sur la période */}
-        <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Statistiques de Période</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
-              <span>Moyenne par intervalle</span>
-              <strong>{(totalOrders / actData.length).toFixed(1)} cmd</strong>
+        {/* Period Stats Block */}
+        <div className="card" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', border: '1px solid rgba(0,0,0,0.06)', background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Statistiques Additionnelles</div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>MOYENNE INTERVALLE</div>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{(totalOrders / actData.length).toFixed(1)} <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-secondary)' }}>cmd</span></div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
-              <span>Maximum enregistré</span>
-              <strong>{maxBar} cmd</strong>
+            <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>MAX ENREGISTRÉ</div>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{maxBar} <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-secondary)' }}>cmd</span></div>
             </div>
           </div>
         </div>
@@ -2176,7 +2645,6 @@ export default function MobileView() {
   };
 
   const renderTopClientsView = () => {
-    // 1. Calculate loyalty of all customers
     const loyaltyCustomers = customers.map(c => {
       const orderCount = orders.filter(o => o.customer_id === c.id && o.statut !== 'annule').length;
       const totalSpent = orders.filter(o => o.customer_id === c.id && o.statut !== 'annule').reduce((s, o) => s + (o.prix_total || 0), 0);
@@ -2187,7 +2655,6 @@ export default function MobileView() {
       };
     }).sort((a, b) => b.totalSpent - a.totalSpent);
 
-    // 2. Filter by search query
     const filteredCustomers = loyaltyCustomers.filter(c => {
       const query = loyaltySearchQuery.toLowerCase();
       return (
@@ -2197,11 +2664,9 @@ export default function MobileView() {
       );
     });
 
-    // 3. Render
     return (
-      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 14px 20px', minHeight: '100%' }}>
-        {/* Header with back button */}
-        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.2rem' }}>
+      <div className="mobile-subview" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '10px 16px 24px', minHeight: '100%' }}>
+        <div className="mobile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
               type="button"
@@ -2209,51 +2674,36 @@ export default function MobileView() {
                 setAccueilSubView('main');
                 setLoyaltySearchQuery('');
               }}
-              style={{ 
-                background: 'rgba(0, 0, 0, 0.03)', 
-                border: 'none', 
-                cursor: 'pointer', 
-                padding: '6px', 
-                borderRadius: '50%',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                color: 'var(--text-primary)',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.07)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.03)'}
+              style={{ background: 'rgba(0, 0, 0, 0.03)', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
             >
               <ArrowLeft size={18} />
             </button>
             <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Classement Fidélité</h2>
           </div>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.08)', padding: '0.2rem 0.5rem', borderRadius: '20px' }}>
             {loyaltyCustomers.length} Clients
           </span>
         </div>
 
-        <p style={{ margin: '0 0 0.15rem 0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-          Découvrez nos clients les plus actifs et fidèles classés par leur volume d'activité.
+        <p style={{ margin: '0', fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+          Découvrez nos clients les plus actifs classés selon leur volume de dépenses total.
         </p>
 
-        {/* Search Input */}
+        {/* Search Field */}
         <div style={{ position: 'relative' }}>
-          <Search size={13} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input 
             type="text" 
             className="input-control" 
             style={{ 
               paddingLeft: '2.4rem', 
               width: '100%', 
-              borderRadius: '14px', 
-              fontSize: '0.75rem', 
-              paddingTop: '0.5rem', 
-              paddingBottom: '0.5rem',
-              background: 'rgba(255, 255, 255, 0.7)',
-              border: '1px solid rgba(0, 0, 0, 0.08)',
-              backdropFilter: 'blur(10px)',
-              transition: 'all 0.25s ease'
+              borderRadius: '12px', 
+              fontSize: '0.72rem', 
+              paddingTop: '0.55rem', 
+              paddingBottom: '0.55rem',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
             }} 
             placeholder="Rechercher un client ou téléphone..." 
             value={loyaltySearchQuery} 
@@ -2265,49 +2715,46 @@ export default function MobileView() {
               onClick={() => setLoyaltySearchQuery('')}
               style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
             >
-              <X size={13} />
+              <X size={14} />
             </button>
           )}
         </div>
 
-        {/* Podium for top 3 (only when not searching) */}
+        {/* Podium for top 3 */}
         {!loyaltySearchQuery && filteredCustomers.length > 0 && (
           <div style={{
             display: 'flex',
             alignItems: 'flex-end',
             justifyContent: 'center',
-            gap: '0.65rem',
-            padding: '1.2rem 0.5rem 0.6rem',
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%)',
-            backdropFilter: 'blur(20px)',
+            gap: '0.75rem',
+            padding: '1.3rem 0.6rem 0.6rem',
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(255, 255, 255, 0.98) 100%)',
             borderRadius: '24px',
-            border: '1px solid rgba(255, 255, 255, 0.6)',
-            boxShadow: '0 8px 32px rgba(31, 38, 135, 0.04)',
+            border: '1px solid rgba(245, 158, 11, 0.2)',
+            boxShadow: '0 8px 32px rgba(245, 158, 11, 0.04)',
             marginBottom: '0.4rem',
-            marginTop: '0.1rem',
             position: 'relative',
             overflow: 'hidden'
           }}>
-            {/* Background decorative glow */}
-            <div style={{ position: 'absolute', top: '-50px', left: '50%', transform: 'translateX(-50%)', width: '150px', height: '150px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255, 215, 0, 0.15) 0%, rgba(255, 255, 255, 0) 70%)', zIndex: 0, pointerEvents: 'none' }}></div>
+            <div style={{ position: 'absolute', top: '-50px', left: '50%', transform: 'translateX(-50%)', width: '150px', height: '150px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, rgba(255, 255, 255, 0) 70%)', zIndex: 0, pointerEvents: 'none' }} />
 
             {/* 2nd Place */}
             {loyaltyCustomers[1] && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 0, zIndex: 1 }}>
                 <div style={{ position: 'relative' }}>
                   <div style={{
-                    width: '45px',
-                    height: '45px',
+                    width: '44px',
+                    height: '44px',
                     borderRadius: '50%',
-                    border: '2.5px solid #A0A5A9',
-                    boxShadow: '0 4px 12px rgba(160, 165, 169, 0.3)',
-                    background: '#ECEFF1',
+                    border: '2.5px solid #cbd5e1',
+                    boxShadow: '0 4px 12px rgba(148, 163, 184, 0.2)',
+                    background: '#f1f5f9',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '0.85rem',
                     fontWeight: 900,
-                    color: '#455A64'
+                    color: '#475569'
                   }}>
                     {loyaltyCustomers[1].prenom[0]?.toUpperCase()}{loyaltyCustomers[1].nom[0]?.toUpperCase()}
                   </div>
@@ -2318,7 +2765,7 @@ export default function MobileView() {
                     width: '18px',
                     height: '18px',
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #CFD8DC, #90A4AE)',
+                    background: 'linear-gradient(135deg, #94a3b8, #64748b)',
                     color: '#fff',
                     display: 'flex',
                     alignItems: 'center',
@@ -2334,10 +2781,10 @@ export default function MobileView() {
                   {loyaltyCustomers[1].prenom}
                 </span>
                 <span style={{ fontSize: '0.58rem', color: 'var(--primary)', fontWeight: 700 }}>
-                  {loyaltyCustomers[1].orderCount} cmd{loyaltyCustomers[1].orderCount > 1 ? 's' : ''}
+                  {loyaltyCustomers[1].orderCount} cmd
                 </span>
                 {canViewCA && (
-                  <span style={{ fontSize: '0.52rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                     {showCAValues ? `${loyaltyCustomers[1].totalSpent.toLocaleString()} F` : '•••• F'}
                   </span>
                 )}
@@ -2345,9 +2792,9 @@ export default function MobileView() {
                 <div style={{
                   width: '100%',
                   height: '42px',
-                  background: 'linear-gradient(to top, rgba(144, 164, 174, 0.08) 0%, rgba(144, 164, 174, 0.22) 100%)',
+                  background: 'linear-gradient(to top, rgba(148, 163, 184, 0.08) 0%, rgba(148, 163, 184, 0.18) 100%)',
                   borderRadius: '10px 10px 18px 18px',
-                  border: '1px solid rgba(144, 164, 174, 0.15)',
+                  border: '1px solid rgba(148, 163, 184, 0.15)',
                   marginTop: '0.45rem',
                   display: 'flex',
                   alignItems: 'center',
@@ -2362,20 +2809,20 @@ export default function MobileView() {
             {loyaltyCustomers[0] && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1.1, minWidth: 0, zIndex: 2 }}>
                 <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%) rotate(-8deg)', fontSize: '1.25rem', zIndex: 3, filter: 'drop-shadow(0 2px 4px rgba(255,215,0,0.3))' }}>👑</span>
+                  <span style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%) rotate(-8deg)', fontSize: '1.25rem', zIndex: 3 }}>👑</span>
                   <div style={{
-                    width: '56px',
-                    height: '56px',
+                    width: '54px',
+                    height: '54px',
                     borderRadius: '50%',
-                    border: '3px solid #FFD700',
-                    boxShadow: '0 6px 18px rgba(255, 215, 0, 0.35)',
-                    background: '#FFFDE7',
+                    border: '3px solid #fbbf24',
+                    boxShadow: '0 6px 18px rgba(251, 191, 36, 0.3)',
+                    background: '#fffbeb',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '1.05rem',
                     fontWeight: 900,
-                    color: '#F57F17'
+                    color: '#d97706'
                   }}>
                     {loyaltyCustomers[0].prenom[0]?.toUpperCase()}{loyaltyCustomers[0].nom[0]?.toUpperCase()}
                   </div>
@@ -2386,7 +2833,7 @@ export default function MobileView() {
                     width: '20px',
                     height: '20px',
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #FFE082, #FFB300)',
+                    background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
                     color: '#fff',
                     display: 'flex',
                     alignItems: 'center',
@@ -2401,11 +2848,11 @@ export default function MobileView() {
                 <span style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: '0.45rem', textAlign: 'center', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {loyaltyCustomers[0].prenom} {loyaltyCustomers[0].nom[0]}.
                 </span>
-                <span style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 800 }}>
-                  {loyaltyCustomers[0].orderCount} cmd{loyaltyCustomers[0].orderCount > 1 ? 's' : ''}
+                <span style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 850 }}>
+                  {loyaltyCustomers[0].orderCount} cmd
                 </span>
                 {canViewCA && (
-                  <span style={{ fontSize: '0.55rem', color: '#D48C00', fontWeight: 700 }}>
+                  <span style={{ fontSize: '0.58rem', color: '#b45309', fontWeight: 800 }}>
                     {showCAValues ? `${loyaltyCustomers[0].totalSpent.toLocaleString()} F` : '•••• F'}
                   </span>
                 )}
@@ -2413,14 +2860,14 @@ export default function MobileView() {
                 <div style={{
                   width: '100%',
                   height: '62px',
-                  background: 'linear-gradient(to top, rgba(255, 179, 0, 0.08) 0%, rgba(255, 179, 0, 0.24) 100%)',
+                  background: 'linear-gradient(to top, rgba(251, 191, 36, 0.08) 0%, rgba(251, 191, 36, 0.22) 100%)',
                   borderRadius: '12px 12px 20px 20px',
-                  border: '1px solid rgba(255, 179, 0, 0.18)',
+                  border: '1px solid rgba(251, 191, 36, 0.18)',
                   marginTop: '0.45rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(255, 179, 0, 0.08)'
+                  boxShadow: '0 4px 12px rgba(251, 191, 36, 0.08)'
                 }}>
                   <span style={{ fontSize: '0.95rem' }}>🥇</span>
                 </div>
@@ -2435,15 +2882,15 @@ export default function MobileView() {
                     width: '40px',
                     height: '40px',
                     borderRadius: '50%',
-                    border: '2.5px solid #CD7F32',
-                    boxShadow: '0 4px 10px rgba(205, 127, 50, 0.3)',
-                    background: '#FDF4EC',
+                    border: '2.5px solid #d97706',
+                    boxShadow: '0 4px 10px rgba(217, 119, 6, 0.18)',
+                    background: '#fff7ed',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '0.8rem',
                     fontWeight: 900,
-                    color: '#8D6E63'
+                    color: '#c2410c'
                   }}>
                     {loyaltyCustomers[2].prenom[0]?.toUpperCase()}{loyaltyCustomers[2].nom[0]?.toUpperCase()}
                   </div>
@@ -2454,7 +2901,7 @@ export default function MobileView() {
                     width: '18px',
                     height: '18px',
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #FFCC80, #CA6F1E)',
+                    background: 'linear-gradient(135deg, #fdba74, #ea580c)',
                     color: '#fff',
                     display: 'flex',
                     alignItems: 'center',
@@ -2470,7 +2917,7 @@ export default function MobileView() {
                   {loyaltyCustomers[2].prenom}
                 </span>
                 <span style={{ fontSize: '0.55rem', color: 'var(--primary)', fontWeight: 700 }}>
-                  {loyaltyCustomers[2].orderCount} cmd{loyaltyCustomers[2].orderCount > 1 ? 's' : ''}
+                  {loyaltyCustomers[2].orderCount} cmd
                 </span>
                 {canViewCA && (
                   <span style={{ fontSize: '0.52rem', color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -2481,9 +2928,9 @@ export default function MobileView() {
                 <div style={{
                   width: '100%',
                   height: '32px',
-                  background: 'linear-gradient(to top, rgba(202, 111, 30, 0.06) 0%, rgba(202, 111, 30, 0.18) 100%)',
+                  background: 'linear-gradient(to top, rgba(217, 119, 6, 0.05) 0%, rgba(217, 119, 6, 0.15) 100%)',
                   borderRadius: '10px 10px 18px 18px',
-                  border: '1px solid rgba(202, 111, 30, 0.12)',
+                  border: '1px solid rgba(217, 119, 6, 0.12)',
                   marginTop: '0.45rem',
                   display: 'flex',
                   alignItems: 'center',
@@ -2497,38 +2944,18 @@ export default function MobileView() {
         )}
 
         {/* Loyalty List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto', maxHeight: '500px', paddingRight: '2px', paddingBottom: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', paddingBottom: '10px' }}>
           {filteredCustomers.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '16px' }}>
               Aucun client ne correspond à votre recherche.
             </div>
           ) : (
             (() => {
-              // Hide top 3 from list if search is empty
               const displayList = (!loyaltySearchQuery) ? filteredCustomers.slice(3) : filteredCustomers;
               
               return displayList.map((c) => {
                 const globalIndex = loyaltyCustomers.findIndex(gc => gc.id === c.id);
                 
-                let tierName = "Nouveau 🌱";
-                let tierColor = "#10B981";
-                let tierBg = "rgba(16, 185, 129, 0.08)";
-                if (c.totalSpent > 0) {
-                  if (globalIndex < 3) {
-                    tierName = "Élite 👑";
-                    tierColor = "#D48C00";
-                    tierBg = "rgba(255, 184, 0, 0.1)";
-                  } else if (globalIndex < 10) {
-                    tierName = "Fidèle ⭐";
-                    tierColor = "#2B82F0";
-                    tierBg = "rgba(43, 130, 240, 0.1)";
-                  } else {
-                    tierName = "Membre 🎫";
-                    tierColor = "#6366F1";
-                    tierBg = "rgba(99, 102, 241, 0.1)";
-                  }
-                }
-
                 return (
                   <div 
                     key={c.id} 
@@ -2536,20 +2963,19 @@ export default function MobileView() {
                       display: 'flex', 
                       alignItems: 'center', 
                       gap: '0.75rem', 
-                      padding: '0.65rem 0.85rem',
-                      background: 'rgba(255, 255, 255, 0.65)',
-                      backdropFilter: 'blur(10px)',
-                      borderRadius: '16px',
-                      border: '1px solid rgba(255, 255, 255, 0.4)',
-                      boxShadow: '0 4px 15px rgba(0, 0, 0, 0.012)',
-                      transition: 'all 0.2s ease',
+                      padding: '0.7rem 0.85rem',
+                      background: '#ffffff',
+                      borderRadius: '14px',
+                      border: '1px solid rgba(0, 0, 0, 0.06)',
+                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
+                      transition: 'transform 0.2s ease',
                       cursor: 'pointer'
                     }}
                   >
                     {/* Rank Badge */}
                     <div style={{ 
-                      width: '26px', 
-                      height: '26px', 
+                      width: '24px', 
+                      height: '24px', 
                       borderRadius: '50%', 
                       background: 'rgba(0, 0, 0, 0.04)', 
                       display: 'flex', 
@@ -2568,7 +2994,7 @@ export default function MobileView() {
                       width: '32px', 
                       height: '32px', 
                       borderRadius: '50%', 
-                      background: 'linear-gradient(135deg, var(--primary-light), rgba(26, 26, 94, 0.12))', 
+                      background: 'linear-gradient(135deg, var(--primary-light), rgba(26, 26, 94, 0.08))', 
                       color: 'var(--primary)', 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -2585,25 +3011,8 @@ export default function MobileView() {
                       <div style={{ fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>
                         {c.prenom} {c.nom}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '1px' }}>
-                        <span style={{ 
-                          fontSize: '0.56rem', 
-                          color: tierColor, 
-                          fontWeight: 800,
-                          background: tierBg,
-                          padding: '0.08rem 0.35rem',
-                          borderRadius: '6px',
-                          display: 'inline-flex',
-                          alignItems: 'center'
-                        }}>
-                          {tierName}
-                        </span>
-                        {c.telephone && (
-                          <>
-                            <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>•</span>
-                            <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{c.telephone}</span>
-                          </>
-                        )}
+                      <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '1px', fontFamily: 'var(--font-mono)' }}>
+                        {c.telephone || 'Aucun tel'}
                       </div>
                     </div>
 
@@ -2635,7 +3044,10 @@ export default function MobileView() {
       <div className="liquid-orb-2"></div>
 
       {/* Main Container */}
-      <div className="mobile-content" style={{ padding: isCalmyClientMode ? 0 : undefined }}>
+      <div 
+        className={`mobile-content ${!currentUser ? 'auth-mode' : ''}`}
+        style={{ padding: isCalmyClientMode ? 0 : undefined }}
+      >
         {!dbIsRemote && (
           <div style={{
             background: '#fee2e2',
@@ -2687,7 +3099,8 @@ export default function MobileView() {
                ÉCRAN 1 — EMAIL (style design ref)
                ══════════════════════════════════════ */
             <div className="auth-screen login-screen">
-                {/* Badge logo bleu */}
+              <div className="auth-card-glass">
+                {/* Logo KLIN UP */}
                 <div className="login-logo-badge">
                   <img src={logoDark} alt="KLIN UP" />
                 </div>
@@ -2731,6 +3144,7 @@ export default function MobileView() {
                 >
                   Mot de passe oublié ? <span>Réinitialiser le PIN</span>
                 </button>
+              </div>
             </div>
 
           ) : (
@@ -2738,6 +3152,7 @@ export default function MobileView() {
                ÉCRAN 2 — CODE PIN (style design ref)
                ══════════════════════════════════════ */
             <div className="auth-screen pin-screen">
+              <div className="auth-card-glass">
                 {/* Bouton retour chevron */}
                 <button
                   type="button"
@@ -2747,11 +3162,6 @@ export default function MobileView() {
                 >
                   <ChevronLeft size={18} />
                 </button>
-
-                {/* Badge logo */}
-                <div className="pin-logo-badge">
-                  <img src={logoDark} alt="KLIN UP" />
-                </div>
 
                 {/* Identité utilisateur */}
                 <div
@@ -2782,25 +3192,56 @@ export default function MobileView() {
                   Entrez votre code PIN à 6 chiffres pour accéder à l'espace de travail.
                 </p>
 
-                {/* Affichage OTP-style */}
-                <div className={`pin-otp-display ${pinError ? 'shake-otp' : ''}`}>
-                  {[0, 1, 2, 3, 4, 5].map(idx => {
-                    const hasDigit = pinCode.length > idx;
-                    const isError = pinError;
-                    return (
-                      <div
-                        key={idx}
-                        className={[
-                          'pin-otp-digit',
-                          hasDigit && !isError ? 'filled' : '',
-                          isError && hasDigit ? 'error' : '',
-                          !hasDigit ? 'empty' : ''
-                        ].filter(Boolean).join(' ')}
-                      >
-                        {hasDigit ? '•' : null}
-                      </div>
-                    );
-                  })}
+                {/* Affichage OTP-style avec input caché pour le clavier système */}
+                <div 
+                  className="pin-otp-container" 
+                  style={{ position: 'relative', width: '100%', maxWidth: '280px', margin: '0 auto' }}
+                  onClick={() => pinInputRef.current?.focus()}
+                >
+                  <input
+                    ref={pinInputRef}
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={pinCode}
+                    onChange={handlePinChange}
+                    style={{
+                      position: 'absolute',
+                      opacity: 0,
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      cursor: 'pointer',
+                      border: 'none',
+                      outline: 'none',
+                      background: 'transparent',
+                      color: 'transparent',
+                      caretColor: 'transparent',
+                      zIndex: 10
+                    }}
+                    autoFocus
+                  />
+                  <div className={`pin-otp-display ${pinError ? 'shake-otp' : ''}`} style={{ margin: 0 }}>
+                    {[0, 1, 2, 3, 4, 5].map(idx => {
+                      const hasDigit = pinCode.length > idx;
+                      const isError = pinError;
+                      return (
+                        <div
+                          key={idx}
+                          className={[
+                            'pin-otp-digit',
+                            hasDigit && !isError ? 'filled' : '',
+                            isError && hasDigit ? 'error' : '',
+                            !hasDigit ? 'empty' : ''
+                          ].filter(Boolean).join(' ')}
+                        >
+                          {hasDigit ? '•' : null}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Bouton valider — n'est actif qu'avec 6 chiffres */}
@@ -2820,7 +3261,7 @@ export default function MobileView() {
                     }
                   }}
                   disabled={pinCode.length < 6}
-                  style={{ opacity: pinCode.length < 6 ? 0.55 : 1 }}
+                  style={{ opacity: pinCode.length < 6 ? 0.55 : 1, marginTop: '16px' }}
                 >
                   Vérifier
                 </button>
@@ -2830,43 +3271,11 @@ export default function MobileView() {
                   type="button"
                   className="pin-resend-link"
                   onClick={() => setShowResetPinModal(true)}
+                  style={{ marginTop: '16px' }}
                 >
                   PIN oublié ? <span>Réinitialiser</span>
                 </button>
-
-                {/* Clavier numérique */}
-                <div className="pin-keypad">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                    <button
-                      key={num}
-                      type="button"
-                      className="keypad-btn-redesigned"
-                      onClick={() => handleKeypadPress(num.toString())}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                  {/* Rangée du bas : cellule vide, 0, effacer */}
-                  <div style={{ height: 52, borderRadius: 12, background: 'transparent' }} />
-                  <button
-                    type="button"
-                    className="keypad-btn-redesigned"
-                    onClick={() => handleKeypadPress('0')}
-                  >
-                    0
-                  </button>
-                  <button
-                    type="button"
-                    className="keypad-btn-action-redesigned"
-                    onClick={() => handleKeypadPress('delete')}
-                    aria-label="Effacer"
-                  >
-                    <svg width="22" height="16" viewBox="0 0 22 16" fill="none">
-                      <path d="M8.5 1L1.5 8L8.5 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M14 5L19 10M19 5L14 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                    </svg>
-                  </button>
-                </div>
+              </div>
             </div>
           )
 
@@ -2938,21 +3347,20 @@ export default function MobileView() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
 
               {/* HEADER — Logo + Action Buttons */}
-              <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                {/* Crop transparent Photoshop padding: ~27% top, ~42% content, ~31% bottom */}
-                <div style={{ width: '125px', height: '50px', overflow: 'hidden', flexShrink: 0 }}>
+              <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '10px' }}>
+                <div style={{ width: '115px', height: '40px', overflow: 'hidden', flexShrink: 0 }}>
                   <img
                     src={logoDark}
                     alt="KLIN UP Logo"
                     style={{
-                      width: '125px',
+                      width: '115px',
                       height: 'auto',
                       display: 'block',
-                      marginTop: '-34px',
+                      marginTop: '-31px',
                     }}
                   />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   {!db.isRemote() && (
                     <span 
                       onClick={async (e) => {
@@ -2971,15 +3379,15 @@ export default function MobileView() {
                       title="L'application fonctionne sur le stockage local de l'appareil (les variables d'environnement Supabase manquent ou le serveur est injoignable). Cliquez pour lancer un diagnostic."
                       style={{ 
                         cursor: 'pointer',
-                        fontSize: '0.5rem', 
-                        fontWeight: 800, 
-                        padding: '0.12rem 0.35rem', 
+                        fontSize: '0.55rem', 
+                        fontWeight: 600, 
+                        padding: '0.15rem 0.4rem', 
                         borderRadius: '6px', 
-                        background: 'rgba(245, 158, 11, 0.12)', 
+                        background: 'rgba(217, 119, 6, 0.06)', 
                         color: '#d97706',
-                        border: '1px solid rgba(245, 158, 11, 0.2)',
+                        border: '1px solid rgba(217, 119, 6, 0.15)',
                         textTransform: 'uppercase',
-                        letterSpacing: '0.3px'
+                        letterSpacing: '0.5px'
                       }}
                     >
                       Local
@@ -2987,41 +3395,63 @@ export default function MobileView() {
                   )}
                   <button 
                     className="action-circle-btn" 
-                    style={{ position: 'relative' }}
+                    style={{ 
+                      position: 'relative', 
+                      width: '34px', 
+                      height: '34px', 
+                      borderRadius: '50%', 
+                      background: '#ffffff', 
+                      border: '1px solid #f1f5f9', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      cursor: 'pointer',
+                      boxShadow: 'none',
+                      color: 'var(--text-secondary)'
+                    }}
                     onClick={() => setShowNotificationsModal(true)}
                   >
-                    <Bell size={15} />
+                    <Bell size={15} strokeWidth={2} />
                     {notifications.some(n => !n.read) && (
-                      <span style={{ position: 'absolute', top: '7px', right: '7px', width: '6px', height: '6px', background: 'var(--status-late)', borderRadius: '50%', border: '1.5px solid #fff' }} />
+                      <span style={{ position: 'absolute', top: '9px', right: '9px', width: '5px', height: '5px', background: 'var(--status-late)', borderRadius: '50%' }} />
                     )}
                   </button>
                 </div>
               </div>
 
-              {/* TOTAL SPEND — Style Finance Card (Adaptive) */}
+              {/* TOTAL SPEND — Style Finance Card */}
               <div 
                 className="dashboard-main-card" 
-                style={{ borderRadius: '20px', padding: '1.2rem 1.1rem', cursor: 'pointer' }}
+                style={{ 
+                  borderRadius: '20px', 
+                  padding: '1.2rem 1.1rem', 
+                  cursor: 'pointer',
+                  background: 'linear-gradient(135deg, rgba(43, 130, 240, 0.06) 0%, rgba(255,255,255,0.98) 60%)',
+                  boxShadow: '0 2px 12px rgba(43, 130, 240, 0.08)',
+                  border: '1px solid rgba(43, 130, 240, 0.14)',
+                  borderLeft: '3px solid var(--primary)'
+                }}
                 onClick={(e) => {
                   if (e.target.closest('.eye-toggle-btn')) return;
                   setAccueilSubView(canToggleCA ? 'ca_detail' : 'actives_detail');
                 }}
               >
-                {/* Carte Chiffre d'Affaires — identique pour tous les rôles */}
+                {/* Carte Chiffre d'Affaires */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
-                  <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 600 }}>Chiffre d'Affaires Total</div>
+                  <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 500 }}>Chiffre d'Affaires Total</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.5rem' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '2rem', fontWeight: 900, fontFamily: 'var(--font-title)', letterSpacing: '-1px', lineHeight: 1.1, color: 'var(--text-primary)' }}>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 600, fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--text-primary)' }}>
                       {canToggleCA ? (showCAValues ? `${revenueTotal.toLocaleString()} ` : '•••••• ') : '•••••• '}
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>FCFA</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>FCFA</span>
                     </div>
                   </div>
                   {canToggleCA && (
                     <button
                       type="button"
                       className="eye-toggle-btn"
+                      style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowCAValues(!showCAValues);
@@ -3033,55 +3463,51 @@ export default function MobileView() {
                   )}
                 </div>
                 
-                {/* Mini line chart area */}
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '42px', marginTop: '0.8rem' }}>
+                {/* Mini chart area */}
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '36px', marginTop: '1rem', marginBottom: '0.4rem' }}>
                   {last7.map((d, i) => (
-                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                       <div style={{ 
-                        width: '100%', 
-                        background: i === 6 ? 'var(--primary)' : 'var(--border-color)', 
-                        borderRadius: '3px 3px 0 0', 
-                        height: `${Math.max(3, (d.count / maxBarCount) * 38)}px`,
+                        width: '5px', 
+                        background: i === 6 ? 'var(--primary)' : '#e2e8f0', 
+                        borderRadius: '99px', 
+                        height: `${Math.max(4, (d.count / maxBarCount) * 32)}px`,
                         transition: 'height 0.4s ease'
                       }} />
                     </div>
                   ))}
                 </div>
-                <div style={{ display: 'flex', gap: '3px', marginTop: '3px' }}>
-                  {last7.map((d, i) => (<div key={i} style={{ flex: 1, textAlign: 'center', fontSize: '0.46rem', color: 'var(--text-muted)', fontWeight: 500 }}>{d.label}</div>))}
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {last7.map((d, i) => (<div key={i} style={{ flex: 1, textAlign: 'center', fontSize: '0.52rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase' }}>{d.label}</div>))}
                 </div>
 
-                {/* Encaissé / Reste dû — identique pour tous, valeurs masquées si pas de droit */}
-                <div style={{ display: 'flex', gap: '0.8rem', marginTop: '0.8rem', paddingTop: '0.7rem', borderTop: '1px solid var(--border-color)' }}>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--status-ready-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ArrowUpRight size={13} color="var(--status-ready)" />
-                    </div>
+                {/* Encaissé / Reste dû */}
+                <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.1rem', paddingTop: '0.9rem', borderTop: '1px solid #f1f5f9' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-ready)' }} />
                     <div>
-                      <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>Encaissé</div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
-                        {canToggleCA ? (showCAValues ? encaisseTotal.toLocaleString() : '••••••') : '••••••'}
+                      <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 500 }}>Encaissé</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '1px' }}>
+                        {canToggleCA ? (showCAValues ? `${encaisseTotal.toLocaleString()} F` : '•••••• F') : '•••••• F'}
                       </div>
                     </div>
                   </div>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--status-late-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ArrowDownRight size={13} color="var(--status-late)" />
-                    </div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--status-late)' }} />
                     <div>
-                      <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 600 }}>Reste dû</div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
-                        {canToggleCA ? (showCAValues ? resteTotal.toLocaleString() : '••••••') : '••••••'}
+                      <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 500 }}>Reste dû</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '1px' }}>
+                        {canToggleCA ? (showCAValues ? `${resteTotal.toLocaleString()} F` : '•••••• F') : '•••••• F'}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* KPI GRID — Style Income/Expenses */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
+              {/* KPI GRID */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
                 {[
-                  { label: 'Actives', value: activeOrders.length, color: 'var(--primary)', bg: 'var(--primary-light)', icon: <Activity size={14} color="var(--primary)" />, sub: 'commandes en cours', subView: 'actives_detail' },
+                  { label: 'Actives', value: activeOrders.length, color: 'var(--primary)', bg: 'var(--primary-light)', icon: <Activity size={14} color="var(--primary)" />, sub: 'en cours', subView: 'actives_detail' },
                   { label: 'Livrées', value: completedThisMonth.length, color: 'var(--status-ready)', bg: 'var(--status-ready-light)', icon: <CheckCircle size={14} color="var(--status-ready)" />, sub: 'ce mois-ci', subView: 'livrees_detail' },
                   { label: 'Express', value: expressOrders.length, color: 'var(--status-pending)', bg: 'var(--status-pending-light)', icon: <Zap size={14} color="var(--status-pending)" />, sub: 'urgentes', subView: 'express_detail' },
                   {
@@ -3094,81 +3520,126 @@ export default function MobileView() {
                     subView: canToggleCA ? 'ca_detail' : 'actives_detail'
                   },
                 ].map((kpi, i) => {
-                  const isColoredCard = kpi.label === 'Actives' || kpi.label === 'Livrées';
+                  const kpiCardBg = [
+                    'linear-gradient(135deg, rgba(43, 130, 240, 0.08) 0%, rgba(43, 130, 240, 0.03) 100%)',
+                    'linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.02) 100%)',
+                    'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.02) 100%)',
+                    'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.02) 100%)'
+                  ];
+                  const kpiCardBorder = [
+                    'rgba(43, 130, 240, 0.18)',
+                    'rgba(34, 197, 94, 0.18)',
+                    'rgba(245, 158, 11, 0.18)',
+                    'rgba(99, 102, 241, 0.18)'
+                  ];
                   return (
-                    <div 
-                      key={i} 
-                      className="kpi-card" 
-                      style={{ 
-                        cursor: 'pointer',
-                        background: isColoredCard ? kpi.color : undefined,
-                        borderColor: isColoredCard ? kpi.color : undefined,
-                        color: isColoredCard ? '#ffffff' : undefined
-                      }}
-                      onClick={() => setAccueilSubView(kpi.subView)}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div className="kpi-label" style={{ color: isColoredCard ? 'rgba(255, 255, 255, 0.85)' : undefined }}>{kpi.label}</div>
-                          <div className="kpi-value" style={{ color: isColoredCard ? '#ffffff' : kpi.color }}>{kpi.value}</div>
-                        </div>
-                        <div 
-                          className="kpi-icon" 
-                          style={{ 
-                            background: isColoredCard ? 'rgba(255, 255, 255, 0.25)' : kpi.bg,
-                            color: isColoredCard ? '#ffffff' : undefined
-                          }}
-                        >
-                          {isColoredCard ? React.cloneElement(kpi.icon, { color: '#ffffff' }) : kpi.icon}
-                        </div>
+                  <div 
+                    key={i} 
+                    className="kpi-card" 
+                    style={{ 
+                      cursor: 'pointer',
+                      background: kpiCardBg[i],
+                      border: `1px solid ${kpiCardBorder[i]}`,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                      borderRadius: '16px',
+                      padding: '0.85rem 1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.2rem'
+                    }}
+                    onClick={() => setAccueilSubView(kpi.subView)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div className="kpi-label" style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 500 }}>{kpi.label}</div>
+                      <div 
+                        className="kpi-icon" 
+                        style={{ 
+                          width: '26px',
+                          height: '26px',
+                          borderRadius: '8px',
+                          background: kpi.bg,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        {kpi.icon}
                       </div>
-                      <div className="kpi-sub" style={{ color: isColoredCard ? 'rgba(255, 255, 255, 0.8)' : undefined }}>{kpi.sub}</div>
                     </div>
+                    <div>
+                      <div className="kpi-value" style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em' }}>{kpi.value}</div>
+                      <div className="kpi-sub" style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginTop: '1px' }}>{kpi.sub}</div>
+                    </div>
+                  </div>
                   );
                 })}
               </div>
 
-              {/* PIPELINE ATELIER — Premium Style */}
+              {/* PIPELINE ATELIER — Stepper Horizontal */}
               <div 
                 className="card" 
-                style={{ background: 'var(--bg-card)', padding: '1.1rem', cursor: 'pointer' }}
+                style={{ background: 'linear-gradient(135deg, #f8faff 0%, #f1f5fb 100%)', border: '1px solid rgba(100, 130, 200, 0.18)', boxShadow: '0 2px 10px rgba(80, 110, 200, 0.06)', padding: '1rem', cursor: 'pointer', borderRadius: '16px' }}
                 onClick={() => setAccueilSubView('pipeline_detail')}
               >
-                <div className="section-header">
-                  <h4>Pipeline Atelier</h4>
-                  <span className="see-all">Temps réel</span>
+                <div className="section-header" style={{ marginBottom: '0.8rem' }}>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 600 }}>Pipeline Atelier</h4>
+                  <span className="see-all" style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }}>Temps réel</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {pipelineCounts.map(p => {
-                    const Icon = p.icon === 'inbox' ? Inbox : p.icon === 'waves' ? Waves : CheckCircle2;
-                    return (
-                      <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: p.colorLight, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Icon size={18} color={p.color} strokeWidth={1.5} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{p.label}</span>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: p.color, background: p.colorLight, padding: '0.25rem 0.5rem', borderRadius: '8px', minWidth: '24px', textAlign: 'center' }}>{p.count}</span>
-                          </div>
-                          <div className="progress-bar-track" style={{ height: '5px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
-                            <div className="progress-bar-fill" style={{ height: '100%', width: `${Math.max(p.count > 0 ? 8 : 0, (p.count / pipelineMax) * 100)}%`, background: p.color, borderRadius: '10px' }} />
-                          </div>
-                        </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', position: 'relative', padding: '0.2rem 0' }}>
+                  {pipelineCounts.map((p, idx) => (
+                    <div key={p.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                      {/* Stepper line */}
+                      {idx < 3 && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '15px',
+                          left: 'calc(50% + 15px)',
+                          right: 'calc(-50% + 15px)',
+                          height: '2px',
+                          background: '#f1f5f9',
+                          zIndex: 1
+                        }} />
+                      )}
+                      
+                      <div style={{
+                        width: '30px',
+                        height: '30px',
+                        borderRadius: '50%',
+                        background: p.count > 0 ? p.colorLight : '#ffffff',
+                        border: `1.5px solid ${p.count > 0 ? p.color : '#e2e8f0'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2,
+                        marginBottom: '0.35rem',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: p.count > 0 ? p.color : 'var(--text-muted)' }}>
+                          {p.count}
+                        </span>
                       </div>
-                    );
-                  })}
+                      
+                      <span style={{ 
+                        fontSize: '0.6rem', 
+                        color: p.count > 0 ? 'var(--text-primary)' : 'var(--text-muted)', 
+                        fontWeight: p.count > 0 ? 500 : 400,
+                        textAlign: 'center'
+                      }}>
+                        {p.label}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* ACTIVITÉ PÉRIODIQUE */}
-              <div className="card" style={{ padding: '0.85rem', position: 'relative', zIndex: showPeriodDropdown ? 10 : 1 }}>
-                <div className="section-header" style={{ position: 'relative' }}>
+              <div className="card" style={{ background: 'linear-gradient(135deg, #fefaf5 0%, #fffbf0 100%)', border: '1px solid rgba(200, 170, 100, 0.2)', boxShadow: '0 2px 10px rgba(180, 140, 60, 0.06)', padding: '1rem', position: 'relative', zIndex: showPeriodDropdown ? 10 : 1, borderRadius: '16px' }}>
+                <div className="section-header" style={{ position: 'relative', marginBottom: '0.8rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }} onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}>
-                    <h4 style={{ margin: 0 }}>Activité — <span style={{ color: 'var(--primary)', borderBottom: '1px dashed var(--primary)' }}>{getPeriodLabel(activityPeriod)}</span></h4>
-                    <ChevronDown size={14} color="var(--primary)" />
+                    <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600 }}>Activité — <span style={{ color: 'var(--primary)', borderBottom: '1px dashed var(--primary)' }}>{getPeriodLabel(activityPeriod)}</span></h4>
+                    <ChevronDown size={12} color="var(--primary)" />
                   </div>
-                  <span className="see-all" style={{ cursor: 'pointer' }} onClick={() => setAccueilSubView('activity_detail')}>Voir plus</span>
+                  <span className="see-all" style={{ cursor: 'pointer', fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }} onClick={() => setAccueilSubView('activity_detail')}>Voir plus</span>
                   
                   {showPeriodDropdown && (
                     <div style={{
@@ -3194,7 +3665,7 @@ export default function MobileView() {
                             padding: '0.45rem 0.6rem', fontSize: '0.72rem', borderRadius: '6px', cursor: 'pointer',
                             background: activityPeriod === p.value ? 'var(--primary-light)' : 'transparent',
                             color: activityPeriod === p.value ? 'var(--primary)' : 'var(--text-primary)',
-                            fontWeight: activityPeriod === p.value ? 700 : 400
+                            fontWeight: activityPeriod === p.value ? 600 : 400
                           }}
                         >
                           {p.label}
@@ -3208,18 +3679,22 @@ export default function MobileView() {
                   const actData = getActivityData();
                   const maxBar = Math.max(...actData.map(d => d.count), 1);
                   return (
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: '55px', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '50px', marginTop: '0.5rem', padding: '0 4px' }}>
                       {actData.map((d, i) => (
-                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                           <div style={{ 
-                            width: '100%', 
+                            width: '6px', 
                             background: i === actData.length - 1 ? 'var(--primary)' : 'var(--primary-light)', 
-                            borderRadius: '4px 4px 0 0', 
-                            height: `${Math.max(d.count > 0 ? 5 : 2, (d.count / maxBar) * 50)}px`, 
+                            borderRadius: '99px', 
+                            height: `${Math.max(d.count > 0 ? 5 : 2, (d.count / maxBar) * 45)}px`, 
                             transition: 'height 0.5s ease', 
                             position: 'relative' 
                           }}>
-                            {d.count > 0 && i >= actData.length - 2 && <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.5rem', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>{d.count}</div>}
+                            {d.count > 0 && i >= actData.length - 2 && (
+                              <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.5rem', fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                                {d.count}
+                              </div>
+                            )}
                           </div>
                           <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', fontWeight: 500 }}>{d.label}</span>
                         </div>
@@ -3233,26 +3708,49 @@ export default function MobileView() {
               {topCustomers.length > 0 && (
                 <div 
                   className="card" 
-                  style={{ padding: '0.85rem', cursor: 'pointer' }}
+                  style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.07) 0%, rgba(251, 191, 36, 0.03) 100%)', border: '1px solid rgba(245, 158, 11, 0.2)', boxShadow: '0 2px 10px rgba(200, 140, 20, 0.07)', padding: '1rem', cursor: 'pointer', borderRadius: '16px' }}
                   onClick={() => setAccueilSubView('top_clients')}
                 >
-                  <div className="section-header">
-                    <h4>Top Clients</h4>
-                    <span className="see-all" style={{ cursor: 'pointer' }}>Voir tout</span>
+                  <div className="section-header" style={{ marginBottom: '0.8rem' }}>
+                    <h4 style={{ fontSize: '0.8rem', fontWeight: 600 }}>Top Clients</h4>
+                    <span className="see-all" style={{ cursor: 'pointer', fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }}>Voir tout</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {topCustomers.map((c, idx) => (
-                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.4rem 0.55rem', background: idx === 0 ? 'var(--primary-light)' : 'transparent', borderRadius: '10px' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: idx === 0 ? 'var(--primary)' : 'var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 800, color: idx === 0 ? '#fff' : 'var(--text-secondary)', flexShrink: 0 }}>
-                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                      <div 
+                        key={c.id} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '0.6rem', 
+                          padding: '0.45rem 0.6rem', 
+                          background: idx === 0 ? 'var(--primary-light)' : 'transparent', 
+                          borderRadius: '10px',
+                          border: idx === 0 ? '1px solid rgba(59, 130, 246, 0.05)' : '1px solid transparent'
+                        }}
+                      >
+                        <div style={{ 
+                          width: '20px', 
+                          height: '20px', 
+                          borderRadius: '6px', 
+                          background: idx === 0 ? 'var(--primary)' : '#f1f5f9', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          fontSize: '0.65rem', 
+                          fontWeight: 700, 
+                          color: idx === 0 ? '#fff' : 'var(--text-secondary)', 
+                          flexShrink: 0 
+                        }}>
+                          {idx + 1}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.prenom} {c.nom}</div>
-                          <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.prenom} {c.nom}</div>
+                          <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginTop: '1px' }}>
                             {canViewCA ? `${c.orderCount} commande${c.orderCount > 1 ? 's' : ''}` : 'Client Top'}
                           </div>
                         </div>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
                           {canViewCA ? (showCAValues ? `${c.totalSpent.toLocaleString()} F` : '•••••• F') : `${c.orderCount} cmd`}
                         </span>
                       </div>
@@ -3261,36 +3759,93 @@ export default function MobileView() {
                 </div>
               )}
 
-              {/* COMMANDES EN COURS — Style Transaction List */}
+              {/* COMMANDES EN COURS */}
               <div>
-                <div className="section-header">
-                  <h4>Commandes en cours</h4>
-                  <span className="see-all">Voir tout</span>
+                <div className="section-header" style={{ marginBottom: '0.8rem' }}>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 600 }}>Commandes en cours</h4>
+                  <span className="see-all" style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }}>Voir tout</span>
                 </div>
-                <div style={{ position: 'relative', marginBottom: '0.55rem' }}>
-                  <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                  <input type="text" className="input-control" style={{ paddingLeft: '2rem', width: '100%', borderRadius: '12px', fontSize: '0.75rem', padding: '0.4rem 1rem 0.4rem 2rem' }} placeholder="Code, article, client..." value={homeSearchQuery} onChange={(e) => setHomeSearchQuery(e.target.value)} />
+                <div style={{ position: 'relative', marginBottom: '0.6rem' }}>
+                  <Search size={13} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input 
+                    type="text" 
+                    className="input-control" 
+                    style={{ 
+                      paddingLeft: '2.2rem', 
+                      width: '100%', 
+                      borderRadius: '12px', 
+                      fontSize: '0.72rem', 
+                      padding: '0.45rem 1rem 0.45rem 2.2rem',
+                      background: '#ffffff',
+                      border: '1px solid rgba(0,0,0,0.05)',
+                      boxShadow: 'none'
+                    }} 
+                    placeholder="Rechercher code, article, client..." 
+                    value={homeSearchQuery} 
+                    onChange={(e) => setHomeSearchQuery(e.target.value)} 
+                  />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                   {filteredHomeOrders.length === 0 ? (
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', padding: '1.5rem' }}>Aucune commande active.</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textAlign: 'center', padding: '1.5rem', background: '#ffffff', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
+                      Aucune commande active.
+                    </p>
                   ) : filteredHomeOrders.map(order => {
                     const client = customers.find(c => c.id === order.customer_id);
                     const clientName = client ? `${client.prenom} ${client.nom}` : 'Client';
                     const clientInitials = client ? `${client.prenom?.[0] || ''}${client.nom?.[0] || ''}` : 'CL';
                     const isLate = isOrderLate(order);
                     return (
-                      <div className="mobile-order-row" key={order.id} style={{ borderLeft: isLate ? '3px solid var(--status-pending)' : undefined }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.65rem', flexShrink: 0 }}>
+                      <div 
+                        className="mobile-order-row" 
+                        key={order.id} 
+                        style={{ 
+                          borderLeft: isLate ? '3px solid var(--status-late)' : '1px solid rgba(0,0,0,0.05)',
+                          background: '#ffffff',
+                          boxShadow: 'var(--shadow-sm)',
+                          padding: '0.6rem 0.8rem',
+                          borderRadius: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.6rem'
+                        }}
+                      >
+                        <div style={{ 
+                          width: '32px', 
+                          height: '32px', 
+                          borderRadius: '8px', 
+                          background: 'var(--primary-light)', 
+                          color: 'var(--primary)', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          fontWeight: 600, 
+                          fontSize: '0.65rem', 
+                          flexShrink: 0 
+                        }}>
                           {clientInitials}
                         </div>
-                        <div className="mobile-order-info">
-                          <div className="mobile-order-title">{order.type_article}</div>
-                          <div className="mobile-order-desc">{clientName} · {order.identifiant_unique_marquage}</div>
+                        <div className="mobile-order-info" style={{ flex: 1, minWidth: 0 }}>
+                          <div className="mobile-order-title" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{order.type_article}</div>
+                          <div className="mobile-order-desc" style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {clientName} · <span style={{ fontFamily: 'monospace' }}>{order.identifiant_unique_marquage}</span>
+                          </div>
                         </div>
-                        <div className="mobile-order-right">
-                          <span className="mobile-order-price">+{order.prix_total.toLocaleString()} F</span>
-                          <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.5rem', padding: '0.1rem 0.3rem' }}>{getOrderStatusLabel(order)}</span>
+                        <div className="mobile-order-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+                          <span className="mobile-order-price" style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            +{order.prix_total.toLocaleString()} F
+                          </span>
+                          <span 
+                            className={`badge badge-${order.statut}`} 
+                            style={{ 
+                              fontSize: '0.52rem', 
+                              padding: '0.1rem 0.35rem', 
+                              borderRadius: '4px',
+                              fontWeight: 500
+                            }}
+                          >
+                            {getOrderStatusLabel(order)}
+                          </span>
                         </div>
                       </div>
                     );
@@ -3317,11 +3872,11 @@ export default function MobileView() {
                     <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Suivi et traitement</p>
                   </div>
                   {currentUser && currentUser.role !== 'agent_lavage_repassage' && (
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', width: '100%', justifyContent: 'center' }}>
                       <button 
                         type="button"
                         className="btn btn-primary" 
-                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        style={{ flex: 1, padding: '0.4rem 0.5rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                         onClick={() => setShowOrderRegistrationModal(true)}
                       >
                         <Plus size={14} /> Ajouter une commande
@@ -3329,7 +3884,7 @@ export default function MobileView() {
                       <button 
                         type="button"
                         className="btn" 
-                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--status-ready)', color: '#fff', border: 'none' }}
+                        style={{ flex: 1, padding: '0.4rem 0.5rem', fontSize: '0.72rem', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', background: 'var(--status-ready)', color: '#fff', border: 'none' }}
                         onClick={handleOpenCreateCustomer}
                       >
                         <Plus size={14} /> Ajouter un profil client

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from './services/db';
 import AdminView from './components/AdminView';
 import logoDark from './assets/logo_dark.png';
