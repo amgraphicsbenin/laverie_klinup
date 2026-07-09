@@ -67,7 +67,7 @@ export default function FicheClient({
             const total = selectedCrmCustomer.active_subscription.total_clothes;
             const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
             return (
-              <div className="progress-bar-track">
+              <div className="progress-bar-track" style={{ background: '#f1f5f9' }}>
                 <div className="progress-bar-fill" style={{ width: `${percentUsed}%`, background: 'var(--primary)' }}></div>
               </div>
             );

@@ -468,11 +468,9 @@ button, input, select, textarea { font-family: inherit; }
 
 .mobile-footer-nav .menu-item:hover:not(.active) svg {
   stroke: var(--text-secondary);
-  transform: scale(1.1) translateY(-1px);
 }
 .mobile-footer-nav .menu-item:hover:not(.active) .material-symbols-rounded {
   color: var(--text-secondary);
-  transform: scale(1.1);
 }
 .mobile-footer-nav .menu-item:hover:not(.active) > span {
   color: var(--text-secondary);
@@ -605,7 +603,6 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .mobile-footer-nav .scan-btn:hover {
-  transform: scale(1.15);
   box-shadow: 0 8px 24px rgba(59, 130, 246, 0.5);
 }
 
@@ -1134,7 +1131,8 @@ select.input-control option {
 .card,
 .metric-mini-card,
 .kpi-card,
-.mobile-order-row {
+.mobile-order-row,
+.kanban-card {
   transition: transform 0.5s var(--ease-elastic),
               box-shadow 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.15),
               background 0.3s ease,
@@ -1143,12 +1141,11 @@ select.input-control option {
 
 /* Hovers avec effets élastiques */
 .btn:hover {
-  transform: translateY(-1.5px);
+  /* Transitions uniquement, pas d'échelle ou de translation */
 }
 
 .action-circle-btn:hover, .eye-toggle-btn:hover {
-  transform: scale(1.12);
-  animation: elasticPop 0.5s var(--ease-elastic);
+  /* Transitions uniquement, pas d'échelle ou de translation */
 }
 
 .card.interactive:hover,
@@ -1162,8 +1159,12 @@ select.input-control option {
 .kpi-card.interactive:hover,
 .kpi-card.clickable:hover,
 .kpi-card[style*="cursor: pointer"]:hover,
-.kpi-card[style*="cursor:pointer"]:hover {
-  transform: translateY(-4px) scale(1.02);
+.kpi-card[style*="cursor:pointer"]:hover,
+.mobile-order-row[style*="cursor: pointer"]:hover,
+.mobile-order-row[style*="cursor:pointer"]:hover,
+.mobile-order-row.interactive:hover,
+.mobile-order-row.clickable:hover,
+.kanban-card:hover {
   background: var(--bg-card-hover);
   border-color: var(--glass-border-hover);
   box-shadow: var(--shadow-lg) !important;
@@ -1171,7 +1172,7 @@ select.input-control option {
 
 /* Active downscales avec animation élastique (tactile physics) */
 .btn:active {
-  transform: translateY(0.5px) scale(0.96) !important;
+  transform: translateY(0.5px) scale(0.95) !important;
   transition: transform 0.1s var(--ease-emphasized) !important;
   box-shadow: none !important;
 }
@@ -1192,7 +1193,12 @@ select.input-control option {
 .kpi-card.interactive:active,
 .kpi-card.clickable:active,
 .kpi-card[style*="cursor: pointer"]:active,
-.kpi-card[style*="cursor:pointer"]:active {
+.kpi-card[style*="cursor:pointer"]:active,
+.mobile-order-row[style*="cursor: pointer"]:active,
+.mobile-order-row[style*="cursor:pointer"]:active,
+.mobile-order-row.interactive:active,
+.mobile-order-row.clickable:active,
+.kanban-card:active {
   transform: scale(0.98) !important;
   transition: transform 150ms var(--ease-spring-back) !important;
   box-shadow: var(--shadow-sm) !important;

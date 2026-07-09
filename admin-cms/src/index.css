@@ -63,6 +63,14 @@
   --radius-md: 12px;
   --radius-card: 20px;         /* Coins arrondis */
   --radius-input: 12px;
+
+  /* Easing curves premium élastiques (Google Material Emphasized / Android 17) */
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-spring-back: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring-soft: cubic-bezier(0.175, 0.885, 0.32, 1.15);
 }
 
 
@@ -126,6 +134,35 @@ button, input, select, textarea {
   100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
+@keyframes slideUpWithFade {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleInCenter {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes elasticPop {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.15); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 .spin-washing {
   animation: spin-laundry 3s linear infinite;
 }
@@ -134,6 +171,17 @@ button, input, select, textarea {
   animation: pulse-glow 2s infinite;
   border: 1.5px solid var(--danger) !important;
 }
+
+/* Stagger animations pour le dashboard et pages admin */
+.main-content > * {
+  animation: slideUpWithFade 500ms var(--ease-emphasized-decelerate) both;
+}
+
+.main-content > *:nth-child(1) { animation-delay: 0.04s; }
+.main-content > *:nth-child(2) { animation-delay: 0.08s; }
+.main-content > *:nth-child(3) { animation-delay: 0.12s; }
+.main-content > *:nth-child(4) { animation-delay: 0.16s; }
+.main-content > *:nth-child(n+5) { animation-delay: 0.20s; }
 
 /* Scrollbar Personnalisée */
 ::-webkit-scrollbar {
@@ -230,18 +278,21 @@ button, input, select, textarea {
   font-size: 0.925rem;
   cursor: pointer;
   border-left: 3px solid transparent;
-  transition: all 0.2s ease;
+  transition: all 0.3s var(--ease-spring-soft);
+  position: relative;
 }
 
 .menu-item:hover {
   color: var(--text-primary);
   font-weight: 600;
+  background: rgba(59, 130, 246, 0.03);
 }
 
 .menu-item.active {
   color: var(--primary);
   border-left: 3px solid var(--primary);
   font-weight: 700;
+  background: rgba(59, 130, 246, 0.06);
 }
 
 .sidebar-footer {
@@ -506,12 +557,20 @@ button, input, select, textarea {
   box-shadow: var(--shadow-card);
   border-radius: var(--radius-card);
   padding: 1.5rem;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.5s var(--ease-elastic),
+              box-shadow 0.4s var(--ease-spring-soft),
+              background 0.3s ease,
+              border-color 0.3s ease;
+  will-change: transform;
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.card:active {
+  transform: scale(0.985);
+  transition: transform 150ms var(--ease-spring-back);
 }
 
 /* KPI Cards Donezo Style */
@@ -789,7 +848,21 @@ button, input, select, textarea {
   border-radius: var(--radius-input);
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform 0.3s var(--ease-spring-soft),
+              box-shadow 0.3s ease,
+              background-color 0.3s ease,
+              border-color 0.3s ease,
+              color 0.3s ease;
+  will-change: transform;
+}
+
+.btn:hover {
+  filter: brightness(1.05);
+}
+
+.btn:active {
+  transform: translateY(0.5px) scale(0.96) !important;
+  transition: transform 100ms var(--ease-emphasized) !important;
 }
 
 .btn-primary {
@@ -811,6 +884,22 @@ button, input, select, textarea {
   background: var(--primary-light);
   color: var(--primary);
   border-color: var(--primary);
+}
+
+.topbar-icon-btn, .theme-toggle, .custom-select-trigger {
+  transition: transform 0.3s var(--ease-spring-soft),
+              box-shadow 0.3s ease,
+              background-color 0.3s ease,
+              border-color 0.3s ease;
+  will-change: transform;
+}
+
+.topbar-icon-btn:hover, .theme-toggle:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.topbar-icon-btn:active, .theme-toggle:active {
+  transform: scale(0.95);
 }
 
 /* Tables */
@@ -845,8 +934,12 @@ tr:last-child td {
   border-bottom: none;
 }
 
+tr td {
+  transition: background-color 0.3s var(--ease-emphasized-decelerate);
+}
+
 tr:hover td {
-  background: rgba(59, 130, 246, 0.015);
+  background: rgba(59, 130, 246, 0.03) !important;
 }
 
 .badge {
@@ -931,12 +1024,20 @@ tr:hover td {
   background: var(--bg-card);
   color: var(--text-primary);
   outline: none;
-  transition: all 0.2s ease;
+  transition: all 0.4s var(--ease-spring-soft);
+  box-shadow: var(--shadow-sm);
+  will-change: transform;
 }
 
 .input-control:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+  box-shadow: var(--shadow-md), 0 0 0 3px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
+  background: #ffffff;
+}
+
+.input-control:hover:not(:focus) {
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 /* Grid Layouts */
@@ -1219,18 +1320,22 @@ tr:hover td {
   justify-content: center;
   cursor: pointer;
   outline: none;
-  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: transform 0.4s var(--ease-elastic),
+              background-color 0.3s var(--ease-spring-soft),
+              border-color 0.3s ease;
   user-select: none;
+  will-change: transform;
 }
 
 .keypad-btn:hover {
   background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .keypad-btn:active {
-  transform: scale(0.86);
+  transform: scale(0.88) !important;
   background: rgba(255, 255, 255, 0.28);
+  transition: transform 100ms var(--ease-emphasized) !important;
 }
 
 .keypad-btn.action-btn {
