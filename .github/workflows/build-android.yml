@@ -38,14 +38,6 @@ jobs:
 
       - name: Build Android APK via EAS (preview profile)
         working-directory: mobile-app
-        run: eas build --platform android --profile preview --non-interactive --output ./build/klinup-preview.apk
+        run: eas build --platform android --profile preview --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: klinup-mobile-preview-apk
-          path: mobile-app/build/klinup-preview.apk
-          if-no-files-found: warn
-          retention-days: 14
