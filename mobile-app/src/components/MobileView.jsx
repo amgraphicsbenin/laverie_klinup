@@ -4804,28 +4804,36 @@ export default function MobileView() {
            ======================================================== */}
         {activeTab === 'historique' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="mobile-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.4px', margin: 0 }}>Historique</h1>
-              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Archives des commandes</p>
+            <div>
+              <div className="modern-home-greeting">Historique</div>
+              <div className="modern-home-sub">Archives et suivi de toutes les commandes passées.</div>
             </div>
 
             {/* Search and filter */}
-            <div className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            <div className="top-clients-card-modern" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {/* Scope filter (All vs Mine) */}
-              <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.45rem', gap: '0.55rem' }}>
+              <div style={{
+                display: 'flex',
+                background: '#f1f5f9',
+                padding: '0.25rem',
+                borderRadius: '16px',
+                border: '1px solid rgba(0, 0, 0, 0.02)',
+                boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.03)'
+              }}>
                 <button
                   type="button"
+                  className="btn"
                   style={{
-                    flex: 1,
-                    padding: '0.35rem',
-                    fontSize: '0.68rem',
-                    borderRadius: '8px',
+                    flex: 1, padding: '0.45rem 0.35rem',
+                    fontSize: '0.72rem',
+                    fontWeight: historyFilterScope === 'all' ? 700 : 500,
+                    borderRadius: '12px',
                     border: 'none',
-                    background: historyFilterScope === 'all' ? 'var(--primary-light)' : 'transparent',
-                    color: historyFilterScope === 'all' ? 'var(--primary)' : 'var(--text-secondary)',
-                    fontWeight: 700,
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    background: historyFilterScope === 'all' ? '#ffffff' : 'transparent',
+                    color: historyFilterScope === 'all' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    boxShadow: historyFilterScope === 'all' ? '0 4px 10px rgba(0, 0, 0, 0.05)' : 'none',
+                    transition: 'all 0.25s ease'
                   }}
                   onClick={() => setHistoryFilterScope('all')}
                 >
@@ -4833,17 +4841,18 @@ export default function MobileView() {
                 </button>
                 <button
                   type="button"
+                  className="btn"
                   style={{
-                    flex: 1,
-                    padding: '0.35rem',
-                    fontSize: '0.68rem',
-                    borderRadius: '8px',
+                    flex: 1, padding: '0.45rem 0.35rem',
+                    fontSize: '0.72rem',
+                    fontWeight: historyFilterScope === 'mine' ? 700 : 500,
+                    borderRadius: '12px',
                     border: 'none',
-                    background: historyFilterScope === 'mine' ? 'var(--primary-light)' : 'transparent',
-                    color: historyFilterScope === 'mine' ? 'var(--primary)' : 'var(--text-secondary)',
-                    fontWeight: 700,
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    background: historyFilterScope === 'mine' ? '#ffffff' : 'transparent',
+                    color: historyFilterScope === 'mine' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    boxShadow: historyFilterScope === 'mine' ? '0 4px 10px rgba(0, 0, 0, 0.05)' : 'none',
+                    transition: 'all 0.25s ease'
                   }}
                   onClick={() => setHistoryFilterScope('mine')}
                 >
@@ -4852,11 +4861,21 @@ export default function MobileView() {
               </div>
 
               <div style={{ position: 'relative' }}>
-                <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <Search size={14} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input 
                   type="text" 
                   className="input-control" 
-                  style={{ padding: '0.4rem', paddingLeft: '2.2rem', width: '100%', fontSize: '0.75rem' }}
+                  style={{
+                    paddingLeft: '2.5rem',
+                    width: '100%',
+                    borderRadius: '14px',
+                    fontSize: '0.76rem',
+                    padding: '0.6rem 1rem 0.6rem 2.5rem',
+                    background: '#ffffff',
+                    border: '1px solid var(--border-color)',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+                    outline: 'none'
+                  }} 
                   placeholder="Rechercher code, client, linge..."
                   value={historySearchQuery}
                   onChange={(e) => setHistorySearchQuery(e.target.value)}
@@ -4864,7 +4883,7 @@ export default function MobileView() {
               </div>
 
               {/* Status filter pills */}
-              <div style={{ display: 'flex', gap: '0.3rem', overflowX: 'auto', paddingBottom: '0.15rem', scrollbarWidth: 'none' }}>
+              <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.15rem', scrollbarWidth: 'none' }}>
                 {[
                   { id: 'all', label: 'Toutes' },
                   { id: 'en_attente', label: 'Traitement' },
@@ -4875,32 +4894,36 @@ export default function MobileView() {
                   { id: 'en_cours_livraison', label: 'En cours' },
                   { id: 'restitue', label: 'Restitué' },
                   { id: 'annule', label: 'Annulé' }
-                ].map(filter => (
-                  <button
-                    key={filter.id}
-                    type="button"
-                    style={{
-                      padding: '0.28rem 0.6rem',
-                      fontSize: '0.65rem',
-                      borderRadius: '20px',
-                      whiteSpace: 'nowrap',
-                      border: historyFilterStatus === filter.id ? '1px solid var(--secondary)' : '1px solid var(--border-color)',
-                      background: historyFilterStatus === filter.id ? 'var(--primary-gradient)' : 'rgba(0, 0, 0, 0.04)',
-                      color: historyFilterStatus === filter.id ? '#fff' : 'var(--text-secondary)',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onClick={() => setHistoryFilterStatus(filter.id)}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
+                ].map(filter => {
+                  const isActive = historyFilterStatus === filter.id;
+                  return (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        fontSize: '0.68rem',
+                        borderRadius: '20px',
+                        whiteSpace: 'nowrap',
+                        border: 'none',
+                        background: isActive ? 'var(--primary-gradient)' : 'rgba(0, 0, 0, 0.04)',
+                        color: isActive ? '#fff' : 'var(--text-secondary)',
+                        boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.18)' : 'none',
+                        fontWeight: isActive ? 700 : 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={() => setHistoryFilterStatus(filter.id)}
+                    >
+                      {filter.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Orders list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
               {filteredHistoryOrders.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                   Aucune commande dans l'historique.
@@ -4909,70 +4932,180 @@ export default function MobileView() {
                 filteredHistoryOrders.map(order => {
                   const client = customers.find(c => c.id === order.customer_id);
                   const clientName = client ? `${client.prenom} ${client.nom}` : 'Client B2B';
-                  const clientInitials = client ? `${client.prenom?.[0] || ''}${client.nom?.[0] || ''}` : 'CB';
+                  const clientInitials = client ? `${client.prenom?.[0] || ''}${client.nom?.[0] || ''}`.toUpperCase() : 'B2B';
                   const isExpress = order.niveau_urgence === 'Express';
                   const remaining = order.prix_total - order.avance_payee;
+
+                  const statusMeta = {
+                    en_attente:          { color: '#d97706', bg: 'rgba(217,119,6,0.08)',   border: 'rgba(217,119,6,0.2)'   },
+                    en_cours_lavage:     { color: '#2563eb', bg: 'rgba(37,99,235,0.08)',   border: 'rgba(37,99,235,0.2)'   },
+                    en_cours_repassage:  { color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.2)'  },
+                    pret:                { color: '#059669', bg: 'rgba(5,150,105,0.08)',   border: 'rgba(5,150,105,0.2)'   },
+                    a_livrer:            { color: '#0284c7', bg: 'rgba(2,132,199,0.08)',   border: 'rgba(2,132,199,0.2)'   },
+                    a_recuperer:         { color: '#059669', bg: 'rgba(5,150,105,0.08)',   border: 'rgba(5,150,105,0.2)'   },
+                    en_cours_livraison:  { color: '#0284c7', bg: 'rgba(2,132,199,0.08)',   border: 'rgba(2,132,199,0.2)'   },
+                    restitue:            { color: '#71717a', bg: 'rgba(113,113,122,0.08)', border: 'rgba(113,113,122,0.2)' },
+                    annule:              { color: '#dc2626', bg: 'rgba(220,38,38,0.08)',   border: 'rgba(220,38,38,0.2)'   }
+                  };
+                  const meta = statusMeta[order.statut] || { color: '#64748b', bg: 'rgba(100,116,139,0.08)', border: 'rgba(100,116,139,0.2)' };
 
                   return (
                     <div 
                       key={order.id} 
-                      className="mobile-order-row"
-                      style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.8rem' }}
+                      className="order-detail-card-modern mobile-order-row"
+                      style={{
+                        display: 'flex', flexDirection: 'column', gap: '0.65rem',
+                        padding: '1rem', background: '#ffffff',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '18px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.015)'
+                      }}
                     >
+                      {/* Status-colored top thin accent line */}
+                      <div style={{
+                        height: '3px',
+                        background: `linear-gradient(90deg, ${meta.color}, ${meta.color}aa)`,
+                        width: 'calc(100% + 2rem)',
+                        margin: '-1rem -1rem 0.65rem -1rem',
+                        flexShrink: 0
+                      }} />
+
                       {/* Header row */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', width: '100%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.58rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <div style={{
+                            width: '32px', height: '32px', borderRadius: '50%', 
+                            background: 'linear-gradient(135deg, var(--primary-light) 0%, rgba(59, 130, 246, 0.15) 100%)',
+                            color: 'var(--primary)', 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                            fontSize: '0.72rem', fontWeight: 800, flexShrink: 0,
+                            border: '1px solid rgba(59, 130, 246, 0.1)'
+                          }}>
                             {clientInitials}
                           </div>
-                          <div>
-                            <strong style={{ fontSize: '0.72rem', color: 'var(--text-primary)' }}>{order.identifiant_unique_marquage}</strong>
-                            <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>{formatDateTime(order.created_at)}</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)', fontWeight: 800 }}>{order.identifiant_unique_marquage}</strong>
+                            <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>{formatDateTime(order.created_at)}</span>
                           </div>
                         </div>
-                        <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.52rem', padding: '0.1rem 0.35rem' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.58rem',
+                          fontWeight: 700,
+                          padding: '3px 8px',
+                          borderRadius: '20px',
+                          background: meta.bg,
+                          color: meta.color,
+                          border: `1px solid ${meta.border}`
+                        }}>
+                          <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: meta.color, display: 'inline-block' }} />
                           {getOrderStatusLabel(order)}
                         </span>
                       </div>
 
-                      {/* Client Info */}
-                      <div style={{ fontSize: '0.68rem', display: 'flex', flexDirection: 'column', gap: '0.12rem', width: '100%', textAlign: 'left' }}>
-                        <div>Client: <strong>{clientName}</strong> {client && <span style={{ color: 'var(--text-secondary)' }}>({client.telephone})</span>}</div>
-                        <div>Urgence: <span style={{ fontWeight: 700, color: isExpress ? 'var(--status-late)' : 'var(--text-primary)' }}>{order.niveau_urgence}</span></div>
+                      {/* Client Info & Urgency */}
+                      <div style={{ fontSize: '0.68rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', width: '100%', textAlign: 'left', paddingLeft: '2px' }}>
+                        <div style={{ color: 'var(--text-primary)' }}>
+                          Client : <strong style={{ color: 'var(--text-primary)' }}>{clientName}</strong> {client && <span style={{ color: 'var(--text-secondary)' }}>({client.telephone})</span>}
+                        </div>
+                        <div>
+                          Urgence : <span style={{ 
+                            fontWeight: 700, 
+                            color: isExpress ? 'var(--status-late)' : 'var(--text-primary)',
+                            background: isExpress ? 'rgba(220, 38, 38, 0.06)' : 'transparent',
+                            padding: isExpress ? '2px 6px' : '0',
+                            borderRadius: isExpress ? '6px' : '0'
+                          }}>{order.niveau_urgence}</span>
+                        </div>
                       </div>
 
                       {/* Items and Services */}
-                      <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.4rem', borderRadius: '8px', fontSize: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', width: '100%', textAlign: 'left', border: '1px solid var(--border-color)' }}>
-                        <div style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.6rem' }}>Détails articles :</div>
-                        {order.items && order.items.length > 0 ? (
-                          order.items.map((it, idx) => (
-                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '0.25rem' }}>
-                              <span>• {it.quantite}x {it.article} ({serviceLabels[it.service] || it.service})</span>
+                      <div style={{
+                        background: '#f8fafc',
+                        padding: '0.65rem 0.75rem',
+                        borderRadius: '12px',
+                        fontSize: '0.68rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.35rem',
+                        border: '1px solid rgba(0, 0, 0, 0.03)',
+                        width: '100%',
+                        textAlign: 'left'
+                      }}>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.62rem', letterSpacing: '0.2px', textTransform: 'uppercase' }}>Articles & Services</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          {order.items && order.items.length > 0 ? (
+                            order.items.map((it, idx) => (
+                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                                <span>• {it.quantite}x {it.article}</span>
+                                <span style={{ fontWeight: 600 }}>({serviceLabels[it.service] || it.service})</span>
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                              <span>• {order.type_article}</span>
+                              <span style={{ fontWeight: 600 }}>({serviceLabels[order.type_service] || order.type_service})</span>
                             </div>
-                          ))
-                        ) : (
-                          <div style={{ paddingLeft: '0.25rem' }}>• {order.type_article} ({serviceLabels[order.type_service] || order.type_service})</div>
-                        )}
+                          )}
+                        </div>
                       </div>
 
                       {/* Financial info */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.65rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.35rem', width: '100%', textAlign: 'left' }}>
-                        <div>Total: <strong>{(order.prix_total || 0).toLocaleString()} F</strong></div>
-                        <div>Acompte: <strong style={{ color: 'var(--status-ready)' }}>{(order.avance_payee || 0).toLocaleString()} F</strong></div>
-                        <div>Réglement: <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{(order.mode_reglement || 'Non défini').replace(/_/g, ' ')}</span></div>
-                        <div style={{ color: remaining > 0 ? 'var(--status-late)' : 'var(--status-ready)' }}>
-                          Solde: <strong>{(remaining || 0).toLocaleString()} F</strong>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        rowGap: '0.35rem',
+                        columnGap: '0.8rem',
+                        fontSize: '0.68rem',
+                        borderTop: '1px solid var(--border-color)',
+                        paddingTop: '0.65rem',
+                        color: 'var(--text-secondary)',
+                        width: '100%',
+                        textAlign: 'left'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Total:</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{(order.prix_total || 0).toLocaleString()} F</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Acompte:</span>
+                          <strong style={{ color: 'var(--status-ready)' }}>{(order.avance_payee || 0).toLocaleString()} F</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Mode:</span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', textTransform: 'capitalize' }}>{(order.mode_reglement || 'N/A').replace(/_/g, ' ')}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Solde:</span>
+                          <strong style={{ color: remaining > 0 ? 'var(--status-late)' : 'var(--status-ready)' }}>
+                            {(remaining || 0).toLocaleString()} F
+                          </strong>
                         </div>
                       </div>
 
                       {/* Footer */}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.3rem', marginTop: '0.1rem', width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem', width: '100%' }}>
                         <button 
-                          className="btn btn-outline" 
-                          style={{ padding: '0.22rem 0.55rem', fontSize: '0.62rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                          type="button" 
+                          className="btn" 
+                          style={{
+                            padding: '0.45rem 0.75rem',
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            borderRadius: '12px',
+                            border: '1.5px solid rgba(59, 130, 246, 0.18)',
+                            background: 'var(--primary-light)',
+                            color: 'var(--primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            cursor: 'pointer'
+                          }}
                           onClick={() => setCreatedOrder(order)}
                         >
-                          <Printer size={10} /> Voir Ticket
+                          <Printer size={12} /> Voir Ticket
                         </button>
                       </div>
                     </div>
