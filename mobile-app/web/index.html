@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#0f0f13" />
     <title>KLIN UP — Aperçu Mobile</title>
     <style>
-      * {
+      *, *::before, *::after {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
@@ -16,254 +16,238 @@
         width: 100%;
         height: 100%;
         background: #0f0f13;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         overflow: hidden;
       }
 
-      /* Label en haut */
+      /* ─── Fond principal ─── */
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      /* ─── Label aperçu ─── */
       .preview-label {
-        position: fixed;
-        top: 16px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(255,255,255,0.08);
-        color: rgba(255,255,255,0.5);
+        color: rgba(255,255,255,0.35);
+        font-family: -apple-system, system-ui, sans-serif;
         font-size: 11px;
         letter-spacing: 1.5px;
         text-transform: uppercase;
-        padding: 6px 14px;
+        padding: 5px 14px;
         border-radius: 20px;
         border: 1px solid rgba(255,255,255,0.1);
-        z-index: 9999;
-        pointer-events: none;
-        white-space: nowrap;
+        flex-shrink: 0;
       }
 
-      /* Cadre téléphone */
+      /* ─── Cadre téléphone ─── */
       .phone-frame {
         position: relative;
         width: 393px;
         height: 852px;
         border-radius: 50px;
-        background: #1a1a1e;
+        background: #1c1c1e;
         box-shadow:
-          0 0 0 1px rgba(255,255,255,0.12),
-          0 0 0 3px #2a2a2e,
-          0 0 0 4px rgba(255,255,255,0.06),
-          0 40px 80px rgba(0,0,0,0.8),
-          inset 0 0 0 1px rgba(255,255,255,0.05);
-        display: flex;
-        align-items: center;
-        justify-content: center;
+          inset 0 0 0 1px rgba(255,255,255,0.14),
+          0 0 0 3px #131313,
+          0 0 0 5px rgba(255,255,255,0.06),
+          0 50px 100px rgba(0,0,0,0.85);
+        flex-shrink: 0;
         overflow: hidden;
+
+        /* Responsive scale */
+        transform-origin: center center;
       }
 
-      /* Écran intérieur */
+      /* ─── Boutons physiques ─── */
+      .btn-right {
+        position: absolute; right: -4px; top: 180px;
+        width: 4px; height: 88px;
+        background: #2c2c2e; border-radius: 0 3px 3px 0;
+      }
+      .btn-left-1 {
+        position: absolute; left: -4px; top: 130px;
+        width: 4px; height: 32px;
+        background: #2c2c2e; border-radius: 3px 0 0 3px;
+      }
+      .btn-left-2 {
+        position: absolute; left: -4px; top: 180px;
+        width: 4px; height: 64px;
+        background: #2c2c2e; border-radius: 3px 0 0 3px;
+      }
+      .btn-left-3 {
+        position: absolute; left: -4px; top: 258px;
+        width: 4px; height: 64px;
+        background: #2c2c2e; border-radius: 3px 0 0 3px;
+      }
+
+      /* ─── Écran ─── */
       .phone-screen {
-        position: relative;
-        width: 361px;
-        height: 820px;
+        position: absolute;
+        inset: 10px;
         border-radius: 42px;
         overflow: hidden;
-        background: #ffffff;
+        background: #fff;
         display: flex;
         flex-direction: column;
       }
 
-      /* Barre de statut (simulée) */
-      .status-bar {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 44px;
-        z-index: 100;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 12px 24px 0;
-        background: rgba(255,255,255,0.0);
-        pointer-events: none;
-      }
-
-      .status-bar-time {
-        font-size: 15px;
-        font-weight: 600;
-        color: #000;
-        letter-spacing: -0.3px;
-      }
-
-      .status-bar-icons {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-      }
-
-      .status-bar-icons svg {
-        fill: #000;
-      }
-
-      /* Notch dynamique island */
+      /* ─── Dynamic Island ─── */
       .dynamic-island {
         position: absolute;
         top: 12px;
         left: 50%;
         transform: translateX(-50%);
-        width: 120px;
+        width: 118px;
         height: 34px;
         background: #0f0f13;
         border-radius: 20px;
-        z-index: 200;
+        z-index: 500;
         pointer-events: none;
       }
 
-      /* Container de l'app React Native */
+      /* ─── Status bar ─── */
+      .status-bar {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 52px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        padding: 0 22px 8px;
+        z-index: 400;
+        pointer-events: none;
+        background: transparent;
+      }
+      .sb-time {
+        font-family: -apple-system, system-ui, sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        color: #000;
+      }
+      .sb-icons {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      /* ─── L'app React Native ─── */
       #root {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        overflow: hidden;
+        /* Force phone dimensions — override React Native Web's full-screen styles */
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+        /* Ensure content starts below status bar */
+        padding-top: 0;
       }
 
-      /* Bouton latéral droit */
-      .phone-button-right {
-        position: absolute;
-        right: -4px;
-        top: 160px;
-        width: 4px;
-        height: 80px;
-        background: #2a2a2e;
-        border-radius: 0 3px 3px 0;
-        box-shadow: 1px 0 0 rgba(255,255,255,0.08);
+      /* Override RN Web AppContainer which uses position:absolute inset:0 */
+      #root > div:first-child {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
       }
 
-      /* Boutons gauches (volume) */
-      .phone-button-left-1 {
-        position: absolute;
-        left: -4px;
-        top: 120px;
-        width: 4px;
-        height: 36px;
-        background: #2a2a2e;
-        border-radius: 3px 0 0 3px;
-        box-shadow: -1px 0 0 rgba(255,255,255,0.08);
-      }
-      .phone-button-left-2 {
-        position: absolute;
-        left: -4px;
-        top: 170px;
-        width: 4px;
-        height: 60px;
-        background: #2a2a2e;
-        border-radius: 3px 0 0 3px;
-        box-shadow: -1px 0 0 rgba(255,255,255,0.08);
-      }
-      .phone-button-left-3 {
-        position: absolute;
-        left: -4px;
-        top: 244px;
-        width: 4px;
-        height: 60px;
-        background: #2a2a2e;
-        border-radius: 3px 0 0 3px;
-        box-shadow: -1px 0 0 rgba(255,255,255,0.08);
-      }
-
-      /* Reflet sur l'écran */
+      /* ─── Reflet écran ─── */
       .screen-glare {
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 40%;
+        inset: 10px;
+        border-radius: 42px;
         background: linear-gradient(
-          170deg,
-          rgba(255,255,255,0.04) 0%,
-          transparent 60%
+          155deg,
+          rgba(255,255,255,0.05) 0%,
+          transparent 50%
         );
-        border-radius: 42px 42px 0 0;
         pointer-events: none;
-        z-index: 300;
-      }
-
-      /* Responsive : sur petit écran, réduire */
-      @media (max-height: 900px) {
-        .phone-frame {
-          transform: scale(0.88);
-          transform-origin: center center;
-        }
-      }
-      @media (max-height: 780px) {
-        .phone-frame {
-          transform: scale(0.75);
-        }
+        z-index: 600;
       }
     </style>
   </head>
   <body>
-    <div class="preview-label">📱 Aperçu KLIN UP — Vue Mobile</div>
+    <div class="preview-label">📱 KLIN UP — Aperçu Mobile</div>
 
-    <div class="phone-frame">
-      <!-- Boutons physiques simulés -->
-      <div class="phone-button-right"></div>
-      <div class="phone-button-left-1"></div>
-      <div class="phone-button-left-2"></div>
-      <div class="phone-button-left-3"></div>
+    <div class="phone-frame" id="phoneFrame">
+      <!-- Boutons physiques -->
+      <div class="btn-right"></div>
+      <div class="btn-left-1"></div>
+      <div class="btn-left-2"></div>
+      <div class="btn-left-3"></div>
 
       <div class="phone-screen">
         <!-- Dynamic Island -->
         <div class="dynamic-island"></div>
 
-        <!-- Barre de statut simulée -->
+        <!-- Status bar simulée -->
         <div class="status-bar">
-          <span class="status-bar-time" id="status-time">12:00</span>
-          <div class="status-bar-icons">
-            <!-- Antenne réseau -->
-            <svg width="17" height="12" viewBox="0 0 17 12">
-              <rect x="0" y="7" width="3" height="5" rx="1" opacity="0.4"/>
-              <rect x="4.5" y="4.5" width="3" height="7.5" rx="1" opacity="0.6"/>
-              <rect x="9" y="2" width="3" height="10" rx="1" opacity="0.8"/>
-              <rect x="13.5" y="0" width="3" height="12" rx="1"/>
+          <span class="sb-time" id="sb-time">--:--</span>
+          <div class="sb-icons">
+            <!-- Signal -->
+            <svg width="17" height="12" viewBox="0 0 17 12" fill="#000">
+              <rect x="0" y="8" width="3" height="4" rx="0.8" opacity="0.3"/>
+              <rect x="4.5" y="5.5" width="3" height="6.5" rx="0.8" opacity="0.5"/>
+              <rect x="9" y="3" width="3" height="9" rx="0.8" opacity="0.75"/>
+              <rect x="13.5" y="0" width="3" height="12" rx="0.8"/>
             </svg>
-            <!-- Wifi -->
-            <svg width="16" height="12" viewBox="0 0 16 12">
-              <path d="M8 9.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/>
-              <path d="M3.5 6.5a6.5 6.5 0 0 1 9 0" stroke="#000" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
-              <path d="M1 4a10 10 0 0 1 14 0" stroke="#000" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.3"/>
+            <!-- WiFi -->
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+              <circle cx="8" cy="10.5" r="1.5" fill="#000"/>
+              <path d="M4.5 7.5a5 5 0 0 1 7 0" stroke="#000" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+              <path d="M1.5 5a9 9 0 0 1 13 0" stroke="#000" stroke-width="1.4" stroke-linecap="round" opacity="0.35"/>
             </svg>
             <!-- Batterie -->
-            <svg width="25" height="12" viewBox="0 0 25 12">
-              <rect x="0" y="1" width="21" height="10" rx="3" stroke="#000" stroke-width="1.2" fill="none"/>
-              <rect x="1.5" y="2.5" width="14" height="7" rx="2" fill="#000"/>
-              <path d="M22 4v4a2 2 0 0 0 0-4z" fill="#000" opacity="0.4"/>
+            <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
+              <rect x="0.5" y="0.5" width="22" height="12" rx="3.5" stroke="#000" stroke-opacity="0.35"/>
+              <rect x="2" y="2" width="17" height="9" rx="2" fill="#000"/>
+              <path d="M23.5 4.5v4a2.5 2.5 0 0 0 0-4z" fill="#000" opacity="0.4"/>
             </svg>
           </div>
         </div>
 
-        <!-- App React Native -->
+        <!-- React Native App -->
         <div id="root"></div>
-
-        <!-- Reflet écran -->
-        <div class="screen-glare"></div>
       </div>
+
+      <!-- Reflet -->
+      <div class="screen-glare"></div>
     </div>
 
     <script>
-      // Afficher l'heure en temps réel
-      function updateTime() {
-        const now = new Date();
-        const h = now.getHours().toString().padStart(2, '0');
-        const m = now.getMinutes().toString().padStart(2, '0');
-        const el = document.getElementById('status-time');
-        if (el) el.textContent = h + ':' + m;
+      // ── Live clock ──
+      function tick() {
+        const d = new Date();
+        const t = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        document.getElementById('sb-time').textContent = t;
       }
-      updateTime();
-      setInterval(updateTime, 10000);
+      tick();
+      setInterval(tick, 5000);
+
+      // ── Responsive scale: fit phone frame to available viewport ──
+      function scaleFrame() {
+        const frame = document.getElementById('phoneFrame');
+        if (!frame) return;
+        const PHONE_W = 393;
+        const PHONE_H = 852;
+        const LABEL_H = 48; // label + gap
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const availW = vw - 32;
+        const availH = vh - LABEL_H - 32;
+        const scaleX = availW / PHONE_W;
+        const scaleY = availH / PHONE_H;
+        const scale = Math.min(scaleX, scaleY, 1); // never scale UP beyond 1
+        frame.style.transform = scale < 1 ? `scale(${scale.toFixed(3)})` : '';
+      }
+      scaleFrame();
+      window.addEventListener('resize', scaleFrame);
     </script>
   </body>
 </html>
