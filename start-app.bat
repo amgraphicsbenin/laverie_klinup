@@ -1,21 +1,23 @@
 @echo off
-title KLIN UP - Mobile App Server (Root Launcher)
+title KLIN UP - Mobile App (Web Preview)
 
-echo Demarrage du serveur de base de donnees partagee en arriere-plan...
-start /b node "%~dp0db-server.js"
+echo ===================================================
+echo   KLIN UP - Apercu Web de l'App Mobile
+echo ===================================================
+echo.
+echo L'application s'ouvrira automatiquement dans votre navigateur.
+echo URL : http://localhost:8081
+echo.
+echo Pour arreter le serveur : Ctrl+C
+echo.
 
 cd /d "%~dp0mobile-app"
 
-echo ===================================================
-echo   Demarrage du serveur Mobile App - KLIN UP
-echo ===================================================
-
 if not exist node_modules (
     echo Dossier node_modules introuvable. Installation des dependances...
-    call npm install
+    call npm install --legacy-peer-deps
 )
 
-echo Lancement du serveur de developpement...
-call npm run dev
+call npx expo start --web --port 8081
 
 pause
