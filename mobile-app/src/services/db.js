@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabaseClient';
 
 const STORAGE_KEYS = {
@@ -203,7 +204,8 @@ let memoryDb = {
   logs: DEFAULT_LOGS,
   catalog: DEFAULT_CATALOG,
   current_user: null,
-  pin_reset_requests: []
+  pin_reset_requests: [],
+  sync_queue: []
 };
 
 const listeners = new Set();
@@ -212,19 +214,19 @@ const notifyListeners = () => {
 };
 let isUsingRemote = false;
 
-// --- PERSISTENCE HELPERS (LOCALSTORAGE FALLBACK) ---
-const loadData = (key, defaultData) => {
-  const data = localStorage.getItem(key);
-  if (!data) {
-    localStorage.setItem(key, JSON.stringify(defaultData));
-    return defaultData;
-  }
+// --- PERSISTENCE HELPERS (ASYNCSTORAGE FOR REACT NATIVE) ---
+const loadData = async (key, defaultData) => {
   try {
+    const data = await AsyncStorage.getItem(key);
+    if (!data) {
+      await AsyncStorage.setItem(key, JSON.stringify(defaultData));
+      return defaultData;
+    }
     const parsed = JSON.parse(data);
     if (key === STORAGE_KEYS.CATALOG) {
       const needsMigration = parsed.length < defaultData.length || !parsed[0].hasOwnProperty('categorie');
       if (needsMigration) {
-        localStorage.setItem(key, JSON.stringify(defaultData));
+        await AsyncStorage.setItem(key, JSON.stringify(defaultData));
         return defaultData;
       }
     }
@@ -234,34 +236,39 @@ const loadData = (key, defaultData) => {
   }
 };
 
-const saveData = (key, data) => {
-  localStorage.setItem(key, JSON.stringify(data));
+const saveData = async (key, data) => {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error("Error saving data:", e);
+  }
 };
 
-function loadFromLocalStorage() {
-  memoryDb.staff = loadData(STORAGE_KEYS.STAFF, DEFAULT_STAFF);
-  memoryDb.customers = loadData(STORAGE_KEYS.CUSTOMERS, DEFAULT_CUSTOMERS);
-  memoryDb.orders = loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
-  memoryDb.logs = loadData(STORAGE_KEYS.LOGS, DEFAULT_LOGS);
-  memoryDb.catalog = loadData(STORAGE_KEYS.CATALOG, DEFAULT_CATALOG);
-  memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
-  memoryDb.pin_reset_requests = loadData('klin_up_pin_reset_requests', []);
+export async function loadFromLocalStorage() {
+  memoryDb.staff = await loadData(STORAGE_KEYS.STAFF, DEFAULT_STAFF);
+  memoryDb.customers = await loadData(STORAGE_KEYS.CUSTOMERS, DEFAULT_CUSTOMERS);
+  memoryDb.orders = await loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
+  memoryDb.logs = await loadData(STORAGE_KEYS.LOGS, DEFAULT_LOGS);
+  memoryDb.catalog = await loadData(STORAGE_KEYS.CATALOG, DEFAULT_CATALOG);
+  memoryDb.current_user = await loadData(STORAGE_KEYS.CURRENT_USER, null);
+  memoryDb.pin_reset_requests = await loadData('klin_up_pin_reset_requests', []);
+  memoryDb.sync_queue = await loadData('klin_up_sync_queue', []);
   notifyListeners();
 }
 
-function persist() {
-  saveData(STORAGE_KEYS.STAFF, memoryDb.staff);
-  saveData(STORAGE_KEYS.CUSTOMERS, memoryDb.customers);
-  saveData(STORAGE_KEYS.ORDERS, memoryDb.orders);
-  saveData(STORAGE_KEYS.LOGS, memoryDb.logs);
-  saveData(STORAGE_KEYS.CATALOG, memoryDb.catalog);
-  saveData(STORAGE_KEYS.CURRENT_USER, memoryDb.current_user);
-  saveData('klin_up_pin_reset_requests', memoryDb.pin_reset_requests);
+export async function persist() {
+  await saveData(STORAGE_KEYS.STAFF, memoryDb.staff);
+  await saveData(STORAGE_KEYS.CUSTOMERS, memoryDb.customers);
+  await saveData(STORAGE_KEYS.ORDERS, memoryDb.orders);
+  await saveData(STORAGE_KEYS.LOGS, memoryDb.logs);
+  await saveData(STORAGE_KEYS.CATALOG, memoryDb.catalog);
+  await saveData(STORAGE_KEYS.CURRENT_USER, memoryDb.current_user);
+  await saveData('klin_up_pin_reset_requests', memoryDb.pin_reset_requests);
+  await saveData('klin_up_sync_queue', memoryDb.sync_queue);
 }
 
-function addToSyncQueue(action, table, recordId, data) {
-  const queue = loadData('klin_up_sync_queue', []);
-  queue.push({
+async function addToSyncQueue(action, table, recordId, data) {
+  memoryDb.sync_queue.push({
     id: 'sq_' + Math.random().toString(36).substr(2, 9),
     action,
     table,
@@ -269,12 +276,12 @@ function addToSyncQueue(action, table, recordId, data) {
     data,
     timestamp: new Date().toISOString()
   });
-  saveData('klin_up_sync_queue', queue);
+  await saveData('klin_up_sync_queue', memoryDb.sync_queue);
 }
 
 async function syncOfflineQueue() {
   if (!supabase) return;
-  const queue = loadData('klin_up_sync_queue', []);
+  const queue = memoryDb.sync_queue;
   if (queue.length === 0) return;
   
   console.log(`[DB] 🔄 Début de synchronisation de la file d'attente hors-ligne (${queue.length} opérations)...`);
@@ -301,18 +308,20 @@ async function syncOfflineQueue() {
     } catch (err) {
       console.warn(`[DB] Interruption de la synchronisation de la file d'attente : ${err.message}`);
       const remaining = queue.slice(successCount);
-      saveData('klin_up_sync_queue', remaining);
+      memoryDb.sync_queue = remaining;
+      await saveData('klin_up_sync_queue', remaining);
       return;
     }
   }
   
-  saveData('klin_up_sync_queue', []);
+  memoryDb.sync_queue = [];
+  await saveData('klin_up_sync_queue', []);
   console.log(`[DB] ✅ Synchronisation de la file d'attente terminée.`);
 }
 
 async function performMutation(action, table, recordId, data, rollbackFn) {
   if (!isUsingRemote) {
-    addToSyncQueue(action, table, recordId, data);
+    await addToSyncQueue(action, table, recordId, data);
     return;
   }
   
@@ -333,7 +342,7 @@ async function performMutation(action, table, recordId, data, rollbackFn) {
         console.warn(`[DB] Mutation échouée pour raison réseau, mise en file d'attente.`);
         isUsingRemote = false;
         db.notify();
-        addToSyncQueue(action, table, recordId, data);
+        await addToSyncQueue(action, table, recordId, data);
         startAutoReconnect();
       } else {
         console.error(`[DB] Erreur de validation de base de données :`, res.error.message);
@@ -344,7 +353,7 @@ async function performMutation(action, table, recordId, data, rollbackFn) {
     console.warn(`[DB] Exception réseau lors de la mutation, mise en file d'attente :`, err.message);
     isUsingRemote = false;
     db.notify();
-    addToSyncQueue(action, table, recordId, data);
+    await addToSyncQueue(action, table, recordId, data);
     startAutoReconnect();
   }
 }
@@ -358,7 +367,7 @@ function withTimeout(promise, ms, label) {
 }
 
 // Initialisation de la base Supabase — Supabase obligatoire (pas de fallback local)
-async function initDb(isRetry = false) {
+export async function initDb(isRetry = false) {
   if (!supabase) {
     console.warn("[DB] Client Supabase non disponible. Impossible de démarrer l'application.");
     db.notify();
@@ -416,7 +425,7 @@ async function initDb(isRetry = false) {
       }
 
       // Récupérer l'utilisateur courant depuis localStorage (stockage de session)
-      memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
+      memoryDb.current_user = await loadData(STORAGE_KEYS.CURRENT_USER, null);
       isUsingRemote = true;
 
       console.log("[DB] ✅ Connecté à Supabase avec succès.");
@@ -424,7 +433,7 @@ async function initDb(isRetry = false) {
       // Essayer de synchroniser la file d'attente hors-ligne
       await syncOfflineQueue();
 
-      persist(); // Sauvegarder les données récupérées en local
+      await persist(); // Sauvegarder les données récupérées en local
       db.notify();
 
       // Démarrage des abonnements temps réel (non-bloquant, erreurs ignorées)
@@ -550,8 +559,10 @@ function setupRealtime() {
   });
 }
 
-loadFromLocalStorage();
-initDb();
+export async function initializeDatabase() {
+  await loadFromLocalStorage();
+  await initDb();
+}
 
 export const db = {
   subscribe: (listener) => {

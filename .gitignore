@@ -22,3 +22,7 @@ Thumbs.db
 
 # Database files
 db.json
+
+# Antigravity IDE directories
+.agents/
+.antigravity/
