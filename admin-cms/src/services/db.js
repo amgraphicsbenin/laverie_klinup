@@ -272,6 +272,18 @@ function addToSyncQueue(action, table, recordId, data) {
   saveData('klin_up_sync_queue', queue);
 }
 
+function sanitizePayload(table, data) {
+  if (!data) return data;
+  if (table === 'orders') {
+    const sanitized = { ...data };
+    delete sanitized.remise_pourcentage;
+    delete sanitized.remise_montant;
+    delete sanitized.prix_base_avant_remise;
+    return sanitized;
+  }
+  return data;
+}
+
 async function syncOfflineQueue() {
   if (!supabase) return;
   const queue = loadData('klin_up_sync_queue', []);
@@ -283,10 +295,11 @@ async function syncOfflineQueue() {
   for (const item of queue) {
     try {
       let res;
+      const sanitizedData = sanitizePayload(item.table, item.data);
       if (item.action === 'insert') {
-        res = await supabase.from(item.table).insert(item.data);
+        res = await supabase.from(item.table).insert(sanitizedData);
       } else if (item.action === 'update') {
-        res = await supabase.from(item.table).update(item.data).eq('id', item.recordId);
+        res = await supabase.from(item.table).update(sanitizedData).eq('id', item.recordId);
       } else if (item.action === 'delete') {
         res = await supabase.from(item.table).delete().eq('id', item.recordId);
       }
@@ -318,10 +331,11 @@ async function performMutation(action, table, recordId, data, rollbackFn) {
   
   try {
     let res;
+    const sanitizedData = sanitizePayload(table, data);
     if (action === 'insert') {
-      res = await supabase.from(table).insert(data);
+      res = await supabase.from(table).insert(sanitizedData);
     } else if (action === 'update') {
-      res = await supabase.from(table).update(data).eq('id', recordId);
+      res = await supabase.from(table).update(sanitizedData).eq('id', recordId);
     } else if (action === 'delete') {
       res = await supabase.from(table).delete().eq('id', recordId);
     }

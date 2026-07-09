@@ -279,6 +279,18 @@ async function addToSyncQueue(action, table, recordId, data) {
   await saveData('klin_up_sync_queue', memoryDb.sync_queue);
 }
 
+function sanitizePayload(table, data) {
+  if (!data) return data;
+  if (table === 'orders') {
+    const sanitized = { ...data };
+    delete sanitized.remise_pourcentage;
+    delete sanitized.remise_montant;
+    delete sanitized.prix_base_avant_remise;
+    return sanitized;
+  }
+  return data;
+}
+
 async function syncOfflineQueue() {
   if (!supabase) return;
   const queue = memoryDb.sync_queue;
@@ -290,10 +302,11 @@ async function syncOfflineQueue() {
   for (const item of queue) {
     try {
       let res;
+      const sanitizedData = sanitizePayload(item.table, item.data);
       if (item.action === 'insert') {
-        res = await supabase.from(item.table).insert(item.data);
+        res = await supabase.from(item.table).insert(sanitizedData);
       } else if (item.action === 'update') {
-        res = await supabase.from(item.table).update(item.data).eq('id', item.recordId);
+        res = await supabase.from(item.table).update(sanitizedData).eq('id', item.recordId);
       } else if (item.action === 'delete') {
         res = await supabase.from(item.table).delete().eq('id', item.recordId);
       }
@@ -327,10 +340,11 @@ async function performMutation(action, table, recordId, data, rollbackFn) {
   
   try {
     let res;
+    const sanitizedData = sanitizePayload(table, data);
     if (action === 'insert') {
-      res = await supabase.from(table).insert(data);
+      res = await supabase.from(table).insert(sanitizedData);
     } else if (action === 'update') {
-      res = await supabase.from(table).update(data).eq('id', recordId);
+      res = await supabase.from(table).update(sanitizedData).eq('id', recordId);
     } else if (action === 'delete') {
       res = await supabase.from(table).delete().eq('id', recordId);
     }
@@ -839,9 +853,16 @@ export const db = {
     let totalPrice = 0;
     let totalClothes = 0;
 
-    if (orderData.items && orderData.items.length > 0) {
-      orderData.items.forEach(item => {
-        totalClothes += Number(item.quantite);
+    const inputItems = (orderData.items || orderData.articles || []).map(item => ({
+      article: item.article,
+      service: item.service,
+      quantite: Number(item.quantite || item.quantity || 1),
+      prix: Number(item.prix || item.price || 0)
+    }));
+
+    if (inputItems.length > 0) {
+      inputItems.forEach(item => {
+        totalClothes += item.quantite;
       });
     } else {
       totalClothes = 1;
@@ -855,19 +876,22 @@ export const db = {
       customer.active_subscription.remaining_clothes -= totalClothes;
       totalPrice = subscribedPlan ? subscribedPlan.prix : 0;
     } else {
-      if (orderData.items && orderData.items.length > 0) {
-        orderData.items.forEach(item => {
+      if (inputItems.length > 0) {
+        inputItems.forEach(item => {
           const catalogItem = memoryDb.catalog.find(c => c.article === item.article && c.service === item.service);
-          const itemPrice = catalogItem ? catalogItem.prix : 1500;
+          const itemPrice = catalogItem ? catalogItem.prix : (item.prix || 1500);
           totalPrice += itemPrice * item.quantite;
         });
       } else {
-        const catalogItem = memoryDb.catalog.find(item => item.article === orderData.type_article && item.service === orderData.type_service);
+        const typeArticle = orderData.type_article || '';
+        const typeService = orderData.type_service || '';
+        const catalogItem = memoryDb.catalog.find(item => item.article === typeArticle && item.service === typeService);
         const basePrice = catalogItem ? catalogItem.prix : 1500;
         totalPrice = basePrice;
       }
 
-      if (orderData.niveau_urgence === 'Express') {
+      const urgency = orderData.niveau_urgence || 'Normal';
+      if (urgency === 'Express') {
         const expressMarkupItem = memoryDb.catalog.find(c => c.id === 'setting_express_markup');
         const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
         totalPrice = Math.round(totalPrice * (1 + expressMarkup / 100));
@@ -882,7 +906,8 @@ export const db = {
       totalPrice = Math.max(0, totalPrice - discountAmount);
     }
 
-    const advancePaid = (isSubscriptionOrder && !subscribedPlan) ? 0 : Number(orderData.avance_payee || 0);
+    const avanceInput = orderData.avance_payee !== undefined ? orderData.avance_payee : (orderData.avance !== undefined ? orderData.avance : 0);
+    const advancePaid = (isSubscriptionOrder && !subscribedPlan) ? 0 : Number(avanceInput);
     const unpaidBalance = totalPrice - advancePaid;
 
     if (customer && unpaidBalance > 0) {
@@ -900,21 +925,24 @@ export const db = {
     const expressHours = expressHoursItem ? Number(expressHoursItem.prix) : 6;
     const normalHoursItem = memoryDb.catalog.find(c => c.id === 'setting_normal_hours');
     const normalHours = normalHoursItem ? Number(normalHoursItem.prix) : 48;
-    const hoursToAdd = orderData.niveau_urgence === 'Express' ? expressHours : normalHours;
+    const urgencyVal = orderData.niveau_urgence || 'Normal';
+    const hoursToAdd = urgencyVal === 'Express' ? expressHours : normalHours;
     
-    const dueDate = new Date(Date.now() + 3600000 * hoursToAdd).toISOString();
+    const dueDate = orderData.due_date || (orderData.date_retrait_prevue ? new Date(orderData.date_retrait_prevue).toISOString() : new Date(Date.now() + 3600000 * hoursToAdd).toISOString());
     const nowStr = new Date().toISOString();
 
     const currentUser = db.getCurrentUser();
+    const modeReglementVal = orderData.mode_reglement || orderData.mode_paiement || 'Espèces';
+    const initialStatus = orderData.statut === 'attente' ? 'en_attente' : (orderData.statut || 'en_attente');
 
     const newOrder = {
       id: 'o_' + Math.random().toString(36).substr(2, 9),
       customer_id: orderData.customer_id,
-      statut: 'en_attente',
-      type_article: orderData.type_article,
-      type_service: orderData.type_service,
-      niveau_urgence: orderData.niveau_urgence,
-      mode_reglement: isSubscriptionOrder ? (subscribedPlan ? orderData.mode_reglement : 'abonnement') : orderData.mode_reglement,
+      statut: initialStatus,
+      type_article: orderData.type_article || (inputItems[0] ? inputItems[0].article : 'Divers'),
+      type_service: orderData.type_service || (inputItems[0] ? inputItems[0].service : 'lavage_simple'),
+      niveau_urgence: urgencyVal,
+      mode_reglement: isSubscriptionOrder ? (subscribedPlan ? modeReglementVal : 'abonnement') : modeReglementVal,
       avance_payee: advancePaid,
       prix_total: totalPrice,
       remise_pourcentage: discountPercent,
@@ -925,7 +953,7 @@ export const db = {
       due_date: dueDate,
       acompte_paid_at: advancePaid > 0 ? nowStr : null,
       solde_paid_at: unpaidBalance <= 0 ? nowStr : null,
-      items: orderData.items || [],
+      items: inputItems,
       created_by_id: currentUser ? currentUser.id : null,
       created_by_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : null
     };
@@ -986,19 +1014,25 @@ export const db = {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
+    let normalizedStatus = newStatus;
+    if (newStatus === 'livre') normalizedStatus = 'restitue';
+    else if (newStatus === 'lavage_cours') normalizedStatus = 'en_cours_lavage';
+    else if (newStatus === 'repassage_cours') normalizedStatus = 'en_cours_repassage';
+    else if (newStatus === 'attente') normalizedStatus = 'en_attente';
+
     const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
     const originalCustomerState = customer ? { ...customer } : null;
 
     const oldStatus = order.statut;
-    order.statut = newStatus;
+    order.statut = normalizedStatus;
 
     let typeLivraison = order.subscription_details?.type_livraison;
-    if (newStatus === 'a_recuperer') {
+    if (normalizedStatus === 'a_recuperer') {
       typeLivraison = 'recuperation';
-    } else if (newStatus === 'a_livrer' || newStatus === 'en_cours_livraison') {
+    } else if (normalizedStatus === 'a_livrer' || normalizedStatus === 'en_cours_livraison') {
       typeLivraison = 'livraison';
-    } else if (newStatus === 'restitue') {
+    } else if (normalizedStatus === 'restitue') {
       if (oldStatus === 'a_recuperer') {
         typeLivraison = 'recuperation';
       } else if (oldStatus === 'en_cours_livraison' || oldStatus === 'a_livrer') {
@@ -1013,7 +1047,7 @@ export const db = {
       };
     }
 
-    if (newStatus === 'restitue' || newStatus === 'a_livrer' || newStatus === 'a_recuperer') {
+    if (normalizedStatus === 'restitue' || normalizedStatus === 'a_livrer' || normalizedStatus === 'a_recuperer') {
       order.solde_paid_at = new Date().toISOString();
       if (customer) {
         const remainingToPay = order.prix_total - order.avance_payee;
@@ -1056,19 +1090,21 @@ export const db = {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
+    const normalizedFinalStatus = finalStatus === 'livre' ? 'restitue' : finalStatus;
+
     const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
     const originalCustomerState = customer ? { ...customer } : null;
 
     const oldStatus = order.statut;
-    order.statut = finalStatus;
+    order.statut = normalizedFinalStatus;
     order.mode_reglement = paymentMethod;
     
     order.avance_payee = Number(order.avance_payee) + Number(amountPaid);
     order.solde_paid_at = new Date().toISOString();
 
     let typeLivraison = order.subscription_details?.type_livraison;
-    if (finalStatus === 'restitue') {
+    if (normalizedFinalStatus === 'restitue') {
       if (oldStatus === 'a_recuperer') {
         typeLivraison = 'recuperation';
       } else if (oldStatus === 'en_cours_livraison' || oldStatus === 'a_livrer') {
@@ -1409,6 +1445,8 @@ export const db = {
   },
 
   isRemote: () => isUsingRemote,
+  getSyncQueue: () => [...memoryDb.sync_queue],
+  updateStaffPin: (userId, newPin) => db.resetStaffPin(userId, newPin),
 
   testConnection: async () => {
     if (!supabase) {
