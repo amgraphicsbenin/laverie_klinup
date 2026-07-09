@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, Dimensions } from 'react-native';
 import { Home, Layers, Receipt, User } from 'lucide-react-native';
 import { initializeDatabase } from './src/services/db';
 import { useDbState } from './src/hooks/useDbState';
@@ -79,7 +79,7 @@ export default function App() {
     }
   };
 
-  return (
+  const appContent = (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         {renderActiveScreen()}
@@ -125,9 +125,45 @@ export default function App() {
       </View>
     </SafeAreaView>
   );
+
+  // On web: wrap in a phone-sized container centered in the browser
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webOuter}>
+        <View style={styles.webPhone}>
+          {appContent}
+        </View>
+      </View>
+    );
+  }
+
+  return appContent;
 }
 
+const PHONE_W = 393;
+const PHONE_H = 852;
+
 const styles = StyleSheet.create({
+  // ── Web-only phone frame wrapper ──
+  webOuter: {
+    flex: 1,
+    backgroundColor: '#0f0f13',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webPhone: {
+    width: PHONE_W,
+    height: PHONE_H,
+    borderRadius: 44,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    // Shadow for the phone frame feel
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 40 },
+    shadowOpacity: 0.6,
+    shadowRadius: 60,
+    elevation: 30,
+  },
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
