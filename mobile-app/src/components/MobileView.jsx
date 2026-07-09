@@ -5419,28 +5419,48 @@ export default function MobileView() {
       {/* ================= MODAL CRÉATION CLIENT ================= */}
       {showNewCustomerModal && (
         <div 
-          className="modal-overlay center-align"
+          className="modal-overlay bottom-align"
+          style={{ zIndex: 1000 }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowNewCustomerModal(false); }}
         >
-          <div className="modal-dialog" style={{ maxWidth: '300px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+          <form onSubmit={handleCreateCustomer} className="modal-sheet">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.45rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Nouveau Client</h3>
-              <button type="button" onClick={() => setShowNewCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={15} color="var(--text-muted)" />
+              <button type="button" onClick={() => setShowNewCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                <X size={18} color="var(--text-muted)" />
               </button>
             </div>
-            
-            <form onSubmit={handleCreateCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem' }}>Prénom</label>
-                <input type="text" className="input-control" style={{ padding: '0.42rem', fontSize: '0.75rem' }} required value={newCustPrenom} onChange={(e) => setNewCustPrenom(e.target.value)} />
+
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingRight: '2px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
+                <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Prénom</label>
+                  <input 
+                    type="text" 
+                    className="input-control" 
+                    style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                    required 
+                    placeholder="Marie"
+                    value={newCustPrenom} 
+                    onChange={(e) => setNewCustPrenom(e.target.value)} 
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Nom</label>
+                  <input 
+                    type="text" 
+                    className="input-control" 
+                    style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                    required 
+                    placeholder="Koffi"
+                    value={newCustNom} 
+                    onChange={(e) => setNewCustNom(e.target.value)} 
+                  />
+                </div>
               </div>
+
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem' }}>Nom</label>
-                <input type="text" className="input-control" style={{ padding: '0.42rem', fontSize: '0.75rem' }} required value={newCustNom} onChange={(e) => setNewCustNom(e.target.value)} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem' }}>Pays (Indicatif)</label>
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Pays (Indicatif)</label>
                 <CustomSelect
                   value={newCustIndicatif}
                   onChange={setNewCustIndicatif}
@@ -5450,16 +5470,35 @@ export default function MobileView() {
                   }))}
                 />
               </div>
+
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem' }}>Téléphone</label>
-                <input type="tel" className="input-control" style={{ padding: '0.42rem', fontSize: '0.75rem' }} required placeholder="Ex: 97979797" value={newCustTel} onChange={(e) => setNewCustTel(e.target.value)} />
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Téléphone</label>
+                <input 
+                  type="tel" 
+                  className="input-control" 
+                  style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                  required 
+                  placeholder="Ex: 97979797" 
+                  value={newCustTel} 
+                  onChange={(e) => setNewCustTel(e.target.value)} 
+                />
               </div>
+
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem' }}>Adresse</label>
-                <input type="text" className="input-control" style={{ padding: '0.42rem', fontSize: '0.75rem' }} required placeholder="Ex: Rue 125, Cotonou" value={newCustAdresse} onChange={(e) => setNewCustAdresse(e.target.value)} />
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Adresse</label>
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                  required 
+                  placeholder="Ex: Rue 125, Cotonou" 
+                  value={newCustAdresse} 
+                  onChange={(e) => setNewCustAdresse(e.target.value)} 
+                />
               </div>
+
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem' }}>Préférence Pliage</label>
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Préférence Pliage</label>
                 <CustomSelect
                   value={newCustPref}
                   onChange={setNewCustPref}
@@ -5469,11 +5508,18 @@ export default function MobileView() {
                   ]}
                 />
               </div>
-              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.3rem', padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }}>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.6rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ padding: '0.45rem 1.2rem', fontSize: '0.72rem', borderRadius: '10px' }}
+              >
                 Enregistrer
               </button>
-            </form>
-          </div>
+            </div>
+          </form>
         </div>
       )}
 
@@ -6173,53 +6219,55 @@ export default function MobileView() {
       {/* ================= MODAL CRÉATION / MODIFICATION CLIENT ================= */}
       {showCustomerModal && (
         <div 
-          className="modal-overlay center-align" 
+          className="modal-overlay bottom-align" 
           style={{ zIndex: 1000 }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowCustomerModal(false); }}
         >
-          <div className="modal-dialog" style={{ maxWidth: '300px', background: '#ffffff', color: '#000000', padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.7rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
-              <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>
+          <form onSubmit={handleSaveCustomer} className="modal-sheet">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.45rem' }}>
+              <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>
                 {editingCustomer ? 'Modifier Profil' : 'Nouveau Client'}
               </h3>
-              <button type="button" onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={15} color="var(--text-muted)" />
+              <button type="button" onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                <X size={18} color="var(--text-muted)" />
               </button>
             </div>
             
-            <form onSubmit={handleSaveCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Prénom</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
-                  required 
-                  placeholder="Ex: Marie" 
-                  value={custPrenom} 
-                  onChange={(e) => setCustPrenom(e.target.value)} 
-                />
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingRight: '2px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
+                <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Prénom</label>
+                  <input 
+                    type="text" 
+                    className="input-control" 
+                    style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                    required 
+                    placeholder="Ex: Marie" 
+                    value={custPrenom} 
+                    onChange={(e) => setCustPrenom(e.target.value)} 
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Nom</label>
+                  <input 
+                    type="text" 
+                    className="input-control" 
+                    style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                    required 
+                    placeholder="Ex: Koffi" 
+                    value={custNom} 
+                    onChange={(e) => setCustNom(e.target.value)} 
+                  />
+                </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Nom</label>
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Téléphone</label>
                 <input 
                   type="text" 
                   className="input-control" 
-                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
-                  required 
-                  placeholder="Ex: Koffi" 
-                  value={custNom} 
-                  onChange={(e) => setCustNom(e.target.value)} 
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Téléphone</label>
-                <input 
-                  type="text" 
-                  className="input-control" 
-                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
+                  style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                   required 
                   placeholder="Ex: 0167676767" 
                   value={custTelephone} 
@@ -6228,11 +6276,11 @@ export default function MobileView() {
               </div>
 
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Adresse</label>
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Adresse</label>
                 <input 
                   type="text" 
                   className="input-control" 
-                  style={{ padding: '0.42rem', fontSize: '0.75rem', borderRadius: '8px' }} 
+                  style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                   required 
                   placeholder="Ex: Haie Vive, Cotonou" 
                   value={custAdresse} 
@@ -6241,7 +6289,7 @@ export default function MobileView() {
               </div>
 
               <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
-                <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Préférence Pliage</label>
+                <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Préférence Pliage</label>
                 <CustomSelect
                   value={custPreferences}
                   onChange={setCustPreferences}
@@ -6251,12 +6299,18 @@ export default function MobileView() {
                   ]}
                 />
               </div>
+            </div>
 
-              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.3rem', padding: '0.48rem', fontSize: '0.75rem', borderRadius: '8px', width: '100%' }}>
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.6rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ padding: '0.45rem 1.2rem', fontSize: '0.72rem', borderRadius: '10px' }}
+              >
                 {editingCustomer ? 'Enregistrer les modifications' : 'Créer le profil'}
               </button>
-            </form>
-          </div>
+            </div>
+          </form>
         </div>
       )}
 
