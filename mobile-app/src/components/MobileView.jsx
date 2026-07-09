@@ -5423,7 +5423,7 @@ export default function MobileView() {
           style={{ zIndex: 1000 }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowNewCustomerModal(false); }}
         >
-          <form onSubmit={handleCreateCustomer} className="modal-sheet">
+          <form onSubmit={handleCreateCustomer} className="modal-sheet" style={{ height: 'auto', maxHeight: '85%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.45rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Nouveau Client</h3>
               <button type="button" onClick={() => setShowNewCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
@@ -5431,14 +5431,14 @@ export default function MobileView() {
               </button>
             </div>
 
-            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingRight: '2px' }}>
+            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingRight: '2px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
                 <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
                   <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Prénom</label>
                   <input 
                     type="text" 
                     className="input-control" 
-                    style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                     required 
                     placeholder="Marie"
                     value={newCustPrenom} 
@@ -5450,7 +5450,7 @@ export default function MobileView() {
                   <input 
                     type="text" 
                     className="input-control" 
-                    style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                     required 
                     placeholder="Koffi"
                     value={newCustNom} 
@@ -5476,7 +5476,7 @@ export default function MobileView() {
                 <input 
                   type="tel" 
                   className="input-control" 
-                  style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                   required 
                   placeholder="Ex: 97979797" 
                   value={newCustTel} 
@@ -5489,7 +5489,7 @@ export default function MobileView() {
                 <input 
                   type="text" 
                   className="input-control" 
-                  style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                   required 
                   placeholder="Ex: Rue 125, Cotonou" 
                   value={newCustAdresse} 
@@ -6223,7 +6223,7 @@ export default function MobileView() {
           style={{ zIndex: 1000 }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowCustomerModal(false); }}
         >
-          <form onSubmit={handleSaveCustomer} className="modal-sheet">
+          <form onSubmit={handleSaveCustomer} className="modal-sheet" style={{ height: 'auto', maxHeight: '85%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.45rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>
                 {editingCustomer ? 'Modifier Profil' : 'Nouveau Client'}
@@ -6233,14 +6233,14 @@ export default function MobileView() {
               </button>
             </div>
             
-            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingRight: '2px' }}>
+            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingRight: '2px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
                 <div className="form-group" style={{ marginBottom: 0, gap: '0.2rem' }}>
                   <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Prénom</label>
                   <input 
                     type="text" 
                     className="input-control" 
-                    style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                     required 
                     placeholder="Ex: Marie" 
                     value={custPrenom} 
@@ -6253,7 +6253,7 @@ export default function MobileView() {
                   <input 
                     type="text" 
                     className="input-control" 
-                    style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                     required 
                     placeholder="Ex: Koffi" 
                     value={custNom} 
@@ -6267,7 +6267,7 @@ export default function MobileView() {
                 <input 
                   type="text" 
                   className="input-control" 
-                  style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                   required 
                   placeholder="Ex: 0167676767" 
                   value={custTelephone} 
@@ -6280,7 +6280,7 @@ export default function MobileView() {
                 <input 
                   type="text" 
                   className="input-control" 
-                  style={{ padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.75rem', borderRadius: '10px' }} 
                   required 
                   placeholder="Ex: Haie Vive, Cotonou" 
                   value={custAdresse} 
