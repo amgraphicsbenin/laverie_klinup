@@ -12,6 +12,15 @@ export default function HistoryScreen() {
   const orders = db.getOrders();
   const customers = db.getCustomers();
 
+  const getDisplayTicketId = (order) => {
+    if (order.ticket_numero && /^\d+$/.test(order.ticket_numero)) return order.ticket_numero;
+    if (/^\d+$/.test(order.id)) return order.id;
+    const allOrders = db.getOrders();
+    const sortedOrders = [...allOrders].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    const index = sortedOrders.findIndex(o => o.id === order.id);
+    return index !== -1 ? String(1001 + index) : '1001';
+  };
+
   const getStatusColor = (statut) => {
     switch (statut) {
       case 'pret':
@@ -62,6 +71,11 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Historique</Text>
+      </View>
+
       {/* Search and Filters */}
       <View style={styles.filterHeader}>
         <View style={styles.searchContainer}>
@@ -119,7 +133,7 @@ export default function HistoryScreen() {
                 <View style={styles.cardHeader}>
                   <View>
                     <Text style={styles.clientName}>{getCustomerName(item.customer_id)}</Text>
-                    <Text style={styles.ticketNo}>Ticket #{item.ticket_numero || item.id.substring(0, 8)}</Text>
+                    <Text style={styles.ticketNo}>Ticket #{getDisplayTicketId(item)}</Text>
                   </View>
                   <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, borderWidth: 1 }]}>
                     <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
@@ -148,10 +162,12 @@ export default function HistoryScreen() {
       >
         {selectedOrder && (
           <View style={styles.compactModalOverlay}>
-            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedOrder(null)}>
+              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
             <View style={[styles.compactModalView, { maxHeight: '90%' }]}>
               <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Commande #{selectedOrder.ticket_numero || selectedOrder.id.substring(0, 8)}</Text>
+                <Text style={styles.compactModalTitle}>Commande #{getDisplayTicketId(selectedOrder)}</Text>
                 <TouchableOpacity onPress={() => setSelectedOrder(null)}>
                   <X size={20} color="#71717a" />
                 </TouchableOpacity>
@@ -215,6 +231,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 8,
+    backgroundColor: '#f8fafc',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#09090b',
+    letterSpacing: -0.5,
+  },
   filterHeader: {
     backgroundColor: '#ffffff',
     paddingVertical: 14,
@@ -264,7 +292,7 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#ffffff',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   scrollContent: {
     padding: 16,
@@ -278,17 +306,17 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   historyCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    borderRadius: 22,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
+    borderColor: 'rgba(255, 255, 255, 0.75)',
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowRadius: 20,
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -298,7 +326,7 @@ const styles = StyleSheet.create({
   },
   clientName: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   ticketNo: {
@@ -315,7 +343,7 @@ const styles = StyleSheet.create({
   },
   statusTagText: {
     fontSize: 9,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   cardFooter: {
     flexDirection: 'row',
@@ -336,7 +364,7 @@ const styles = StyleSheet.create({
   },
   totalAmount: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   modalView: {
@@ -356,7 +384,7 @@ const styles = StyleSheet.create({
   },
   modalTitleLarge: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   modalScroll: {
@@ -376,7 +404,7 @@ const styles = StyleSheet.create({
   },
   detailClientName: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   detailDate: {
@@ -405,7 +433,7 @@ const styles = StyleSheet.create({
   },
   articlePrice: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   divider: {
@@ -415,12 +443,12 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   totalValue: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#2563eb',
   },
   subLabel: {
@@ -463,7 +491,7 @@ const styles = StyleSheet.create({
   },
   compactModalTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   compactModalScroll: {

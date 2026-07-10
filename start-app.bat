@@ -15,7 +15,7 @@ if not exist node_modules (
 
 :: Liberer le port 8081 si occupe
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8081 ^| findstr LISTENING') do (
-    echo Liberation du port 8081 (PID: %%a)...
+    echo Liberation du port 8081 [PID: %%a]...
     taskkill /PID %%a /F >nul 2>&1
 )
 

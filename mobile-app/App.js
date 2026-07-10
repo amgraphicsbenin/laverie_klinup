@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, Dimensions, StatusBar as RNStatusBar } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase, db } from './src/services/db';
 import { useDbState } from './src/hooks/useDbState';
@@ -18,6 +19,7 @@ export default function App() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [openOrderFormOnMount, setOpenOrderFormOnMount] = useState(false);
   const [gestionFilter, setGestionFilter] = useState(null);
+  const [orderFormVisible, setOrderFormVisible] = useState(false);
 
   // Load database on mount
   useEffect(() => {
@@ -77,7 +79,7 @@ export default function App() {
       case 'accueil':
         return (
           <DashboardScreen 
-            onNavigate={(tab) => setActiveTab(tab)}
+            onNavigate={(tab) => { setActiveTab(tab); setOrderFormVisible(false); }}
             setSelectedOrder={setSelectedOrder}
             setGestionFilter={setGestionFilter}
           />
@@ -91,6 +93,8 @@ export default function App() {
             setGestionFilter={setGestionFilter}
             openOrderFormOnMount={openOrderFormOnMount}
             onCloseOrderFormOnMount={() => setOpenOrderFormOnMount(false)}
+            orderFormVisible={orderFormVisible}
+            setOrderFormVisible={setOrderFormVisible}
           />
         );
       case 'historique':
@@ -100,7 +104,7 @@ export default function App() {
       default:
         return (
           <DashboardScreen 
-            onNavigate={(tab) => setActiveTab(tab)} 
+            onNavigate={(tab) => { setActiveTab(tab); setOrderFormVisible(false); }} 
             setSelectedOrder={setSelectedOrder}
             setGestionFilter={setGestionFilter}
           />
@@ -108,30 +112,34 @@ export default function App() {
     }
   };
 
-  const appContent = !currentUser ? (
-    <LoginScreen />
-  ) : (    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <MotiView
-          key={activeTab}
-          from={{ opacity: 0, scale: 0.98, translateY: 6 }}
-          animate={{ opacity: 1, scale: 1, translateY: 0 }}
-          transition={{ type: 'spring', damping: 16, mass: 0.6 }}
-          style={{ flex: 1 }}
-        >
-          {renderActiveScreen()}
-        </MotiView>
-      </View>
+  const appContent = (
+    <View style={{ flex: 1 }}>
+      <StatusBar style="dark" />
+      {!currentUser ? (
+        <LoginScreen />
+      ) : (
+        <SafeAreaView style={styles.container}>
+          <View style={styles.content}>
+            <MotiView
+              key={activeTab}
+              from={{ opacity: 0, scale: 0.98, translateY: 6 }}
+              animate={{ opacity: 1, scale: 1, translateY: 0 }}
+              transition={{ type: 'spring', damping: 16, mass: 0.6 }}
+              style={{ flex: 1 }}
+            >
+              {renderActiveScreen()}
+            </MotiView>
+          </View>
 
       {/* BOTTOM TAB BAR */}
       <View style={styles.tabBar}>
         <TouchableOpacity 
-          onPress={() => setActiveTab('accueil')}
+          onPress={() => { setActiveTab('accueil'); setOrderFormVisible(false); }}
           style={styles.tabItem}
         >
           <MotiView
-            animate={{ scale: activeTab === 'accueil' ? 1.15 : 1 }}
-            transition={{ type: 'spring', damping: 12 }}
+            animate={{ scale: activeTab === 'accueil' ? 1.06 : 1 }}
+            transition={{ type: 'timing', duration: 200 }}
           >
             <MaterialCommunityIcons
               name={activeTab === 'accueil' ? 'home' : 'home-outline'}
@@ -144,12 +152,12 @@ export default function App() {
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={() => setActiveTab('gestion')}
+            onPress={() => { setActiveTab('gestion'); setOrderFormVisible(false); }}
             style={styles.tabItem}
           >
             <MotiView
-              animate={{ scale: activeTab === 'gestion' ? 1.15 : 1 }}
-              transition={{ type: 'spring', damping: 12 }}
+              animate={{ scale: activeTab === 'gestion' ? 1.06 : 1 }}
+              transition={{ type: 'timing', duration: 200 }}
             >
               <MaterialCommunityIcons
                 name={activeTab === 'gestion' ? 'clipboard-list' : 'clipboard-list-outline'}
@@ -165,15 +173,22 @@ export default function App() {
         <View style={styles.centerTabItem}>
           <TouchableOpacity 
             onPress={() => {
-              setOpenOrderFormOnMount(true);
-              setActiveTab('gestion');
+              if (activeTab !== 'gestion') {
+                setActiveTab('gestion');
+                setOrderFormVisible(true);
+              } else {
+                setOrderFormVisible(!orderFormVisible);
+              }
             }}
             style={styles.scanButtonCircle}
             activeOpacity={0.85}
           >
             <MotiView
-              animate={{ scale: openOrderFormOnMount ? 1.1 : 1 }}
-              transition={{ type: 'spring', damping: 10 }}
+              animate={{ 
+                scale: orderFormVisible ? 1.05 : 1,
+                rotate: orderFormVisible ? '135deg' : '0deg'
+              }}
+              transition={{ type: 'timing', duration: 250 }}
             >
               <MaterialCommunityIcons name="plus" size={26} color="#ffffff" />
             </MotiView>
@@ -182,12 +197,12 @@ export default function App() {
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={() => setActiveTab('historique')}
+            onPress={() => { setActiveTab('historique'); setOrderFormVisible(false); }}
             style={styles.tabItem}
           >
             <MotiView
-              animate={{ scale: activeTab === 'historique' ? 1.15 : 1 }}
-              transition={{ type: 'spring', damping: 12 }}
+              animate={{ scale: activeTab === 'historique' ? 1.06 : 1 }}
+              transition={{ type: 'timing', duration: 200 }}
             >
               <MaterialCommunityIcons
                 name={activeTab === 'historique' ? 'history' : 'history'}
@@ -200,12 +215,12 @@ export default function App() {
         )}
 
         <TouchableOpacity 
-          onPress={() => setActiveTab('profile')}
+          onPress={() => { setActiveTab('profile'); setOrderFormVisible(false); }}
           style={styles.tabItem}
         >
           <MotiView
-            animate={{ scale: activeTab === 'profile' ? 1.15 : 1 }}
-            transition={{ type: 'spring', damping: 12 }}
+            animate={{ scale: activeTab === 'profile' ? 1.06 : 1 }}
+            transition={{ type: 'timing', duration: 200 }}
           >
             <MaterialCommunityIcons
               name={activeTab === 'profile' ? 'account-circle' : 'account-circle-outline'}
@@ -216,7 +231,9 @@ export default function App() {
           <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive]}>Profil</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+        </SafeAreaView>
+      )}
+    </View>
   );
 
   // On web: wrap in a phone-sized container centered in the browser
@@ -259,7 +276,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
-    paddingTop: Platform.OS === 'android' ? 25 : 0,
+    paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
   },
   content: {
     flex: 1,
@@ -272,7 +289,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#2563eb',
     marginTop: 16,
     letterSpacing: 3,
@@ -289,13 +306,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    height: 64,
+    height: Platform.OS === 'ios' ? 88 : 78,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.05)',
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 8,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 14,
   },
   tabItem: {
     alignItems: 'center',
@@ -332,6 +350,6 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {
     color: '#002cf7',
-    fontWeight: '700',
+    fontWeight: '600',
   },
 });

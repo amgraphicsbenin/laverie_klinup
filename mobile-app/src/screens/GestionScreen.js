@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
-import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight } from 'lucide-react-native';
+import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock } from 'lucide-react-native';
 import { db } from '../services/db';
 import { CustomSelect } from '../components/CustomSelect';
 import { BlurView } from 'expo-blur';
@@ -13,10 +13,69 @@ export default function GestionScreen({
   gestionFilter, 
   setGestionFilter, 
   openOrderFormOnMount, 
-  onCloseOrderFormOnMount 
+  onCloseOrderFormOnMount,
+  orderFormVisible,
+  setOrderFormVisible
 }) {
   const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('actives'); // actives, urgentes, retard
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceOrder, setInvoiceOrder] = useState(null);
+
+  const [localShowOrderForm, localSetShowOrderForm] = useState(false);
+  const showOrderForm = orderFormVisible !== undefined ? orderFormVisible : localShowOrderForm;
+  const setShowOrderForm = setOrderFormVisible !== undefined ? setOrderFormVisible : localSetShowOrderForm;
+
+  const handleShowInvoice = (order, e) => {
+    e.stopPropagation();
+    setInvoiceOrder(order);
+    setShowInvoiceModal(true);
+  };
+
+  const getDisplayTicketId = (order) => {
+    if (order.ticket_numero && /^\d+$/.test(order.ticket_numero)) return order.ticket_numero;
+    if (/^\d+$/.test(order.id)) return order.id;
+    const allOrders = db.getOrders();
+    const sortedOrders = [...allOrders].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    const index = sortedOrders.findIndex(o => o.id === order.id);
+    return index !== -1 ? String(1001 + index) : '1001';
+  };
+
+  const getItemsSummary = (items) => {
+    if (!items || items.length === 0) return 'Aucun article';
+    return items.map(a => `${a.article} x${a.quantite || a.quantity}`).join(', ');
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    } catch(e) {
+      return dateStr;
+    }
+  };
+
+  const [expandedArticles, setExpandedArticles] = useState({});
+
+  const toggleExpandArticle = (articleName) => {
+    setExpandedArticles(prev => ({
+      ...prev,
+      [articleName]: !prev[articleName]
+    }));
+  };
+
+  const isArticleExpanded = (articleName, items) => {
+    if (expandedArticles[articleName]) return true;
+    return items.some(item => selectedArticles.some(cartItem => cartItem.id === item.id && cartItem.quantity > 0));
+  };
+
+  useEffect(() => {
+    if (!showOrderForm) {
+      setExpandedArticles({});
+    }
+  }, [showOrderForm]);
 
   // Handle openOrderFormOnMount from tab bar trigger
   useEffect(() => {
@@ -43,7 +102,26 @@ export default function GestionScreen({
 
   // Modals visibility
   const [showOrderDetails, setShowOrderDetails] = useState(false);
-  const [showOrderForm, setShowOrderForm] = useState(false);
+
+  const getNextStatusStyle = (currentStatus) => {
+    switch (currentStatus) {
+      case 'attente':
+      case 'en_attente':
+        return { bg: '#2563eb', text: '#ffffff', label: 'Lavage' };
+      case 'lavage_cours':
+      case 'en_cours_lavage':
+        return { bg: '#0891b2', text: '#ffffff', label: 'Repassage' };
+      case 'repassage_cours':
+      case 'en_cours_repassage':
+        return { bg: '#10b981', text: '#ffffff', label: 'Prêt' };
+      case 'pret':
+      case 'a_recuperer':
+      case 'a_livrer':
+        return { bg: '#64748b', text: '#ffffff', label: 'Livré' };
+      default:
+        return null;
+    }
+  };
   const [selectedCategory, setSelectedCategory] = useState('Tous');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   
@@ -59,12 +137,9 @@ export default function GestionScreen({
   const [orderClient, setOrderClient] = useState('');
   const [selectedArticles, setSelectedArticles] = useState([]); // [{ id, article, service, quantity, price }]
   const [orderAvance, setOrderAvance] = useState('0');
-  const [orderPaymentMethod, setOrderPaymentMethod] = useState('Espèces');
-  const [orderExpDate, setOrderExpDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 2);
-    return d.toISOString().split('T')[0];
-  });
+  const [orderPaymentMethod, setOrderPaymentMethod] = useState('Espèce');
+  const [orderDiscount, setOrderDiscount] = useState('0');
+  const [orderUrgency, setOrderUrgency] = useState('Normal');
 
   // Client Details View
   const [selectedClient, setSelectedClient] = useState(null);
@@ -81,7 +156,7 @@ export default function GestionScreen({
   };
 
   // Status transitions
-  const handleNextStatus = async (order) => {
+  const handleNextStatus = async (order, updateSelected = false) => {
     let nextStatus = 'en_attente';
     if (order.statut === 'attente' || order.statut === 'en_attente') nextStatus = 'en_cours_lavage';
     else if (order.statut === 'lavage_cours' || order.statut === 'en_cours_lavage') nextStatus = 'en_cours_repassage';
@@ -90,8 +165,10 @@ export default function GestionScreen({
 
     try {
       await db.updateOrderStatus(order.id, nextStatus);
-      const updated = db.getOrders().find(o => o.id === order.id);
-      if (updated) setSelectedOrder(updated);
+      if (updateSelected) {
+        const updated = db.getOrders().find(o => o.id === order.id);
+        if (updated) setSelectedOrder(updated);
+      }
     } catch (e) {
       Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
     }
@@ -175,8 +252,11 @@ export default function GestionScreen({
     }
 
     const total = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const discountPercent = Number(orderDiscount) || 0;
+    const discountAmount = Math.round(total * (discountPercent / 100));
+    const netTotal = total - discountAmount;
     const avance = parseFloat(orderAvance) || 0;
-    const reste = total - avance;
+    const reste = netTotal - avance;
 
     try {
       const newOrder = {
@@ -187,12 +267,13 @@ export default function GestionScreen({
           quantite: a.quantity,
           prix: a.price
         })),
-        total,
+        total: netTotal,
         avance,
         reste,
         statut: 'attente',
-        date_retrait_prevue: orderExpDate,
         mode_paiement: orderPaymentMethod,
+        niveau_urgence: orderUrgency,
+        remise_pourcentage: discountPercent,
         created_by_id: currentUser ? currentUser.id : 'u1'
       };
 
@@ -202,6 +283,8 @@ export default function GestionScreen({
       setOrderClient('');
       setSelectedArticles([]);
       setOrderAvance('0');
+      setOrderDiscount('0');
+      setOrderUrgency('Normal');
       setShowOrderForm(false);
     } catch (e) {
       Alert.alert("Erreur", "Impossible de créer la commande.");
@@ -209,13 +292,16 @@ export default function GestionScreen({
   };
 
   const addArticleToOrder = (item) => {
-    const existingIdx = selectedArticles.findIndex(a => a.id === item.id);
+    // Supprimer tout autre service pour le même vêtement avant d'ajouter le nouveau
+    const clearedCart = selectedArticles.filter(a => !(a.article === item.article && a.service !== item.service));
+    
+    const existingIdx = clearedCart.findIndex(a => a.id === item.id);
     if (existingIdx !== -1) {
-      const copy = [...selectedArticles];
+      const copy = [...clearedCart];
       copy[existingIdx].quantity += 1;
       setSelectedArticles(copy);
     } else {
-      setSelectedArticles([...selectedArticles, {
+      setSelectedArticles([...clearedCart, {
         id: item.id,
         article: item.article,
         service: item.service,
@@ -275,7 +361,7 @@ export default function GestionScreen({
     const matchesQuery = clientName.includes(query) || ticketNo.includes(query) || orderId.includes(query);
     if (!matchesQuery) return false;
 
-    // Filter by dashboard selected card
+    // Filter by dashboard selected card (gestionFilter overrides local statusFilter)
     if (gestionFilter === 'en_cours') {
       return o.statut !== 'livre' && o.statut !== 'restitue';
     }
@@ -283,6 +369,17 @@ export default function GestionScreen({
       return o.statut === 'pret' || o.statut === 'a_recuperer' || o.statut === 'a_livrer';
     }
     if (gestionFilter === 'retards') {
+      return o.est_en_retard || o.statut === 'retard' || (o.statut !== 'restitue' && o.statut !== 'livre' && o.due_date && new Date(o.due_date) < new Date());
+    }
+
+    // Apply 3-button local status filter
+    if (statusFilter === 'actives') {
+      return o.statut !== 'livre' && o.statut !== 'restitue';
+    }
+    if (statusFilter === 'urgentes') {
+      return o.niveau_urgence === 'Express';
+    }
+    if (statusFilter === 'retard') {
       return o.est_en_retard || o.statut === 'retard' || (o.statut !== 'restitue' && o.statut !== 'livre' && o.due_date && new Date(o.due_date) < new Date());
     }
     return true;
@@ -302,28 +399,81 @@ export default function GestionScreen({
 
   return (
     <View style={styles.container}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Gestion</Text>
+      </View>
+
       {/* TABS SELECTOR */}
       <View style={styles.tabHeader}>
-        <View style={styles.tabSelector}>
+        {/* BOUTONS SUPÉRIEURS D'ACTION */}
+        <View style={styles.topActionsRow}>
           <TouchableOpacity 
-            onPress={() => { setSubTab('orders'); setSearchQuery(''); }}
-            style={[styles.tabButton, subTab === 'orders' && styles.tabButtonActive]}
+            onPress={() => setShowOrderForm(true)}
+            style={styles.topActionBtnBlue}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.tabButtonText, subTab === 'orders' && styles.tabButtonTextActive]}>Commandes</Text>
+            <Plus size={14} color="#ffffff" style={{ marginRight: 6 }} />
+            <Text style={styles.topActionBtnTextBlue}>Ajouter une commande</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            onPress={() => { setSubTab('clients'); setSearchQuery(''); }}
-            style={[styles.tabButton, subTab === 'clients' && styles.tabButtonActive]}
+            onPress={() => { setEditingCustomer(null); setShowCustomerModal(true); }}
+            style={styles.topActionBtnWhite}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.tabButtonText, subTab === 'clients' && styles.tabButtonTextActive]}>Clients</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => { setSubTab('catalog'); setSearchQuery(''); }}
-            style={[styles.tabButton, subTab === 'catalog' && styles.tabButtonActive]}
-          >
-            <Text style={[styles.tabButtonText, subTab === 'catalog' && styles.tabButtonTextActive]}>Catalogue</Text>
+            <Plus size={14} color="#002cf7" style={{ marginRight: 6 }} />
+            <Text style={styles.topActionBtnTextWhite}>Ajouter un profil client</Text>
           </TouchableOpacity>
         </View>
+
+        {/* FILTRE DE 3 BOUTONS AVEC COULEURS SÉMANTIQUES */}
+        {subTab === 'orders' && (
+          <View style={styles.statusFilterRow}>
+            <TouchableOpacity
+              onPress={() => { setStatusFilter('actives'); setGestionFilter(null); }}
+              style={[
+                styles.statusFilterBtn, 
+                statusFilter === 'actives' && !gestionFilter ? { backgroundColor: '#002cf7', borderColor: '#002cf7' } : null
+              ]}
+            >
+              <Text style={[
+                styles.statusFilterText, 
+                statusFilter === 'actives' && !gestionFilter ? { color: '#ffffff' } : null
+              ]}>
+                Actives
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setStatusFilter('urgentes'); setGestionFilter(null); }}
+              style={[
+                styles.statusFilterBtn, 
+                statusFilter === 'urgentes' && !gestionFilter ? { backgroundColor: '#e11d48', borderColor: '#e11d48' } : null
+              ]}
+            >
+              <Text style={[
+                styles.statusFilterText, 
+                statusFilter === 'urgentes' && !gestionFilter ? { color: '#ffffff' } : null
+              ]}>
+                Urgentes
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setStatusFilter('retard'); setGestionFilter(null); }}
+              style={[
+                styles.statusFilterBtn, 
+                statusFilter === 'retard' && !gestionFilter ? { backgroundColor: '#d97706', borderColor: '#d97706' } : null
+              ]}
+            >
+              <Text style={[
+                styles.statusFilterText, 
+                statusFilter === 'retard' && !gestionFilter ? { color: '#ffffff' } : null
+              ]}>
+                En retard
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
       </View>
 
       {/* SEARCH BAR */}
@@ -381,12 +531,82 @@ export default function GestionScreen({
                   <View style={styles.cardHeader}>
                     <Text style={styles.cardClientName}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</Text>
                     <View style={[styles.statusTag, { backgroundColor: status.bg }]}>
+                      <View style={[styles.statusDot, { backgroundColor: status.text }]} />
                       <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
                     </View>
                   </View>
                   <View style={styles.cardDetails}>
-                    <Text style={styles.cardTicketNo}>Ticket #{item.ticket_numero || item.id.substring(0, 8)}</Text>
+                    <Text style={styles.cardTicketNo}>Ticket #{getDisplayTicketId(item)}</Text>
                     <Text style={styles.cardPrice}>{formatPrice(item.prix_total || item.total)}</Text>
+                  </View>
+                  
+                  <View style={styles.cardExtraInfoRow}>
+                    <Text style={styles.cardExtraInfoText} numberOfLines={1}>
+                      {getItemsSummary(item.items || item.articles)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.cardMetaRow}>
+                    <View style={styles.metaBadge}>
+                      <Calendar size={10} color="#64748b" style={{ marginRight: 4 }} />
+                      <Text style={styles.metaBadgeText}>Retrait : {formatDate(item.due_date || item.date_retrait_prevue)}</Text>
+                    </View>
+                    <View style={[styles.metaBadge, item.niveau_urgence === 'Express' && styles.metaBadgeUrgent]}>
+                      <Clock size={10} color={item.niveau_urgence === 'Express' ? '#e11d48' : '#64748b'} style={{ marginRight: 4 }} />
+                      <Text style={[styles.metaBadgeText, item.niveau_urgence === 'Express' && styles.metaBadgeUrgentText]}>
+                        {item.niveau_urgence || 'Normal'}
+                      </Text>
+                    </View>
+                    <View style={styles.metaBadge}>
+                      <CreditCard size={10} color="#64748b" style={{ marginRight: 4 }} />
+                      <Text style={styles.metaBadgeText}>{item.mode_reglement || item.mode_paiement || 'Espèces'}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.cardDivider} />
+                  <View style={styles.cardFooterArea}>
+                    <View style={styles.cardFooterRow}>
+                      <TouchableOpacity
+                        onPress={(e) => handleShowInvoice(item, e)}
+                        style={styles.factureBtn}
+                        activeOpacity={0.7}
+                      >
+                        <Receipt size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                        <Text style={styles.factureBtnText}>Facture</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Next Status Button */}
+                    {(() => {
+                      const nextStyle = getNextStatusStyle(item.statut);
+                      if (!nextStyle) return null;
+                      return (
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleNextStatus(item, false);
+                          }}
+                          activeOpacity={0.8}
+                          style={{ marginHorizontal: 4 }}
+                        >
+                          <MotiView
+                            animate={{
+                              backgroundColor: nextStyle.bg,
+                            }}
+                            transition={{
+                              type: 'timing',
+                              duration: 250,
+                            }}
+                            style={styles.cardNextStatusBlockBtn}
+                          >
+                            <Check size={14} color="#ffffff" style={{ marginRight: 6 }} />
+                            <Text style={styles.cardNextStatusBlockBtnText}>
+                              Marquer comme : {nextStyle.label}
+                            </Text>
+                          </MotiView>
+                        </TouchableOpacity>
+                      );
+                    })()}
                   </View>
                 </TouchableOpacity>
               );
@@ -457,10 +677,12 @@ export default function GestionScreen({
       {showOrderDetails && selectedOrder && (
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
-            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseOrderDetails}>
+              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
             <View style={[styles.compactModalView, { maxHeight: '90%' }]}>
               <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Commande #{selectedOrder.ticket_numero || selectedOrder.id.substring(0, 8)}</Text>
+                <Text style={styles.compactModalTitle}>Commande #{getDisplayTicketId(selectedOrder)}</Text>
                 <TouchableOpacity onPress={handleCloseOrderDetails}>
                   <X size={20} color="#71717a" />
                 </TouchableOpacity>
@@ -527,7 +749,7 @@ export default function GestionScreen({
                 {/* Action Button for changing status */}
                 {selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && (
                   <TouchableOpacity
-                    onPress={() => handleNextStatus(selectedOrder)}
+                    onPress={() => handleNextStatus(selectedOrder, true)}
                     style={styles.statusChangeBtn}
                   >
                     <Text style={styles.statusChangeBtnText}>
@@ -547,7 +769,9 @@ export default function GestionScreen({
       {showOrderForm && (
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
-            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setShowOrderForm(false)}>
+              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
             <KeyboardAvoidingView
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               style={[styles.compactModalView, { maxHeight: '90%' }]}
@@ -570,179 +794,235 @@ export default function GestionScreen({
                   style={styles.selectMargin}
                 />
 
-                {/* Catégories d'articles */}
-                <Text style={styles.formLabel}>Choisir les Articles</Text>
-                <View style={styles.categoryTabsRow}>
-                  {['Tous', 'Lavage', 'Repassage', 'Sec'].map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      onPress={() => setSelectedCategory(cat)}
-                      style={[styles.categoryTabBtn, selectedCategory === cat && styles.categoryTabBtnActive]}
-                    >
-                      <Text style={[styles.categoryTabBtnText, selectedCategory === cat && styles.categoryTabBtnTextActive]}>
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                {/* Choisir les vêtements */}
+                <Text style={styles.formLabel}>Choisir les vêtements</Text>
+                <View style={styles.fixedArticleContainer}>
+                  <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>
+                    {(() => {
+                      const uniqueArticles = [...new Set(catalog
+                        .filter(c => c.categorie !== 'system_setting' && c.service !== 'system' && c.categorie !== 'abonnement' && c.service !== 'abonnement')
+                        .map(c => c.article)
+                      )];
 
-                {/* Liste des articles filtrés */}
-                <View style={styles.formArticlesList}>
-                  {catalog.filter(c => {
-                    if (c.categorie === 'system_setting' || c.service === 'system') return false;
-                    if (selectedCategory === 'Tous') return true;
-                    if (selectedCategory === 'Lavage') return c.service.includes('lavage');
-                    if (selectedCategory === 'Repassage') return c.service.includes('repassage');
-                    if (selectedCategory === 'Sec') return c.service.includes('sec') || c.service.includes('nettoyage');
-                    return true;
-                  }).map(item => {
-                    const inCart = selectedArticles.find(a => a.id === item.id);
-                    const qty = inCart ? inCart.quantity : 0;
-                    return (
-                      <View key={item.id} style={styles.formArticleItem}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.formArticleName}>{item.article}</Text>
-                          <View style={styles.formArticleMeta}>
-                            <View style={styles.miniServiceTag}>
-                              <Text style={styles.miniServiceTagText}>{item.service.replace(/_/g, ' ')}</Text>
+                      if (uniqueArticles.length === 0) {
+                        return <Text style={styles.emptyDetailsText}>Aucun article trouvé</Text>;
+                      }
+
+                      return uniqueArticles.map(articleName => {
+                        const items = catalog.filter(c => c.article === articleName);
+                        const traitementItem = items.find(i => i.service === 'lavage_simple') || items.find(i => i.service.includes('lavage')) || items.find(i => i.service.includes('sec') || i.service.includes('nettoyage'));
+                        const repassageItem = items.find(i => i.service === 'repassage');
+                        
+                        const isExpanded = isArticleExpanded(articleName, items);
+
+                        const getQtyInCart = (itemId) => {
+                          const cartItem = selectedArticles.find(a => a.id === itemId);
+                          return cartItem ? cartItem.quantity : 0;
+                        };
+
+                        return (
+                          <View key={articleName} style={styles.clothingCard}>
+                            <View style={styles.clothingHeader}>
+                              <Text style={styles.clothingName}>{articleName}</Text>
+                              <TouchableOpacity 
+                                onPress={() => toggleExpandArticle(articleName)}
+                                style={isExpanded ? styles.clothingCloseBtn : styles.clothingAddBtn}
+                              >
+                                <Text style={isExpanded ? styles.clothingCloseBtnText : styles.clothingAddBtnText}>
+                                  {isExpanded ? 'Masquer' : 'Ajouter'}
+                                </Text>
+                              </TouchableOpacity>
                             </View>
-                            <Text style={styles.formArticlePrice}>{formatPrice(item.prix)}</Text>
+
+                            {isExpanded && (
+                              <View style={styles.servicesContainer}>
+                                {/* Traitement Service */}
+                                {traitementItem && (
+                                  <View style={styles.serviceRow}>
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={styles.serviceLabel}>Traitement (Lavage)</Text>
+                                      <Text style={styles.servicePrice}>{formatPrice(traitementItem.prix)}</Text>
+                                    </View>
+                                    {getQtyInCart(traitementItem.id) === 0 ? (
+                                      <TouchableOpacity 
+                                        onPress={() => addArticleToOrder(traitementItem)}
+                                        style={styles.serviceAddBtn}
+                                      >
+                                        <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
+                                        <Text style={styles.serviceAddBtnText}>Ajouter</Text>
+                                      </TouchableOpacity>
+                                    ) : (
+                                      <View style={styles.serviceQtyRow}>
+                                        <TouchableOpacity onPress={() => removeArticleFromOrder(traitementItem.id)} style={styles.serviceQtyBtn}>
+                                          <Text style={styles.serviceQtyBtnText}>-</Text>
+                                        </TouchableOpacity>
+                                        <Text style={styles.serviceQtyText}>{getQtyInCart(traitementItem.id)}</Text>
+                                        <TouchableOpacity onPress={() => addArticleToOrder(traitementItem)} style={styles.serviceQtyBtn}>
+                                          <Text style={styles.serviceQtyBtnText}>+</Text>
+                                        </TouchableOpacity>
+                                      </View>
+                                    )}
+                                  </View>
+                                )}
+
+                                {/* Repassage Service */}
+                                {repassageItem && (
+                                  <View style={styles.serviceRow}>
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={styles.serviceLabel}>Repassage</Text>
+                                      <Text style={styles.servicePrice}>{formatPrice(repassageItem.prix)}</Text>
+                                    </View>
+                                    {getQtyInCart(repassageItem.id) === 0 ? (
+                                      <TouchableOpacity 
+                                        onPress={() => addArticleToOrder(repassageItem)}
+                                        style={styles.serviceAddBtn}
+                                      >
+                                        <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
+                                        <Text style={styles.serviceAddBtnText}>Ajouter</Text>
+                                      </TouchableOpacity>
+                                    ) : (
+                                      <View style={styles.serviceQtyRow}>
+                                        <TouchableOpacity onPress={() => removeArticleFromOrder(repassageItem.id)} style={styles.serviceQtyBtn}>
+                                          <Text style={styles.serviceQtyBtnText}>-</Text>
+                                        </TouchableOpacity>
+                                        <Text style={styles.serviceQtyText}>{getQtyInCart(repassageItem.id)}</Text>
+                                        <TouchableOpacity onPress={() => addArticleToOrder(repassageItem)} style={styles.serviceQtyBtn}>
+                                          <Text style={styles.serviceQtyBtnText}>+</Text>
+                                        </TouchableOpacity>
+                                      </View>
+                                    )}
+                                  </View>
+                                )}
+                              </View>
+                            )}
                           </View>
-                        </View>
-                        {qty === 0 ? (
-                          <TouchableOpacity 
-                            onPress={() => addArticleToOrder(item)} 
-                            style={styles.formArticleAddBtn}
-                          >
-                            <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                            <Text style={styles.formArticleAddBtnText}>Ajouter</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={styles.formArticleQtyRow}>
-                            <TouchableOpacity onPress={() => removeArticleFromOrder(item.id)} style={styles.formQtyBtn}>
-                              <Text style={styles.formQtyBtnText}>-</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.formQtyText}>{qty}</Text>
-                            <TouchableOpacity onPress={() => addArticleToOrder(item)} style={styles.formQtyBtn}>
-                              <Text style={styles.formQtyBtnText}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })}
+                        );
+                      });
+                    })()}
+                  </ScrollView>
                 </View>
 
-                {/* Mode de règlement */}
-                <Text style={styles.formLabel}>Mode de Règlement</Text>
-                <View style={styles.paymentMethodRow}>
-                  {['Espèces', 'Wave', 'Orange Money'].map((method) => {
-                    const isActive = orderPaymentMethod === method;
+                {/* Niveau d'urgence */}
+                <Text style={styles.formLabel}>Urgence</Text>
+                <View style={styles.urgencyRow}>
+                  {['Normal', 'Express'].map((level) => {
+                    const isActive = orderUrgency === level;
                     return (
                       <TouchableOpacity
-                        key={method}
-                        onPress={() => setOrderPaymentMethod(method)}
-                        style={[styles.paymentMethodBtn, isActive && styles.paymentMethodBtnActive]}
+                        key={level}
+                        onPress={() => setOrderUrgency(level)}
+                        style={[
+                          styles.urgencyBtn, 
+                          isActive ? { backgroundColor: level === 'Express' ? '#e11d48' : '#002cf7', borderColor: level === 'Express' ? '#e11d48' : '#002cf7' } : null
+                        ]}
+                        activeOpacity={0.8}
                       >
-                        <Text style={[styles.paymentMethodBtnText, isActive && styles.paymentMethodBtnTextActive]}>
-                          {method}
+                        <Text style={[styles.urgencyBtnText, isActive && { color: '#ffffff' }]}>
+                          {level === 'Express' ? 'Express (24h)' : 'Normal (48h)'}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
 
-                {/* Avance payée avec presets */}
-                <Text style={styles.formLabel}>Avance (FCFA)</Text>
+                {/* Avance et Mode de règlement (same line) */}
+                <View style={styles.formRowInline}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formLabel}>Avance (FCFA)</Text>
+                    <TextInput
+                      keyboardType="numeric"
+                      value={orderAvance}
+                      onChangeText={setOrderAvance}
+                      style={styles.formInput}
+                    />
+                  </View>
+                  <View style={{ width: 12 }} />
+                  <View style={{ flex: 1.2 }}>
+                    <Text style={styles.formLabel}>Mode Règlement</Text>
+                    <CustomSelect
+                      value={orderPaymentMethod}
+                      onChange={setOrderPaymentMethod}
+                      options={[
+                        { value: 'Espèce', label: 'Espèce' },
+                        { value: 'Mobile Money', label: 'Mobile Money' }
+                      ]}
+                      placeholder="Choisir"
+                    />
+                  </View>
+                </View>
+
+                {/* Réduction (%) */}
+                <Text style={styles.formLabel}>Réduction (%)</Text>
                 <TextInput
                   keyboardType="numeric"
-                  value={orderAvance}
-                  onChangeText={setOrderAvance}
+                  value={orderDiscount}
+                  onChangeText={(val) => {
+                    const num = parseInt(val, 10);
+                    if (val === '') setOrderDiscount('0');
+                    else if (!isNaN(num) && num >= 0 && num <= 100) setOrderDiscount(num.toString());
+                  }}
                   style={styles.formInput}
+                  placeholder="Ex: 10"
+                  placeholderTextColor="#a1a1aa"
                 />
-                
-                {/* Presets Avance */}
-                <View style={styles.formPresetsRow}>
-                  {['0', '1000', '2000', '5000', 'total'].map((preset) => {
-                    const currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                    const label = preset === 'total' ? 'Total' : formatPrice(parseInt(preset));
-                    const val = preset === 'total' ? currentTotal.toString() : preset;
-                    const isActive = orderAvance === val;
-                    return (
-                      <TouchableOpacity 
-                        key={preset}
-                        onPress={() => setOrderAvance(val)}
-                        style={[styles.formPresetBtn, isActive && styles.formPresetBtnActive]}
-                      >
-                        <Text style={[styles.formPresetBtnText, isActive && styles.formPresetBtnTextActive]}>
-                          {label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Date retrait avec presets */}
-                <Text style={styles.formLabel}>Date de retrait prévue</Text>
-                <TextInput
-                  value={orderExpDate}
-                  onChangeText={setOrderExpDate}
-                  placeholder="AAAA-MM-JJ"
-                  style={styles.formInput}
-                />
-                
-                {/* Presets Date */}
-                <View style={styles.formPresetsRow}>
-                  {[
-                    { label: 'Demain', days: 1 },
-                    { label: 'Dans 2 jours', days: 2 },
-                    { label: 'Dans 3 jours', days: 3 },
-                  ].map((preset) => {
-                    const targetDate = (() => {
-                      const d = new Date();
-                      d.setDate(d.getDate() + preset.days);
-                      return d.toISOString().split('T')[0];
-                    })();
-                    const isActive = orderExpDate === targetDate;
-                    return (
-                      <TouchableOpacity 
-                        key={preset.label}
-                        onPress={() => {
-                          const d = new Date();
-                          d.setDate(d.getDate() + preset.days);
-                          setOrderExpDate(d.toISOString().split('T')[0]);
-                        }}
-                        style={[styles.formPresetBtn, isActive && styles.formPresetBtnActive]}
-                      >
-                        <Text style={[styles.formPresetBtnText, isActive && styles.formPresetBtnTextActive]}>
-                          {preset.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
 
                 {/* Live Receipt Card */}
                 {(() => {
                   const currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                  const discountPercent = Number(orderDiscount) || 0;
+                  const discountAmount = Math.round(currentTotal * (discountPercent / 100));
+                  const netTotal = currentTotal - discountAmount;
                   const currentAvance = parseFloat(orderAvance) || 0;
-                  const currentReste = currentTotal - currentAvance;
+                  const currentReste = netTotal - currentAvance;
+
+                  // Dynamic availability delay calculation from CMS
+                  const expressHours = catalog.find(c => c.id === 'setting_express_hours')?.prix || 6;
+                  const normalHours = catalog.find(c => c.id === 'setting_normal_hours')?.prix || 48;
+                  const delay = orderUrgency === 'Express' ? `${expressHours}h (Express)` : `${normalHours}h (Normal)`;
+
                   return (
                     <View style={styles.receiptPreviewCard}>
+                      <Text style={styles.receiptSectionTitle}>Facturation</Text>
+                      
                       <View style={styles.receiptRow}>
-                        <Text style={styles.receiptRowLabel}>Total commande</Text>
-                        <Text style={styles.receiptRowValBold}>{formatPrice(currentTotal)}</Text>
+                        <Text style={styles.receiptRowLabel}>Total Brut</Text>
+                        <Text style={styles.receiptRowVal}>{formatPrice(currentTotal)}</Text>
                       </View>
+                      
+                      {discountAmount > 0 && (
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabel}>Réduction ({discountPercent}%)</Text>
+                          <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
+                        </View>
+                      )}
+
                       <View style={styles.receiptRow}>
-                        <Text style={styles.receiptRowLabel}>Avance</Text>
+                        <Text style={styles.receiptRowLabelBold}>Net à Payer</Text>
+                        <Text style={styles.receiptRowValBold}>{formatPrice(netTotal)}</Text>
+                      </View>
+
+                      <View style={styles.receiptRow}>
+                        <Text style={styles.receiptRowLabel}>Acompte (Avance)</Text>
                         <Text style={styles.receiptRowVal}>{formatPrice(currentAvance)}</Text>
                       </View>
+
                       <View style={styles.receiptDivider} />
+
                       <View style={styles.receiptRow}>
-                        <Text style={styles.receiptRowLabelBold}>Reste à payer</Text>
+                        <Text style={styles.receiptRowLabelBold}>Solde Restant</Text>
                         <Text style={[styles.receiptRowValTotal, { color: currentReste > 0 ? '#ef4444' : '#10b981' }]}>
                           {formatPrice(currentReste)}
                         </Text>
+                      </View>
+
+                      <View style={[styles.receiptRow, { marginTop: 6 }]}>
+                        <Text style={styles.receiptRowLabelMuted}>Mode règlement :</Text>
+                        <Text style={styles.receiptRowValMuted}>{orderPaymentMethod}</Text>
+                      </View>
+
+                      <View style={[styles.receiptRow, { marginTop: 4 }]}>
+                        <Text style={styles.receiptRowLabelMuted}>Disponibilité :</Text>
+                        <Text style={[styles.receiptRowValMuted, { fontWeight: '700', color: '#002cf7' }]}>Sous {delay}</Text>
                       </View>
                     </View>
                   );
@@ -764,7 +1044,9 @@ export default function GestionScreen({
       {showCustomerModal && (
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
-            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setShowCustomerModal(false)}>
+              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
             <KeyboardAvoidingView
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               style={styles.compactModalView}
@@ -854,7 +1136,9 @@ export default function GestionScreen({
       {selectedClient !== null && selectedClient && (
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
-            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedClient(null)}>
+              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
             <View style={[styles.compactModalView, { maxHeight: '90%' }]}>
               <View style={styles.compactModalHeader}>
                 <Text style={styles.compactModalTitle}>Fiche Client</Text>
@@ -900,7 +1184,7 @@ export default function GestionScreen({
                       return (
                         <View key={item.id} style={styles.orderHistoryItem}>
                           <View>
-                            <Text style={styles.orderHistoryNo}>Ticket #{item.ticket_numero || item.id.substring(0, 8)}</Text>
+                            <Text style={styles.orderHistoryNo}>Ticket #{getDisplayTicketId(item)}</Text>
                             <Text style={styles.orderHistoryDate}>{item.created_at.split('T')[0]}</Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
@@ -914,6 +1198,128 @@ export default function GestionScreen({
                     })
                   );
                 })()}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* MODAL 5 : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
+      {showInvoiceModal && invoiceOrder && (
+        <View style={styles.absoluteModalContainer}>
+          <View style={styles.popupModalOverlay}>
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
+              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
+            <View style={styles.popupModalView}>
+              <View style={styles.compactModalHeader}>
+                <Text style={styles.compactModalTitle}>Facture Client</Text>
+                <TouchableOpacity onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
+                  <X size={20} color="#71717a" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
+                {/* TPE Thermal Receipt Wrapper */}
+                <View style={styles.tpeReceiptContainer}>
+                  {/* Receipt Header */}
+                  <Text style={styles.tpeBrand}>KLIN UP</Text>
+                  <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
+                  <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
+                  <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
+                  
+                  <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                  {/* Receipt Metadata */}
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
+                    <Text style={styles.tpeMetaVal}>#{getDisplayTicketId(invoiceOrder)}</Text>
+                  </View>
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>Code :</Text>
+                    <Text style={styles.tpeMetaVal}>{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
+                  </View>
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>Date :</Text>
+                    <Text style={styles.tpeMetaVal}>
+                      {invoiceOrder.created_at ? new Date(invoiceOrder.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
+                    </Text>
+                  </View>
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>Client :</Text>
+                    <Text style={styles.tpeMetaVal}>
+                      {(() => {
+                        const c = customers.find(cust => cust.id === invoiceOrder.customer_id);
+                        return c ? `${c.prenom} ${c.nom}` : 'Client Inconnu';
+                      })()}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                  {/* Items list */}
+                  <Text style={styles.tpeSectionTitle}>ARTICLES & SERVICES</Text>
+                  {(invoiceOrder.items || invoiceOrder.articles || []).map((art, idx) => (
+                    <View key={idx} style={styles.tpeItemRow}>
+                      <View style={{ flex: 1.8 }}>
+                        <Text style={styles.tpeItemName}>{art.article}</Text>
+                        <Text style={styles.tpeItemService}>{art.service.replace(/_/g, ' ')}</Text>
+                      </View>
+                      <Text style={styles.tpeItemQty}>x{art.quantite || art.quantity}</Text>
+                      <Text style={styles.tpeItemPrice}>{formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</Text>
+                    </View>
+                  ))}
+
+                  <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                  {/* Billing Details */}
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={styles.tpeTotalLabel}>TOTAL BRUT</Text>
+                    <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
+                  </View>
+                  
+                  {invoiceOrder.remise_pourcentage > 0 && (
+                    <View style={styles.tpeTotalRow}>
+                      <Text style={styles.tpeTotalLabel}>REMISE ({invoiceOrder.remise_pourcentage}%)</Text>
+                      <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(invoiceOrder.remise_montant || 0)}</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
+                    <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.total || invoiceOrder.prix_total)}</Text>
+                  </View>
+
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={styles.tpeTotalLabel}>AVANCE PAYEE</Text>
+                    <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.avance_payee || invoiceOrder.avance || 0)}</Text>
+                  </View>
+
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={styles.tpeTotalLabelBold}>RESTE A PAYER</Text>
+                    <Text style={[styles.tpeTotalValBold, { color: (invoiceOrder.reste || 0) > 0 ? '#ef4444' : '#10b981' }]}>
+                      {formatPrice(invoiceOrder.reste || 0)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                  {/* Footer & Barcode placeholder */}
+                  <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
+                  
+                  <View style={styles.barcodeContainer}>
+                    <Text style={styles.barcodeText}>* {invoiceOrder.identifiant_unique_marquage || invoiceOrder.id} *</Text>
+                  </View>
+
+                  <Text style={styles.tpeTextMutedCentred}>Rejoignez KLIN UP pour un service premium</Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+                  style={[styles.invoiceCloseBtn, { marginTop: 16 }]}
+                >
+                  <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
+                </TouchableOpacity>
               </ScrollView>
             </View>
           </View>
@@ -969,7 +1375,7 @@ const styles = StyleSheet.create({
   },
   tabButtonTextActive: {
     color: '#09090b',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   searchSection: {
     flexDirection: 'row',
@@ -1018,7 +1424,7 @@ const styles = StyleSheet.create({
   filterPillText: {
     fontSize: 12,
     color: '#002cf7',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   clearFilterBtn: {
     width: 16,
@@ -1064,17 +1470,17 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   orderCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    borderRadius: 22,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
+    borderColor: 'rgba(255, 255, 255, 0.75)',
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowRadius: 20,
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1084,7 +1490,7 @@ const styles = StyleSheet.create({
   },
   cardClientName: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   statusTag: {
@@ -1093,9 +1499,22 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
   },
+  statusTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 99,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
   statusTagText: {
     fontSize: 9,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   cardDetails: {
     flexDirection: 'row',
@@ -1109,31 +1528,31 @@ const styles = StyleSheet.create({
   },
   cardPrice: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   clientCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    borderRadius: 22,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
+    borderColor: 'rgba(255, 255, 255, 0.75)',
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowRadius: 20,
+    elevation: 3,
   },
   clientInfo: {
     flex: 1,
   },
   clientName: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   clientPhone: {
@@ -1160,7 +1579,7 @@ const styles = StyleSheet.create({
   },
   catalogArticle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   catalogService: {
@@ -1171,7 +1590,7 @@ const styles = StyleSheet.create({
   },
   catalogPrice: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   modalView: {
@@ -1221,7 +1640,7 @@ const styles = StyleSheet.create({
   },
   detailTextLarge: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   detailArticleRow: {
@@ -1246,12 +1665,12 @@ const styles = StyleSheet.create({
   },
   detailLabelBold: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   detailPriceBold: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#2563eb',
   },
   detailLabelMuted: {
@@ -1317,7 +1736,7 @@ const styles = StyleSheet.create({
   },
   catalogBadgeText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   catalogBadgeService: {
@@ -1328,7 +1747,7 @@ const styles = StyleSheet.create({
   },
   catalogBadgePrice: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#2563eb',
     marginTop: 4,
   },
@@ -1361,7 +1780,7 @@ const styles = StyleSheet.create({
   },
   selectedRowName: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   selectedRowService: {
@@ -1384,12 +1803,12 @@ const styles = StyleSheet.create({
   },
   qtyBtnText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   qtyText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   formInput: {
@@ -1448,11 +1867,11 @@ const styles = StyleSheet.create({
   },
   compactModalTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   compactModalScroll: {
-    paddingBottom: 30,
+    paddingBottom: 135,
   },
   compactInputRow: {
     flexDirection: 'row',
@@ -1504,7 +1923,7 @@ const styles = StyleSheet.create({
   },
   prefTextActive: {
     color: '#2563eb',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   compactSubmitBtn: {
     backgroundColor: '#2563eb',
@@ -1526,7 +1945,7 @@ const styles = StyleSheet.create({
   // Fiche Client Detail styles
   clientProfileName: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   clientProfilePhone: {
@@ -1604,7 +2023,7 @@ const styles = StyleSheet.create({
   },
   orderHistoryNo: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   orderHistoryDate: {
@@ -1615,7 +2034,7 @@ const styles = StyleSheet.create({
   },
   orderHistoryTotal: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   categoryTabsRow: {
@@ -1656,7 +2075,7 @@ const styles = StyleSheet.create({
   },
   formArticleName: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   formArticleMeta: {
@@ -1675,12 +2094,12 @@ const styles = StyleSheet.create({
   },
   miniServiceTagText: {
     fontSize: 9,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#002cf7',
   },
   formArticlePrice: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   formArticleAddBtn: {
@@ -1695,7 +2114,7 @@ const styles = StyleSheet.create({
   },
   formArticleAddBtnText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#002cf7',
   },
   formArticleQtyRow: {
@@ -1713,12 +2132,12 @@ const styles = StyleSheet.create({
   },
   formQtyBtnText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#ffffff',
   },
   formQtyText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   paymentMethodRow: {
@@ -1747,7 +2166,7 @@ const styles = StyleSheet.create({
   },
   paymentMethodBtnTextActive: {
     color: '#002cf7',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   formPresetsRow: {
     flexDirection: 'row',
@@ -1775,7 +2194,7 @@ const styles = StyleSheet.create({
   },
   formPresetBtnTextActive: {
     color: '#002cf7',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   receiptPreviewCard: {
     backgroundColor: 'rgba(0, 44, 247, 0.03)',
@@ -1799,7 +2218,7 @@ const styles = StyleSheet.create({
   receiptRowLabelBold: {
     fontSize: 13,
     color: '#0f172a',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   receiptRowVal: {
     fontSize: 12,
@@ -1809,15 +2228,668 @@ const styles = StyleSheet.create({
   receiptRowValBold: {
     fontSize: 13,
     color: '#0f172a',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   receiptRowValTotal: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   receiptDivider: {
     height: 1,
     backgroundColor: 'rgba(0, 44, 247, 0.1)',
     marginVertical: 8,
+  },
+  // Header styles
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+    backgroundColor: '#f4f5f7',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#09090b',
+    letterSpacing: -0.5,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+  },
+  // Top Actions styles
+  topActionsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    gap: 12,
+    backgroundColor: '#f4f5f7',
+  },
+  topActionBtnBlue: {
+    flex: 1.1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#002cf7',
+    borderRadius: 14,
+    height: 40,
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  topActionBtnTextBlue: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  topActionBtnWhite: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#002cf7',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    height: 40,
+  },
+  topActionBtnTextWhite: {
+    color: '#002cf7',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  // 3-Button Filter styles
+  statusFilterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    gap: 8,
+    backgroundColor: '#f4f5f7',
+  },
+  statusFilterBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  statusFilterBtnActive: {
+    backgroundColor: '#09090b',
+    borderColor: '#09090b',
+  },
+  statusFilterText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  statusFilterTextActive: {
+    color: '#ffffff',
+  },
+  // Order card style updates & invoice button styles
+  urgencyRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
+  },
+  urgencyBtn: {
+    flex: 1,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  urgencyBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  formRowInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  receiptSectionTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  receiptRowLabelMuted: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  receiptRowValMuted: {
+    fontSize: 11,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  cardExtraInfoRow: {
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  cardExtraInfoText: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  cardMetaRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
+  metaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  metaBadgeText: {
+    fontSize: 9,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  metaBadgeUrgent: {
+    borderColor: '#ffe4e6',
+    backgroundColor: '#fff1f2',
+  },
+  metaBadgeUrgentText: {
+    color: '#e11d48',
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+    marginVertical: 12,
+  },
+  cardFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  factureBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 44, 247, 0.05)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(0, 44, 247, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  factureBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#002cf7',
+  },
+  nextStatusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#002cf7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  nextStatusBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  // Invoice Modal specific styles
+  invoiceHeaderArea: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  popupModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  popupModalView: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 16,
+    width: '95%',
+    maxWidth: 370,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+  },
+  cardFooterArea: {
+    paddingTop: 8,
+    gap: 8,
+  },
+  cardNextStatusBlockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  cardNextStatusBlockBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  tpeScroll: {
+    paddingBottom: 10,
+  },
+  tpeReceiptContainer: {
+    backgroundColor: '#fafaf9',
+    borderWidth: 1,
+    borderColor: '#e7e5e4',
+    padding: 14,
+    borderRadius: 12,
+  },
+  tpeBrand: {
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    color: '#1c1917',
+    letterSpacing: 1.5,
+  },
+  tpeBrandSub: {
+    fontSize: 8,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#78716c',
+    letterSpacing: 0.8,
+    marginTop: 2,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  tpeTextMuted: {
+    fontSize: 10,
+    color: '#78716c',
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+  tpeTextMutedCentred: {
+    fontSize: 9,
+    color: '#a8a29e',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  tpeDashedDivider: {
+    fontSize: 12,
+    color: '#d6d3d1',
+    textAlign: 'center',
+    letterSpacing: 2,
+    marginVertical: 10,
+  },
+  tpeMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 2,
+  },
+  tpeMetaLabel: {
+    fontSize: 11,
+    color: '#78716c',
+    fontWeight: '500',
+  },
+  tpeMetaVal: {
+    fontSize: 11,
+    color: '#1c1917',
+    fontWeight: '600',
+  },
+  tpeSectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#44403c',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  tpeItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  tpeItemName: {
+    fontSize: 12,
+    color: '#1c1917',
+    fontWeight: '600',
+  },
+  tpeItemService: {
+    fontSize: 9,
+    color: '#78716c',
+    textTransform: 'uppercase',
+  },
+  tpeItemQty: {
+    fontSize: 11,
+    color: '#44403c',
+    fontWeight: '500',
+    marginHorizontal: 8,
+  },
+  tpeItemPrice: {
+    fontSize: 11,
+    color: '#1c1917',
+    fontWeight: '600',
+  },
+  tpeTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 3,
+  },
+  tpeTotalLabel: {
+    fontSize: 11,
+    color: '#44403c',
+    fontWeight: '500',
+  },
+  tpeTotalVal: {
+    fontSize: 11,
+    color: '#1c1917',
+    fontWeight: '600',
+  },
+  tpeTotalLabelBold: {
+    fontSize: 11,
+    color: '#1c1917',
+    fontWeight: '700',
+  },
+  tpeTotalValBold: {
+    fontSize: 11,
+    color: '#1c1917',
+    fontWeight: '700',
+  },
+  tpeFooterMessage: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#44403c',
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 10,
+    letterSpacing: 0.5,
+  },
+  barcodeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#a8a29e',
+    paddingVertical: 10,
+    marginVertical: 6,
+    borderRadius: 4,
+  },
+  barcodeText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1c1917',
+    letterSpacing: 2,
+  },
+  invoiceBrand: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#002cf7',
+    letterSpacing: 2,
+  },
+  invoiceMuted: {
+    fontSize: 11,
+    color: '#71717a',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  invoiceDetailsCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+  },
+  invoiceInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 3,
+  },
+  invoiceInfoLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  invoiceInfoVal: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  invoiceInfoValBold: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '700',
+  },
+  invoiceDivider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+    marginVertical: 10,
+  },
+  invoiceItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  invoiceItemName: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  invoiceItemService: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  invoiceItemQty: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  invoiceItemPrice: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  invoiceTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  invoiceTotalLabel: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  invoiceTotalLabelBold: {
+    fontSize: 13,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  invoiceTotalLabelMuted: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  invoiceTotalVal: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  invoiceTotalValBold: {
+    fontSize: 13,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  invoiceTotalValMuted: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  invoiceFooterArea: {
+    alignItems: 'center',
+    marginVertical: 16,
+    paddingHorizontal: 10,
+  },
+  invoiceFooterText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  invoiceFooterSubtext: {
+    fontSize: 9,
+    color: '#71717a',
+    textAlign: 'center',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  invoiceCloseBtn: {
+    backgroundColor: '#09090b',
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  invoiceCloseBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  fixedArticleContainer: {
+    height: 310,
+    backgroundColor: '#f8fafc',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    padding: 10,
+    marginVertical: 12,
+  },
+  clothingCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.75)',
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.02,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  clothingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  clothingName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  clothingAddBtn: {
+    backgroundColor: 'rgba(0, 44, 247, 0.06)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  clothingAddBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#002cf7',
+  },
+  clothingCloseBtn: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  clothingCloseBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  servicesContainer: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 8,
+    gap: 8,
+  },
+  serviceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  serviceLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#475569',
+  },
+  servicePrice: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#002cf7',
+    marginTop: 2,
+  },
+  serviceAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 44, 247, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 44, 247, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  serviceAddBtnText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#002cf7',
+  },
+  serviceQtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  serviceQtyBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#002cf7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  serviceQtyBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    lineHeight: 14,
+  },
+  serviceQtyText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0f172a',
+    minWidth: 16,
+    textAlign: 'center',
   },
 });

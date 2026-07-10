@@ -936,7 +936,14 @@ export const db = {
     const initialStatus = orderData.statut === 'attente' ? 'en_attente' : (orderData.statut || 'en_attente');
 
     const newOrder = {
-      id: 'o_' + Math.random().toString(36).substr(2, 9),
+      id: (() => {
+        const numericIds = memoryDb.orders.map(o => {
+          const num = parseInt(o.id, 10);
+          return isNaN(num) ? 0 : num;
+        });
+        const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
+        return String(Math.max(1001, maxId + 1));
+      })(),
       customer_id: orderData.customer_id,
       statut: initialStatus,
       type_article: orderData.type_article || (inputItems[0] ? inputItems[0].article : 'Divers'),

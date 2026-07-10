@@ -1,50 +1,45 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Modal, FlatList } from 'react-native';
-import { ChevronDown, Check, X } from 'lucide-react-native';
+import { StyleSheet, Text, View, TouchableOpacity, FlatList } from 'react-native';
+import { ChevronDown, Check } from 'lucide-react-native';
 
 export const CustomSelect = ({ value, onChange, options, placeholder, disabled, style, buttonStyle }) => {
-  const [modalVisible, setModalVisible] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const selectedOption = options.find(o => String(o.value) === String(value));
 
   const handleSelect = (val) => {
     onChange(val);
-    setModalVisible(false);
+    setIsOpen(false);
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style, { zIndex: isOpen ? 9999 : 1 }]}>
       <TouchableOpacity
         activeOpacity={0.7}
         disabled={disabled}
-        onPress={() => setModalVisible(true)}
+        onPress={() => setIsOpen(!isOpen)}
         style={[styles.button, disabled && styles.disabledButton, buttonStyle]}
       >
-        <Text style={[styles.buttonText, !selectedOption && styles.placeholderText]}>
+        <Text style={[styles.buttonText, !selectedOption && styles.placeholderText]} numberOfLines={1}>
           {selectedOption ? selectedOption.label : (placeholder || '-- Choisir --')}
         </Text>
         <ChevronDown size={16} color="#71717a" />
       </TouchableOpacity>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{placeholder || 'Sélectionner'}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
-                <X size={20} color="#71717a" />
-              </TouchableOpacity>
-            </View>
-
-            {/* List */}
+      {isOpen && (
+        <>
+          {/* Transparent Backdrop to close dropdown on clicking outside */}
+          <TouchableOpacity 
+            activeOpacity={1} 
+            style={styles.backdrop} 
+            onPress={() => setIsOpen(false)} 
+          />
+          
+          <View style={styles.dropdownMenu}>
             <FlatList
               data={options}
               keyExtractor={(item) => String(item.value)}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => {
                 const isSelected = String(item.value) === String(value);
                 return (
@@ -55,15 +50,15 @@ export const CustomSelect = ({ value, onChange, options, placeholder, disabled, 
                     <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
                       {item.label}
                     </Text>
-                    {isSelected && <Check size={16} color="#3b82f6" />}
+                    {isSelected && <Check size={14} color="#002cf7" />}
                   </TouchableOpacity>
                 );
               }}
               style={styles.optionsList}
             />
           </View>
-        </View>
-      </Modal>
+        </>
+      )}
     </View>
   );
 };
@@ -71,6 +66,7 @@ export const CustomSelect = ({ value, onChange, options, placeholder, disabled, 
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    position: 'relative',
   },
   button: {
     width: '100%',
@@ -95,53 +91,53 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: '#a1a1aa',
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  backdrop: {
+    position: 'absolute',
+    top: -1000,
+    bottom: -1000,
+    left: -1000,
+    right: -1000,
+    backgroundColor: 'transparent',
+    zIndex: 9998,
   },
-  modalContent: {
+  dropdownMenu: {
+    position: 'absolute',
+    top: 44,
+    left: 0,
+    right: 0,
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '50%',
-    paddingBottom: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f4f4f5',
-  },
-  modalTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#18181b',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e4e4e7',
+    maxHeight: 180,
+    zIndex: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
   },
   optionsList: {
-    paddingHorizontal: 16,
+    padding: 6,
   },
   optionItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f4f4f5',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 8,
   },
   selectedOptionItem: {
     backgroundColor: '#eff6ff',
-    borderRadius: 8,
-    paddingHorizontal: 8,
   },
   optionText: {
     fontSize: 13,
-    color: '#52525b',
+    color: '#3f3f46',
   },
   selectedOptionText: {
-    color: '#3b82f6',
+    color: '#002cf7',
     fontWeight: '600',
   },
 });

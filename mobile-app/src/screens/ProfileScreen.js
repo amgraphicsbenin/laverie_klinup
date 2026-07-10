@@ -82,7 +82,13 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profil</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       {/* Profil Header */}
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
@@ -221,7 +227,8 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+     </ScrollView>
+    </View>
   );
 }
 
@@ -231,18 +238,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     paddingBottom: 110,
   },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 8,
+    backgroundColor: '#f8fafc',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#09090b',
+    letterSpacing: -0.5,
+  },
   profileCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
+    borderColor: 'rgba(255, 255, 255, 0.75)',
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowRadius: 20,
+    elevation: 3,
     marginBottom: 20,
   },
   avatar: {
@@ -258,12 +277,12 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 26,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#2563eb',
   },
   profileName: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   profileRole: {
@@ -302,16 +321,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   infoCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
+    borderColor: 'rgba(255, 255, 255, 0.75)',
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowRadius: 20,
+    elevation: 3,
     marginBottom: 20,
   },
   infoRow: {
@@ -337,7 +356,7 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
   },
   divider: {
@@ -411,7 +430,6 @@ const styles = StyleSheet.create({
   approvedText: {
     fontSize: 11,
     color: '#10b981',
-    fontWeight: '#059669',
     fontWeight: '600',
   },
   modalOverlay: {
@@ -438,7 +456,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
   },
   modalBody: {

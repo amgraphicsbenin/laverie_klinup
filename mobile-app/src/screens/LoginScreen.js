@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
     textAlign: 'center',
     marginBottom: 8,
@@ -306,12 +306,12 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 26,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#ffffff',
   },
   userName: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0f172a',
     textAlign: 'center',
   },
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   },
   pinTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0f172a',
     textAlign: 'center',
     marginBottom: 8,
