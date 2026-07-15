@@ -20,6 +20,20 @@ export function OrderFormModal({ visible, onClose }) {
   const [orderUrgency, setOrderUrgency] = useState('Normal');
   const [expandedArticles, setExpandedArticles] = useState([]);
 
+  const [payWithSubscription, setPayWithSubscription] = useState(false);
+  const [subscribePlanId, setSubscribePlanId] = useState('');
+
+  const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
+
+  useEffect(() => {
+    if (activeCustomer && activeCustomer.active_subscription) {
+      setPayWithSubscription(true);
+    } else {
+      setPayWithSubscription(false);
+    }
+    setSubscribePlanId('');
+  }, [orderClient]);
+
   // Reset form when opening
   useEffect(() => {
     if (visible) {
@@ -30,6 +44,8 @@ export function OrderFormModal({ visible, onClose }) {
       setOrderDiscount('0');
       setOrderUrgency('Normal');
       setExpandedArticles([]);
+      setPayWithSubscription(false);
+      setSubscribePlanId('');
     }
   }, [visible]);
 
@@ -82,6 +98,10 @@ export function OrderFormModal({ visible, onClose }) {
     return `${price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} FCFA`;
   };
 
+  const getTotalClothesCount = () => {
+    return selectedArticles.reduce((sum, item) => sum + item.quantity, 0);
+  };
+
   const handleCreateOrder = async () => {
     if (!orderClient) {
       Alert.alert("Erreur", "Veuillez sélectionner un client.");
@@ -92,12 +112,29 @@ export function OrderFormModal({ visible, onClose }) {
       return;
     }
 
-    const total = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const totalClothes = selectedArticles.reduce((sum, item) => sum + item.quantity, 0);
+    if (payWithSubscription && !subscribePlanId && activeCustomer && activeCustomer.active_subscription) {
+      const remaining = activeCustomer.active_subscription.remaining_clothes;
+      if (remaining < totalClothes) {
+        Alert.alert(
+          "Solde insuffisant",
+          `Le solde d'abonnement du client (${remaining} vêtements restants) est insuffisant pour cette commande (${totalClothes} vêtements). Veuillez renouveler l'abonnement ou payer par un autre mode.`
+        );
+        return;
+      }
+    }
+
+    const currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const discountPercent = Number(orderDiscount) || 0;
-    const discountAmount = Math.round(total * (discountPercent / 100));
-    const netTotal = total - discountAmount;
-    const avance = parseFloat(orderAvance) || 0;
-    const reste = netTotal - avance;
+    const discountAmount = Math.round(currentTotal * (discountPercent / 100));
+    const netTotal = currentTotal - discountAmount;
+    
+    // Calculate final parameters to send to db.createOrder
+    const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
+    const isImmediateSub = !!subscribePlanId;
+    
+    const finalModeReglement = isSubscriptionActive ? (isImmediateSub ? orderPaymentMethod : 'abonnement') : orderPaymentMethod;
+    const finalAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
 
     try {
       const currentUser = db.getCurrentUser();
@@ -110,13 +147,14 @@ export function OrderFormModal({ visible, onClose }) {
           prix: a.price
         })),
         total: netTotal,
-        avance,
-        reste,
+        avance: finalAvance,
         statut: 'attente',
-        mode_paiement: orderPaymentMethod,
+        mode_paiement: finalModeReglement,
         niveau_urgence: orderUrgency,
         remise_pourcentage: discountPercent,
-        created_by_id: currentUser ? currentUser.id : 'u1'
+        created_by_id: currentUser ? currentUser.id : 'u1',
+        pay_with_subscription: payWithSubscription,
+        subscribe_plan_id: subscribePlanId
       };
 
       await db.createOrder(newOrder);
@@ -128,9 +166,11 @@ export function OrderFormModal({ visible, onClose }) {
       setOrderDiscount('0');
       setOrderUrgency('Normal');
       setExpandedArticles([]);
+      setPayWithSubscription(false);
+      setSubscribePlanId('');
       onClose();
     } catch (e) {
-      Alert.alert("Erreur", "Impossible de créer la commande.");
+      Alert.alert("Erreur", e.message || "Impossible de créer la commande.");
     }
   };
 
@@ -184,6 +224,98 @@ export function OrderFormModal({ visible, onClose }) {
                 placeholder="Sélectionner le client"
                 style={styles.selectMargin}
               />
+
+              {/* Zone d'abonnement dynamique */}
+              {activeCustomer && (
+                <View style={styles.subContainer}>
+                  {activeCustomer.active_subscription ? (
+                    <View style={styles.subCard}>
+                      <View style={styles.subHeaderRow}>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            if (!subscribePlanId) {
+                              setPayWithSubscription(!payWithSubscription);
+                            }
+                          }}
+                          disabled={!!subscribePlanId}
+                          style={styles.checkboxRow}
+                        >
+                          <View style={[
+                            styles.checkbox,
+                            payWithSubscription && styles.checkboxChecked,
+                            !!subscribePlanId && styles.checkboxDisabled
+                          ]}>
+                            {payWithSubscription && <Text style={styles.checkboxTick}>✓</Text>}
+                          </View>
+                          <Text style={[styles.checkboxLabel, !!subscribePlanId && { color: '#a1a1aa' }]}>
+                            Régler avec l'abonnement
+                          </Text>
+                        </TouchableOpacity>
+                        <Text style={styles.subTextBold}>
+                          ({activeCustomer.active_subscription.remaining_clothes} vêt. restants)
+                        </Text>
+                      </View>
+
+                      {/* Alerte si solde insuffisant */}
+                      {payWithSubscription && !subscribePlanId && getTotalClothesCount() > activeCustomer.active_subscription.remaining_clothes && (
+                        <View style={styles.alertRow}>
+                          <Text style={styles.alertText}>
+                            ⚠ Solde insuffisant ({getTotalClothesCount()} requis)
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Menu de renouvellement / changement */}
+                      <View style={{ marginTop: 8 }}>
+                        <Text style={styles.subLabelSmall}>Renouveler / Changer d'abonnement :</Text>
+                        <CustomSelect
+                          value={subscribePlanId}
+                          onChange={(val) => {
+                            setSubscribePlanId(val);
+                            if (val) {
+                              setPayWithSubscription(true);
+                            } else {
+                              setPayWithSubscription(!!activeCustomer.active_subscription);
+                            }
+                          }}
+                          options={[
+                            { label: "-- Conserver l'abonnement en cours --", value: "" },
+                            ...catalog.filter(c => c.categorie === 'abonnement').map(p => ({
+                              label: `${p.article} (${p.prix.toLocaleString('fr-FR')} F)`,
+                              value: p.id
+                            }))
+                          ]}
+                          placeholder="Conserver l'abonnement en cours"
+                        />
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.subCard}>
+                      <Text style={styles.subLabelSmallBold}>Souscrire immédiatement à un abonnement :</Text>
+                      <CustomSelect
+                        value={subscribePlanId}
+                        onChange={(val) => {
+                          setSubscribePlanId(val);
+                          if (val) {
+                            setPayWithSubscription(true);
+                          } else {
+                            setPayWithSubscription(false);
+                          }
+                        }}
+                        options={[
+                          { label: "-- Pas d'abonnement --", value: "" },
+                          ...catalog.filter(c => c.categorie === 'abonnement').map(p => ({
+                            label: `${p.article} (${p.prix.toLocaleString('fr-FR')} F)`,
+                            value: p.id
+                          }))
+                        ]}
+                        placeholder="Pas d'abonnement"
+                      />
+                    </View>
+                  )}
+                </View>
+              )}
 
               {/* Choisir les vêtements */}
               <Text style={styles.formLabel}>Choisir les vêtements</Text>
@@ -359,11 +491,35 @@ export function OrderFormModal({ visible, onClose }) {
 
               {/* Live Receipt Card */}
               {(() => {
-                const currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
+                
+                let currentTotal = 0;
+                let isImmediateSub = false;
+                let subPlan = null;
+                
+                if (subscribePlanId) {
+                  subPlan = catalog.find(c => c.id === subscribePlanId && c.categorie === 'abonnement');
+                  currentTotal = subPlan ? subPlan.prix : 0;
+                  isImmediateSub = true;
+                } else if (isSubscriptionActive) {
+                  currentTotal = 0; // paid with active subscription garments balance
+                } else {
+                  currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                }
+
+                // If express, apply markup only to regular billing
+                if (!isSubscriptionActive && orderUrgency === 'Express') {
+                  const expressMarkupItem = catalog.find(c => c.id === 'setting_express_markup');
+                  const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+                  currentTotal = Math.round(currentTotal * (1 + expressMarkup / 100));
+                }
+
                 const discountPercent = Number(orderDiscount) || 0;
                 const discountAmount = Math.round(currentTotal * (discountPercent / 100));
                 const netTotal = currentTotal - discountAmount;
-                const currentAvance = parseFloat(orderAvance) || 0;
+                
+                // Avance behaves differently for active sub vs sub purchase
+                const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
                 const currentReste = netTotal - currentAvance;
 
                 const expressHours = catalog.find(c => c.id === 'setting_express_hours')?.prix || 6;
@@ -376,7 +532,9 @@ export function OrderFormModal({ visible, onClose }) {
                     
                     <View style={styles.receiptRow}>
                       <Text style={styles.receiptRowLabel}>Total Brut</Text>
-                      <Text style={styles.receiptRowVal}>{formatPrice(currentTotal)}</Text>
+                      <Text style={styles.receiptRowVal}>
+                        {isSubscriptionActive && !isImmediateSub ? 'Débit forfait abonnement' : formatPrice(currentTotal)}
+                      </Text>
                     </View>
                     
                     {discountAmount > 0 && (
@@ -388,7 +546,9 @@ export function OrderFormModal({ visible, onClose }) {
 
                     <View style={styles.receiptRow}>
                       <Text style={styles.receiptRowLabelBold}>Net à Payer</Text>
-                      <Text style={styles.receiptRowValBold}>{formatPrice(netTotal)}</Text>
+                      <Text style={styles.receiptRowValBold}>
+                        {isSubscriptionActive && !isImmediateSub ? '0 vêtements déduits' : formatPrice(netTotal)}
+                      </Text>
                     </View>
 
                     <View style={styles.receiptRow}>
@@ -407,7 +567,9 @@ export function OrderFormModal({ visible, onClose }) {
 
                     <View style={[styles.receiptRow, { marginTop: 6 }]}>
                       <Text style={styles.receiptRowLabelMuted}>Mode règlement :</Text>
-                      <Text style={styles.receiptRowValMuted}>{orderPaymentMethod}</Text>
+                      <Text style={styles.receiptRowValMuted}>
+                        {isSubscriptionActive && !isImmediateSub ? 'Abonnement' : orderPaymentMethod}
+                      </Text>
                     </View>
 
                     <View style={[styles.receiptRow, { marginTop: 4 }]}>
@@ -725,5 +887,85 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
     marginVertical: 20,
+  },
+  subContainer: {
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  subCard: {
+    backgroundColor: 'rgba(0, 44, 247, 0.04)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 44, 247, 0.1)',
+    borderRadius: 16,
+    padding: 12,
+  },
+  subHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#002cf7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  checkboxChecked: {
+    backgroundColor: '#002cf7',
+    borderColor: '#002cf7',
+  },
+  checkboxDisabled: {
+    borderColor: '#a1a1aa',
+    backgroundColor: '#f4f4f5',
+  },
+  checkboxTick: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  checkboxLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#002cf7',
+  },
+  subTextBold: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  alertRow: {
+    marginTop: 6,
+    backgroundColor: '#fff1f2',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffe4e6',
+  },
+  alertText: {
+    color: '#ef4444',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  subLabelSmall: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  subLabelSmallBold: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 6,
   },
 });
