@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, FlatList, Platform, Modal } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, FlatList, Platform, Modal, BackHandler } from 'react-native';
 import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, Plus, ArrowUpRight, X, Percent, ShoppingBag, Clock } from 'lucide-react-native';
 import { db } from '../services/db';
 import { MotiView } from 'moti';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
+import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
 
-export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter }) {
+export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange }) {
+  const scrollPaddingBottom = useScrollPaddingBottom();
   const staff = db.getStaff();
   const orders = db.getOrders();
   const customers = db.getCustomers();
@@ -15,6 +17,30 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 
   // State for active KPI details modal
   const [activeKpiDetail, setActiveKpiDetail] = useState(null);
+
+  // Notify parent of modal visibility
+  React.useEffect(() => {
+    if (onModalStateChange) {
+      onModalStateChange(activeKpiDetail !== null);
+    }
+  }, [activeKpiDetail]);
+
+  // Handle Android back button/gesture to close KPI modal
+  React.useEffect(() => {
+    if (Platform.OS === 'web' || !activeKpiDetail) return;
+
+    const backAction = () => {
+      setActiveKpiDetail(null);
+      return true; // prevent default behavior (exit/tab change)
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [activeKpiDetail]);
 
   const handleOrderPress = (order) => {
     setSelectedOrder(order);
@@ -119,15 +145,15 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   };
 
   const kpiThemes = {
-    ca_mensuel: { primary: '#4f46e5', bg: 'rgba(224, 231, 255, 0.95)', text: '#1e1b4b', title: 'Chiffre d\'Affaires Mensuel' },
-    panier_moyen: { primary: '#a855f7', bg: 'rgba(243, 232, 255, 0.95)', text: '#3b0764', title: 'Panier Moyen' },
-    recouvrement: { primary: '#10b981', bg: 'rgba(209, 250, 229, 0.95)', text: '#064e3b', title: 'Taux de Recouvrement' },
-    part_express: { primary: '#ef4444', bg: 'rgba(254, 226, 226, 0.95)', text: '#7f1d1d', title: 'Part Express' },
-    en_cours: { primary: '#0369a1', bg: 'rgba(224, 242, 254, 0.95)', text: '#0c4a6e', title: 'Commandes En Cours' },
-    pretes: { primary: '#15803d', bg: 'rgba(220, 252, 231, 0.95)', text: '#064e3b', title: 'Commandes Prêtes' },
-    retards: { primary: '#be123c', bg: 'rgba(255, 228, 230, 0.95)', text: '#4c0519', title: 'Retards & Urgences' },
-    ca_jour: { primary: '#2563eb', bg: 'rgba(239, 246, 255, 0.95)', text: '#1e3a8a', title: 'CA Journalier' },
-    volume_jour: { primary: '#475569', bg: 'rgba(241, 245, 249, 0.95)', text: '#0f172a', title: 'Commandes du Jour' },
+    ca_mensuel: { primary: '#4f46e5', bg: '#e0e7ff', text: '#1e1b4b', title: 'Chiffre d\'Affaires Mensuel' },
+    panier_moyen: { primary: '#a855f7', bg: '#f3e8ff', text: '#3b0764', title: 'Panier Moyen' },
+    recouvrement: { primary: '#10b981', bg: '#d1fae5', text: '#064e3b', title: 'Taux de Recouvrement' },
+    part_express: { primary: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', title: 'Part Express' },
+    en_cours: { primary: '#0369a1', bg: '#e0f2fe', text: '#0c4a6e', title: 'Commandes En Cours' },
+    pretes: { primary: '#15803d', bg: '#dcfce7', text: '#064e3b', title: 'Commandes Prêtes' },
+    retards: { primary: '#be123c', bg: '#ffe4e6', text: '#4c0519', title: 'Retards & Urgences' },
+    ca_jour: { primary: '#2563eb', bg: '#eff6ff', text: '#1e3a8a', title: 'CA Journalier' },
+    volume_jour: { primary: '#475569', bg: '#f1f5f9', text: '#0f172a', title: 'Commandes du Jour' },
   };
 
   const renderKpiDetails = () => {
@@ -348,7 +374,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]} showsVerticalScrollIndicator={false}>
         {/* ADVANCED KPI CAROUSEL */}
         {(!currentUser || currentUser.role !== 'agent_lavage_repassage') && (
           <ScrollView 
@@ -362,7 +388,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 250 }}
-                style={[styles.kpiCard, { backgroundColor: 'rgba(224, 231, 255, 0.85)' }]}
+                style={[styles.kpiCard, { backgroundColor: '#e0e7ff' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(0, 44, 247, 0.05)' }]}>
@@ -382,7 +408,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 250, delay: 50 }}
-                style={[styles.kpiCard, { backgroundColor: 'rgba(243, 232, 255, 0.85)' }]}
+                style={[styles.kpiCard, { backgroundColor: '#f3e8ff' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(168, 85, 247, 0.05)' }]}>
@@ -402,7 +428,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 250, delay: 100 }}
-                style={[styles.kpiCard, { backgroundColor: 'rgba(209, 250, 229, 0.85)' }]}
+                style={[styles.kpiCard, { backgroundColor: '#d1fae5' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.05)' }]}>
@@ -422,7 +448,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 250, delay: 150 }}
-                style={[styles.kpiCard, { backgroundColor: 'rgba(254, 226, 226, 0.85)' }]}
+                style={[styles.kpiCard, { backgroundColor: '#fee2e2' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
@@ -728,11 +754,11 @@ const styles = StyleSheet.create({
     paddingBottom: 110,
   },
   mainSpendCard: {
-    backgroundColor: 'rgba(239, 246, 255, 0.88)',
+    backgroundColor: '#eff6ff',
     borderRadius: 24,
     padding: 20,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    borderColor: '#ffffff',
     shadowColor: '#002cf7',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.035,
@@ -788,11 +814,11 @@ const styles = StyleSheet.create({
   },
   gridCard: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    borderColor: '#ffffff',
     shadowColor: '#002cf7',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.025,
@@ -800,20 +826,20 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   gridCardPastelBlue: {
-    backgroundColor: 'rgba(224, 242, 254, 0.85)',
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: '#e0f2fe',
+    borderColor: '#ffffff',
   },
   gridCardPastelGreen: {
-    backgroundColor: 'rgba(220, 252, 231, 0.85)',
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: '#dcfce7',
+    borderColor: '#ffffff',
   },
   gridCardPastelRed: {
-    backgroundColor: 'rgba(255, 228, 230, 0.85)',
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: '#ffe4e6',
+    borderColor: '#ffffff',
   },
   gridCardPastelSlate: {
-    backgroundColor: 'rgba(241, 245, 249, 0.85)',
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: '#f1f5f9',
+    borderColor: '#ffffff',
   },
   gridCardBlue: {
     backgroundColor: '#002cf7',
@@ -932,12 +958,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    borderColor: '#ffffff',
     shadowColor: '#002cf7',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.025,
@@ -993,16 +1019,26 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(9, 9, 11, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(9, 9, 11, 0.45)',
+    padding: 16,
   },
   modalContent: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    borderRadius: 24,
     padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: '85%',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1121,11 +1157,11 @@ const styles = StyleSheet.create({
   },
   kpiCard: {
     width: 145,
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    backgroundColor: '#ffffff',
     borderRadius: 22,
     padding: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    borderColor: '#ffffff',
     shadowColor: '#002cf7',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.03,
@@ -1181,7 +1217,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    borderColor: '#ffffff',
   },
   kpiHeroValue: {
     fontSize: 28,

@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ActivityIndicator, BackHandler } from 'react-native';
 import { Mail, ChevronLeft, Lock } from 'lucide-react-native';
 import { db } from '../services/db';
 
@@ -9,6 +9,24 @@ export default function LoginScreen() {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Handle Android back button/gesture to go back to email input screen
+  useEffect(() => {
+    if (Platform.OS === 'web' || !selectedUser) return;
+
+    const backAction = () => {
+      setSelectedUser(null);
+      setPin('');
+      return true; // prevent default behavior
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [selectedUser]);
 
   const handleEmailSubmit = () => {
     if (!email) return;

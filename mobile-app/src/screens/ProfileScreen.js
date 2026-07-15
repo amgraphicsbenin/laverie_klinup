@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler } from 'react-native';
 import { User, Shield, RefreshCw, Key, LogOut, CheckCircle2, X } from 'lucide-react-native';
 import { db } from '../services/db';
 import { BlurView } from 'expo-blur';
+import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ onModalStateChange }) {
   const currentUser = db.getCurrentUser();
   const isRemote = db.isRemote();
   const syncQueue = db.getSyncQueue ? db.getSyncQueue() : [];
@@ -13,6 +14,33 @@ export default function ProfileScreen() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
+  const scrollPaddingBottom = useScrollPaddingBottom();
+
+  // Notify parent of modal visibility
+  useEffect(() => {
+    if (onModalStateChange) {
+      onModalStateChange(showPinModal);
+    }
+  }, [showPinModal]);
+
+  // Handle Android back button/gesture to close the PIN modal
+  useEffect(() => {
+    if (Platform.OS === 'web' || !showPinModal) return;
+
+    const backAction = () => {
+      setShowPinModal(false);
+      setCurrentPin('');
+      setNewPin('');
+      return true; // prevent default behavior
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [showPinModal]);
 
   const getRoleLabel = (role) => {
     switch (role) {
@@ -88,7 +116,7 @@ export default function ProfileScreen() {
         <Text style={styles.headerTitle}>Profil</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: scrollPaddingBottom }]} showsVerticalScrollIndicator={false}>
       {/* Profil Header */}
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
@@ -251,12 +279,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   profileCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    borderColor: '#ffffff',
     shadowColor: '#002cf7',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.03,
@@ -321,11 +349,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   infoCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    backgroundColor: '#ffffff',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    borderColor: '#ffffff',
     shadowColor: '#002cf7',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.03,
@@ -434,19 +462,26 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    padding: 16,
   },
   modalContent: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    borderRadius: 24,
     padding: 24,
-    paddingBottom: 40,
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: '85%',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
     shadowRadius: 24,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',

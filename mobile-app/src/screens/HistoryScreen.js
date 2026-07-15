@@ -1,13 +1,39 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler } from 'react-native';
 import { Search, Calendar, ChevronRight, X, Clock } from 'lucide-react-native';
 import { db } from '../services/db';
 import { BlurView } from 'expo-blur';
+import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
 
-export default function HistoryScreen() {
+export default function HistoryScreen({ onModalStateChange }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, delivered, late
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const scrollPaddingBottom = useScrollPaddingBottom();
+
+  // Notify parent of modal visibility
+  useEffect(() => {
+    if (onModalStateChange) {
+      onModalStateChange(selectedOrder !== null);
+    }
+  }, [selectedOrder]);
+
+  // Handle Android back button/gesture to close history details modal
+  useEffect(() => {
+    if (Platform.OS === 'web' || !selectedOrder) return;
+
+    const backAction = () => {
+      setSelectedOrder(null);
+      return true; // prevent default behavior
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [selectedOrder]);
 
   const orders = db.getOrders();
   const customers = db.getCustomers();
@@ -117,7 +143,7 @@ export default function HistoryScreen() {
       </View>
 
       {/* History List */}
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]} showsVerticalScrollIndicator={false}>
         {filteredOrders.length === 0 ? (
           <Text style={styles.noResultsText}>Aucune archive correspondante</Text>
         ) : (
@@ -306,12 +332,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   historyCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    backgroundColor: '#ffffff',
     borderRadius: 22,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.75)',
+    borderColor: '#ffffff',
     shadowColor: '#002cf7',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.03,
@@ -468,20 +494,26 @@ const styles = StyleSheet.create({
   },
   compactModalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    padding: 16,
   },
   compactModalView: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    borderRadius: 24,
     padding: 20,
-    maxHeight: '80%',
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: '85%',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
   },
   compactModalHeader: {
     flexDirection: 'row',

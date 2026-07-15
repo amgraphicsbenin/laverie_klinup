@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform, BackHandler } from 'react-native';
 import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock } from 'lucide-react-native';
 import { db } from '../services/db';
 import { CustomSelect } from '../components/CustomSelect';
 import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
 
 export default function GestionScreen({ 
   selectedOrder, 
@@ -15,17 +16,17 @@ export default function GestionScreen({
   openOrderFormOnMount, 
   onCloseOrderFormOnMount,
   orderFormVisible,
-  setOrderFormVisible
+  setOrderFormVisible,
+  onModalStateChange
 }) {
   const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('actives'); // actives, urgentes, retard
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceOrder, setInvoiceOrder] = useState(null);
+  const scrollPaddingBottom = useScrollPaddingBottom();
 
-  const [localShowOrderForm, localSetShowOrderForm] = useState(false);
-  const showOrderForm = orderFormVisible !== undefined ? orderFormVisible : localShowOrderForm;
-  const setShowOrderForm = setOrderFormVisible !== undefined ? setOrderFormVisible : localSetShowOrderForm;
+  const setShowOrderForm = setOrderFormVisible;
 
   const handleShowInvoice = (order, e) => {
     e.stopPropagation();
@@ -57,35 +58,7 @@ export default function GestionScreen({
     }
   };
 
-  const [expandedArticles, setExpandedArticles] = useState({});
 
-  const toggleExpandArticle = (articleName) => {
-    setExpandedArticles(prev => ({
-      ...prev,
-      [articleName]: !prev[articleName]
-    }));
-  };
-
-  const isArticleExpanded = (articleName, items) => {
-    if (expandedArticles[articleName]) return true;
-    return items.some(item => selectedArticles.some(cartItem => cartItem.id === item.id && cartItem.quantity > 0));
-  };
-
-  useEffect(() => {
-    if (!showOrderForm) {
-      setExpandedArticles({});
-    }
-  }, [showOrderForm]);
-
-  // Handle openOrderFormOnMount from tab bar trigger
-  useEffect(() => {
-    if (openOrderFormOnMount) {
-      setShowOrderForm(true);
-      if (onCloseOrderFormOnMount) {
-        onCloseOrderFormOnMount();
-      }
-    }
-  }, [openOrderFormOnMount]);
 
   // Switch to orders tab if a dashboard filter is applied
   useEffect(() => {
@@ -133,13 +106,7 @@ export default function GestionScreen({
   const [custAdresse, setCustAdresse] = useState('');
   const [custPreferences, setCustPreferences] = useState('Plié');
 
-  // Order Form state
-  const [orderClient, setOrderClient] = useState('');
-  const [selectedArticles, setSelectedArticles] = useState([]); // [{ id, article, service, quantity, price }]
-  const [orderAvance, setOrderAvance] = useState('0');
-  const [orderPaymentMethod, setOrderPaymentMethod] = useState('Espèce');
-  const [orderDiscount, setOrderDiscount] = useState('0');
-  const [orderUrgency, setOrderUrgency] = useState('Normal');
+
 
   // Client Details View
   const [selectedClient, setSelectedClient] = useState(null);
@@ -149,6 +116,55 @@ export default function GestionScreen({
       setShowOrderDetails(true);
     }
   }, [selectedOrder]);
+
+  // Handle Android back button/gesture to close modals and forms inside GestionScreen
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const backAction = () => {
+      if (showInvoiceModal) {
+        setShowInvoiceModal(false);
+        setInvoiceOrder(null);
+        return true;
+      }
+      if (showCustomerModal) {
+        setShowCustomerModal(false);
+        setEditingCustomer(null);
+        return true;
+      }
+      if (showOrderDetails) {
+        setShowOrderDetails(false);
+        if (setSelectedOrder) setSelectedOrder(null);
+        return true;
+      }
+      if (selectedClient) {
+        setSelectedClient(null);
+        return true;
+      }
+      return false; // let it propagate to parent back handler (which changes tab to accueil)
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [
+    showInvoiceModal,
+    showCustomerModal,
+    showOrderDetails,
+    selectedClient,
+    setSelectedOrder
+  ]);
+
+  // Notify parent of modal visibility
+  useEffect(() => {
+    if (onModalStateChange) {
+      const isAnyModalOpen = showInvoiceModal || showCustomerModal || selectedClient !== null || showOrderDetails;
+      onModalStateChange(isAnyModalOpen);
+    }
+  }, [showInvoiceModal, showCustomerModal, selectedClient, showOrderDetails, onModalStateChange]);
 
   const handleCloseOrderDetails = () => {
     setShowOrderDetails(false);
@@ -241,87 +257,7 @@ export default function GestionScreen({
   };
 
   // Order Submission
-  const handleCreateOrder = async () => {
-    if (!orderClient) {
-      Alert.alert("Erreur", "Veuillez sélectionner un client.");
-      return;
-    }
-    if (selectedArticles.length === 0) {
-      Alert.alert("Erreur", "Veuillez ajouter au moins un article.");
-      return;
-    }
 
-    const total = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const discountPercent = Number(orderDiscount) || 0;
-    const discountAmount = Math.round(total * (discountPercent / 100));
-    const netTotal = total - discountAmount;
-    const avance = parseFloat(orderAvance) || 0;
-    const reste = netTotal - avance;
-
-    try {
-      const newOrder = {
-        customer_id: orderClient,
-        articles: selectedArticles.map(a => ({
-          article: a.article,
-          service: a.service,
-          quantite: a.quantity,
-          prix: a.price
-        })),
-        total: netTotal,
-        avance,
-        reste,
-        statut: 'attente',
-        mode_paiement: orderPaymentMethod,
-        niveau_urgence: orderUrgency,
-        remise_pourcentage: discountPercent,
-        created_by_id: currentUser ? currentUser.id : 'u1'
-      };
-
-      await db.createOrder(newOrder);
-
-      // Clean state
-      setOrderClient('');
-      setSelectedArticles([]);
-      setOrderAvance('0');
-      setOrderDiscount('0');
-      setOrderUrgency('Normal');
-      setShowOrderForm(false);
-    } catch (e) {
-      Alert.alert("Erreur", "Impossible de créer la commande.");
-    }
-  };
-
-  const addArticleToOrder = (item) => {
-    // Supprimer tout autre service pour le même vêtement avant d'ajouter le nouveau
-    const clearedCart = selectedArticles.filter(a => !(a.article === item.article && a.service !== item.service));
-    
-    const existingIdx = clearedCart.findIndex(a => a.id === item.id);
-    if (existingIdx !== -1) {
-      const copy = [...clearedCart];
-      copy[existingIdx].quantity += 1;
-      setSelectedArticles(copy);
-    } else {
-      setSelectedArticles([...clearedCart, {
-        id: item.id,
-        article: item.article,
-        service: item.service,
-        quantity: 1,
-        price: item.prix
-      }]);
-    }
-  };
-
-  const removeArticleFromOrder = (id) => {
-    const existing = selectedArticles.find(a => a.id === id);
-    if (existing && existing.quantity > 1) {
-      const copy = [...selectedArticles];
-      const idx = copy.findIndex(a => a.id === id);
-      copy[idx].quantity -= 1;
-      setSelectedArticles(copy);
-    } else {
-      setSelectedArticles(selectedArticles.filter(a => a.id !== id));
-    }
-  };
 
   const getStatusColor = (statut) => {
     switch (statut) {
@@ -511,7 +447,7 @@ export default function GestionScreen({
       )}
 
       {/* CONTENT LIST */}
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]} showsVerticalScrollIndicator={false}>
         
         {/* SUBTAB 1 : ORDERS LIST */}
         {subTab === 'orders' && (
@@ -680,7 +616,11 @@ export default function GestionScreen({
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseOrderDetails}>
               <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
-            <View style={[styles.compactModalView, { maxHeight: '90%' }]}>
+            <MotiView
+              from={{ opacity: 0, scale: 0.88, translateY: 48 }}
+              animate={{ opacity: 1, scale: 1, translateY: 0 }}
+              transition={{ type: 'spring', damping: 16, mass: 0.8 }}
+              style={[styles.compactModalView, { maxHeight: '90%' }]}>
               <View style={styles.compactModalHeader}>
                 <Text style={styles.compactModalTitle}>Commande #{getDisplayTicketId(selectedOrder)}</Text>
                 <TouchableOpacity onPress={handleCloseOrderDetails}>
@@ -760,282 +700,7 @@ export default function GestionScreen({
                   </TouchableOpacity>
                 )}
               </ScrollView>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* MODAL 2 : CRÉATION DE COMMANDE (BOTTOM SHEET DOCKÉ) */}
-      {showOrderForm && (
-        <View style={styles.absoluteModalContainer}>
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setShowOrderForm(false)}>
-              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={[styles.compactModalView, { maxHeight: '90%' }]}
-            >
-              <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Nouvelle Commande</Text>
-                <TouchableOpacity onPress={() => setShowOrderForm(false)}>
-                  <X size={20} color="#71717a" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
-                {/* Sélection du client */}
-                <Text style={styles.formLabel}>Client</Text>
-                <CustomSelect
-                  value={orderClient}
-                  onChange={setOrderClient}
-                  options={customers.map(c => ({ value: c.id, label: `${c.prenom} ${c.nom} (${c.telephone})` }))}
-                  placeholder="Sélectionner le client"
-                  style={styles.selectMargin}
-                />
-
-                {/* Choisir les vêtements */}
-                <Text style={styles.formLabel}>Choisir les vêtements</Text>
-                <View style={styles.fixedArticleContainer}>
-                  <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>
-                    {(() => {
-                      const uniqueArticles = [...new Set(catalog
-                        .filter(c => c.categorie !== 'system_setting' && c.service !== 'system' && c.categorie !== 'abonnement' && c.service !== 'abonnement')
-                        .map(c => c.article)
-                      )];
-
-                      if (uniqueArticles.length === 0) {
-                        return <Text style={styles.emptyDetailsText}>Aucun article trouvé</Text>;
-                      }
-
-                      return uniqueArticles.map(articleName => {
-                        const items = catalog.filter(c => c.article === articleName);
-                        const traitementItem = items.find(i => i.service === 'lavage_simple') || items.find(i => i.service.includes('lavage')) || items.find(i => i.service.includes('sec') || i.service.includes('nettoyage'));
-                        const repassageItem = items.find(i => i.service === 'repassage');
-                        
-                        const isExpanded = isArticleExpanded(articleName, items);
-
-                        const getQtyInCart = (itemId) => {
-                          const cartItem = selectedArticles.find(a => a.id === itemId);
-                          return cartItem ? cartItem.quantity : 0;
-                        };
-
-                        return (
-                          <View key={articleName} style={styles.clothingCard}>
-                            <View style={styles.clothingHeader}>
-                              <Text style={styles.clothingName}>{articleName}</Text>
-                              <TouchableOpacity 
-                                onPress={() => toggleExpandArticle(articleName)}
-                                style={isExpanded ? styles.clothingCloseBtn : styles.clothingAddBtn}
-                              >
-                                <Text style={isExpanded ? styles.clothingCloseBtnText : styles.clothingAddBtnText}>
-                                  {isExpanded ? 'Masquer' : 'Ajouter'}
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-
-                            {isExpanded && (
-                              <View style={styles.servicesContainer}>
-                                {/* Traitement Service */}
-                                {traitementItem && (
-                                  <View style={styles.serviceRow}>
-                                    <View style={{ flex: 1 }}>
-                                      <Text style={styles.serviceLabel}>Traitement (Lavage)</Text>
-                                      <Text style={styles.servicePrice}>{formatPrice(traitementItem.prix)}</Text>
-                                    </View>
-                                    {getQtyInCart(traitementItem.id) === 0 ? (
-                                      <TouchableOpacity 
-                                        onPress={() => addArticleToOrder(traitementItem)}
-                                        style={styles.serviceAddBtn}
-                                      >
-                                        <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                                        <Text style={styles.serviceAddBtnText}>Ajouter</Text>
-                                      </TouchableOpacity>
-                                    ) : (
-                                      <View style={styles.serviceQtyRow}>
-                                        <TouchableOpacity onPress={() => removeArticleFromOrder(traitementItem.id)} style={styles.serviceQtyBtn}>
-                                          <Text style={styles.serviceQtyBtnText}>-</Text>
-                                        </TouchableOpacity>
-                                        <Text style={styles.serviceQtyText}>{getQtyInCart(traitementItem.id)}</Text>
-                                        <TouchableOpacity onPress={() => addArticleToOrder(traitementItem)} style={styles.serviceQtyBtn}>
-                                          <Text style={styles.serviceQtyBtnText}>+</Text>
-                                        </TouchableOpacity>
-                                      </View>
-                                    )}
-                                  </View>
-                                )}
-
-                                {/* Repassage Service */}
-                                {repassageItem && (
-                                  <View style={styles.serviceRow}>
-                                    <View style={{ flex: 1 }}>
-                                      <Text style={styles.serviceLabel}>Repassage</Text>
-                                      <Text style={styles.servicePrice}>{formatPrice(repassageItem.prix)}</Text>
-                                    </View>
-                                    {getQtyInCart(repassageItem.id) === 0 ? (
-                                      <TouchableOpacity 
-                                        onPress={() => addArticleToOrder(repassageItem)}
-                                        style={styles.serviceAddBtn}
-                                      >
-                                        <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                                        <Text style={styles.serviceAddBtnText}>Ajouter</Text>
-                                      </TouchableOpacity>
-                                    ) : (
-                                      <View style={styles.serviceQtyRow}>
-                                        <TouchableOpacity onPress={() => removeArticleFromOrder(repassageItem.id)} style={styles.serviceQtyBtn}>
-                                          <Text style={styles.serviceQtyBtnText}>-</Text>
-                                        </TouchableOpacity>
-                                        <Text style={styles.serviceQtyText}>{getQtyInCart(repassageItem.id)}</Text>
-                                        <TouchableOpacity onPress={() => addArticleToOrder(repassageItem)} style={styles.serviceQtyBtn}>
-                                          <Text style={styles.serviceQtyBtnText}>+</Text>
-                                        </TouchableOpacity>
-                                      </View>
-                                    )}
-                                  </View>
-                                )}
-                              </View>
-                            )}
-                          </View>
-                        );
-                      });
-                    })()}
-                  </ScrollView>
-                </View>
-
-                {/* Niveau d'urgence */}
-                <Text style={styles.formLabel}>Urgence</Text>
-                <View style={styles.urgencyRow}>
-                  {['Normal', 'Express'].map((level) => {
-                    const isActive = orderUrgency === level;
-                    return (
-                      <TouchableOpacity
-                        key={level}
-                        onPress={() => setOrderUrgency(level)}
-                        style={[
-                          styles.urgencyBtn, 
-                          isActive ? { backgroundColor: level === 'Express' ? '#e11d48' : '#002cf7', borderColor: level === 'Express' ? '#e11d48' : '#002cf7' } : null
-                        ]}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[styles.urgencyBtnText, isActive && { color: '#ffffff' }]}>
-                          {level === 'Express' ? 'Express (24h)' : 'Normal (48h)'}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Avance et Mode de règlement (same line) */}
-                <View style={styles.formRowInline}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Avance (FCFA)</Text>
-                    <TextInput
-                      keyboardType="numeric"
-                      value={orderAvance}
-                      onChangeText={setOrderAvance}
-                      style={styles.formInput}
-                    />
-                  </View>
-                  <View style={{ width: 12 }} />
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={styles.formLabel}>Mode Règlement</Text>
-                    <CustomSelect
-                      value={orderPaymentMethod}
-                      onChange={setOrderPaymentMethod}
-                      options={[
-                        { value: 'Espèce', label: 'Espèce' },
-                        { value: 'Mobile Money', label: 'Mobile Money' }
-                      ]}
-                      placeholder="Choisir"
-                    />
-                  </View>
-                </View>
-
-                {/* Réduction (%) */}
-                <Text style={styles.formLabel}>Réduction (%)</Text>
-                <TextInput
-                  keyboardType="numeric"
-                  value={orderDiscount}
-                  onChangeText={(val) => {
-                    const num = parseInt(val, 10);
-                    if (val === '') setOrderDiscount('0');
-                    else if (!isNaN(num) && num >= 0 && num <= 100) setOrderDiscount(num.toString());
-                  }}
-                  style={styles.formInput}
-                  placeholder="Ex: 10"
-                  placeholderTextColor="#a1a1aa"
-                />
-
-                {/* Live Receipt Card */}
-                {(() => {
-                  const currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                  const discountPercent = Number(orderDiscount) || 0;
-                  const discountAmount = Math.round(currentTotal * (discountPercent / 100));
-                  const netTotal = currentTotal - discountAmount;
-                  const currentAvance = parseFloat(orderAvance) || 0;
-                  const currentReste = netTotal - currentAvance;
-
-                  // Dynamic availability delay calculation from CMS
-                  const expressHours = catalog.find(c => c.id === 'setting_express_hours')?.prix || 6;
-                  const normalHours = catalog.find(c => c.id === 'setting_normal_hours')?.prix || 48;
-                  const delay = orderUrgency === 'Express' ? `${expressHours}h (Express)` : `${normalHours}h (Normal)`;
-
-                  return (
-                    <View style={styles.receiptPreviewCard}>
-                      <Text style={styles.receiptSectionTitle}>Facturation</Text>
-                      
-                      <View style={styles.receiptRow}>
-                        <Text style={styles.receiptRowLabel}>Total Brut</Text>
-                        <Text style={styles.receiptRowVal}>{formatPrice(currentTotal)}</Text>
-                      </View>
-                      
-                      {discountAmount > 0 && (
-                        <View style={styles.receiptRow}>
-                          <Text style={styles.receiptRowLabel}>Réduction ({discountPercent}%)</Text>
-                          <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
-                        </View>
-                      )}
-
-                      <View style={styles.receiptRow}>
-                        <Text style={styles.receiptRowLabelBold}>Net à Payer</Text>
-                        <Text style={styles.receiptRowValBold}>{formatPrice(netTotal)}</Text>
-                      </View>
-
-                      <View style={styles.receiptRow}>
-                        <Text style={styles.receiptRowLabel}>Acompte (Avance)</Text>
-                        <Text style={styles.receiptRowVal}>{formatPrice(currentAvance)}</Text>
-                      </View>
-
-                      <View style={styles.receiptDivider} />
-
-                      <View style={styles.receiptRow}>
-                        <Text style={styles.receiptRowLabelBold}>Solde Restant</Text>
-                        <Text style={[styles.receiptRowValTotal, { color: currentReste > 0 ? '#ef4444' : '#10b981' }]}>
-                          {formatPrice(currentReste)}
-                        </Text>
-                      </View>
-
-                      <View style={[styles.receiptRow, { marginTop: 6 }]}>
-                        <Text style={styles.receiptRowLabelMuted}>Mode règlement :</Text>
-                        <Text style={styles.receiptRowValMuted}>{orderPaymentMethod}</Text>
-                      </View>
-
-                      <View style={[styles.receiptRow, { marginTop: 4 }]}>
-                        <Text style={styles.receiptRowLabelMuted}>Disponibilité :</Text>
-                        <Text style={[styles.receiptRowValMuted, { fontWeight: '700', color: '#002cf7' }]}>Sous {delay}</Text>
-                      </View>
-                    </View>
-                  );
-                })()}
-
-                <TouchableOpacity
-                  onPress={handleCreateOrder}
-                  style={styles.submitOrderBtn}
-                >
-                  <Text style={styles.submitOrderBtnText}>Enregistrer la Commande</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </KeyboardAvoidingView>
+            </MotiView>
           </View>
         </View>
       )}
@@ -1043,92 +708,98 @@ export default function GestionScreen({
       {/* MODAL 3 : CRÉATION / MODIFICATION CLIENT */}
       {showCustomerModal && (
         <View style={styles.absoluteModalContainer}>
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setShowCustomerModal(false)}>
-              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.compactModalView}
-            >
-              <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>
-                  {editingCustomer ? "Modifier le Profil Client" : "Nouveau Profil Client"}
-                </Text>
-                <TouchableOpacity onPress={() => setShowCustomerModal(false)}>
-                  <X size={20} color="#71717a" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView contentContainerStyle={styles.compactModalScroll} bounces={false}>
-                <View style={styles.compactInputRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.compactLabel}>Prénom</Text>
-                    <TextInput
-                      placeholder="Prénom"
-                      placeholderTextColor="#a1a1aa"
-                      value={custPrenom}
-                      onChangeText={setCustPrenom}
-                      style={styles.compactInput}
-                    />
-                  </View>
-                  <View style={{ width: 12 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.compactLabel}>Nom</Text>
-                    <TextInput
-                      placeholder="Nom"
-                      placeholderTextColor="#a1a1aa"
-                      value={custNom}
-                      onChangeText={setCustNom}
-                      style={styles.compactInput}
-                    />
-                  </View>
-                </View>
-
-                <Text style={styles.compactLabel}>Téléphone</Text>
-                <TextInput
-                  placeholder="Ex: +229 97 00 00 00"
-                  placeholderTextColor="#a1a1aa"
-                  keyboardType="phone-pad"
-                  value={custTelephone}
-                  onChangeText={setCustTelephone}
-                  style={styles.compactInput}
-                />
-
-                <Text style={styles.compactLabel}>Adresse</Text>
-                <TextInput
-                  placeholder="Ex: Cotonou, Haie Vive"
-                  placeholderTextColor="#a1a1aa"
-                  value={custAdresse}
-                  onChangeText={setCustAdresse}
-                  style={styles.compactInput}
-                />
-
-                <Text style={styles.compactLabel}>Préférence de pliage</Text>
-                <View style={styles.prefSelector}>
-                  <TouchableOpacity 
-                    onPress={() => setCustPreferences('Plié')}
-                    style={[styles.prefOption, custPreferences === 'Plié' && styles.prefOptionActive]}
-                  >
-                    <Text style={[styles.prefText, custPreferences === 'Plié' && styles.prefTextActive]}>Plié</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => setCustPreferences('Cintre')}
-                    style={[styles.prefOption, custPreferences === 'Cintre' && styles.prefOptionActive]}
-                  >
-                    <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+          >
+            <View style={styles.compactModalOverlay}>
+              <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setShowCustomerModal(false)}>
+                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+              </TouchableOpacity>
+              <MotiView
+                from={{ opacity: 0, scale: 0.88, translateY: 48 }}
+                animate={{ opacity: 1, scale: 1, translateY: 0 }}
+                transition={{ type: 'spring', damping: 16, mass: 0.8 }}
+                style={styles.compactModalView}>
+                <View style={styles.compactModalHeader}>
+                  <Text style={styles.compactModalTitle}>
+                    {editingCustomer ? "Modifier le Profil Client" : "Nouveau Profil Client"}
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowCustomerModal(false)}>
+                    <X size={20} color="#71717a" />
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity
-                  onPress={handleSaveCustomer}
-                  style={styles.compactSubmitBtn}
-                >
-                  <Text style={styles.compactSubmitBtnText}>Enregistrer le client</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </KeyboardAvoidingView>
-          </View>
+                <ScrollView contentContainerStyle={styles.compactModalScroll} bounces={false}>
+                  <View style={styles.compactInputRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.compactLabel}>Prénom</Text>
+                      <TextInput
+                        placeholder="Prénom"
+                        placeholderTextColor="#a1a1aa"
+                        value={custPrenom}
+                        onChangeText={setCustPrenom}
+                        style={styles.compactInput}
+                      />
+                    </View>
+                    <View style={{ width: 12 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.compactLabel}>Nom</Text>
+                      <TextInput
+                        placeholder="Nom"
+                        placeholderTextColor="#a1a1aa"
+                        value={custNom}
+                        onChangeText={setCustNom}
+                        style={styles.compactInput}
+                      />
+                    </View>
+                  </View>
+
+                  <Text style={styles.compactLabel}>Téléphone</Text>
+                  <TextInput
+                    placeholder="Ex: +229 97 00 00 00"
+                    placeholderTextColor="#a1a1aa"
+                    keyboardType="phone-pad"
+                    value={custTelephone}
+                    onChangeText={setCustTelephone}
+                    style={styles.compactInput}
+                  />
+
+                  <Text style={styles.compactLabel}>Adresse</Text>
+                  <TextInput
+                    placeholder="Ex: Cotonou, Haie Vive"
+                    placeholderTextColor="#a1a1aa"
+                    value={custAdresse}
+                    onChangeText={setCustAdresse}
+                    style={styles.compactInput}
+                  />
+
+                  <Text style={styles.compactLabel}>Préférence de pliage</Text>
+                  <View style={styles.prefSelector}>
+                    <TouchableOpacity 
+                      onPress={() => setCustPreferences('Plié')}
+                      style={[styles.prefOption, custPreferences === 'Plié' && styles.prefOptionActive]}
+                    >
+                      <Text style={[styles.prefText, custPreferences === 'Plié' && styles.prefTextActive]}>Plié</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      onPress={() => setCustPreferences('Cintre')}
+                      style={[styles.prefOption, custPreferences === 'Cintre' && styles.prefOptionActive]}
+                    >
+                      <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={handleSaveCustomer}
+                    style={styles.compactSubmitBtn}
+                  >
+                    <Text style={styles.compactSubmitBtnText}>Enregistrer le client</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </MotiView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       )}
 
@@ -1844,20 +1515,26 @@ const styles = StyleSheet.create({
   // Compact Bottom-Sheet Client Modal Styles
   compactModalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    padding: 16,
   },
   compactModalView: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    borderRadius: 24,
     padding: 20,
-    maxHeight: '80%',
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: '85%',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
   },
   compactModalHeader: {
     flexDirection: 'row',
