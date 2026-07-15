@@ -196,11 +196,12 @@ export default function App() {
         styles.tabBar,
         {
           height: Platform.OS === 'ios'
-            ? 88
-            : 54 + androidNavBarH,          // 54dp icons + gesture nav bar space
+            ? 106
+            : 82 + androidNavBarH,          // 48dp icons + 12dp top/22dp bottom padding + gesture nav bar space
+          paddingTop: 12,
           paddingBottom: Platform.OS === 'ios'
-            ? 24
-            : Math.max(8, androidNavBarH),  // at least 8dp, grows with nav bar
+            ? 46
+            : 22 + androidNavBarH,
         }
       ]}>
         <TouchableOpacity 
@@ -404,14 +405,12 @@ const styles = StyleSheet.create({
     width: 60,
   },
   scanButtonCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#002cf7',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'absolute',
-    top: -12,
     shadowColor: '#002cf7',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,

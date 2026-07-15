@@ -5,10 +5,11 @@ import { db } from '../services/db';
 import { MotiView } from 'moti';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
-import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
+import { useScrollPaddingBottom, useTabBarHeight } from '../hooks/useTabBarHeight';
 
 export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange }) {
   const scrollPaddingBottom = useScrollPaddingBottom();
+  const tabBarHeight = useTabBarHeight();
   const staff = db.getStaff();
   const orders = db.getOrders();
   const customers = db.getCustomers();
@@ -17,6 +18,13 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 
   // State for active KPI details modal
   const [activeKpiDetail, setActiveKpiDetail] = useState(null);
+  const [localKpiDetail, setLocalKpiDetail] = useState(null);
+
+  React.useEffect(() => {
+    if (activeKpiDetail) {
+      setLocalKpiDetail(activeKpiDetail);
+    }
+  }, [activeKpiDetail]);
 
   // Notify parent of modal visibility
   React.useEffect(() => {
@@ -157,8 +165,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   };
 
   const renderKpiDetails = () => {
-    if (!activeKpiDetail) return null;
-    const theme = kpiThemes[activeKpiDetail];
+    const kpiToRender = activeKpiDetail || localKpiDetail;
+    if (!kpiToRender) return null;
+    const theme = kpiThemes[kpiToRender];
+    const isVisible = activeKpiDetail !== null;
     
     let heroValue = '';
     let heroLabel = '';
@@ -166,7 +176,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
     let listTitle = '';
     let listItems = [];
     
-    switch (activeKpiDetail) {
+    switch (kpiToRender) {
       case 'ca_mensuel':
         heroValue = formatPrice(monthlyRevenue);
         heroLabel = "Chiffre d'affaires encaissé + reste à payer ce mois-ci";
@@ -293,39 +303,74 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
     }
 
     return (
-      <Modal visible={activeKpiDetail !== null} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setActiveKpiDetail(null)}>
-            <BlurView tint="dark" intensity={30} style={StyleSheet.absoluteFill} />
-          </TouchableOpacity>
-          <View style={[styles.modalContent, { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.primary }]}>{theme.title}</Text>
-              <TouchableOpacity onPress={() => setActiveKpiDetail(null)} style={styles.closeBtn}>
-                <X size={18} color="#09090b" />
-              </TouchableOpacity>
+      <MotiView
+        pointerEvents={isVisible ? 'auto' : 'none'}
+        animate={{
+          opacity: isVisible ? 1 : 0
+        }}
+        transition={{ type: 'timing', duration: 250 }}
+        style={[
+          StyleSheet.absoluteFill,
+          { 
+            zIndex: 9999,
+            justifyContent: 'center',
+            alignItems: 'center',
+            bottom: tabBarHeight,
+          }
+        ]}
+      >
+        <TouchableOpacity 
+          activeOpacity={1} 
+          style={StyleSheet.absoluteFill} 
+          onPress={() => setActiveKpiDetail(null)}
+        >
+          <BlurView tint="dark" intensity={30} style={StyleSheet.absoluteFill} />
+        </TouchableOpacity>
+
+        <MotiView
+          animate={{
+            opacity: isVisible ? 1 : 0,
+            scale: isVisible ? 1 : 0.9,
+            translateY: isVisible ? 0 : 50
+          }}
+          transition={{ type: 'spring', damping: 18, mass: 0.8 }}
+          style={[styles.premiumModalContent, { borderTopWidth: 4, borderTopColor: theme.primary }]}
+        >
+          <View style={styles.modalHeader}>
+            <View style={styles.modalTitleContainer}>
+              <View style={[styles.themeDot, { backgroundColor: theme.primary }]} />
+              <Text style={styles.premiumModalTitle}>{theme.title}</Text>
             </View>
-            
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-              {/* Hero Banner Section (styled according to theme background) */}
-              <View style={[styles.kpiHeroCard, { backgroundColor: theme.bg }]}>
-                <Text style={[styles.kpiHeroValue, { color: theme.primary }]}>{heroValue}</Text>
-                <Text style={[styles.kpiHeroLabel, { color: theme.primary }]}>{heroLabel}</Text>
-              </View>
+            <TouchableOpacity onPress={() => setActiveKpiDetail(null)} style={styles.premiumCloseBtn}>
+              <X size={16} color="#71717a" />
+            </TouchableOpacity>
+          </View>
 
-              {/* Sub-statistics Grid */}
-              <Text style={styles.modalSectionTitle}>Mesures Clés</Text>
-              <View style={styles.kpiSubGrid}>
-                {subStats.map((stat, idx) => (
-                  <View key={idx} style={styles.kpiSubBox}>
-                    <Text style={styles.kpiSubBoxLabel}>{stat.label}</Text>
-                    <Text style={[styles.kpiSubBoxVal, { color: theme.primary }]}>{stat.val}</Text>
-                  </View>
-                ))}
-              </View>
+          <ScrollView 
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false} 
+            contentContainerStyle={{ paddingBottom: 24 }}
+          >
+            {/* Hero Banner Section with glass texture */}
+            <View style={[styles.premiumKpiHeroCard, { backgroundColor: theme.bg, borderColor: 'rgba(255, 255, 255, 0.9)' }]}>
+              <Text style={[styles.premiumKpiHeroValue, { color: theme.primary }]}>{heroValue}</Text>
+              <Text style={styles.premiumKpiHeroLabel}>{heroLabel}</Text>
+            </View>
 
-              {/* Related Detail List */}
-              <Text style={styles.modalSectionTitle}>{listTitle}</Text>
+            {/* Sub-statistics Grid */}
+            <Text style={styles.premiumModalSectionTitle}>Mesures Clés</Text>
+            <View style={styles.kpiSubGrid}>
+              {subStats.map((stat, idx) => (
+                <View key={idx} style={styles.premiumKpiSubBox}>
+                  <Text style={styles.kpiSubBoxLabel}>{stat.label}</Text>
+                  <Text style={[styles.premiumKpiSubBoxVal, { color: theme.primary }]}>{stat.val}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Related Detail List */}
+            <Text style={styles.premiumModalSectionTitle}>{listTitle}</Text>
+            <View style={styles.detailsListContainer}>
               {listItems.length === 0 ? (
                 <Text style={styles.emptyDetailsText}>Aucune donnée disponible</Text>
               ) : (
@@ -338,7 +383,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                         setActiveKpiDetail(null);
                         handleOrderPress(o);
                       }}
-                      style={styles.detailsOrderRowClickable}
+                      style={styles.premiumDetailsOrderRowClickable}
                     >
                       <View style={{ flex: 1 }}>
                         <Text style={styles.detailsClientName}>{getCustomerName(o.customer_id)}</Text>
@@ -354,10 +399,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                   );
                 })
               )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+            </View>
+          </ScrollView>
+        </MotiView>
+      </MotiView>
     );
   };
 
@@ -367,9 +412,8 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
       {/* HEADER */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Activité</Text>
-          <Text style={styles.subHeadline}>
-            Vous suivez au mieux <Text style={styles.boldText}>votre Laverie</Text>
+          <Text style={styles.headerTitle}>
+            {currentUser ? `Salut ${currentUser.prenom}` : 'Salut'}
           </Text>
         </View>
       </View>
@@ -1271,5 +1315,111 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '600',
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+  },
+  premiumModalContent: {
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderRadius: 28,
+    padding: 24,
+    width: '92%',
+    maxWidth: 385,
+    maxHeight: '82%',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.18,
+    shadowRadius: 30,
+    elevation: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    overflow: 'hidden',
+  },
+  modalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  themeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  premiumModalTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+    letterSpacing: -0.3,
+  },
+  premiumCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  premiumKpiHeroCard: {
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 10,
+  },
+  premiumKpiHeroValue: {
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+  },
+  premiumKpiHeroLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 4,
+    color: '#64748b',
+  },
+  premiumModalSectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  premiumKpiSubBox: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: 'rgba(248, 250, 252, 0.8)',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    borderRadius: 16,
+    padding: 12,
+  },
+  premiumKpiSubBoxVal: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  detailsListContainer: {
+    backgroundColor: 'rgba(248, 250, 252, 0.5)',
+    borderRadius: 20,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  premiumDetailsOrderRowClickable: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.5)',
   },
 });

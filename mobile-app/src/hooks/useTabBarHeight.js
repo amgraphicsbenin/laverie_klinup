@@ -16,19 +16,19 @@ export function useScrollPaddingBottom() {
   const screenH = Dimensions.get('screen').height;
 
   if (Platform.OS === 'ios') {
-    // iOS handles safe area via SafeAreaView; 88 = tab bar height incl. home indicator
-    return 96;
+    // iOS handles safe area via SafeAreaView; 106 = tab bar height incl. home indicator + 12 buffer
+    return 118;
   }
 
   if (Platform.OS === 'android') {
     const statusBarH = RNStatusBar.currentHeight || 0;
     const navBarH = Math.max(0, screenH - windowH - statusBarH);
-    // tab icons (54) + nav bar + 12 buffer
-    return 54 + navBarH + 12;
+    // tab icons + vertical padding (82) + nav bar + 12 buffer
+    return 82 + navBarH + 12;
   }
 
-  // Web: tab bar is absolutely positioned (approx 62px) + buffer
-  return 80;
+  // Web: tab bar is absolutely positioned (approx 82px) + buffer
+  return 98;
 }
 
 /**
@@ -39,13 +39,13 @@ export function useTabBarHeight() {
   const { height: windowH } = useWindowDimensions();
   const screenH = Dimensions.get('screen').height;
 
-  if (Platform.OS === 'ios') return 88;
+  if (Platform.OS === 'ios') return 106;
 
   if (Platform.OS === 'android') {
     const statusBarH = RNStatusBar.currentHeight || 0;
     const navBarH = Math.max(0, screenH - windowH - statusBarH);
-    return 54 + navBarH;
+    return 82 + navBarH;
   }
 
-  return 64; // web fallback
+  return 82; // web fallback
 }
