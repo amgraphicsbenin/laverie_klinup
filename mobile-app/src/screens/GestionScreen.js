@@ -20,7 +20,10 @@ export default function GestionScreen({
   orderFormVisible,
   setOrderFormVisible,
   onModalStateChange,
-  closeAllModalsTrigger
+  closeAllModalsTrigger,
+  initialSelectedClient,
+  onClearInitialSelectedClient,
+  onShowSuccess
 }) {
   const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
   const [searchQuery, setSearchQuery] = useState('');
