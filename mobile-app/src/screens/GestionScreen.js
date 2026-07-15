@@ -764,9 +764,11 @@ export default function GestionScreen({
                         e.stopPropagation();
                         if (client) setSelectedClient(client);
                       }}
-                      activeOpacity={0.7}
+                      activeOpacity={0.8}
+                      style={styles.clientPillBtn}
                     >
-                      <Text style={[styles.cardClientName, { color: '#002cf7', textDecorationLine: 'underline' }]}>
+                      <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                      <Text style={styles.clientPillBtnText}>
                         {client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}
                       </Text>
                     </TouchableOpacity>
@@ -3499,5 +3501,21 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#002cf7',
     borderRadius: 3,
+  },
+  clientPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  clientPillBtnText: {
+    color: '#002cf7',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

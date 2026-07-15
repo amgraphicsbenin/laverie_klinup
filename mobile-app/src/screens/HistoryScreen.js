@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert } from 'react-native';
-import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download, Award, Edit3, Trash2 } from 'lucide-react-native';
+import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download, Award, Edit3, Trash2, User } from 'lucide-react-native';
 import { db } from '../services/db';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
@@ -441,19 +441,21 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 style={styles.historyCard}
               >
                 <View style={styles.cardHeader}>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <TouchableOpacity
                       onPress={(e) => {
                         e.stopPropagation();
                         if (clientObj) setSelectedClient(clientObj);
                       }}
-                      activeOpacity={0.7}
+                      activeOpacity={0.8}
+                      style={styles.clientPillBtn}
                     >
-                      <Text style={[styles.clientName, { color: '#002cf7', textDecorationLine: 'underline' }]}>
+                      <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                      <Text style={styles.clientPillBtnText}>
                         {getCustomerName(item.customer_id)}
                       </Text>
                     </TouchableOpacity>
-                    <Text style={styles.ticketNo}>Ticket #{getDisplayTicketId(item)}</Text>
+                    <Text style={[styles.ticketNo, { marginTop: 6 }]}>Ticket #{getDisplayTicketId(item)}</Text>
                   </View>
                   <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, borderWidth: 1 }]}>
                     <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
@@ -1633,6 +1635,22 @@ const styles = StyleSheet.create({
   },
   subscribeBtnText: {
     color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  clientPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  clientPillBtnText: {
+    color: '#002cf7',
     fontSize: 12,
     fontWeight: '600',
   },
