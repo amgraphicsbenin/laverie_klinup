@@ -9,7 +9,6 @@ import * as Sharing from 'expo-sharing';
 import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
-import ClientsScreen from './ClientsScreen';
 
 export default function GestionScreen({ 
   selectedOrder, 
@@ -27,7 +26,6 @@ export default function GestionScreen({
   onShowSuccess
 }) {
   const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
-  const [showClientsPage, setShowClientsPage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('actives'); // actives, urgentes, retard
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -668,26 +666,6 @@ export default function GestionScreen({
     c.article.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (showClientsPage) {
-    return (
-      <MotiView
-        from={{ opacity: 0, translateX: 40 }}
-        animate={{ opacity: 1, translateX: 0 }}
-        transition={{ type: 'timing', duration: 280 }}
-        style={{ flex: 1 }}
-      >
-        <ClientsScreen
-          onBack={() => setShowClientsPage(false)}
-          onSelectClient={(client) => {
-            setShowClientsPage(false);
-            setSelectedClient(client);
-          }}
-          onShowSuccess={onShowSuccess}
-        />
-      </MotiView>
-    );
-  }
-
   return (
     <View style={styles.container}>
       {/* HEADER */}
@@ -707,13 +685,13 @@ export default function GestionScreen({
             <Plus size={14} color="#ffffff" style={{ marginRight: 6 }} />
             <Text style={styles.topActionBtnTextBlue}>Ajouter une commande</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowClientsPage(true)}
+          <TouchableOpacity 
+            onPress={() => { setEditingCustomer(null); setShowCustomerModal(true); }}
             style={styles.topActionBtnWhite}
             activeOpacity={0.8}
           >
-            <User size={14} color="#002cf7" style={{ marginRight: 6 }} />
-            <Text style={styles.topActionBtnTextWhite}>Clients</Text>
+            <Plus size={14} color="#002cf7" style={{ marginRight: 6 }} />
+            <Text style={styles.topActionBtnTextWhite}>Ajouter un profil client</Text>
           </TouchableOpacity>
         </View>
 
