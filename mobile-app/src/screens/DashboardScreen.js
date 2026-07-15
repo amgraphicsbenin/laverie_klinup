@@ -436,6 +436,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
+            style={{ marginHorizontal: -20 }}
             contentContainerStyle={styles.kpiContainer}
           >
             {/* KPI 1: Chiffre d'Affaires Mensuel */}
@@ -1205,8 +1206,7 @@ const styles = StyleSheet.create({
   },
   // Advanced KPIs styling
   kpiContainer: {
-    paddingLeft: 0,
-    paddingRight: 8,
+    paddingHorizontal: 20,
     paddingVertical: 10,
     gap: 12,
     marginBottom: 8,
