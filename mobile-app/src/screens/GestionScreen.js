@@ -257,6 +257,7 @@ export default function GestionScreen({
     }
 
     try {
+      const isEditing = !!editingCustomer;
       if (editingCustomer) {
         await db.updateCustomer(editingCustomer.id, {
           nom: custNom,
@@ -290,6 +291,9 @@ export default function GestionScreen({
       setEditingCustomer(null);
       setWasEditingFromFiche(null);
       setShowCustomerModal(false);
+      if (onShowSuccess) {
+        onShowSuccess(isEditing ? "Profil client modifié avec succès !" : "Nouveau client créé avec succès !");
+      }
     } catch (e) {
       Alert.alert("Erreur", "Impossible d'enregistrer le profil client.");
     }

@@ -27,6 +27,14 @@ export default function App() {
 
   const [closeModalsTrigger, setCloseModalsTrigger] = useState(0);
   const [initSelectedClient, setInitSelectedClient] = useState(null);
+  const [successToast, setSuccessToast] = useState({ visible: false, message: '' });
+
+  const triggerSuccess = (message) => {
+    setSuccessToast({ visible: true, message });
+    setTimeout(() => {
+      setSuccessToast({ visible: false, message: '' });
+    }, 3200);
+  };
 
   const isAnyModalVisible = localModalOpen || selectedOrder !== null;
 
@@ -150,6 +158,7 @@ export default function App() {
             closeAllModalsTrigger={closeModalsTrigger}
             initialSelectedClient={initSelectedClient}
             onClearInitialSelectedClient={() => setInitSelectedClient(null)}
+            onShowSuccess={triggerSuccess}
           />
         );
       case 'historique':
@@ -301,7 +310,44 @@ export default function App() {
           <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive]}>Profil</Text>
         </TouchableOpacity>
       </View>
-      <OrderFormModal visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} />
+      <OrderFormModal visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
+
+      {/* GLOBAL FLOATING SUCCESS TOAST */}
+      <MotiView
+        pointerEvents={successToast.visible ? 'auto' : 'none'}
+        animate={{
+          opacity: successToast.visible ? 1 : 0,
+          translateY: successToast.visible ? (Platform.OS === 'ios' ? 50 : 25) : -120,
+          scale: successToast.visible ? 1 : 0.88,
+        }}
+        transition={{ type: 'spring', damping: 15, mass: 0.8 }}
+        style={styles.globalToastContainer}
+      >
+        <BlurView intensity={Platform.OS === 'ios' ? 45 : 95} tint="light" style={StyleSheet.absoluteFill} />
+        <View style={styles.globalToastContent}>
+          <MotiView
+            animate={{
+              scale: successToast.visible ? 1 : 0.5,
+              rotate: successToast.visible ? '0deg' : '-45deg',
+            }}
+            transition={{ type: 'spring', damping: 10, delay: 150 }}
+            style={styles.toastIconCircle}
+          >
+            <MaterialCommunityIcons name="check-bold" size={16} color="#ffffff" />
+          </MotiView>
+          <MotiView
+            animate={{
+              opacity: successToast.visible ? 1 : 0,
+              translateX: successToast.visible ? 0 : 15,
+            }}
+            transition={{ type: 'timing', duration: 400, delay: 250 }}
+            style={{ flex: 1 }}
+          >
+            <Text style={styles.toastTitle}>Succès</Text>
+            <Text style={styles.toastMessage}>{successToast.message}</Text>
+          </MotiView>
+        </View>
+      </MotiView>
     </SafeAreaView>
   )}
 </View>
@@ -419,5 +465,46 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: '#002cf7',
     fontWeight: '600',
+  },
+  globalToastContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 20 : 10,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+    padding: 14,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 999,
+    zIndex: 9999,
+    overflow: 'hidden',
+  },
+  globalToastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  toastIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#22c55e',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toastTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#15803d',
+  },
+  toastMessage: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#475569',
   },
 });

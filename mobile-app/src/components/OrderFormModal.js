@@ -7,7 +7,7 @@ import { CustomSelect } from './CustomSelect';
 import { db } from '../services/db';
 import { useTabBarHeight } from '../hooks/useTabBarHeight';
 
-export function OrderFormModal({ visible, onClose }) {
+export function OrderFormModal({ visible, onClose, onShowSuccess }) {
   const customers = db.getCustomers();
   const catalog = db.getCatalog();
   const tabBarHeight = useTabBarHeight();
@@ -169,6 +169,7 @@ export function OrderFormModal({ visible, onClose }) {
       setPayWithSubscription(false);
       setSubscribePlanId('');
       onClose();
+      if (onShowSuccess) onShowSuccess("Commande créée avec succès !");
     } catch (e) {
       Alert.alert("Erreur", e.message || "Impossible de créer la commande.");
     }
