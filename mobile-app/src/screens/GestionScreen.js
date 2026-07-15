@@ -128,6 +128,24 @@ export default function GestionScreen({
 
   // Client Details View
   const [selectedClient, setSelectedClient] = useState(null);
+  const [wasEditingFromFiche, setWasEditingFromFiche] = useState(null);
+
+  const handleCloseCustomerModal = () => {
+    setShowCustomerModal(false);
+    setEditingCustomer(null);
+    setCustNom('');
+    setCustPrenom('');
+    setCustTelephone('');
+    setCustAdresse('');
+    setCustPreferences('Plié');
+    if (wasEditingFromFiche) {
+      const origClient = db.getCustomers().find(c => c.id === wasEditingFromFiche);
+      if (origClient) {
+        setSelectedClient(origClient);
+      }
+      setWasEditingFromFiche(null);
+    }
+  };
 
   useEffect(() => {
     if (selectedOrder) {
@@ -146,8 +164,7 @@ export default function GestionScreen({
         return true;
       }
       if (showCustomerModal) {
-        setShowCustomerModal(false);
-        setEditingCustomer(null);
+        handleCloseCustomerModal();
         return true;
       }
       if (showOrderDetails) {
@@ -173,7 +190,8 @@ export default function GestionScreen({
     showCustomerModal,
     showOrderDetails,
     selectedClient,
-    setSelectedOrder
+    setSelectedOrder,
+    wasEditingFromFiche
   ]);
 
   // Notify parent of modal visibility
@@ -247,6 +265,13 @@ export default function GestionScreen({
           adresse: custAdresse,
           preferences_pliage: custPreferences
         });
+
+        if (wasEditingFromFiche === editingCustomer.id) {
+          const updatedClient = db.getCustomers().find(c => c.id === editingCustomer.id);
+          if (updatedClient) {
+            setSelectedClient(updatedClient);
+          }
+        }
       } else {
         await db.addCustomer({
           nom: custNom,
@@ -263,6 +288,7 @@ export default function GestionScreen({
       setCustAdresse('');
       setCustPreferences('Plié');
       setEditingCustomer(null);
+      setWasEditingFromFiche(null);
       setShowCustomerModal(false);
     } catch (e) {
       Alert.alert("Erreur", "Impossible d'enregistrer le profil client.");
@@ -270,6 +296,12 @@ export default function GestionScreen({
   };
 
   const handleEditCustomer = (client) => {
+    if (selectedClient && selectedClient.id === client.id) {
+      setWasEditingFromFiche(client.id);
+      setSelectedClient(null);
+    } else {
+      setWasEditingFromFiche(null);
+    }
     setEditingCustomer(client);
     setCustNom(client.nom);
     setCustPrenom(client.prenom);
@@ -1352,7 +1384,7 @@ export default function GestionScreen({
             style={{ flex: 1 }}
           >
             <View style={styles.compactModalOverlay}>
-              <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setShowCustomerModal(false)}>
+              <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseCustomerModal}>
                 <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
               </TouchableOpacity>
               <MotiView
@@ -1364,7 +1396,7 @@ export default function GestionScreen({
                   <Text style={styles.compactModalTitle}>
                     {editingCustomer ? "Modifier le Profil Client" : "Nouveau Profil Client"}
                   </Text>
-                  <TouchableOpacity onPress={() => setShowCustomerModal(false)}>
+                  <TouchableOpacity onPress={handleCloseCustomerModal}>
                     <X size={20} color="#71717a" />
                   </TouchableOpacity>
                 </View>

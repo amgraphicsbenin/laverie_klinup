@@ -26,6 +26,7 @@ export default function App() {
   const [localModalOpen, setLocalModalOpen] = useState(false);
 
   const [closeModalsTrigger, setCloseModalsTrigger] = useState(0);
+  const [initSelectedClient, setInitSelectedClient] = useState(null);
 
   const isAnyModalVisible = localModalOpen || selectedOrder !== null;
 
@@ -121,8 +122,6 @@ export default function App() {
       </View>
     );
   }
-
-  const [initSelectedClient, setInitSelectedClient] = useState(null);
 
   const renderActiveScreen = () => {
     switch (activeTab) {
