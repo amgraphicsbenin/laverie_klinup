@@ -610,7 +610,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             </MotiView>
           </TouchableOpacity>
 
-          {/* Card 2: Prêtes (Pastel Green) */}
+          {/* Card 2: Prêtes (Vibrant Green) */}
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => setActiveKpiDetail('pretes')}
@@ -623,19 +623,19 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               style={[styles.gridCard, styles.gridCardPastelGreen]}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(21, 128, 61, 0.06)' }]}>
-                  <CheckCircle2 size={14} color="#15803d" />
+                <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                  <CheckCircle2 size={14} color="#ffffff" />
                 </View>
-                <Text style={[styles.gridCardLabel, { color: '#15803d' }]}>Commandes Prêtes</Text>
+                <Text style={[styles.gridCardLabel, { color: '#ffffff' }]}>Commandes Prêtes</Text>
               </View>
-              <Text style={[styles.gridCardValue, { color: '#15803d' }]}>{readyOrders.length}</Text>
-              <Text style={[styles.gridCardSub, { color: '#16a34a' }]}>À récupérer</Text>
+              <Text style={[styles.gridCardValue, { color: '#ffffff' }]}>{readyOrders.length}</Text>
+              <Text style={[styles.gridCardSub, { color: 'rgba(255, 255, 255, 0.8)' }]}>À récupérer</Text>
             </MotiView>
           </TouchableOpacity>
         </View>
 
         <View style={styles.gridRow}>
-          {/* Card 3: Retards/Urgences (Pastel Red) */}
+          {/* Card 3: Retards/Urgences (Vibrant Red) */}
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => setActiveKpiDetail('retards')}
@@ -648,13 +648,13 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               style={[styles.gridCard, styles.gridCardPastelRed]}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(190, 18, 60, 0.06)' }]}>
-                  <AlertTriangle size={14} color="#be123c" />
+                <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                  <AlertTriangle size={14} color="#ffffff" />
                 </View>
-                <Text style={[styles.gridCardLabel, { color: '#be123c' }]}>Retards / Urgences</Text>
+                <Text style={[styles.gridCardLabel, { color: '#ffffff' }]}>Retards / Urgences</Text>
               </View>
-              <Text style={[styles.gridCardValue, { color: '#be123c' }]}>{lateOrders.length}</Text>
-              <Text style={[styles.gridCardSub, { color: '#e11d48' }]}>Livraison alerte</Text>
+              <Text style={[styles.gridCardValue, { color: '#ffffff' }]}>{lateOrders.length}</Text>
+              <Text style={[styles.gridCardSub, { color: 'rgba(255, 255, 255, 0.8)' }]}>Livraison alerte</Text>
             </MotiView>
           </TouchableOpacity>
 
@@ -887,12 +887,12 @@ const styles = StyleSheet.create({
     borderColor: '#ffffff',
   },
   gridCardPastelGreen: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#ffffff',
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
   },
   gridCardPastelRed: {
-    backgroundColor: '#ffe4e6',
-    borderColor: '#ffffff',
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
   },
   gridCardPastelSlate: {
     backgroundColor: '#f1f5f9',
