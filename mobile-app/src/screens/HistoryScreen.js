@@ -545,9 +545,11 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                         setSelectedClient(client);
                       }
                     }}
-                    activeOpacity={0.7}
+                    activeOpacity={0.8}
+                    style={[styles.clientPillBtn, { marginBottom: 8 }]}
                   >
-                    <Text style={[styles.detailClientName, { color: '#002cf7', textDecorationLine: 'underline' }]}>
+                    <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                    <Text style={styles.clientPillBtnText}>
                       {getCustomerName(selectedOrder.customer_id)}
                     </Text>
                   </TouchableOpacity>

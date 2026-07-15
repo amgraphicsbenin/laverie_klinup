@@ -1051,9 +1051,11 @@ export default function GestionScreen({
                           setSelectedClient(client);
                         }
                       }}
-                      activeOpacity={0.7}
+                      activeOpacity={0.8}
+                      style={[styles.clientPillBtn, { marginBottom: 8 }]}
                     >
-                      <Text style={[styles.detailTextLarge, { color: '#002cf7', textDecorationLine: 'underline' }]}>
+                      <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                      <Text style={styles.clientPillBtnText}>
                         {customers.find(c => c.id === selectedOrder.customer_id) ? 
                           `${customers.find(c => c.id === selectedOrder.customer_id).prenom} ${customers.find(c => c.id === selectedOrder.customer_id).nom}` : 
                           'Client inconnu'}
