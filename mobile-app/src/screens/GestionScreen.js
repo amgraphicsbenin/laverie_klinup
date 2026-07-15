@@ -3314,8 +3314,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.03,
     shadowRadius: 16,
-    elevation: 2,
+    elevation: 10,
     marginBottom: 16,
+    zIndex: 10,
   },
   subscriptionHeader: {
     flexDirection: 'row',

@@ -450,7 +450,7 @@ export function OrderFormModal({ visible, onClose }) {
 
               {/* Avance et Mode de règlement (same line) */}
               <View style={styles.formRowInline}>
-                <View style={{ flex: 1 }}>
+                <View style={styles.formFieldInline}>
                   <Text style={styles.formLabel}>Avance (FCFA)</Text>
                   <TextInput
                     keyboardType="numeric"
@@ -459,8 +459,7 @@ export function OrderFormModal({ visible, onClose }) {
                     style={styles.formInput}
                   />
                 </View>
-                <View style={{ width: 12 }} />
-                <View style={{ flex: 1.2 }}>
+                <View style={styles.formFieldInline}>
                   <Text style={styles.formLabel}>Mode Règlement</Text>
                   <CustomSelect
                     value={orderPaymentMethod}
@@ -470,6 +469,7 @@ export function OrderFormModal({ visible, onClose }) {
                       { value: 'Mobile Money', label: 'Mobile Money' }
                     ]}
                     placeholder="Choisir"
+                    buttonStyle={styles.formSelectButton}
                   />
                 </View>
               </View>
@@ -742,8 +742,19 @@ const styles = StyleSheet.create({
   },
   formRowInline: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 12,
     marginBottom: 14,
+  },
+  formFieldInline: {
+    flex: 1,
+    minWidth: 0,
+  },
+  formSelectButton: {
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
   },
   receiptSectionTitle: {
     fontSize: 11,
@@ -891,6 +902,8 @@ const styles = StyleSheet.create({
   subContainer: {
     marginTop: 10,
     marginBottom: 8,
+    zIndex: 10,
+    elevation: 10,
   },
   subCard: {
     backgroundColor: 'rgba(0, 44, 247, 0.04)',
@@ -898,6 +911,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 44, 247, 0.1)',
     borderRadius: 16,
     padding: 12,
+    zIndex: 10,
+    elevation: 10,
   },
   subHeaderRow: {
     flexDirection: 'row',
