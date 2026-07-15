@@ -1034,12 +1034,12 @@ export default function GestionScreen({
                   <X size={20} color="#71717a" />
                 </TouchableOpacity>
               </View>
-              <ScrollView 
+              {/* Infos Client */}
+              <ScrollView
                 style={{ flexGrow: 0 }}
-                contentContainerStyle={styles.compactModalScroll} 
+                contentContainerStyle={styles.compactModalScroll}
                 showsVerticalScrollIndicator={false}
               >
-                {/* Infos Client */}
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>Client & Statut</Text>
                   <View style={styles.detailCard}>

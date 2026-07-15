@@ -9,7 +9,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { MotiView } from 'moti';
 
-export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger }) {
+export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger, onSelectClient }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, delivered, late
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -17,25 +17,21 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const scrollPaddingBottom = useScrollPaddingBottom();
 
-  const [selectedClient, setSelectedClient] = useState(null);
-  const [selectedCrmSubId, setSelectedCrmSubId] = useState('');
-
   // Close details modal when trigger increments
   useEffect(() => {
     if (closeAllModalsTrigger > 0) {
       setSelectedOrder(null);
       setShowInvoiceModal(false);
       setInvoiceOrder(null);
-      setSelectedClient(null);
     }
   }, [closeAllModalsTrigger]);
 
   // Notify parent of modal visibility
   useEffect(() => {
     if (onModalStateChange) {
-      onModalStateChange(selectedOrder !== null || showInvoiceModal || selectedClient !== null);
+      onModalStateChange(selectedOrder !== null || showInvoiceModal);
     }
-  }, [selectedOrder, showInvoiceModal, selectedClient]);
+  }, [selectedOrder, showInvoiceModal]);
 
   // Handle Android back button/gesture to close history details modal
   useEffect(() => {
@@ -445,7 +441,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                     <TouchableOpacity
                       onPress={(e) => {
                         e.stopPropagation();
-                        if (clientObj) setSelectedClient(clientObj);
+                        if (clientObj && onSelectClient) onSelectClient(clientObj);
                       }}
                       activeOpacity={0.8}
                       style={styles.clientPillBtn}
@@ -540,9 +536,9 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   <TouchableOpacity
                     onPress={() => {
                       const client = customers.find(c => c.id === selectedOrder.customer_id);
-                      if (client) {
+                      if (client && onSelectClient) {
                         setSelectedOrder(null);
-                        setSelectedClient(client);
+                        onSelectClient(client);
                       }
                     }}
                     activeOpacity={0.8}
@@ -775,171 +771,6 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 </TouchableOpacity>
               </ScrollView>
             </View>
-          </View>
-        </View>
-      )}
-      {/* MODAL : DETAIL CLIENT (BOTTOM SHEET) */}
-      {selectedClient !== null && selectedClient && (
-        <View style={styles.absoluteModalContainer}>
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedClient(null)}>
-              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
-            <MotiView
-              from={{ opacity: 0, scale: 0.88, translateY: 48 }}
-              animate={{ opacity: 1, scale: 1, translateY: 0 }}
-              transition={{ type: 'spring', damping: 16, mass: 0.8 }}
-              style={[styles.compactModalView, { maxHeight: '90%' }]}
-            >
-              <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Détails Client</Text>
-                <TouchableOpacity onPress={() => setSelectedClient(null)}>
-                  <X size={20} color="#71717a" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
-                {(() => {
-                  const activeClient = customers.find(c => c.id === selectedClient.id) || selectedClient;
-                  return (
-                    <>
-                      <View style={styles.detailCard}>
-                        <Text style={styles.clientProfileName}>{activeClient.prenom} {activeClient.nom}</Text>
-                        <Text style={styles.clientProfilePhone}>{activeClient.telephone}</Text>
-                        <Text style={styles.clientProfileAddress}>{activeClient.adresse || 'Aucune adresse renseignée'}</Text>
-                        <Text style={styles.clientProfilePreferences}>Préférence : {activeClient.preferences_pliage || 'Plié'}</Text>
-                      </View>
-
-                      {/* SECTION ABONNEMENT CLIENT */}
-                      <Text style={styles.detailSectionTitle}>Forfait d'Abonnement</Text>
-                      <View style={styles.premiumSubscriptionCard}>
-                        <View style={styles.subscriptionHeader}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Award size={16} color="#002cf7" />
-                            <Text style={styles.subscriptionTitle}>Forfait d'Abonnement</Text>
-                          </View>
-                          {activeClient.active_subscription && (
-                            <View style={styles.subActiveBadge}>
-                              <Text style={styles.subActiveBadgeText}>Actif</Text>
-                            </View>
-                          )}
-                        </View>
-
-                        {activeClient.active_subscription ? (
-                          <View style={{ gap: 10 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
-                              <Text style={styles.subPlanBalance}>
-                                Solde : {activeClient.active_subscription.remaining_clothes} / {activeClient.active_subscription.total_clothes} vêt.
-                              </Text>
-                            </View>
-
-                            {/* Barre de progression */}
-                            {(() => {
-                              const remaining = activeClient.active_subscription.remaining_clothes;
-                              const total = activeClient.active_subscription.total_clothes;
-                              const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                              return (
-                                <View style={{ gap: 4 }}>
-                                  <View style={styles.progressBarBg}>
-                                    <View style={[styles.progressBarFill, { width: `${percentUsed}%` }]} />
-                                  </View>
-                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={styles.progressText}>Consommé : {percentUsed}%</Text>
-                                    <Text style={styles.progressText}>Restant : {remaining} vêtements</Text>
-                                  </View>
-                                </View>
-                              );
-                            })()}
-
-                            <View style={styles.subDatesRow}>
-                              <Text style={styles.subDateText}>
-                                Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
-                              </Text>
-                              <Text style={styles.subDateText}>
-                                Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
-                              </Text>
-                            </View>
-
-                            <TouchableOpacity
-                              onPress={() => handleUnsubscribeCrm(activeClient.id)}
-                              style={styles.unsubscribeBtn}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ) : (
-                          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                            <View style={{ flex: 1 }}>
-                              <CustomSelect
-                                value={selectedCrmSubId}
-                                onChange={(val) => setSelectedCrmSubId(val)}
-                                options={[
-                                  { label: "-- Choisir une formule --", value: "" },
-                                  ...catalog.filter(item => item.service === 'abonnement').map(sub => ({
-                                    label: `${sub.article} (${sub.prix.toLocaleString('fr-FR')} F/m)`,
-                                    value: sub.id
-                                  }))
-                                ]}
-                                placeholder="Choisir une formule"
-                              />
-                            </View>
-                            <TouchableOpacity
-                              onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
-                              style={styles.subscribeBtn}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.subscribeBtnText}>Souscrire</Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </View>
-                    </>
-                  );
-                })()}
-
-                {/* Historique Client */}
-                <Text style={styles.detailSectionTitle}>Historique des Commandes</Text>
-                {(() => {
-                  const clientOrders = orders.filter(o => o.customer_id === selectedClient.id);
-                  if (clientOrders.length === 0) {
-                    return <Text style={styles.emptyDetailsText}>Aucune commande pour ce client</Text>;
-                  }
-                  return clientOrders.map((o) => {
-                    const oStatus = getStatusColor(o.statut);
-                    return (
-                      <View key={o.id} style={[styles.detailCard, { marginBottom: 8 }]}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0f172a' }}>Ticket #{getDisplayTicketId(o)}</Text>
-                          <View style={[styles.statusTag, { backgroundColor: oStatus.bg, borderColor: oStatus.border, borderWidth: 1, paddingVertical: 2, paddingHorizontal: 6 }]}>
-                            <Text style={{ fontSize: 9, color: oStatus.text, fontWeight: '700' }}>{oStatus.label}</Text>
-                          </View>
-                        </View>
-                        <Text style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                          Articles : {getItemsSummary ? getItemsSummary(o.items || o.articles) : (o.items || o.articles || []).map(a => `${a.article} x${a.quantite}`).join(', ')}
-                        </Text>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
-                          <Text style={{ fontSize: 11, color: '#64748b' }}>
-                            {o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : ''}
-                          </Text>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#002cf7' }}>
-                            {formatPrice(o.prix_total || o.total)}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  });
-                })()}
-              </ScrollView>
-
-              <TouchableOpacity
-                onPress={() => setSelectedClient(null)}
-                style={[styles.invoiceCloseBtn, { marginTop: 16 }]}
-              >
-                <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
-              </TouchableOpacity>
-            </MotiView>
           </View>
         </View>
       )}

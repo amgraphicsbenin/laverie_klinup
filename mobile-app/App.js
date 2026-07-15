@@ -122,6 +122,8 @@ export default function App() {
     );
   }
 
+  const [initSelectedClient, setInitSelectedClient] = useState(null);
+
   const renderActiveScreen = () => {
     switch (activeTab) {
       case 'accueil':
@@ -147,10 +149,21 @@ export default function App() {
             setOrderFormVisible={setOrderFormVisible}
             onModalStateChange={setLocalModalOpen}
             closeAllModalsTrigger={closeModalsTrigger}
+            initialSelectedClient={initSelectedClient}
+            onClearInitialSelectedClient={() => setInitSelectedClient(null)}
           />
         );
       case 'historique':
-        return <HistoryScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} />;
+        return (
+          <HistoryScreen 
+            onModalStateChange={setLocalModalOpen} 
+            closeAllModalsTrigger={closeModalsTrigger}
+            onSelectClient={(client) => {
+              setActiveTab('gestion');
+              setInitSelectedClient(client);
+            }}
+          />
+        );
       case 'profile':
         return <ProfileScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} />;
       default:
