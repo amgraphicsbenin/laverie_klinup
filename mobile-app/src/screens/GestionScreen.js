@@ -1481,7 +1481,12 @@ export default function GestionScreen({
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedClient(null)}>
               <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
-            <View style={[styles.compactModalView, { maxHeight: '90%' }]}>
+            <MotiView
+              from={{ opacity: 0, scale: 0.88, translateY: 48 }}
+              animate={{ opacity: 1, scale: 1, translateY: 0 }}
+              transition={{ type: 'spring', damping: 16, mass: 0.8 }}
+              style={[styles.compactModalView, { maxHeight: '90%' }]}
+            >
               <View style={styles.compactModalHeader}>
                 <Text style={styles.compactModalTitle}>Fiche Client</Text>
                 <TouchableOpacity onPress={() => setSelectedClient(null)}>
@@ -1634,7 +1639,7 @@ export default function GestionScreen({
                   );
                 })()}
               </ScrollView>
-            </View>
+            </MotiView>
           </View>
         </View>
       )}
