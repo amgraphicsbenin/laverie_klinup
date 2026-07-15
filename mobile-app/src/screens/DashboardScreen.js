@@ -346,7 +346,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             translateY: isVisible ? 0 : 50
           }}
           transition={{ type: 'spring', damping: 18, mass: 0.8 }}
-          style={[styles.premiumModalContent, { borderTopWidth: 4, borderTopColor: theme.primary }]}
+          style={styles.premiumModalContent}
         >
           <View style={styles.modalHeader}>
             <View style={styles.modalTitleContainer}>
