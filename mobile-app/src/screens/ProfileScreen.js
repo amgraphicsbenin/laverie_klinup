@@ -5,7 +5,7 @@ import { db } from '../services/db';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
 
-export default function ProfileScreen({ onModalStateChange }) {
+export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigger }) {
   const currentUser = db.getCurrentUser();
   const isRemote = db.isRemote();
   const syncQueue = db.getSyncQueue ? db.getSyncQueue() : [];
@@ -15,6 +15,15 @@ export default function ProfileScreen({ onModalStateChange }) {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const scrollPaddingBottom = useScrollPaddingBottom();
+
+  // Close PIN modal when trigger increments
+  useEffect(() => {
+    if (closeAllModalsTrigger > 0) {
+      setShowPinModal(false);
+      setCurrentPin('');
+      setNewPin('');
+    }
+  }, [closeAllModalsTrigger]);
 
   // Notify parent of modal visibility
   useEffect(() => {

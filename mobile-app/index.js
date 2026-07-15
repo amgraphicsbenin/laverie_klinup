@@ -1,5 +1,6 @@
 import { registerRootComponent } from 'expo';
 import { Text, TextInput, Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import App from './App';
 
@@ -21,4 +22,12 @@ if (TextInput.defaultProps) {
   TextInput.defaultProps = { style: { fontFamily: defaultFont } };
 }
 
-registerRootComponent(App);
+function Root() {
+  return (
+    <SafeAreaProvider>
+      <App />
+    </SafeAreaProvider>
+  );
+}
+
+registerRootComponent(Root);

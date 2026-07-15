@@ -1,22 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler } from 'react-native';
-import { Search, Calendar, ChevronRight, X, Clock } from 'lucide-react-native';
+import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert } from 'react-native';
+import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download } from 'lucide-react-native';
 import { db } from '../services/db';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
-export default function HistoryScreen({ onModalStateChange }) {
+export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, delivered, late
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceOrder, setInvoiceOrder] = useState(null);
   const scrollPaddingBottom = useScrollPaddingBottom();
+
+  // Close details modal when trigger increments
+  useEffect(() => {
+    if (closeAllModalsTrigger > 0) {
+      setSelectedOrder(null);
+      setShowInvoiceModal(false);
+      setInvoiceOrder(null);
+    }
+  }, [closeAllModalsTrigger]);
 
   // Notify parent of modal visibility
   useEffect(() => {
     if (onModalStateChange) {
-      onModalStateChange(selectedOrder !== null);
+      onModalStateChange(selectedOrder !== null || showInvoiceModal);
     }
-  }, [selectedOrder]);
+  }, [selectedOrder, showInvoiceModal]);
 
   // Handle Android back button/gesture to close history details modal
   useEffect(() => {
@@ -50,24 +63,29 @@ export default function HistoryScreen({ onModalStateChange }) {
   const getStatusColor = (statut) => {
     switch (statut) {
       case 'pret':
-      case 'a_recuperer':
-      case 'a_livrer':
         return { bg: 'rgba(5, 150, 105, 0.06)', text: '#059669', border: 'rgba(5, 150, 105, 0.12)', label: 'Prêt' };
+      case 'a_recuperer':
+        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'À récupérer' };
+      case 'a_livrer':
+        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'À livrer' };
+      case 'en_cours_livraison':
+        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'En livraison' };
+      case 'restitue':
+        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Récupéré' };
+      case 'livre':
+        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Livré' };
       case 'lavage_cours':
       case 'en_cours_lavage':
         return { bg: 'rgba(37, 99, 235, 0.06)', text: '#2563eb', border: 'rgba(37, 99, 235, 0.12)', label: 'Lavage' };
       case 'repassage_cours':
       case 'en_cours_repassage':
         return { bg: 'rgba(13, 148, 136, 0.06)', text: '#0d9488', border: 'rgba(13, 148, 136, 0.12)', label: 'Repassage' };
+      case 'traitement':
+        return { bg: 'rgba(124, 58, 237, 0.06)', text: '#7c3aed', border: 'rgba(124, 58, 237, 0.12)', label: 'Traitement' };
       case 'attente':
       case 'en_attente':
-        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'En attente' };
-      case 'en_cours_livraison':
-        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'En livraison' };
-      case 'restitue':
-      case 'livre':
       default:
-        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Livré' };
+        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'En attente' };
     }
   };
 
@@ -78,6 +96,224 @@ export default function HistoryScreen({ onModalStateChange }) {
 
   const formatPrice = (price) => {
     return (price || 0).toLocaleString('fr-FR') + ' FCFA';
+  };
+
+  const generateInvoiceHtml = (order) => {
+    const client = customers.find(c => c.id === order.customer_id) || { prenom: 'Client', nom: 'Inconnu' };
+    const dateStr = order.created_at ? new Date(order.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
+    const displayTicketId = getDisplayTicketId(order);
+    
+    const articlesHtml = (order.items || order.articles || []).map(art => `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px;">
+        <div style="flex: 1.8; text-align: left;">
+          <div style="font-weight: bold; color: #000;">${art.article}</div>
+          <div style="font-size: 11px; color: #666; text-transform: uppercase;">${art.service.replace(/_/g, ' ')}</div>
+        </div>
+        <div style="width: 40px; text-align: center;">x${art.quantite || art.quantity}</div>
+        <div style="width: 100px; text-align: right; font-weight: bold;">${formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</div>
+      </div>
+    `).join('');
+
+    const remiseHtml = order.remise_pourcentage > 0 ? `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px;">
+        <div style="font-weight: bold;">REMISE (${order.remise_pourcentage}%)</div>
+        <div style="color: #ff3b30; font-weight: bold;">-${formatPrice(order.remise_montant || 0)}</div>
+      </div>
+    ` : '';
+
+    return `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+          <style>
+            body {
+              font-family: 'Courier New', Courier, monospace, sans-serif;
+              color: #000000;
+              margin: 0;
+              padding: 24px;
+              background-color: #ffffff;
+            }
+            .container {
+              max-width: 380px;
+              margin: 0 auto;
+              padding: 10px;
+            }
+            .brand {
+              font-size: 24px;
+              font-weight: 900;
+              text-align: center;
+              margin-bottom: 2px;
+              letter-spacing: 2px;
+            }
+            .brand-sub {
+              font-size: 10px;
+              font-weight: bold;
+              text-align: center;
+              margin-bottom: 8px;
+              color: #333;
+            }
+            .text-muted {
+              font-size: 11px;
+              text-align: center;
+              color: #555;
+              margin: 2px 0;
+            }
+            .divider {
+              border-top: 1px dashed #000;
+              margin: 12px 0;
+            }
+            .meta-row {
+              display: flex;
+              justify-content: space-between;
+              font-size: 13px;
+              margin-bottom: 4px;
+            }
+            .meta-label {
+              font-weight: bold;
+              color: #333;
+            }
+            .meta-value {
+              text-align: right;
+            }
+            .section-title {
+              font-size: 12px;
+              font-weight: bold;
+              margin-bottom: 10px;
+              text-align: center;
+              letter-spacing: 1px;
+            }
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 6px;
+              font-size: 14px;
+            }
+            .total-bold {
+              font-weight: 900;
+              font-size: 15px;
+            }
+            .footer-msg {
+              font-size: 12px;
+              font-weight: bold;
+              text-align: center;
+              margin-top: 20px;
+              margin-bottom: 12px;
+            }
+            .barcode {
+              border: 1px dashed #000;
+              padding: 8px;
+              text-align: center;
+              font-size: 15px;
+              font-weight: bold;
+              margin: 10px 0;
+              letter-spacing: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="brand">KLIN UP</div>
+            <div class="brand-sub">LAVERIE & PRESSING PREMIUM</div>
+            <div class="text-muted">Tél: +229 XX XX XX XX</div>
+            <div class="text-muted">Cotonou, Bénin</div>
+            
+            <div class="divider"></div>
+            
+            <div class="meta-row">
+              <div class="meta-label">Ticket N° :</div>
+              <div class="meta-value">#${displayTicketId}</div>
+            </div>
+            <div class="meta-row">
+              <div class="meta-label">Code :</div>
+              <div class="meta-value">${order.identifiant_unique_marquage || order.id}</div>
+            </div>
+            <div class="meta-row">
+              <div class="meta-label">Date :</div>
+              <div class="meta-value">${dateStr}</div>
+            </div>
+            <div class="meta-row">
+              <div class="meta-label">Client :</div>
+              <div class="meta-value">${client.prenom} ${client.nom}</div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="section-title">ARTICLES & SERVICES</div>
+            ${articlesHtml}
+            
+            <div class="divider"></div>
+            
+            <div class="total-row">
+              <div>TOTAL BRUT</div>
+              <div>${formatPrice(order.prix_total || order.total)}</div>
+            </div>
+            ${remiseHtml}
+            <div class="total-row total-bold">
+              <div>NET A PAYER</div>
+              <div>${formatPrice(order.total || order.prix_total)}</div>
+            </div>
+            <div class="total-row">
+              <div>AVANCE PAYEE</div>
+              <div>${formatPrice(order.avance_payee || order.avance || 0)}</div>
+            </div>
+            <div class="total-row total-bold" style="color: ${(order.reste || 0) > 0 ? '#ff3b30' : '#34c759'};">
+              <div>RESTE A PAYER</div>
+              <div>${formatPrice(order.reste || 0)}</div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="footer-msg">MERCI DE VOTRE CONFIANCE !</div>
+            
+            <div class="barcode">* ${order.identifiant_unique_marquage || order.id} *</div>
+            
+            <div class="text-muted" style="text-align: center;">Rejoignez KLIN UP pour un service premium</div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  const handlePrintInvoice = async (order) => {
+    try {
+      const html = generateInvoiceHtml(order);
+      await Print.printAsync({ html });
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible d'imprimer la facture.");
+      console.error(error);
+    }
+  };
+
+  const handleDownloadInvoice = async (order) => {
+    try {
+      const html = generateInvoiceHtml(order);
+      const { uri } = await Print.printToFileAsync({ html });
+      
+      if (Platform.OS === 'web') {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `facture_${order.identifiant_unique_marquage || order.id || displayTicketId}.pdf`;
+        link.click();
+      } else {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Télécharger la facture',
+          UTI: 'com.adobe.pdf'
+        });
+      }
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible de télécharger la facture.");
+      console.error(error);
+    }
+  };
+
+  const handleShowInvoice = (item, e) => {
+    e.stopPropagation();
+    setInvoiceOrder(item);
+    setShowInvoiceModal(true);
   };
 
   // Filtering orders
@@ -166,12 +402,27 @@ export default function HistoryScreen({ onModalStateChange }) {
                   </View>
                 </View>
 
+                <View style={styles.cardDivider} />
+
                 <View style={styles.cardFooter}>
                   <View style={styles.dateBlock}>
                     <Calendar size={12} color="#71717a" style={{ marginRight: 4 }} />
                     <Text style={styles.dateText}>{item.created_at.split('T')[0]}</Text>
                   </View>
                   <Text style={styles.totalAmount}>{formatPrice(item.prix_total || item.total)}</Text>
+                </View>
+
+                <View style={styles.cardDivider} />
+
+                <View style={styles.cardFooterArea}>
+                  <TouchableOpacity
+                    onPress={(e) => handleShowInvoice(item, e)}
+                    style={styles.factureBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Receipt size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                    <Text style={styles.factureBtnText}>Facture</Text>
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             );
@@ -199,7 +450,11 @@ export default function HistoryScreen({ onModalStateChange }) {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={{ flexGrow: 0 }}
+                contentContainerStyle={styles.compactModalScroll} 
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.detailCard}>
                   <Text style={styles.detailClientName}>{getCustomerName(selectedOrder.customer_id)}</Text>
                   <Text style={styles.detailDate}>Enregistrée le : {selectedOrder.created_at.replace('T', ' ').substring(0, 16)}</Text>
@@ -223,6 +478,25 @@ export default function HistoryScreen({ onModalStateChange }) {
                     </View>
                   ))}
                   <View style={styles.divider} />
+                  {selectedOrder.remise_pourcentage > 0 && (
+                    <>
+                      <View style={styles.articleRow}>
+                        <Text style={styles.subLabel}>Sous-total</Text>
+                        <Text style={styles.subValue}>
+                          {formatPrice((selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0))}
+                        </Text>
+                      </View>
+                      <View style={styles.articleRow}>
+                        <Text style={[styles.subLabel, { color: '#ef4444' }]}>Réduction ({selectedOrder.remise_pourcentage}%)</Text>
+                        <Text style={[styles.subValue, { color: '#ef4444', fontWeight: '600' }]}>
+                          -{formatPrice(
+                            (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) - 
+                            (selectedOrder.prix_total || selectedOrder.total)
+                          )}
+                        </Text>
+                      </View>
+                    </>
+                  )}
                   <View style={styles.articleRow}>
                     <Text style={styles.totalLabel}>Total</Text>
                     <Text style={styles.totalValue}>{formatPrice(selectedOrder.prix_total || selectedOrder.total)}</Text>
@@ -248,6 +522,145 @@ export default function HistoryScreen({ onModalStateChange }) {
           </View>
         )}
       </Modal>
+
+      {/* MODAL : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
+      {showInvoiceModal && invoiceOrder && (
+        <View style={styles.absoluteModalContainer}>
+          <View style={styles.popupModalOverlay}>
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
+              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
+            <View style={styles.popupModalView}>
+              <View style={styles.compactModalHeader}>
+                <Text style={styles.compactModalTitle}>Facture Client</Text>
+                <TouchableOpacity onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
+                  <X size={20} color="#71717a" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
+                {/* TPE Thermal Receipt Wrapper */}
+                <View style={styles.tpeReceiptContainer}>
+                  {/* Receipt Header */}
+                  <Text style={styles.tpeBrand}>KLIN UP</Text>
+                  <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
+                  <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
+                  <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
+                  
+                  <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                  {/* Receipt Metadata */}
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
+                    <Text style={styles.tpeMetaVal}>#{getDisplayTicketId(invoiceOrder)}</Text>
+                  </View>
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>Code :</Text>
+                    <Text style={styles.tpeMetaVal}>{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
+                  </View>
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>Date :</Text>
+                    <Text style={styles.tpeMetaVal}>
+                      {invoiceOrder.created_at ? new Date(invoiceOrder.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
+                    </Text>
+                  </View>
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>Client :</Text>
+                    <Text style={styles.tpeMetaVal}>
+                      {getCustomerName(invoiceOrder.customer_id)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                  {/* Items list */}
+                  <Text style={styles.tpeSectionTitle}>ARTICLES & SERVICES</Text>
+                  {(invoiceOrder.items || invoiceOrder.articles || []).map((art, idx) => (
+                    <View key={idx} style={styles.tpeItemRow}>
+                      <View style={{ flex: 1.8 }}>
+                        <Text style={styles.tpeItemName}>{art.article}</Text>
+                        <Text style={styles.tpeItemService}>{art.service.replace(/_/g, ' ')}</Text>
+                      </View>
+                      <Text style={styles.tpeItemQty}>x{art.quantite || art.quantity}</Text>
+                      <Text style={styles.tpeItemPrice}>{formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</Text>
+                    </View>
+                  ))}
+
+                  <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                  {/* Billing Details */}
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={styles.tpeTotalLabel}>TOTAL BRUT</Text>
+                    <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
+                  </View>
+                  
+                  {invoiceOrder.remise_pourcentage > 0 && (
+                    <View style={styles.tpeTotalRow}>
+                      <Text style={styles.tpeTotalLabel}>REMISE ({invoiceOrder.remise_pourcentage}%)</Text>
+                      <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(invoiceOrder.remise_montant || 0)}</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
+                    <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.total || invoiceOrder.prix_total)}</Text>
+                  </View>
+
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={styles.tpeTotalLabel}>AVANCE PAYEE</Text>
+                    <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.avance_payee || invoiceOrder.avance || 0)}</Text>
+                  </View>
+
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={styles.tpeTotalLabelBold}>RESTE A PAYER</Text>
+                    <Text style={[styles.tpeTotalValBold, { color: (invoiceOrder.reste || 0) > 0 ? '#ef4444' : '#10b981' }]}>
+                      {formatPrice(invoiceOrder.reste || 0)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                  {/* Footer & Barcode placeholder */}
+                  <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
+                  
+                  <View style={styles.barcodeContainer}>
+                    <Text style={styles.barcodeText}>* {invoiceOrder.identifiant_unique_marquage || invoiceOrder.id} *</Text>
+                  </View>
+
+                  <Text style={styles.tpeTextMutedCentred}>Rejoignez KLIN UP pour un service premium</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+                  <TouchableOpacity
+                    onPress={() => handleDownloadInvoice(invoiceOrder)}
+                    style={styles.invoiceDownloadBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Download size={14} color="#002cf7" style={{ marginRight: 6 }} />
+                    <Text style={styles.invoiceDownloadBtnText}>Télécharger</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handlePrintInvoice(invoiceOrder)}
+                    style={styles.invoicePrintBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Printer size={14} color="#ffffff" style={{ marginRight: 6 }} />
+                    <Text style={styles.invoicePrintBtnText}>Imprimer</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+                  style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
+                >
+                  <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -527,6 +940,257 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   compactModalScroll: {
-    paddingBottom: 30,
+    paddingBottom: 24,
+  },
+  absoluteModalContainer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    marginVertical: 10,
+  },
+  cardFooterArea: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  factureBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+  },
+  factureBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#002cf7',
+  },
+  popupModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(9, 9, 11, 0.4)',
+    padding: 16,
+  },
+  popupModalView: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 20,
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: '90%',
+    shadowColor: '#09090b',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 4,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  tpeScroll: {
+    paddingBottom: 16,
+  },
+  tpeReceiptContainer: {
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  tpeBrand: {
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+    color: '#0f172a',
+    letterSpacing: 1,
+  },
+  tpeBrandSub: {
+    fontSize: 9,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#475569',
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  tpeTextMuted: {
+    fontSize: 10,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  tpeTextMutedCentred: {
+    fontSize: 9,
+    color: '#64748b',
+    textAlign: 'center',
+    marginTop: 10,
+    fontWeight: '500',
+  },
+  tpeDashedDivider: {
+    fontSize: 10,
+    color: '#cbd5e1',
+    textAlign: 'center',
+    marginVertical: 8,
+    letterSpacing: 2,
+  },
+  tpeMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 2,
+  },
+  tpeMetaLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  tpeMetaVal: {
+    fontSize: 11,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  tpeSectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 8,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  tpeItemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 4,
+  },
+  tpeItemName: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  tpeItemService: {
+    fontSize: 9,
+    color: '#64748b',
+    textTransform: 'uppercase',
+    marginTop: 1,
+    fontWeight: '500',
+  },
+  tpeItemQty: {
+    fontSize: 11,
+    color: '#0f172a',
+    fontWeight: '600',
+    width: 30,
+    textAlign: 'center',
+  },
+  tpeItemPrice: {
+    fontSize: 11,
+    color: '#0f172a',
+    fontWeight: '700',
+    width: 90,
+    textAlign: 'right',
+  },
+  tpeTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 3,
+  },
+  tpeTotalLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  tpeTotalVal: {
+    fontSize: 11,
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  tpeTotalLabelBold: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '700',
+  },
+  tpeTotalValBold: {
+    fontSize: 12,
+    color: '#002cf7',
+    fontWeight: '700',
+  },
+  tpeFooterMessage: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'center',
+    marginVertical: 12,
+  },
+  barcodeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#94a3b8',
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginVertical: 8,
+  },
+  barcodeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
+    letterSpacing: 2,
+  },
+  invoiceCloseBtn: {
+    backgroundColor: '#09090b',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  invoiceCloseBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  invoiceDownloadBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1.5,
+    borderColor: '#bfdbfe',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  invoiceDownloadBtnText: {
+    color: '#002cf7',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  invoicePrintBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#002cf7',
+    borderRadius: 12,
+    paddingVertical: 12,
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  invoicePrintBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

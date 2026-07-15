@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform, BackHandler } from 'react-native';
-import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock } from 'lucide-react-native';
+import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, Download } from 'lucide-react-native';
 import { db } from '../services/db';
 import { CustomSelect } from '../components/CustomSelect';
 import { BlurView } from 'expo-blur';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
@@ -17,13 +19,25 @@ export default function GestionScreen({
   onCloseOrderFormOnMount,
   orderFormVisible,
   setOrderFormVisible,
-  onModalStateChange
+  onModalStateChange,
+  closeAllModalsTrigger
 }) {
   const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('actives'); // actives, urgentes, retard
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceOrder, setInvoiceOrder] = useState(null);
+
+  // Close all local modals when trigger increments
+  useEffect(() => {
+    if (closeAllModalsTrigger > 0) {
+      setShowCustomerModal(false);
+      setSelectedClient(null);
+      setShowInvoiceModal(false);
+      setShowOrderDetails(false);
+      if (setSelectedOrder) setSelectedOrder(null);
+    }
+  }, [closeAllModalsTrigger]);
   const scrollPaddingBottom = useScrollPaddingBottom();
 
   const setShowOrderForm = setOrderFormVisible;
@@ -80,17 +94,21 @@ export default function GestionScreen({
     switch (currentStatus) {
       case 'attente':
       case 'en_attente':
-        return { bg: '#2563eb', text: '#ffffff', label: 'Lavage' };
+        return { bg: '#7c3aed', text: '#ffffff', label: 'Passer au traitement' };
+      case 'traitement':
+        return { bg: '#002cf7', text: '#ffffff', label: 'Lancer le lavage' };
       case 'lavage_cours':
       case 'en_cours_lavage':
-        return { bg: '#0891b2', text: '#ffffff', label: 'Repassage' };
+        return { bg: '#0d9488', text: '#ffffff', label: 'Passer au repassage' };
       case 'repassage_cours':
       case 'en_cours_repassage':
-        return { bg: '#10b981', text: '#ffffff', label: 'Prêt' };
-      case 'pret':
-      case 'a_recuperer':
+        return { bg: '#059669', text: '#ffffff', label: 'Prêt' };
       case 'a_livrer':
-        return { bg: '#64748b', text: '#ffffff', label: 'Livré' };
+        return { bg: '#4f46e5', text: '#ffffff', label: 'Démarrer la livraison' };
+      case 'en_cours_livraison':
+        return { bg: '#09090b', text: '#ffffff', label: 'Terminer la livraison' };
+      case 'a_recuperer':
+        return { bg: '#d97706', text: '#ffffff', label: 'Marquer comme récupéré' };
       default:
         return null;
     }
@@ -174,10 +192,15 @@ export default function GestionScreen({
   // Status transitions
   const handleNextStatus = async (order, updateSelected = false) => {
     let nextStatus = 'en_attente';
-    if (order.statut === 'attente' || order.statut === 'en_attente') nextStatus = 'en_cours_lavage';
-    else if (order.statut === 'lavage_cours' || order.statut === 'en_cours_lavage') nextStatus = 'en_cours_repassage';
-    else if (order.statut === 'repassage_cours' || order.statut === 'en_cours_repassage') nextStatus = 'pret';
-    else if (order.statut === 'pret') nextStatus = 'restitue';
+    const status = order.statut;
+    if (status === 'attente' || status === 'en_attente') nextStatus = 'traitement';
+    else if (status === 'traitement') nextStatus = 'en_cours_lavage';
+    else if (status === 'lavage_cours' || status === 'en_cours_lavage') nextStatus = 'en_cours_repassage';
+    else if (status === 'repassage_cours' || status === 'en_cours_repassage') nextStatus = 'pret';
+    else if (status === 'a_livrer') nextStatus = 'en_cours_livraison';
+    else if (status === 'en_cours_livraison') nextStatus = 'livre';
+    else if (status === 'a_recuperer') nextStatus = 'restitue';
+    else return;
 
     try {
       await db.updateOrderStatus(order.id, nextStatus);
@@ -185,6 +208,24 @@ export default function GestionScreen({
         const updated = db.getOrders().find(o => o.id === order.id);
         if (updated) setSelectedOrder(updated);
       }
+    } catch (e) {
+      Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
+    }
+  };
+
+  const handleUpdateStatusDirect = async (order, nextStatus) => {
+    try {
+      await db.updateOrderStatus(order.id, nextStatus);
+      const updated = db.getOrders().find(o => o.id === order.id);
+      if (updated) setSelectedOrder(updated);
+    } catch (e) {
+      Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
+    }
+  };
+
+  const handleNextStatusDirectList = async (order, nextStatus) => {
+    try {
+      await db.updateOrderStatus(order.id, nextStatus);
     } catch (e) {
       Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
     }
@@ -262,29 +303,246 @@ export default function GestionScreen({
   const getStatusColor = (statut) => {
     switch (statut) {
       case 'pret':
-      case 'a_recuperer':
-      case 'a_livrer':
         return { bg: '#e8f5e9', text: '#2e7d32', label: 'Prêt' };
+      case 'a_recuperer':
+        return { bg: '#fef3c7', text: '#d97706', label: 'À récupérer' };
+      case 'a_livrer':
+        return { bg: '#eef2ff', text: '#4f46e5', label: 'À livrer' };
+      case 'en_cours_livraison':
+        return { bg: '#fffde7', text: '#b45309', label: 'En livraison' };
+      case 'restitue':
+        return { bg: '#f4f4f5', text: '#71717a', label: 'Récupéré' };
+      case 'livre':
+        return { bg: '#f4f4f5', text: '#71717a', label: 'Livré' };
       case 'lavage_cours':
       case 'en_cours_lavage':
         return { bg: '#e3f2fd', text: '#1565c0', label: 'Lavage' };
       case 'repassage_cours':
       case 'en_cours_repassage':
         return { bg: '#e0f7fa', text: '#00838f', label: 'Repassage' };
+      case 'traitement':
+        return { bg: '#f3e5f5', text: '#7b1fa2', label: 'Traitement' };
       case 'attente':
       case 'en_attente':
-        return { bg: '#fff3e0', text: '#e65100', label: 'En attente' };
-      case 'en_cours_livraison':
-        return { bg: '#fffde7', text: '#fbc02d', label: 'En livraison' };
-      case 'restitue':
-      case 'livre':
       default:
-        return { bg: '#f4f4f5', text: '#71717a', label: 'Livré' };
+        return { bg: '#fff3e0', text: '#e65100', label: 'En attente' };
     }
   };
 
   const formatPrice = (price) => {
     return (price || 0).toLocaleString('fr-FR') + ' FCFA';
+  };
+
+  const generateInvoiceHtml = (order) => {
+    const client = customers.find(c => c.id === order.customer_id) || { prenom: 'Client', nom: 'Inconnu' };
+    const dateStr = order.created_at ? new Date(order.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
+    const displayTicketId = getDisplayTicketId(order);
+    
+    const articlesHtml = (order.items || order.articles || []).map(art => `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px;">
+        <div style="flex: 1.8; text-align: left;">
+          <div style="font-weight: bold; color: #000;">${art.article}</div>
+          <div style="font-size: 11px; color: #666; text-transform: uppercase;">${art.service.replace(/_/g, ' ')}</div>
+        </div>
+        <div style="width: 40px; text-align: center;">x${art.quantite || art.quantity}</div>
+        <div style="width: 100px; text-align: right; font-weight: bold;">${formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</div>
+      </div>
+    `).join('');
+
+    const remiseHtml = order.remise_pourcentage > 0 ? `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px;">
+        <div style="font-weight: bold;">REMISE (${order.remise_pourcentage}%)</div>
+        <div style="color: #ff3b30; font-weight: bold;">-${formatPrice(order.remise_montant || 0)}</div>
+      </div>
+    ` : '';
+
+    return `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+          <style>
+            body {
+              font-family: 'Courier New', Courier, monospace, sans-serif;
+              color: #000000;
+              margin: 0;
+              padding: 24px;
+              background-color: #ffffff;
+            }
+            .container {
+              max-width: 380px;
+              margin: 0 auto;
+              padding: 10px;
+            }
+            .brand {
+              font-size: 24px;
+              font-weight: 900;
+              text-align: center;
+              margin-bottom: 2px;
+              letter-spacing: 2px;
+            }
+            .brand-sub {
+              font-size: 10px;
+              font-weight: bold;
+              text-align: center;
+              margin-bottom: 8px;
+              color: #333;
+            }
+            .text-muted {
+              font-size: 11px;
+              text-align: center;
+              color: #555;
+              margin: 2px 0;
+            }
+            .divider {
+              border-top: 1px dashed #000;
+              margin: 12px 0;
+            }
+            .meta-row {
+              display: flex;
+              justify-content: space-between;
+              font-size: 13px;
+              margin-bottom: 4px;
+            }
+            .meta-label {
+              font-weight: bold;
+              color: #333;
+            }
+            .meta-value {
+              text-align: right;
+            }
+            .section-title {
+              font-size: 12px;
+              font-weight: bold;
+              margin-bottom: 10px;
+              text-align: center;
+              letter-spacing: 1px;
+            }
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 6px;
+              font-size: 14px;
+            }
+            .total-bold {
+              font-weight: 900;
+              font-size: 15px;
+            }
+            .footer-msg {
+              font-size: 12px;
+              font-weight: bold;
+              text-align: center;
+              margin-top: 20px;
+              margin-bottom: 12px;
+            }
+            .barcode {
+              border: 1px dashed #000;
+              padding: 8px;
+              text-align: center;
+              font-size: 15px;
+              font-weight: bold;
+              margin: 10px 0;
+              letter-spacing: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="brand">KLIN UP</div>
+            <div class="brand-sub">LAVERIE & PRESSING PREMIUM</div>
+            <div class="text-muted">Tél: +229 XX XX XX XX</div>
+            <div class="text-muted">Cotonou, Bénin</div>
+            
+            <div class="divider"></div>
+            
+            <div class="meta-row">
+              <div class="meta-label">Ticket N° :</div>
+              <div class="meta-value">#${displayTicketId}</div>
+            </div>
+            <div class="meta-row">
+              <div class="meta-label">Code :</div>
+              <div class="meta-value">${order.identifiant_unique_marquage || order.id}</div>
+            </div>
+            <div class="meta-row">
+              <div class="meta-label">Date :</div>
+              <div class="meta-value">${dateStr}</div>
+            </div>
+            <div class="meta-row">
+              <div class="meta-label">Client :</div>
+              <div class="meta-value">${client.prenom} ${client.nom}</div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="section-title">ARTICLES & SERVICES</div>
+            ${articlesHtml}
+            
+            <div class="divider"></div>
+            
+            <div class="total-row">
+              <div>TOTAL BRUT</div>
+              <div>${formatPrice(order.prix_total || order.total)}</div>
+            </div>
+            ${remiseHtml}
+            <div class="total-row total-bold">
+              <div>NET A PAYER</div>
+              <div>${formatPrice(order.total || order.prix_total)}</div>
+            </div>
+            <div class="total-row">
+              <div>AVANCE PAYEE</div>
+              <div>${formatPrice(order.avance_payee || order.avance || 0)}</div>
+            </div>
+            <div class="total-row total-bold" style="color: ${(order.reste || 0) > 0 ? '#ff3b30' : '#34c759'};">
+              <div>RESTE A PAYER</div>
+              <div>${formatPrice(order.reste || 0)}</div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="footer-msg">MERCI DE VOTRE CONFIANCE !</div>
+            
+            <div class="barcode">* ${order.identifiant_unique_marquage || order.id} *</div>
+            
+            <div class="text-muted" style="text-align: center;">Rejoignez KLIN UP pour un service premium</div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  const handlePrintInvoice = async (order) => {
+    try {
+      const html = generateInvoiceHtml(order);
+      await Print.printAsync({ html });
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible d'imprimer la facture.");
+      console.error(error);
+    }
+  };
+
+  const handleDownloadInvoice = async (order) => {
+    try {
+      const html = generateInvoiceHtml(order);
+      const { uri } = await Print.printToFileAsync({ html });
+      
+      if (Platform.OS === 'web') {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `facture_${order.identifiant_unique_marquage || order.id || displayTicketId}.pdf`;
+        link.click();
+      } else {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Télécharger la facture',
+          UTI: 'com.adobe.pdf'
+        });
+      }
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible de télécharger la facture.");
+      console.error(error);
+    }
   };
 
   // Filters
@@ -514,8 +772,67 @@ export default function GestionScreen({
 
                     {/* Next Status Button */}
                     {(() => {
+                      const status = item.statut;
+                      
+                      if (status === 'pret') {
+                        return (
+                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleNextStatusDirectList(item, 'a_livrer');
+                              }}
+                              activeOpacity={0.8}
+                              style={{ flex: 1 }}
+                            >
+                              <MotiView
+                                animate={{ backgroundColor: '#4f46e5' }}
+                                style={[styles.cardNextStatusBlockBtn, { minHeight: 34 }]}
+                              >
+                                <Truck size={12} color="#ffffff" style={{ marginRight: 4 }} />
+                                <Text style={[styles.cardNextStatusBlockBtnText, { fontSize: 10 }]}>
+                                  À livrer
+                                </Text>
+                              </MotiView>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleNextStatusDirectList(item, 'a_recuperer');
+                              }}
+                              activeOpacity={0.8}
+                              style={{ flex: 1 }}
+                            >
+                              <MotiView
+                                animate={{ backgroundColor: '#d97706' }}
+                                style={[styles.cardNextStatusBlockBtn, { minHeight: 34 }]}
+                              >
+                                <User size={12} color="#ffffff" style={{ marginRight: 4 }} />
+                                <Text style={[styles.cardNextStatusBlockBtnText, { fontSize: 10 }]}>
+                                  À récupérer
+                                </Text>
+                              </MotiView>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      }
+                      
                       const nextStyle = getNextStatusStyle(item.statut);
                       if (!nextStyle) return null;
+                      
+                      const getNextStatusIcon = (status) => {
+                        if (status === 'attente' || status === 'en_attente') return 'Sparkles';
+                        if (status === 'traitement') return 'Wind';
+                        if (status === 'lavage_cours' || status === 'en_cours_lavage') return 'Shirt';
+                        if (status === 'repassage_cours' || status === 'en_cours_repassage') return 'Check';
+                        if (status === 'a_livrer') return 'Truck';
+                        if (status === 'en_cours_livraison') return 'ShoppingBag';
+                        return 'CheckCircle';
+                      };
+                      
+                      const iconName = getNextStatusIcon(item.statut);
+                      
                       return (
                         <TouchableOpacity
                           onPress={(e) => {
@@ -531,14 +848,35 @@ export default function GestionScreen({
                             }}
                             transition={{
                               type: 'timing',
-                              duration: 250,
+                              duration: 1000,
                             }}
                             style={styles.cardNextStatusBlockBtn}
                           >
-                            <Check size={14} color="#ffffff" style={{ marginRight: 6 }} />
-                            <Text style={styles.cardNextStatusBlockBtnText}>
-                              Marquer comme : {nextStyle.label}
-                            </Text>
+                            <MotiView
+                              key={iconName}
+                              from={{ opacity: 0, scale: 0.5 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ type: 'timing', duration: 800 }}
+                              style={{ marginRight: 6 }}
+                            >
+                              {iconName === 'Sparkles' && <Sparkles size={13} color="#ffffff" />}
+                              {iconName === 'Wind' && <Wind size={13} color="#ffffff" />}
+                              {iconName === 'Shirt' && <Shirt size={13} color="#ffffff" />}
+                              {iconName === 'Check' && <Check size={13} color="#ffffff" />}
+                              {iconName === 'Truck' && <Truck size={13} color="#ffffff" />}
+                              {iconName === 'ShoppingBag' && <ShoppingBag size={13} color="#ffffff" />}
+                              {iconName === 'CheckCircle' && <CheckCircle size={13} color="#ffffff" />}
+                            </MotiView>
+                            <MotiView
+                              key={nextStyle.label}
+                              from={{ opacity: 0, translateX: 5 }}
+                              animate={{ opacity: 1, translateX: 0 }}
+                              transition={{ type: 'timing', duration: 800 }}
+                            >
+                              <Text style={styles.cardNextStatusBlockBtnText}>
+                                {nextStyle.label}
+                              </Text>
+                            </MotiView>
                           </MotiView>
                         </TouchableOpacity>
                       );
@@ -628,7 +966,11 @@ export default function GestionScreen({
                 </TouchableOpacity>
               </View>
 
-              <ScrollView contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={{ flexGrow: 0 }}
+                contentContainerStyle={styles.compactModalScroll} 
+                showsVerticalScrollIndicator={false}
+              >
                 {/* Infos Client */}
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>Client & Statut</Text>
@@ -658,6 +1000,25 @@ export default function GestionScreen({
                       </View>
                     ))}
                     <View style={styles.detailDivider} />
+                    {selectedOrder.remise_pourcentage > 0 && (
+                      <>
+                        <View style={styles.detailArticleRow}>
+                          <Text style={styles.detailLabelMuted}>Sous-total</Text>
+                          <Text style={styles.detailTextMuted}>
+                            {formatPrice((selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0))}
+                          </Text>
+                        </View>
+                        <View style={styles.detailArticleRow}>
+                          <Text style={[styles.detailLabelMuted, { color: '#ef4444' }]}>Réduction ({selectedOrder.remise_pourcentage}%)</Text>
+                          <Text style={[styles.detailTextMuted, { color: '#ef4444', fontWeight: '600' }]}>
+                            -{formatPrice(
+                              (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) - 
+                              (selectedOrder.prix_total || selectedOrder.total)
+                            )}
+                          </Text>
+                        </View>
+                      </>
+                    )}
                     <View style={styles.detailArticleRow}>
                       <Text style={styles.detailLabelBold}>Total</Text>
                       <Text style={styles.detailPriceBold}>{formatPrice(selectedOrder.prix_total || selectedOrder.total)}</Text>
@@ -683,22 +1044,198 @@ export default function GestionScreen({
                       Date retrait prévue : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
                     </Text>
                     <Text style={styles.logisticsText}>Mode de paiement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement}</Text>
+                          {/* Action Button for changing status */}
+                 {selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && (() => {
+                   const status = selectedOrder.statut;
+                   
+                   // If status is 'pret', render two buttons side by side
+                   if (status === 'pret') {
+                     return (
+                       <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 20 }}>
+                         <TouchableOpacity
+                           onPress={() => handleUpdateStatusDirect(selectedOrder, 'a_livrer')}
+                           activeOpacity={0.88}
+                           style={{ flex: 1 }}
+                         >
+                           <MotiView
+                             animate={{ backgroundColor: '#4f46e5' }}
+                             style={styles.statusChangeBtnSide}
+                           >
+                             <Truck size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                             <Text style={styles.statusChangeBtnText}>À livrer</Text>
+                           </MotiView>
+                         </TouchableOpacity>
+                         
+                         <TouchableOpacity
+                           onPress={() => handleUpdateStatusDirect(selectedOrder, 'a_recuperer')}
+                           activeOpacity={0.88}
+                           style={{ flex: 1 }}
+                         >
+                           <MotiView
+                             animate={{ backgroundColor: '#d97706' }}
+                             style={styles.statusChangeBtnSide}
+                           >
+                             <User size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                             <Text style={styles.statusChangeBtnText}>À récupérer</Text>
+                           </MotiView>
+                         </TouchableOpacity>
+                       </View>
+                     );
+                   }
+                   
+                   // For all other statuses, render a single button
+                   const getSingleStatusDetails = () => {
+                     if (status === 'attente' || status === 'en_attente') {
+                       return {
+                         label: 'Passer au traitement',
+                         icon: 'Sparkles',
+                         color: '#7c3aed', // Purple for processing
+                         iconColor: '#ffffff',
+                         nextStatus: 'traitement',
+                         animation: {
+                           from: { rotate: '0deg', scale: 0.95 },
+                           animate: { rotate: '15deg', scale: [1, 1.1, 1] },
+                           transition: { loop: true, type: 'timing', duration: 1500 }
+                         }
+                       };
+                     } else if (status === 'traitement') {
+                       return {
+                         label: 'Lancer le lavage',
+                         icon: 'Wind',
+                         color: '#002cf7', // Blue for laundry
+                         iconColor: '#ffffff',
+                         nextStatus: 'en_cours_lavage',
+                         animation: {
+                           from: { rotate: '0deg' },
+                           animate: { rotate: '360deg' },
+                           transition: { loop: true, type: 'timing', duration: 2500, ease: 'linear' }
+                         }
+                       };
+                     } else if (status === 'lavage_cours' || status === 'en_cours_lavage') {
+                       return {
+                         label: 'Passer au repassage',
+                         icon: 'Shirt',
+                         color: '#0d9488', // Teal for ironing
+                         iconColor: '#ffffff',
+                         nextStatus: 'en_cours_repassage',
+                         animation: {
+                           from: { translateY: 0 },
+                           animate: { translateY: [-2, 2, -2] },
+                           transition: { loop: true, type: 'timing', duration: 1000 }
+                         }
+                       };
+                     } else if (status === 'repassage_cours' || status === 'en_cours_repassage') {
+                       return {
+                         label: 'Marquer comme prêt',
+                         icon: 'Check',
+                         color: '#059669', // Green for ready
+                         iconColor: '#ffffff',
+                         nextStatus: 'pret',
+                         animation: {
+                           from: { scale: 0.8 },
+                           animate: { scale: [1, 1.2, 1] },
+                           transition: { loop: true, type: 'spring', damping: 10, stiffness: 100 }
+                         }
+                       };
+                     } else if (status === 'a_livrer') {
+                       return {
+                         label: 'Démarrer la livraison',
+                         icon: 'Truck',
+                         color: '#4f46e5', // Indigo for delivery start
+                         iconColor: '#ffffff',
+                         nextStatus: 'en_cours_livraison',
+                         animation: {
+                           from: { translateX: -3 },
+                           animate: { translateX: [0, 3, 0] },
+                           transition: { loop: true, type: 'timing', duration: 1000 }
+                         }
+                       };
+                     } else if (status === 'en_cours_livraison') {
+                       return {
+                         label: 'Terminer la livraison',
+                         icon: 'ShoppingBag',
+                         color: '#09090b', // Dark for delivery end
+                         iconColor: '#ffffff',
+                         nextStatus: 'livre',
+                         animation: {
+                           from: { scale: 0.9 },
+                           animate: { scale: [1, 1.1, 1] },
+                           transition: { loop: true, type: 'timing', duration: 1500 }
+                         }
+                       };
+                     } else if (status === 'a_recuperer') {
+                       return {
+                         label: 'Marquer comme récupéré',
+                         icon: 'CheckCircle',
+                         color: '#d97706', // Orange for pickup
+                         iconColor: '#ffffff',
+                         nextStatus: 'restitue',
+                         animation: {
+                           from: { scale: 0.8 },
+                           animate: { scale: [1, 1.15, 1] },
+                           transition: { loop: true, type: 'spring', damping: 10 }
+                         }
+                       };
+                     }
+                     return null;
+                   };
+
+                   const btn = getSingleStatusDetails();
+                   if (!btn) return null;
+
+                   return (
+                     <TouchableOpacity
+                       onPress={() => handleNextStatus(selectedOrder, true)}
+                       activeOpacity={0.88}
+                       style={{ width: '100%' }}
+                     >
+                       <MotiView
+                         animate={{
+                           backgroundColor: btn.color
+                         }}
+                         transition={{
+                           type: 'timing',
+                           duration: 1200
+                         }}
+                         style={styles.statusChangeBtn}
+                       >
+                         <MotiView
+                           key={btn.icon}
+                           from={{ opacity: 0, scale: 0.3, rotate: '-45deg' }}
+                           animate={{ opacity: 1, scale: 1, rotate: '0deg' }}
+                           transition={{ type: 'timing', duration: 1000 }}
+                           style={{ marginRight: 8 }}
+                         >
+                           <MotiView
+                             from={btn.animation.from}
+                             animate={btn.animation.animate}
+                             transition={btn.animation.transition}
+                           >
+                             {btn.icon === 'Sparkles' && <Sparkles size={16} color={btn.iconColor} />}
+                             {btn.icon === 'Wind' && <Wind size={16} color={btn.iconColor} />}
+                             {btn.icon === 'Shirt' && <Shirt size={16} color={btn.iconColor} />}
+                             {btn.icon === 'Check' && <Check size={16} color={btn.iconColor} />}
+                             {btn.icon === 'Truck' && <Truck size={16} color={btn.iconColor} />}
+                             {btn.icon === 'ShoppingBag' && <ShoppingBag size={16} color={btn.iconColor} />}
+                             {btn.icon === 'CheckCircle' && <CheckCircle size={16} color={btn.iconColor} />}
+                           </MotiView>
+                         </MotiView>
+                         
+                         <MotiView
+                           key={btn.label}
+                           from={{ opacity: 0, translateY: 10 }}
+                           animate={{ opacity: 1, translateY: 0 }}
+                           transition={{ type: 'timing', duration: 1000 }}
+                         >
+                           <Text style={styles.statusChangeBtnText}>{btn.label}</Text>
+                         </MotiView>
+                       </MotiView>
+                     </TouchableOpacity>
+                   );
+                 })()}
                   </View>
                 </View>
 
-                {/* Action Button for changing status */}
-                {selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && (
-                  <TouchableOpacity
-                    onPress={() => handleNextStatus(selectedOrder, true)}
-                    style={styles.statusChangeBtn}
-                  >
-                    <Text style={styles.statusChangeBtnText}>
-                      {selectedOrder.statut === 'attente' || selectedOrder.statut === 'en_attente' ? 'Passer au Lavage' :
-                       selectedOrder.statut === 'lavage_cours' || selectedOrder.statut === 'en_cours_lavage' ? 'Passer au Repassage' :
-                       selectedOrder.statut === 'repassage_cours' || selectedOrder.statut === 'en_cours_repassage' ? 'Marquer comme Prêt' : 'Marquer comme Livré'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
               </ScrollView>
             </MotiView>
           </View>
@@ -985,9 +1522,29 @@ export default function GestionScreen({
                   <Text style={styles.tpeTextMutedCentred}>Rejoignez KLIN UP pour un service premium</Text>
                 </View>
 
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+                  <TouchableOpacity
+                    onPress={() => handleDownloadInvoice(invoiceOrder)}
+                    style={styles.invoiceDownloadBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Download size={14} color="#002cf7" style={{ marginRight: 6 }} />
+                    <Text style={styles.invoiceDownloadBtnText}>Télécharger</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handlePrintInvoice(invoiceOrder)}
+                    style={styles.invoicePrintBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Printer size={14} color="#ffffff" style={{ marginRight: 6 }} />
+                    <Text style={styles.invoicePrintBtnText}>Imprimer</Text>
+                  </TouchableOpacity>
+                </View>
+
                 <TouchableOpacity
                   onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
-                  style={[styles.invoiceCloseBtn, { marginTop: 16 }]}
+                  style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
                 >
                   <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
                 </TouchableOpacity>
@@ -1361,16 +1918,30 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   statusChangeBtn: {
-    backgroundColor: '#2563eb',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 16,
     paddingVertical: 14,
-    alignItems: 'center',
     marginTop: 24,
     marginBottom: 20,
-    shadowColor: '#2563eb',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
+    elevation: 3,
+  },
+  statusChangeBtnSide: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    paddingVertical: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   statusChangeBtnText: {
     color: '#ffffff',
@@ -1548,7 +2119,7 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   compactModalScroll: {
-    paddingBottom: 135,
+    paddingBottom: 24,
   },
   compactInputRow: {
     flexDirection: 'row',
@@ -2568,5 +3139,40 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     minWidth: 16,
     textAlign: 'center',
+  },
+  invoiceDownloadBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1.5,
+    borderColor: '#bfdbfe',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  invoiceDownloadBtnText: {
+    color: '#002cf7',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  invoicePrintBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#002cf7',
+    borderRadius: 12,
+    paddingVertical: 12,
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  invoicePrintBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

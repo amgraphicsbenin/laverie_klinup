@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, Dimensions, StatusBar as RNStatusBar, BackHandler, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, BackHandler } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase, db } from './src/services/db';
@@ -14,26 +15,9 @@ import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
 import { OrderFormModal } from './src/components/OrderFormModal';
 
-// ─── Android gesture navigation bar height helper ─────────────────────────────
-// On Android 10+ with gesture navigation, the navigation bar is typically
-// 0px tall visually (pill gesture area). We add a safe bottom padding so
-// the tab bar never overlaps the gesture area. Using StatusBar height
-// subtraction from window vs screen height gives us a reliable measurement.
-function useAndroidNavBarHeight() {
-  const { height: windowH } = useWindowDimensions();
-  const screenH = Dimensions.get('screen').height;
-  if (Platform.OS !== 'android') return 0;
-  // nav bar height = screen height – window height – status bar height
-  const statusBarH = RNStatusBar.currentHeight || 0;
-  const navBarH = screenH - windowH - statusBarH;
-  // Clamp: gesture-nav bar is usually 0–24dp, 3-button bar is ~48dp
-  return Math.max(0, navBarH);
-}
-// ──────────────────────────────────────────────────────────────────────────────
-
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
-  const androidNavBarH = useAndroidNavBarHeight();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('accueil');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [openOrderFormOnMount, setOpenOrderFormOnMount] = useState(false);
@@ -41,7 +25,14 @@ export default function App() {
   const [orderFormVisible, setOrderFormVisible] = useState(false);
   const [localModalOpen, setLocalModalOpen] = useState(false);
 
+  const [closeModalsTrigger, setCloseModalsTrigger] = useState(0);
+
   const isAnyModalVisible = localModalOpen || selectedOrder !== null;
+
+  const handleCloseActiveModal = () => {
+    setSelectedOrder(null);
+    setCloseModalsTrigger(prev => prev + 1);
+  };
 
   // Load database on mount
   useEffect(() => {
@@ -140,6 +131,7 @@ export default function App() {
             setSelectedOrder={setSelectedOrder}
             setGestionFilter={setGestionFilter}
             onModalStateChange={setLocalModalOpen}
+            closeAllModalsTrigger={closeModalsTrigger}
           />
         );
       case 'gestion':
@@ -154,12 +146,13 @@ export default function App() {
             orderFormVisible={orderFormVisible}
             setOrderFormVisible={setOrderFormVisible}
             onModalStateChange={setLocalModalOpen}
+            closeAllModalsTrigger={closeModalsTrigger}
           />
         );
       case 'historique':
-        return <HistoryScreen onModalStateChange={setLocalModalOpen} />;
+        return <HistoryScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} />;
       case 'profile':
-        return <ProfileScreen onModalStateChange={setLocalModalOpen} />;
+        return <ProfileScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} />;
       default:
         return (
           <DashboardScreen 
@@ -167,6 +160,7 @@ export default function App() {
             setSelectedOrder={setSelectedOrder}
             setGestionFilter={setGestionFilter}
             onModalStateChange={setLocalModalOpen}
+            closeAllModalsTrigger={closeModalsTrigger}
           />
         );
     }
@@ -195,13 +189,9 @@ export default function App() {
       <View style={[
         styles.tabBar,
         {
-          height: Platform.OS === 'ios'
-            ? 106
-            : 82 + androidNavBarH,          // 48dp icons + 12dp top/22dp bottom padding + gesture nav bar space
+          height: 82 + insets.bottom,          // 48dp icons + 12dp top/22dp bottom padding + native safe bottom inset
           paddingTop: 12,
-          paddingBottom: Platform.OS === 'ios'
-            ? 46
-            : 22 + androidNavBarH,
+          paddingBottom: 22 + insets.bottom,
         }
       ]}>
         <TouchableOpacity 
@@ -240,36 +230,27 @@ export default function App() {
           </TouchableOpacity>
         )}
 
-        {/* Center Plus Button (with smooth fade out when any modal is visible) */}
+        {/* Center Plus Button (always visible, turns red & 'x' to close other active modals) */}
         <View 
           style={styles.centerTabItem}
-          pointerEvents={isAnyModalVisible ? 'none' : 'auto'}
+          pointerEvents="auto"
         >
-          <MotiView
-            animate={{ 
-              opacity: isAnyModalVisible ? 0 : 1,
-              scale: isAnyModalVisible ? 0.6 : 1,
-              translateY: isAnyModalVisible ? 15 : 0
-            }}
-            transition={{ type: 'timing', duration: 300 }}
-            style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+          <TouchableOpacity 
+            onPress={isAnyModalVisible ? handleCloseActiveModal : () => setOrderFormVisible(!orderFormVisible)}
+            activeOpacity={0.85}
           >
-            <TouchableOpacity 
-              onPress={() => setOrderFormVisible(!orderFormVisible)}
+            <MotiView
+              animate={{ 
+                backgroundColor: isAnyModalVisible ? '#ef4444' : '#002cf7',
+                scale: (isAnyModalVisible || orderFormVisible) ? 1.05 : 1,
+                rotate: (isAnyModalVisible || orderFormVisible) ? '135deg' : '0deg'
+              }}
+              transition={{ type: 'timing', duration: 250 }}
               style={styles.scanButtonCircle}
-              activeOpacity={0.85}
             >
-              <MotiView
-                animate={{ 
-                  scale: orderFormVisible ? 1.05 : 1,
-                  rotate: orderFormVisible ? '135deg' : '0deg'
-                }}
-                transition={{ type: 'timing', duration: 250 }}
-              >
-                <MaterialCommunityIcons name="plus" size={26} color="#ffffff" />
-              </MotiView>
-            </TouchableOpacity>
-          </MotiView>
+              <MaterialCommunityIcons name="plus" size={26} color="#ffffff" />
+            </MotiView>
+          </TouchableOpacity>
         </View>
 
         {currentUser.role !== 'agent_lavage_repassage' && (

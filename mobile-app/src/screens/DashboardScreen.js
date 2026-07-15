@@ -7,7 +7,7 @@ import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom, useTabBarHeight } from '../hooks/useTabBarHeight';
 
-export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange }) {
+export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger }) {
   const scrollPaddingBottom = useScrollPaddingBottom();
   const tabBarHeight = useTabBarHeight();
   const staff = db.getStaff();
@@ -19,6 +19,13 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   // State for active KPI details modal
   const [activeKpiDetail, setActiveKpiDetail] = useState(null);
   const [localKpiDetail, setLocalKpiDetail] = useState(null);
+
+  // Close KPI details when trigger increments
+  React.useEffect(() => {
+    if (closeAllModalsTrigger > 0) {
+      setActiveKpiDetail(null);
+    }
+  }, [closeAllModalsTrigger]);
 
   React.useEffect(() => {
     if (activeKpiDetail) {
@@ -113,24 +120,29 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   const getStatusColor = (statut) => {
     switch (statut) {
       case 'pret':
-      case 'a_recuperer':
-      case 'a_livrer':
         return { bg: 'rgba(5, 150, 105, 0.06)', text: '#059669', border: 'rgba(5, 150, 105, 0.12)', label: 'Prêt' };
+      case 'a_recuperer':
+        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'À récupérer' };
+      case 'a_livrer':
+        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'À livrer' };
+      case 'en_cours_livraison':
+        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'En livraison' };
+      case 'restitue':
+        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Récupéré' };
+      case 'livre':
+        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Livré' };
       case 'lavage_cours':
       case 'en_cours_lavage':
         return { bg: 'rgba(37, 99, 235, 0.06)', text: '#2563eb', border: 'rgba(37, 99, 235, 0.12)', label: 'Lavage' };
       case 'repassage_cours':
       case 'en_cours_repassage':
         return { bg: 'rgba(13, 148, 136, 0.06)', text: '#0d9488', border: 'rgba(13, 148, 136, 0.12)', label: 'Repassage' };
+      case 'traitement':
+        return { bg: 'rgba(124, 58, 237, 0.06)', text: '#7c3aed', border: 'rgba(124, 58, 237, 0.12)', label: 'Traitement' };
       case 'attente':
       case 'en_attente':
-        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'En attente' };
-      case 'en_cours_livraison':
-        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'En livraison' };
-      case 'restitue':
-      case 'livre':
       default:
-        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Livré' };
+        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'En attente' };
     }
   };
 
@@ -347,7 +359,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           </View>
 
           <ScrollView 
-            style={{ flex: 1 }}
+            style={{ flexShrink: 1, width: '100%' }}
             showsVerticalScrollIndicator={false} 
             contentContainerStyle={{ paddingBottom: 24 }}
           >

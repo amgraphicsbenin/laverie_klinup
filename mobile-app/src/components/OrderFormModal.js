@@ -171,7 +171,7 @@ export function OrderFormModal({ visible, onClose }) {
             </View>
 
             <ScrollView 
-              style={{ flex: 1 }}
+              style={{ flexShrink: 1, width: '100%' }}
               contentContainerStyle={styles.compactModalScroll} 
               showsVerticalScrollIndicator={false}
             >
