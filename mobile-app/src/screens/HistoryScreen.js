@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert } from 'react-native';
-import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download } from 'lucide-react-native';
+import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download, Award, Edit3, Trash2 } from 'lucide-react-native';
 import { db } from '../services/db';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
+import { CustomSelect } from '../components/CustomSelect';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { MotiView } from 'moti';
 
 export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -15,21 +17,25 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const scrollPaddingBottom = useScrollPaddingBottom();
 
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedCrmSubId, setSelectedCrmSubId] = useState('');
+
   // Close details modal when trigger increments
   useEffect(() => {
     if (closeAllModalsTrigger > 0) {
       setSelectedOrder(null);
       setShowInvoiceModal(false);
       setInvoiceOrder(null);
+      setSelectedClient(null);
     }
   }, [closeAllModalsTrigger]);
 
   // Notify parent of modal visibility
   useEffect(() => {
     if (onModalStateChange) {
-      onModalStateChange(selectedOrder !== null || showInvoiceModal);
+      onModalStateChange(selectedOrder !== null || showInvoiceModal || selectedClient !== null);
     }
-  }, [selectedOrder, showInvoiceModal]);
+  }, [selectedOrder, showInvoiceModal, selectedClient]);
 
   // Handle Android back button/gesture to close history details modal
   useEffect(() => {
@@ -87,6 +93,47 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       default:
         return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'En attente' };
     }
+  };
+
+  const catalog = db.getCatalog();
+
+  const handleSubscribeCrm = (customerId, planId) => {
+    if (!planId) {
+      Alert.alert("Erreur", "Veuillez sélectionner un forfait d'abonnement.");
+      return;
+    }
+    const updatedCust = db.subscribeCustomer(customerId, planId);
+    if (updatedCust) {
+      Alert.alert("Succès", `Abonnement souscrit avec succès pour ${updatedCust.prenom} ${updatedCust.nom} !`);
+      setSelectedCrmSubId('');
+      setSelectedClient({ ...updatedCust });
+    }
+  };
+
+  const handleUnsubscribeCrm = (customerId) => {
+    Alert.alert(
+      "Confirmation",
+      "Êtes-vous sûr de vouloir résilier cet abonnement ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        { 
+          text: "Résilier", 
+          style: "destructive",
+          onPress: () => {
+            const updatedCust = db.unsubscribeCustomer(customerId);
+            if (updatedCust) {
+              Alert.alert("Succès", "Abonnement résilié avec succès !");
+              setSelectedClient({ ...updatedCust });
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const getItemsSummary = (items) => {
+    if (!items || items.length === 0) return 'Aucun article';
+    return items.map(a => `${a.article} x${a.quantite || a.quantity}`).join(', ');
   };
 
   const getCustomerName = (customerId) => {
@@ -385,6 +432,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
         ) : (
           filteredOrders.map((item) => {
             const status = getStatusColor(item.statut);
+            const clientObj = customers.find(c => c.id === item.customer_id);
             return (
               <TouchableOpacity
                 key={item.id}
@@ -394,13 +442,44 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
               >
                 <View style={styles.cardHeader}>
                   <View>
-                    <Text style={styles.clientName}>{getCustomerName(item.customer_id)}</Text>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        if (clientObj) setSelectedClient(clientObj);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.clientName, { color: '#002cf7', textDecorationLine: 'underline' }]}>
+                        {getCustomerName(item.customer_id)}
+                      </Text>
+                    </TouchableOpacity>
                     <Text style={styles.ticketNo}>Ticket #{getDisplayTicketId(item)}</Text>
                   </View>
                   <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, borderWidth: 1 }]}>
                     <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
                   </View>
                 </View>
+
+                {clientObj && clientObj.active_subscription && (
+                  <View style={styles.cardSubscriptionGaugeContainer}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={styles.cardSubText}>Abonnement : {clientObj.active_subscription.name}</Text>
+                      <Text style={styles.cardSubTextBold}>
+                        {clientObj.active_subscription.remaining_clothes} / {clientObj.active_subscription.total_clothes} vêt.
+                      </Text>
+                    </View>
+                    {(() => {
+                      const remaining = clientObj.active_subscription.remaining_clothes;
+                      const total = clientObj.active_subscription.total_clothes;
+                      const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                      return (
+                        <View style={styles.cardProgressBarBg}>
+                          <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
+                        </View>
+                      );
+                    })()}
+                  </View>
+                )}
 
                 <View style={styles.cardDivider} />
 
@@ -456,7 +535,20 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 showsVerticalScrollIndicator={false}
               >
                 <View style={styles.detailCard}>
-                  <Text style={styles.detailClientName}>{getCustomerName(selectedOrder.customer_id)}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const client = customers.find(c => c.id === selectedOrder.customer_id);
+                      if (client) {
+                        setSelectedOrder(null);
+                        setSelectedClient(client);
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.detailClientName, { color: '#002cf7', textDecorationLine: 'underline' }]}>
+                      {getCustomerName(selectedOrder.customer_id)}
+                    </Text>
+                  </TouchableOpacity>
                   <Text style={styles.detailDate}>Enregistrée le : {selectedOrder.created_at.replace('T', ' ').substring(0, 16)}</Text>
                   <Text style={styles.detailDate}>
                     Retrait prévu le : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
@@ -467,6 +559,27 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                       {getStatusColor(selectedOrder.statut).label}
                     </Text>
                   </View>
+
+                  {(() => {
+                    const client = customers.find(c => c.id === selectedOrder.customer_id);
+                    if (client && client.active_subscription) {
+                      const remaining = client.active_subscription.remaining_clothes;
+                      const total = client.active_subscription.total_clothes;
+                      const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                      return (
+                        <View style={[styles.cardSubscriptionGaugeContainer, { marginTop: 12 }]}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <Text style={styles.cardSubText}>Abonnement : {client.active_subscription.name}</Text>
+                            <Text style={styles.cardSubTextBold}>{remaining} / {total} vêt.</Text>
+                          </View>
+                          <View style={styles.cardProgressBarBg}>
+                            <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
+                          </View>
+                        </View>
+                      );
+                    }
+                    return null;
+                  })()}
                 </View>
 
                 <Text style={styles.sectionTitle}>Articles</Text>
@@ -658,6 +771,171 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 </TouchableOpacity>
               </ScrollView>
             </View>
+          </View>
+        </View>
+      )}
+      {/* MODAL : DETAIL CLIENT (BOTTOM SHEET) */}
+      {selectedClient !== null && selectedClient && (
+        <View style={styles.absoluteModalContainer}>
+          <View style={styles.compactModalOverlay}>
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedClient(null)}>
+              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
+            <MotiView
+              from={{ opacity: 0, scale: 0.88, translateY: 48 }}
+              animate={{ opacity: 1, scale: 1, translateY: 0 }}
+              transition={{ type: 'spring', damping: 16, mass: 0.8 }}
+              style={[styles.compactModalView, { maxHeight: '90%' }]}
+            >
+              <View style={styles.compactModalHeader}>
+                <Text style={styles.compactModalTitle}>Détails Client</Text>
+                <TouchableOpacity onPress={() => setSelectedClient(null)}>
+                  <X size={20} color="#71717a" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
+                {(() => {
+                  const activeClient = customers.find(c => c.id === selectedClient.id) || selectedClient;
+                  return (
+                    <>
+                      <View style={styles.detailCard}>
+                        <Text style={styles.clientProfileName}>{activeClient.prenom} {activeClient.nom}</Text>
+                        <Text style={styles.clientProfilePhone}>{activeClient.telephone}</Text>
+                        <Text style={styles.clientProfileAddress}>{activeClient.adresse || 'Aucune adresse renseignée'}</Text>
+                        <Text style={styles.clientProfilePreferences}>Préférence : {activeClient.preferences_pliage || 'Plié'}</Text>
+                      </View>
+
+                      {/* SECTION ABONNEMENT CLIENT */}
+                      <Text style={styles.detailSectionTitle}>Forfait d'Abonnement</Text>
+                      <View style={styles.premiumSubscriptionCard}>
+                        <View style={styles.subscriptionHeader}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Award size={16} color="#002cf7" />
+                            <Text style={styles.subscriptionTitle}>Forfait d'Abonnement</Text>
+                          </View>
+                          {activeClient.active_subscription && (
+                            <View style={styles.subActiveBadge}>
+                              <Text style={styles.subActiveBadgeText}>Actif</Text>
+                            </View>
+                          )}
+                        </View>
+
+                        {activeClient.active_subscription ? (
+                          <View style={{ gap: 10 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
+                              <Text style={styles.subPlanBalance}>
+                                Solde : {activeClient.active_subscription.remaining_clothes} / {activeClient.active_subscription.total_clothes} vêt.
+                              </Text>
+                            </View>
+
+                            {/* Barre de progression */}
+                            {(() => {
+                              const remaining = activeClient.active_subscription.remaining_clothes;
+                              const total = activeClient.active_subscription.total_clothes;
+                              const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                              return (
+                                <View style={{ gap: 4 }}>
+                                  <View style={styles.progressBarBg}>
+                                    <View style={[styles.progressBarFill, { width: `${percentUsed}%` }]} />
+                                  </View>
+                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text style={styles.progressText}>Consommé : {percentUsed}%</Text>
+                                    <Text style={styles.progressText}>Restant : {remaining} vêtements</Text>
+                                  </View>
+                                </View>
+                              );
+                            })()}
+
+                            <View style={styles.subDatesRow}>
+                              <Text style={styles.subDateText}>
+                                Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
+                              </Text>
+                              <Text style={styles.subDateText}>
+                                Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
+                              </Text>
+                            </View>
+
+                            <TouchableOpacity
+                              onPress={() => handleUnsubscribeCrm(activeClient.id)}
+                              style={styles.unsubscribeBtn}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                            <View style={{ flex: 1 }}>
+                              <CustomSelect
+                                value={selectedCrmSubId}
+                                onChange={(val) => setSelectedCrmSubId(val)}
+                                options={[
+                                  { label: "-- Choisir une formule --", value: "" },
+                                  ...catalog.filter(item => item.service === 'abonnement').map(sub => ({
+                                    label: `${sub.article} (${sub.prix.toLocaleString('fr-FR')} F/m)`,
+                                    value: sub.id
+                                  }))
+                                ]}
+                                placeholder="Choisir une formule"
+                              />
+                            </View>
+                            <TouchableOpacity
+                              onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
+                              style={styles.subscribeBtn}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.subscribeBtnText}>Souscrire</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    </>
+                  );
+                })()}
+
+                {/* Historique Client */}
+                <Text style={styles.detailSectionTitle}>Historique des Commandes</Text>
+                {(() => {
+                  const clientOrders = orders.filter(o => o.customer_id === selectedClient.id);
+                  if (clientOrders.length === 0) {
+                    return <Text style={styles.emptyDetailsText}>Aucune commande pour ce client</Text>;
+                  }
+                  return clientOrders.map((o) => {
+                    const oStatus = getStatusColor(o.statut);
+                    return (
+                      <View key={o.id} style={[styles.detailCard, { marginBottom: 8 }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0f172a' }}>Ticket #{getDisplayTicketId(o)}</Text>
+                          <View style={[styles.statusTag, { backgroundColor: oStatus.bg, borderColor: oStatus.border, borderWidth: 1, paddingVertical: 2, paddingHorizontal: 6 }]}>
+                            <Text style={{ fontSize: 9, color: oStatus.text, fontWeight: '700' }}>{oStatus.label}</Text>
+                          </View>
+                        </View>
+                        <Text style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                          Articles : {getItemsSummary ? getItemsSummary(o.items || o.articles) : (o.items || o.articles || []).map(a => `${a.article} x${a.quantite}`).join(', ')}
+                        </Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                          <Text style={{ fontSize: 11, color: '#64748b' }}>
+                            {o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : ''}
+                          </Text>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#002cf7' }}>
+                            {formatPrice(o.prix_total || o.total)}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  });
+                })()}
+              </ScrollView>
+
+              <TouchableOpacity
+                onPress={() => setSelectedClient(null)}
+                style={[styles.invoiceCloseBtn, { marginTop: 16 }]}
+              >
+                <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
+              </TouchableOpacity>
+            </MotiView>
           </View>
         </View>
       )}
@@ -1191,6 +1469,171 @@ const styles = StyleSheet.create({
   invoicePrintBtnText: {
     color: '#ffffff',
     fontSize: 13,
+    fontWeight: '600',
+  },
+  cardSubscriptionGaugeContainer: {
+    marginTop: 8,
+    backgroundColor: 'rgba(0, 44, 247, 0.03)',
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 44, 247, 0.08)',
+  },
+  cardSubText: {
+    fontSize: 10,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  cardSubTextBold: {
+    fontSize: 10,
+    color: '#002cf7',
+    fontWeight: '700',
+  },
+  cardProgressBarBg: {
+    height: 6,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  cardProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#002cf7',
+    borderRadius: 3,
+  },
+  clientProfileName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  clientProfilePhone: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#002cf7',
+    marginBottom: 4,
+  },
+  clientProfileAddress: {
+    fontSize: 12,
+    color: '#475569',
+    marginBottom: 4,
+  },
+  clientProfilePreferences: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  detailSectionTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 18,
+    marginBottom: 10,
+  },
+  premiumSubscriptionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.02)',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.03,
+    shadowRadius: 16,
+    elevation: 10,
+    marginBottom: 16,
+    zIndex: 10,
+  },
+  subscriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 8,
+    marginBottom: 10,
+  },
+  subscriptionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  subActiveBadge: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  subActiveBadgeText: {
+    fontSize: 9,
+    color: '#15803d',
+    fontWeight: '700',
+  },
+  subPlanName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#002cf7',
+  },
+  subPlanBalance: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#002cf7',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  subDatesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 8,
+    marginTop: 4,
+  },
+  subDateText: {
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  unsubscribeBtn: {
+    backgroundColor: '#fff1f2',
+    borderWidth: 1,
+    borderColor: '#ffe4e6',
+    borderRadius: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  unsubscribeBtnText: {
+    fontSize: 12,
+    color: '#ef4444',
+    fontWeight: '600',
+  },
+  subscribeBtn: {
+    backgroundColor: '#002cf7',
+    borderRadius: 10,
+    height: 40,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  subscribeBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
     fontWeight: '600',
   },
 });

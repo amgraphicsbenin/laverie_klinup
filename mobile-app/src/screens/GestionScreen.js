@@ -759,7 +759,17 @@ export default function GestionScreen({
                   style={styles.orderCard}
                 >
                   <View style={styles.cardHeader}>
-                    <Text style={styles.cardClientName}>{client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}</Text>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        if (client) setSelectedClient(client);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.cardClientName, { color: '#002cf7', textDecorationLine: 'underline' }]}>
+                        {client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}
+                      </Text>
+                    </TouchableOpacity>
                     <View style={[styles.statusTag, { backgroundColor: status.bg }]}>
                       <View style={[styles.statusDot, { backgroundColor: status.text }]} />
                       <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
@@ -775,6 +785,27 @@ export default function GestionScreen({
                       {getItemsSummary(item.items || item.articles)}
                     </Text>
                   </View>
+
+                  {client && client.active_subscription && (
+                    <View style={styles.cardSubscriptionGaugeContainer}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text style={styles.cardSubText}>Abonnement : {client.active_subscription.name}</Text>
+                        <Text style={styles.cardSubTextBold}>
+                          {client.active_subscription.remaining_clothes} / {client.active_subscription.total_clothes} vêt.
+                        </Text>
+                      </View>
+                      {(() => {
+                        const remaining = client.active_subscription.remaining_clothes;
+                        const total = client.active_subscription.total_clothes;
+                        const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                        return (
+                          <View style={styles.cardProgressBarBg}>
+                            <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
+                          </View>
+                        );
+                      })()}
+                    </View>
+                  )}
 
                   <View style={styles.cardMetaRow}>
                     <View style={styles.metaBadge}>
@@ -1001,7 +1032,6 @@ export default function GestionScreen({
                   <X size={20} color="#71717a" />
                 </TouchableOpacity>
               </View>
-
               <ScrollView 
                 style={{ flexGrow: 0 }}
                 contentContainerStyle={styles.compactModalScroll} 
@@ -1011,11 +1041,22 @@ export default function GestionScreen({
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>Client & Statut</Text>
                   <View style={styles.detailCard}>
-                    <Text style={styles.detailTextLarge}>
-                      {customers.find(c => c.id === selectedOrder.customer_id) ? 
-                        `${customers.find(c => c.id === selectedOrder.customer_id).prenom} ${customers.find(c => c.id === selectedOrder.customer_id).nom}` : 
-                        'Client inconnu'}
-                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const client = customers.find(c => c.id === selectedOrder.customer_id);
+                        if (client) {
+                          setShowOrderDetails(false);
+                          setSelectedClient(client);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.detailTextLarge, { color: '#002cf7', textDecorationLine: 'underline' }]}>
+                        {customers.find(c => c.id === selectedOrder.customer_id) ? 
+                          `${customers.find(c => c.id === selectedOrder.customer_id).prenom} ${customers.find(c => c.id === selectedOrder.customer_id).nom}` : 
+                          'Client inconnu'}
+                      </Text>
+                    </TouchableOpacity>
                     <Text style={styles.detailTextMuted}>Téléphone : {customers.find(c => c.id === selectedOrder.customer_id)?.telephone || 'N/A'}</Text>
                     
                     <View style={[styles.statusTag, { backgroundColor: getStatusColor(selectedOrder.statut).bg, borderColor: getStatusColor(selectedOrder.statut).border, alignSelf: 'flex-start', marginTop: 8, borderWidth: 1 }]}>
@@ -1023,6 +1064,27 @@ export default function GestionScreen({
                         {getStatusColor(selectedOrder.statut).label}
                       </Text>
                     </View>
+
+                    {(() => {
+                      const client = customers.find(c => c.id === selectedOrder.customer_id);
+                      if (client && client.active_subscription) {
+                        const remaining = client.active_subscription.remaining_clothes;
+                        const total = client.active_subscription.total_clothes;
+                        const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                        return (
+                          <View style={[styles.cardSubscriptionGaugeContainer, { marginTop: 12 }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <Text style={styles.cardSubText}>Abonnement : {client.active_subscription.name}</Text>
+                              <Text style={styles.cardSubTextBold}>{remaining} / {total} vêt.</Text>
+                            </View>
+                            <View style={styles.cardProgressBarBg}>
+                              <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
+                            </View>
+                          </View>
+                        );
+                      }
+                      return null;
+                    })()}
                   </View>
                 </View>
                 {/* Articles */}
@@ -3408,5 +3470,34 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  cardSubscriptionGaugeContainer: {
+    marginTop: 8,
+    backgroundColor: 'rgba(0, 44, 247, 0.03)',
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 44, 247, 0.08)',
+  },
+  cardSubText: {
+    fontSize: 10,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  cardSubTextBold: {
+    fontSize: 10,
+    color: '#002cf7',
+    fontWeight: '700',
+  },
+  cardProgressBarBg: {
+    height: 6,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  cardProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#002cf7',
+    borderRadius: 3,
   },
 });

@@ -544,12 +544,39 @@ export function OrderFormModal({ visible, onClose }) {
                       </View>
                     )}
 
-                    <View style={styles.receiptRow}>
-                      <Text style={styles.receiptRowLabelBold}>Net à Payer</Text>
-                      <Text style={styles.receiptRowValBold}>
-                        {isSubscriptionActive && !isImmediateSub ? '0 vêtements déduits' : formatPrice(netTotal)}
-                      </Text>
-                    </View>
+                    {isSubscriptionActive && !isImmediateSub && activeCustomer && activeCustomer.active_subscription ? (
+                      <>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabel}>Formule Active</Text>
+                          <Text style={[styles.receiptRowVal, { fontWeight: '700', color: '#002cf7' }]}>
+                            {activeCustomer.active_subscription.name}
+                          </Text>
+                        </View>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabel}>Solde Actuel</Text>
+                          <Text style={styles.receiptRowVal}>
+                            {activeCustomer.active_subscription.remaining_clothes} vêt.
+                          </Text>
+                        </View>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabel}>Vêtements Déduits</Text>
+                          <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>
+                            -{getTotalClothesCount()} vêt.
+                          </Text>
+                        </View>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabelBold}>Solde Restant (Abonnement)</Text>
+                          <Text style={[styles.receiptRowValBold, { color: '#10b981' }]}>
+                            {activeCustomer.active_subscription.remaining_clothes - getTotalClothesCount()} vêt.
+                          </Text>
+                        </View>
+                      </>
+                    ) : (
+                      <View style={styles.receiptRow}>
+                        <Text style={styles.receiptRowLabelBold}>Net à Payer</Text>
+                        <Text style={styles.receiptRowValBold}>{formatPrice(netTotal)}</Text>
+                      </View>
+                    )}
 
                     <View style={styles.receiptRow}>
                       <Text style={styles.receiptRowLabel}>Acompte (Avance)</Text>
