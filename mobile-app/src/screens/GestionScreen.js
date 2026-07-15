@@ -1572,7 +1572,7 @@ const styles = StyleSheet.create({
   },
   tabHeader: {
     backgroundColor: '#f4f5f7',
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 10,
   },
   tabSelector: {
@@ -2491,7 +2491,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 24,
     paddingTop: 24,
-    paddingBottom: 16,
+    paddingBottom: 4,
     backgroundColor: '#f4f5f7',
   },
   headerTitle: {
@@ -2505,7 +2505,7 @@ const styles = StyleSheet.create({
   topActionsRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 0,
     paddingBottom: 12,
     gap: 12,
     backgroundColor: '#f4f5f7',
