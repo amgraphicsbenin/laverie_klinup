@@ -37,7 +37,9 @@
     "owner": "amgraphicsbenin",
     "plugins": [
       "expo-asset",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-font",
+      "expo-status-bar"
     ]
   }
 }
