@@ -135,6 +135,9 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
         return { bg: 'rgba(124, 58, 237, 0.06)', text: '#7c3aed', border: 'rgba(124, 58, 237, 0.12)', label: 'Traitement' };
       case 'attente':
       case 'en_attente':
+        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'En attente' };
+      case 'annule':
+        return { bg: 'rgba(220, 38, 38, 0.06)', text: '#dc2626', border: 'rgba(220, 38, 38, 0.15)', label: 'Annulée' };
       default:
         return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'En attente' };
     }
@@ -420,6 +423,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
 
     if (filterType === 'delivered') return o.statut === 'livre' || o.statut === 'restitue';
     if (filterType === 'late') return o.est_en_retard || o.statut === 'retard' || (o.statut !== 'restitue' && o.statut !== 'livre' && o.due_date && new Date(o.due_date) < new Date());
+    if (filterType === 'cancelled') return o.statut === 'annule';
     return true;
   });
 
@@ -465,6 +469,14 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           >
             <Text style={[styles.chipText, filterType === 'late' && styles.chipTextActive]}>
               Retards ({orders.filter(o => o.est_en_retard || o.statut === 'retard' || (o.statut !== 'restitue' && o.statut !== 'livre' && o.due_date && new Date(o.due_date) < new Date())).length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setFilterType('cancelled')}
+            style={[styles.chip, filterType === 'cancelled' && { backgroundColor: 'rgba(220, 38, 38, 0.1)', borderColor: 'rgba(220, 38, 38, 0.3)', borderWidth: 1 }]}
+          >
+            <Text style={[styles.chipText, filterType === 'cancelled' && { color: '#dc2626', fontWeight: '600' }]}>
+              Annulées ({orders.filter(o => o.statut === 'annule').length})
             </Text>
           </TouchableOpacity>
         </ScrollView>

@@ -477,6 +477,9 @@ export default function GestionScreen({
         return { bg: '#f3e5f5', text: '#7b1fa2', label: 'Traitement' };
       case 'attente':
       case 'en_attente':
+        return { bg: '#fff3e0', text: '#e65100', label: 'En attente' };
+      case 'annule':
+        return { bg: '#fef2f2', text: '#dc2626', label: 'Annulée' };
       default:
         return { bg: '#fff3e0', text: '#e65100', label: 'En attente' };
     }
