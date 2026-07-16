@@ -21,6 +21,7 @@ export default function GestionScreen({
   onCloseOrderFormOnMount,
   orderFormVisible,
   setOrderFormVisible,
+  onOpenOrderForm,
   onModalStateChange,
   closeAllModalsTrigger,
   initialSelectedClient,
@@ -709,7 +710,7 @@ export default function GestionScreen({
 
     // Filter by dashboard selected card (gestionFilter overrides local statusFilter)
     if (gestionFilter === 'en_cours') {
-      return o.statut !== 'livre' && o.statut !== 'restitue';
+      return o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule';
     }
     if (gestionFilter === 'pretes') {
       return o.statut === 'pret' || o.statut === 'a_recuperer' || o.statut === 'a_livrer';
@@ -720,7 +721,7 @@ export default function GestionScreen({
 
     // Apply 3-button local status filter
     if (statusFilter === 'actives') {
-      return o.statut !== 'livre' && o.statut !== 'restitue';
+      return o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule';
     }
     if (statusFilter === 'urgentes') {
       return o.niveau_urgence === 'Express';
@@ -775,7 +776,7 @@ export default function GestionScreen({
         {/* BOUTONS SUPÉRIEURS D'ACTION */}
         <View style={styles.topActionsRow}>
           <TouchableOpacity 
-            onPress={() => setShowOrderForm(true)}
+            onPress={() => { if (onOpenOrderForm) onOpenOrderForm(); else setShowOrderForm(true); }}
             style={styles.topActionBtnBlue}
             activeOpacity={0.8}
           >

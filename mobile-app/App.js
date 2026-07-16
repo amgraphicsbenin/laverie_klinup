@@ -25,6 +25,7 @@ export default function App() {
   const [openOrderFormOnMount, setOpenOrderFormOnMount] = useState(false);
   const [gestionFilter, setGestionFilter] = useState(null);
   const [orderFormVisible, setOrderFormVisible] = useState(false);
+  const [orderFormKey, setOrderFormKey] = useState(0);
   const [localModalOpen, setLocalModalOpen] = useState(false);
 
   const [closeModalsTrigger, setCloseModalsTrigger] = useState(0);
@@ -192,6 +193,7 @@ export default function App() {
             onCloseOrderFormOnMount={() => setOpenOrderFormOnMount(false)}
             orderFormVisible={orderFormVisible}
             setOrderFormVisible={setOrderFormVisible}
+            onOpenOrderForm={() => { setOrderFormKey(prev => prev + 1); setOrderFormVisible(true); }}
             onModalStateChange={setLocalModalOpen}
             closeAllModalsTrigger={closeModalsTrigger}
             initialSelectedClient={initSelectedClient}
@@ -299,7 +301,10 @@ export default function App() {
           pointerEvents="auto"
         >
           <TouchableOpacity 
-            onPress={isAnyModalVisible ? handleCloseActiveModal : () => setOrderFormVisible(!orderFormVisible)}
+            onPress={isAnyModalVisible ? handleCloseActiveModal : () => {
+              if (!orderFormVisible) setOrderFormKey(prev => prev + 1);
+              setOrderFormVisible(!orderFormVisible);
+            }}
             activeOpacity={0.85}
           >
             <MotiView
@@ -352,7 +357,7 @@ export default function App() {
           <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive]}>Profil</Text>
         </TouchableOpacity>
       </View>
-      <OrderFormModal visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
+      <OrderFormModal key={orderFormKey} visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
 
       {/* GLOBAL FLOATING SUCCESS TOAST */}
       <MotiView
