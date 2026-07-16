@@ -6,11 +6,14 @@ import { MotiView } from 'moti';
 import { CustomSelect } from './CustomSelect';
 import { db } from '../services/db';
 import { useTabBarHeight } from '../hooks/useTabBarHeight';
+import { useDbState } from '../hooks/useDbState';
 
 export function OrderFormModal({ visible, onClose, onShowSuccess }) {
+  const { isDarkMode } = useDbState();
   const customers = db.getCustomers();
   const catalog = db.getCatalog();
   const tabBarHeight = useTabBarHeight();
+  const styles = getStyles(isDarkMode);
 
   const [orderClient, setOrderClient] = useState('');
   const [selectedArticles, setSelectedArticles] = useState([]);
@@ -549,7 +552,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                       <>
                         <View style={styles.receiptRow}>
                           <Text style={styles.receiptRowLabel}>Formule Active</Text>
-                          <Text style={[styles.receiptRowVal, { fontWeight: '700', color: '#002cf7' }]}>
+                          <Text style={[styles.receiptRowVal, { fontWeight: '700', color: isDarkMode ? '#38bdf8' : '#002cf7' }]}>
                             {activeCustomer.active_subscription.name}
                           </Text>
                         </View>
@@ -602,7 +605,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
 
                     <View style={[styles.receiptRow, { marginTop: 4 }]}>
                       <Text style={styles.receiptRowLabelMuted}>Disponibilité :</Text>
-                      <Text style={[styles.receiptRowValMuted, { fontWeight: '700', color: '#002cf7' }]}>Sous {delay}</Text>
+                      <Text style={[styles.receiptRowValMuted, { fontWeight: '700', color: isDarkMode ? '#38bdf8' : '#002cf7' }]}>Sous {delay}</Text>
                     </View>
                   </View>
                 );
@@ -622,7 +625,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   absoluteModalContainer: {
     position: 'absolute',
     top: 0,
@@ -1012,3 +1015,74 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 });
+
+const getStyles = (isDarkMode) => {
+  if (!isDarkMode) return baseStyles;
+  
+  const overrides = {
+    compactModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
+    compactModalView: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+    compactModalTitle: { color: '#ffffff' },
+    modalLabel: { color: '#cbd5e1' },
+    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    articleRow: { borderBottomColor: '#334155' },
+    articleName: { color: '#ffffff' },
+    articlePrice: { color: '#94a3b8' },
+    articleQtyInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    totalLabel: { color: '#94a3b8' },
+    totalValue: { color: '#ffffff' },
+    summarySection: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    summaryLabel: { color: '#cbd5e1' },
+    summaryValue: { color: '#ffffff' },
+    prefSelector: { backgroundColor: '#0f172a' },
+    prefOptActive: { backgroundColor: '#1e293b' },
+    prefOptText: { color: '#cbd5e1' },
+    prefOptTextActive: { color: '#ffffff' },
+    subLabelSmall: { color: '#94a3b8' },
+    subLabelSmallBold: { color: '#cbd5e1' },
+    
+    // Additional form labels, input and layout overrides
+    formLabel: { color: '#cbd5e1' },
+    fixedArticleContainer: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    clothingCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    clothingName: { color: '#ffffff' },
+    clothingCloseBtn: { backgroundColor: '#334155' },
+    clothingCloseBtnText: { color: '#cbd5e1' },
+    clothingAddBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
+    clothingAddBtnText: { color: '#38bdf8' },
+    formInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    urgencyBtn: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    urgencyBtnText: { color: '#cbd5e1' },
+    formSelectButton: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    serviceLabel: { color: '#cbd5e1' },
+    servicePrice: { color: '#38bdf8' },
+    serviceQtyText: { color: '#ffffff' },
+    subCard: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
+    subTextBold: { color: '#ffffff' },
+    checkbox: { backgroundColor: '#0f172a', borderColor: '#002cf7' },
+    checkboxLabel: { color: '#38bdf8' },
+    alertRow: { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444' },
+    alertText: { color: '#f87171' },
+    
+    // Receipt/Facturation card overrides
+    receiptPreviewCard: { backgroundColor: 'rgba(0, 44, 247, 0.12)', borderColor: 'rgba(56, 189, 248, 0.2)' },
+    receiptSectionTitle: { color: '#ffffff' },
+    receiptRowLabel: { color: '#cbd5e1' },
+    receiptRowVal: { color: '#cbd5e1' },
+    receiptRowLabelBold: { color: '#ffffff' },
+    receiptRowValBold: { color: '#ffffff' },
+    receiptRowValTotal: { color: '#ffffff' },
+    receiptRowLabelMuted: { color: '#cbd5e1' },
+    receiptRowValMuted: { color: '#cbd5e1' },
+    receiptDivider: { backgroundColor: 'rgba(56, 189, 248, 0.15)' },
+  };
+
+  const merged = {};
+  Object.keys(baseStyles).forEach(key => {
+    merged[key] = StyleSheet.flatten(baseStyles[key]);
+  });
+  Object.keys(overrides).forEach(key => {
+    merged[key] = { ...merged[key], ...overrides[key] };
+  });
+  return merged;
+};

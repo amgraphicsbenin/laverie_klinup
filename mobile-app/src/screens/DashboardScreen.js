@@ -6,15 +6,16 @@ import { MotiView } from 'moti';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom, useTabBarHeight } from '../hooks/useTabBarHeight';
+import { useDbState } from '../hooks/useDbState';
 
 export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger }) {
+  const { currentUser, isRemote, isDarkMode } = useDbState();
   const scrollPaddingBottom = useScrollPaddingBottom();
   const tabBarHeight = useTabBarHeight();
   const staff = db.getStaff();
   const orders = db.getOrders();
   const customers = db.getCustomers();
-  const currentUser = db.getCurrentUser();
-  const isRemote = db.isRemote();
+  const styles = getStyles(isDarkMode);
 
   // State for active KPI details modal
   const [activeKpiDetail, setActiveKpiDetail] = useState(null);
@@ -165,15 +166,15 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   };
 
   const kpiThemes = {
-    ca_mensuel: { primary: '#4f46e5', bg: '#e0e7ff', text: '#1e1b4b', title: 'Chiffre d\'Affaires Mensuel' },
-    panier_moyen: { primary: '#a855f7', bg: '#f3e8ff', text: '#3b0764', title: 'Panier Moyen' },
-    recouvrement: { primary: '#10b981', bg: '#d1fae5', text: '#064e3b', title: 'Taux de Recouvrement' },
-    part_express: { primary: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', title: 'Part Express' },
-    en_cours: { primary: '#0369a1', bg: '#e0f2fe', text: '#0c4a6e', title: 'Commandes En Cours' },
-    pretes: { primary: '#15803d', bg: '#dcfce7', text: '#064e3b', title: 'Commandes Prêtes' },
-    retards: { primary: '#be123c', bg: '#ffe4e6', text: '#4c0519', title: 'Retards & Urgences' },
-    ca_jour: { primary: '#2563eb', bg: '#eff6ff', text: '#1e3a8a', title: 'CA Journalier' },
-    volume_jour: { primary: '#475569', bg: '#f1f5f9', text: '#0f172a', title: 'Commandes du Jour' },
+    ca_mensuel: { primary: '#6366f1', bg: isDarkMode ? '#1e1b4b' : '#e0e7ff', text: isDarkMode ? '#e0e7ff' : '#1e1b4b', title: 'Chiffre d\'Affaires Mensuel' },
+    panier_moyen: { primary: '#c084fc', bg: isDarkMode ? '#3b0764' : '#f3e8ff', text: isDarkMode ? '#f3e8ff' : '#3b0764', title: 'Panier Moyen' },
+    recouvrement: { primary: '#34d399', bg: isDarkMode ? '#064e3b' : '#d1fae5', text: isDarkMode ? '#d1fae5' : '#064e3b', title: 'Taux de Recouvrement' },
+    part_express: { primary: '#f87171', bg: isDarkMode ? '#7f1d1d' : '#fee2e2', text: isDarkMode ? '#fee2e2' : '#7f1d1d', title: 'Part Express' },
+    en_cours: { primary: '#38bdf8', bg: isDarkMode ? '#0c4a6e' : '#e0f2fe', text: isDarkMode ? '#e0f2fe' : '#0c4a6e', title: 'Commandes En Cours' },
+    pretes: { primary: '#4ade80', bg: isDarkMode ? '#064e3b' : '#dcfce7', text: isDarkMode ? '#dcfce7' : '#064e3b', title: 'Commandes Prêtes' },
+    retards: { primary: '#fb7185', bg: isDarkMode ? '#4c0519' : '#ffe4e6', text: isDarkMode ? '#ffe4e6' : '#4c0519', title: 'Retards & Urgences' },
+    ca_jour: { primary: '#60a5fa', bg: isDarkMode ? '#1e3a8a' : '#eff6ff', text: isDarkMode ? '#eff6ff' : '#1e3a8a', title: 'CA Journalier' },
+    volume_jour: { primary: '#94a3b8', bg: isDarkMode ? '#1e293b' : '#f1f5f9', text: isDarkMode ? '#f8fafc' : '#0f172a', title: 'Commandes du Jour' },
   };
 
   const renderKpiDetails = () => {
@@ -445,7 +446,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 250 }}
-                style={[styles.kpiCard, { backgroundColor: '#e0e7ff' }]}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(0, 44, 247, 0.05)' }]}>
@@ -465,7 +466,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 250, delay: 50 }}
-                style={[styles.kpiCard, { backgroundColor: '#f3e8ff' }]}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(168, 85, 247, 0.15)' : '#f3e8ff' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(168, 85, 247, 0.05)' }]}>
@@ -485,7 +486,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 250, delay: 100 }}
-                style={[styles.kpiCard, { backgroundColor: '#d1fae5' }]}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#d1fae5' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.05)' }]}>
@@ -505,7 +506,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 250, delay: 150 }}
-                style={[styles.kpiCard, { backgroundColor: '#fee2e2' }]}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
@@ -740,7 +741,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f4f5f7',
@@ -1435,3 +1436,66 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(226, 232, 240, 0.5)',
   },
 });
+
+const getStyles = (isDarkMode) => {
+  if (!isDarkMode) return baseStyles;
+  
+  const overrides = {
+    container: { backgroundColor: '#0f172a' },
+    header: { backgroundColor: '#0f172a' },
+    headerTitle: { color: '#ffffff' },
+    subHeadline: { color: '#94a3b8' },
+    boldText: { color: '#ffffff' },
+    circleButtonBlack: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+    kpiCard: { borderColor: '#334155' },
+    kpiLabel: { color: '#cbd5e1' },
+    kpiValue: { color: '#ffffff' },
+    kpiSub: { color: '#94a3b8' },
+    mainSpendCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    spendLabel: { color: '#94a3b8' },
+    spendValue: { color: '#ffffff' },
+    chartLabel: { color: '#94a3b8' },
+    barInactive: { backgroundColor: '#334155' },
+    kpiSubCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    kpiSubVal: { color: '#ffffff' },
+    kpiSubLbl: { color: '#94a3b8' },
+    sectionTitle: { color: '#94a3b8' },
+    viewAllText: { color: '#38bdf8' },
+    orderCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    orderClientName: { color: '#ffffff' },
+    orderNumber: { color: '#cbd5e1' },
+    orderPrice: { color: '#ffffff' },
+    divider: { backgroundColor: '#334155' },
+    tabTitle: { color: '#94a3b8' },
+    tabTitleActive: { color: '#ffffff' },
+    searchContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    searchInput: { color: '#ffffff' },
+    modalContent: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    modalTitle: { color: '#ffffff' },
+    modalSubtitle: { color: '#94a3b8' },
+    modalLabel: { color: '#e2e8f0' },
+    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    infoRow: { borderBottomColor: '#334155' },
+    infoLabel: { color: '#94a3b8' },
+    infoValue: { color: '#ffffff' },
+    detailsListContainer: { backgroundColor: 'rgba(15, 23, 42, 0.5)', borderColor: '#334155' },
+    premiumDetailsOrderRowClickable: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    premiumKpiHeroCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    premiumKpiHeroLabel: { color: '#cbd5e1' },
+    premiumKpiSubBox: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    premiumKpiSubBoxLbl: { color: '#94a3b8' },
+    premiumModalTitle: { color: '#ffffff' },
+    emptyStateContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    emptyStateText: { color: '#94a3b8' },
+  };
+
+  const merged = {};
+  Object.keys(baseStyles).forEach(key => {
+    if (overrides[key]) {
+      merged[key] = { ...StyleSheet.flatten(baseStyles[key]), ...overrides[key] };
+    } else {
+      merged[key] = baseStyles[key];
+    }
+  });
+  return merged;
+};

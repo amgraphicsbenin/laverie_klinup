@@ -9,6 +9,8 @@ import * as Sharing from 'expo-sharing';
 import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
+import ClientsScreen from './ClientsScreen';
+import { useDbState } from '../hooks/useDbState';
 
 export default function GestionScreen({ 
   selectedOrder, 
@@ -25,7 +27,10 @@ export default function GestionScreen({
   onClearInitialSelectedClient,
   onShowSuccess
 }) {
+  const { isDarkMode } = useDbState();
+  const styles = getStyles(isDarkMode);
   const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
+  const [showClientsPage, setShowClientsPage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('actives'); // actives, urgentes, retard
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -161,6 +166,10 @@ export default function GestionScreen({
     if (Platform.OS === 'web') return;
 
     const backAction = () => {
+      if (showClientsPage) {
+        setShowClientsPage(false);
+        return true;
+      }
       if (showInvoiceModal) {
         setShowInvoiceModal(false);
         setInvoiceOrder(null);
@@ -189,6 +198,7 @@ export default function GestionScreen({
 
     return () => backHandler.remove();
   }, [
+    showClientsPage,
     showInvoiceModal,
     showCustomerModal,
     showOrderDetails,
@@ -666,6 +676,26 @@ export default function GestionScreen({
     c.article.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (showClientsPage) {
+    return (
+      <MotiView
+        from={{ opacity: 0, translateX: 40 }}
+        animate={{ opacity: 1, translateX: 0 }}
+        transition={{ type: 'timing', duration: 280 }}
+        style={{ flex: 1 }}
+      >
+        <ClientsScreen
+          onBack={() => setShowClientsPage(false)}
+          onSelectClient={(client) => {
+            setShowClientsPage(false);
+            setSelectedClient(client);
+          }}
+          onShowSuccess={onShowSuccess}
+        />
+      </MotiView>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* HEADER */}
@@ -685,13 +715,13 @@ export default function GestionScreen({
             <Plus size={14} color="#ffffff" style={{ marginRight: 6 }} />
             <Text style={styles.topActionBtnTextBlue}>Ajouter une commande</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => { setEditingCustomer(null); setShowCustomerModal(true); }}
+          <TouchableOpacity
+            onPress={() => setShowClientsPage(true)}
             style={styles.topActionBtnWhite}
             activeOpacity={0.8}
           >
-            <Plus size={14} color="#002cf7" style={{ marginRight: 6 }} />
-            <Text style={styles.topActionBtnTextWhite}>Ajouter un profil client</Text>
+            <User size={14} color="#002cf7" style={{ marginRight: 6 }} />
+            <Text style={styles.topActionBtnTextWhite}>Clients</Text>
           </TouchableOpacity>
         </View>
 
@@ -1796,7 +1826,7 @@ export default function GestionScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f4f5f7',
@@ -3565,3 +3595,144 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+const getStyles = (isDarkMode) => {
+  if (!isDarkMode) return baseStyles;
+  
+  const overrides = {
+    container: { backgroundColor: '#0f172a' },
+    header: { backgroundColor: '#0f172a' },
+    headerTitle: { color: '#ffffff' },
+    tabHeader: { backgroundColor: '#0f172a' },
+    topActionsRow: { backgroundColor: '#0f172a' },
+    topActionBtnWhite: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    topActionBtnTextWhite: { color: '#ffffff' },
+    statusFilterRow: { backgroundColor: '#0f172a' },
+    statusFilterBtn: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    statusFilterText: { color: '#cbd5e1' },
+    searchSection: { backgroundColor: '#0f172a' },
+    searchContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    searchInput: { color: '#ffffff' },
+    filterPillSection: { backgroundColor: '#0f172a' },
+    filterPill: { backgroundColor: 'rgba(56, 189, 248, 0.1)' },
+    filterPillText: { color: '#38bdf8' },
+    orderCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    cardClientName: { color: '#ffffff' },
+    cardTicketNo: { color: '#cbd5e1' },
+    cardPrice: { color: '#ffffff' },
+    cardExtraInfoText: { color: '#cbd5e1' },
+    metaBadge: { backgroundColor: '#334155', borderColor: '#475569' },
+    metaBadgeText: { color: '#cbd5e1' },
+    cardDivider: { backgroundColor: '#334155' },
+    divider: { backgroundColor: '#334155' },
+    factureBtn: { backgroundColor: 'rgba(0, 44, 247, 0.1)', borderColor: '#002cf7' },
+    factureBtnText: { color: '#38bdf8' },
+    cardProgressContainer: { backgroundColor: 'rgba(15, 23, 42, 0.5)', borderColor: '#334155' },
+    cardProgressLabel: { color: '#cbd5e1' },
+    cardProgressValue: { color: '#38bdf8' },
+    cardProgressBarBg: { backgroundColor: '#334155' },
+    tabSelector: { backgroundColor: 'rgba(255, 255, 255, 0.05)' },
+    tabButtonActive: { backgroundColor: '#1e293b' },
+    tabButtonTextActive: { color: '#ffffff' },
+    tabButtonTextInactive: { color: '#64748b' },
+    card: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    cardTitle: { color: '#ffffff' },
+    cardSubtitle: { color: '#94a3b8' },
+    cardFooter: { borderTopColor: '#334155' },
+    totalAmount: { color: '#ffffff' },
+    sectionTitle: { color: '#94a3b8' },
+    actionButton: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    actionText: { color: '#ffffff' },
+    modalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
+    modalContent: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    modalTitle: { color: '#ffffff' },
+    modalLabel: { color: '#e2e8f0' },
+    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    infoRow: { borderBottomColor: '#334155' },
+    infoLabel: { color: '#94a3b8' },
+    infoValue: { color: '#ffffff' },
+    clientPillBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
+    clientPillBtnText: { color: '#38bdf8' },
+    emptyStateContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    emptyStateText: { color: '#94a3b8' },
+    
+    // Clients tab list overrides
+    clientCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    clientName: { color: '#ffffff' },
+    clientTel: { color: '#cbd5e1' },
+    clientFooter: { borderTopColor: '#334155' },
+    clientMetaText: { color: '#94a3b8' },
+    
+    // Catalog overrides
+    serviceCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    serviceName: { color: '#ffffff' },
+    serviceDesc: { color: '#cbd5e1' },
+    servicePrice: { color: '#ffffff' },
+    catalogHeader: { backgroundColor: '#0f172a' },
+    
+    // Bottom Sheet Order modal list row overrides
+    premiumDetailsOrderRowClickable: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    detailsListContainer: { backgroundColor: 'rgba(15, 23, 42, 0.5)', borderColor: '#334155' },
+
+    // Modal popup views overrides (New client form, invoice details, order details)
+    compactModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
+    compactModalView: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+    compactModalTitle: { color: '#ffffff' },
+    compactLabel: { color: '#cbd5e1' },
+    compactInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    prefSelector: { backgroundColor: '#0f172a' },
+    prefOptionActive: { backgroundColor: '#1e293b' },
+    prefText: { color: '#cbd5e1' },
+    prefTextActive: { color: '#ffffff' },
+    
+    popupModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
+    popupModalView: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+    
+    detailSectionTitle: { color: '#cbd5e1' },
+    detailCard: { backgroundColor: '#0f172a', borderColor: '#334155', borderWidth: 1 },
+    detailTextMuted: { color: '#cbd5e1' },
+    detailArticleText: { color: '#cbd5e1' },
+    detailArticlePrice: { color: '#ffffff' },
+    detailLabelBold: { color: '#ffffff' },
+    detailLabelMuted: { color: '#94a3b8' },
+    detailPriceBold: { color: '#38bdf8' },
+    logisticsText: { color: '#cbd5e1' },
+    detailDivider: { backgroundColor: '#334155' },
+
+    // Client detailed profile fiche inside popup
+    clientProfileName: { color: '#ffffff' },
+    clientProfilePhone: { color: '#cbd5e1' },
+    clientProfileAddress: { color: '#94a3b8' },
+    clientProfilePreferences: { color: '#38bdf8' },
+    clientEditBtn: { backgroundColor: 'rgba(56, 189, 248, 0.1)', borderColor: '#38bdf8' },
+    clientEditBtnText: { color: '#38bdf8' },
+    clientDeleteBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#f43f5e' },
+    clientDeleteBtnText: { color: '#f87171' },
+    premiumSubscriptionCard: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    subscriptionTitle: { color: '#ffffff' },
+    subActiveBadge: { backgroundColor: 'rgba(74, 222, 128, 0.1)' },
+    subActiveBadgeText: { color: '#4ade80' },
+    subPlanName: { color: '#38bdf8' },
+    subPlanBalance: { color: '#cbd5e1' },
+    progressBarBg: { backgroundColor: '#334155' },
+    progressText: { color: '#cbd5e1' },
+    subDateText: { color: '#94a3b8' },
+    unsubscribeBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444' },
+    unsubscribeBtnText: { color: '#f87171' },
+    
+    // Client detailed profile order history cards overrides
+    orderHistoryItem: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    orderHistoryNo: { color: '#ffffff' },
+    orderHistoryDate: { color: '#cbd5e1' },
+    orderHistoryTotal: { color: '#ffffff' },
+  };
+
+  const merged = {};
+  Object.keys(baseStyles).forEach(key => {
+    merged[key] = StyleSheet.flatten(baseStyles[key]);
+  });
+  Object.keys(overrides).forEach(key => {
+    merged[key] = { ...merged[key], ...overrides[key] };
+  });
+  return merged;
+};

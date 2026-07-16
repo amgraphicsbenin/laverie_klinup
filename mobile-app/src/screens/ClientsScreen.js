@@ -1,36 +1,96 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity,
   Alert, BackHandler, Platform, KeyboardAvoidingView, Modal
 } from "react-native";
-import { Search, Plus, User, MapPin, Phone, ChevronRight, X, Check, Edit3, Trash2 } from "lucide-react-native";
+import { Search, Plus, User, MapPin, Phone, ChevronRight, X, Check, Edit3, Trash2, Award, CreditCard, Calendar } from "lucide-react-native";
 import { db } from "../services/db";
 import { MotiView } from "moti";
 import { BlurView } from "expo-blur";
+import { useScrollPaddingBottom } from "../hooks/useTabBarHeight";
+import { CustomSelect } from "../components/CustomSelect";
+import { useDbState } from "../hooks/useDbState";
 
 export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess }) {
+  const { isDarkMode } = useDbState();
+  const styles = getStyles(isDarkMode);
   const [customers, setCustomers] = useState(() => db.getCustomers());
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [isFicheVisible, setIsFicheVisible] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedCrmSubId, setSelectedCrmSubId] = useState("");
 
   const [custNom, setCustNom] = useState("");
   const [custPrenom, setCustPrenom] = useState("");
   const [custTelephone, setCustTelephone] = useState("");
   const [custAdresse, setCustAdresse] = useState("");
-  const [custPreferences, setCustPreferences] = useState("Plie");
+  const [custPreferences, setCustPreferences] = useState("Plié");
+
+  const scrollPaddingBottom = useScrollPaddingBottom();
 
   const refreshCustomers = () => setCustomers(db.getCustomers());
+
+  const handleSelectClientForFiche = (client) => {
+    setSelectedClient(client);
+    setIsFicheVisible(true);
+  };
+
+  const handleCloseFiche = () => {
+    setIsFicheVisible(false);
+    setTimeout(() => {
+      setSelectedClient(null);
+      setSelectedCrmSubId("");
+    }, 250);
+  };
+
+  const catalog = db.getCatalog();
+
+  const handleSubscribeCrm = (customerId, planId) => {
+    if (!planId) {
+      Alert.alert("Erreur", "Veuillez sélectionner un forfait d'abonnement.");
+      return;
+    }
+    const updatedCust = db.subscribeCustomer(customerId, planId);
+    if (updatedCust) {
+      Alert.alert("Succès", `Abonnement souscrit avec succès pour ${updatedCust.prenom} ${updatedCust.nom} !`);
+      setSelectedCrmSubId('');
+      setSelectedClient({ ...updatedCust });
+      refreshCustomers();
+    }
+  };
+
+  const handleUnsubscribeCrm = (customerId) => {
+    Alert.alert(
+      "Confirmation",
+      "Êtes-vous sûr de vouloir résilier cet abonnement ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        { 
+          text: "Résilier", 
+          style: "destructive",
+          onPress: () => {
+            const updatedCust = db.unsubscribeCustomer(customerId);
+            if (updatedCust) {
+              Alert.alert("Succès", "Abonnement résilié avec succès !");
+              setSelectedClient({ ...updatedCust });
+              refreshCustomers();
+            }
+          }
+        }
+      ]
+    );
+  };
 
   useEffect(() => {
     if (Platform.OS === "web") return;
     const backAction = () => {
       if (showCustomerModal) { handleCloseCustomerModal(); return true; }
       if (showEditModal) { handleCloseEditModal(); return true; }
-      if (selectedClient) { setSelectedClient(null); return true; }
+      if (selectedClient) { handleCloseFiche(); return true; }
       onBack();
       return true;
     };
@@ -53,25 +113,25 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
   const handleCloseCustomerModal = () => {
     setShowCustomerModal(false);
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plie");
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié");
   };
 
   const handleCloseEditModal = () => {
     setShowEditModal(false);
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plie");
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié");
   };
 
   const handleOpenAddCustomer = () => {
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plie");
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié");
     setShowCustomerModal(true);
   };
 
   const handleEditCustomer = (client) => {
     setEditingCustomer(client);
     setCustNom(client.nom); setCustPrenom(client.prenom); setCustTelephone(client.telephone);
-    setCustAdresse(client.adresse || ""); setCustPreferences(client.preferences_pliage || "Plie");
+    setCustAdresse(client.adresse || ""); setCustPreferences(client.preferences_pliage || "Plié");
     setSelectedClient(null);
     setShowEditModal(true);
   };
@@ -106,55 +166,107 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
   const formatDate = (dateStr) => { if (!dateStr) return "N/A"; try { return new Date(dateStr).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }); } catch { return dateStr; } };
   const formatPrice = (price) => (price || 0).toLocaleString("fr-FR") + " FCFA";
 
-  const renderForm = (isEditing, onClose) => (
-    <View style={StyleSheet.absoluteFill}>
-      <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
-        <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
-      </TouchableOpacity>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.formModalWrapper} pointerEvents="box-none">
-        <MotiView
-          from={{ opacity: 0, translateY: 60 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: "spring", damping: 18 }}
-          style={styles.formModal}
-        >
-          <View style={styles.formHandle} />
-          <View style={styles.formHeader}>
-            <View>
-              <Text style={styles.formTitle}>{isEditing ? "Modifier le client" : "Nouveau client"}</Text>
-              <Text style={styles.formSubtitle}>{isEditing ? "Mettez a jour les informations" : "Remplissez les informations ci-dessous"}</Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.formClose}>
-              <X size={18} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
-            <Text style={styles.formLabel}>Nom *</Text>
-            <TextInput style={styles.formInput} value={custNom} onChangeText={setCustNom} placeholder="Nom de famille" placeholderTextColor="#a1a1aa" />
-            <Text style={styles.formLabel}>Prenom</Text>
-            <TextInput style={styles.formInput} value={custPrenom} onChangeText={setCustPrenom} placeholder="Prenom" placeholderTextColor="#a1a1aa" />
-            <Text style={styles.formLabel}>Telephone *</Text>
-            <TextInput style={styles.formInput} value={custTelephone} onChangeText={setCustTelephone} placeholder="+229 XX XX XX XX" keyboardType="phone-pad" placeholderTextColor="#a1a1aa" />
-            <Text style={styles.formLabel}>Adresse</Text>
-            <TextInput style={styles.formInput} value={custAdresse} onChangeText={setCustAdresse} placeholder="Adresse (optionnel)" placeholderTextColor="#a1a1aa" />
-            <Text style={styles.formLabel}>Preferences de pliage</Text>
-            <View style={styles.prefRow}>
-              {["Plie", "Suspendu", "Roule"].map(pref => (
-                <TouchableOpacity key={pref} onPress={() => setCustPreferences(pref)} style={[styles.prefBtn, custPreferences === pref && styles.prefBtnActive]}>
-                  <Text style={[styles.prefBtnText, custPreferences === pref && styles.prefBtnTextActive]}>{pref}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-
-          <TouchableOpacity onPress={handleSaveCustomer} style={styles.saveBtn} activeOpacity={0.85}>
-            <Check size={16} color="#ffffff" style={{ marginRight: 6 }} />
-            <Text style={styles.saveBtnText}>{isEditing ? "Enregistrer les modifications" : "Creer le profil"}</Text>
+  const renderForm = (isEditing, onClose, visible) => (
+    <Modal
+      animationType="fade"
+      visible={visible}
+      onRequestClose={onClose}
+      transparent={true}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View style={styles.compactModalOverlay}>
+          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
+            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
-        </MotiView>
+          <MotiView
+            from={{ opacity: 0, scale: 0.88, translateY: 48 }}
+            animate={{ opacity: 1, scale: 1, translateY: 0 }}
+            transition={{ type: 'spring', damping: 16, mass: 0.8 }}
+            style={styles.compactModalView}
+          >
+            <View style={styles.compactModalHeader}>
+              <Text style={styles.compactModalTitle}>
+                {isEditing ? "Modifier le Profil Client" : "Nouveau Profil Client"}
+              </Text>
+              <TouchableOpacity onPress={onClose}>
+                <X size={20} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.compactModalScroll} bounces={false} showsVerticalScrollIndicator={false}>
+              <View style={styles.compactInputRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.compactLabel}>Prénom</Text>
+                  <TextInput
+                    placeholder="Prénom"
+                    placeholderTextColor="#a1a1aa"
+                    value={custPrenom}
+                    onChangeText={setCustPrenom}
+                    style={styles.compactInput}
+                  />
+                </View>
+                <View style={{ width: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.compactLabel}>Nom *</Text>
+                  <TextInput
+                    placeholder="Nom"
+                    placeholderTextColor="#a1a1aa"
+                    value={custNom}
+                    onChangeText={setCustNom}
+                    style={styles.compactInput}
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.compactLabel}>Téléphone *</Text>
+              <TextInput
+                placeholder="Ex: +229 97 00 00 00"
+                placeholderTextColor="#a1a1aa"
+                keyboardType="phone-pad"
+                value={custTelephone}
+                onChangeText={setCustTelephone}
+                style={styles.compactInput}
+              />
+
+              <Text style={styles.compactLabel}>Adresse</Text>
+              <TextInput
+                placeholder="Ex: Cotonou, Haie Vive"
+                placeholderTextColor="#a1a1aa"
+                value={custAdresse}
+                onChangeText={setCustAdresse}
+                style={styles.compactInput}
+              />
+
+              <Text style={styles.compactLabel}>Préférence de pliage</Text>
+              <View style={styles.prefSelector}>
+                <TouchableOpacity 
+                  onPress={() => setCustPreferences('Plié')}
+                  style={[styles.prefOption, custPreferences === 'Plié' && styles.prefOptionActive]}
+                >
+                  <Text style={[styles.prefText, custPreferences === 'Plié' && styles.prefTextActive]}>Plié</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => setCustPreferences('Cintre')}
+                  style={[styles.prefOption, custPreferences === 'Cintre' && styles.prefOptionActive]}
+                >
+                  <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                onPress={handleSaveCustomer}
+                style={styles.compactSubmitBtn}
+              >
+                <Text style={styles.compactSubmitBtnText}>Enregistrer le client</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </MotiView>
+        </View>
       </KeyboardAvoidingView>
-    </View>
+    </Modal>
   );
 
   return (
@@ -198,7 +310,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]} showsVerticalScrollIndicator={false}>
         {filteredClients.length === 0 ? (
           <Text style={styles.noResultsText}>Aucun client correspondant</Text>
         ) : (
@@ -207,7 +319,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
             const hasActiveSub = client.active_subscription && client.active_subscription.remaining_clothes > 0;
             return (
               <MotiView key={client.id} from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 300, delay: index * 40 }}>
-                <TouchableOpacity activeOpacity={0.7} onPress={() => setSelectedClient(client)} style={styles.clientCard}>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => handleSelectClientForFiche(client)} style={styles.clientCard}>
                   <View style={styles.cardHeader}>
                     <View style={styles.clientAvatar}>
                       <Text style={styles.clientAvatarText}>{(client.prenom?.[0] || "") + (client.nom?.[0] || "")}</Text>
@@ -257,89 +369,171 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
       </ScrollView>
 
       {selectedClient && (
-        <Modal animationType="fade" visible={!!selectedClient} onRequestClose={() => setSelectedClient(null)} transparent={true}>
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedClient(null)}>
-              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
-            <MotiView from={{ opacity: 0, scale: 0.92, translateY: 24 }} animate={{ opacity: 1, scale: 1, translateY: 0 }} transition={{ type: "spring", damping: 16 }} style={styles.compactModalView}>
-              <View style={styles.compactModalHeader}>
-                <View style={styles.ficheAvatarRow}>
-                  <View style={styles.ficheAvatarLarge}>
-                    <Text style={styles.ficheAvatarTextLarge}>{(selectedClient.prenom?.[0] || "") + (selectedClient.nom?.[0] || "")}</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.compactModalTitle}>{selectedClient.prenom} {selectedClient.nom}</Text>
-                    <Text style={styles.ficheSubtitle}>{selectedClient.telephone}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity onPress={() => setSelectedClient(null)}>
-                  <X size={20} color="#71717a" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
-                <View style={styles.detailCard}>
-                  {selectedClient.adresse ? (
-                    <View style={styles.ficheInfoRow}><MapPin size={13} color="#71717a" /><Text style={styles.ficheInfoText}>{selectedClient.adresse}</Text></View>
-                  ) : null}
-                  <View style={styles.ficheInfoRow}>
-                    <Text style={styles.ficheInfoLabel}>Preferences :</Text>
-                    <Text style={styles.ficheInfoValue}>{selectedClient.preferences_pliage || "Plie"}</Text>
-                  </View>
-                </View>
-                {selectedClient.active_subscription && (
-                  <View style={styles.detailCard}>
-                    <View style={styles.subscriptionHeader}>
-                      <Text style={styles.subscriptionTitle}>Abonnement actif</Text>
-                      <View style={styles.subActiveBadge}><Text style={styles.subActiveBadgeText}>ACTIF</Text></View>
+        <Modal animationType="none" visible={!!selectedClient} onRequestClose={handleCloseFiche} transparent={true}>
+          <MotiView
+            from={{ opacity: 0 }}
+            animate={{ opacity: isFicheVisible ? 1 : 0 }}
+            transition={{ type: 'timing', duration: 220 }}
+            style={{ flex: 1 }}
+          >
+            <View style={styles.compactModalOverlay}>
+              <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseFiche}>
+                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+              </TouchableOpacity>
+              <MotiView
+                from={{ opacity: 0, scale: 0.9, translateY: 40 }}
+                animate={{
+                  opacity: isFicheVisible ? 1 : 0,
+                  scale: isFicheVisible ? 1 : 0.9,
+                  translateY: isFicheVisible ? 0 : 40
+                }}
+                transition={{ type: 'spring', damping: 15, mass: 0.8 }}
+                style={styles.compactModalView}
+              >
+                <View style={styles.compactModalHeader}>
+                  <View style={styles.ficheAvatarRow}>
+                    <View style={styles.ficheAvatarLarge}>
+                      <Text style={styles.ficheAvatarTextLarge}>{(selectedClient.prenom?.[0] || "") + (selectedClient.nom?.[0] || "")}</Text>
                     </View>
-                    <Text style={styles.subPlanName}>{selectedClient.active_subscription.name}</Text>
-                    <Text style={styles.subPlanBalance}>{selectedClient.active_subscription.remaining_clothes} vet. restants / {selectedClient.active_subscription.total_clothes} vet.</Text>
-                    {(() => {
-                      const rem = selectedClient.active_subscription.remaining_clothes;
-                      const tot = selectedClient.active_subscription.total_clothes;
-                      const pct = Math.max(0, Math.min(100, Math.round(((tot - rem) / tot) * 100)));
-                      return (<View style={[styles.progressBarBg, { marginTop: 8 }]}><View style={[styles.progressBarFill, { width: `${pct}%` }]} /></View>);
-                    })()}
+                    <View>
+                      <Text style={styles.compactModalTitle}>{selectedClient.prenom} {selectedClient.nom}</Text>
+                      <Text style={styles.ficheSubtitle}>{selectedClient.telephone}</Text>
+                    </View>
                   </View>
-                )}
-                <Text style={styles.sectionTitle}>Commandes ({getClientOrders(selectedClient.id).length})</Text>
-                <View style={styles.detailCard}>
-                  {getClientOrders(selectedClient.id).length === 0 ? (
-                    <Text style={[styles.ficheInfoText, { textAlign: "center", paddingVertical: 8 }]}>Aucune commande</Text>
-                  ) : (
-                    getClientOrders(selectedClient.id).slice(0, 5).map((o, idx) => (
-                      <View key={o.id} style={[styles.articleRow, idx > 0 && { borderTopWidth: 1, borderTopColor: "#f1f5f9" }]}>
-                        <Text style={styles.articleText}>#{o.ticket_numero || o.id?.slice(-4)}</Text>
-                        <Text style={styles.articleText}>{formatDate(o.created_at)}</Text>
-                        <Text style={styles.articlePrice}>{formatPrice(o.total)}</Text>
-                      </View>
-                    ))
-                  )}
+                  <TouchableOpacity onPress={handleCloseFiche}>
+                    <X size={20} color="#71717a" />
+                  </TouchableOpacity>
                 </View>
-              </ScrollView>
-              <View style={styles.ficheActions}>
-                <TouchableOpacity onPress={() => handleDeleteCustomer(selectedClient.id)} style={styles.ficheDeleteBtn}>
-                  <Trash2 size={14} color="#ef4444" style={{ marginRight: 4 }} />
-                  <Text style={styles.ficheDeleteBtnText}>Supprimer</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleEditCustomer(selectedClient)} style={styles.ficheEditBtn}>
-                  <Edit3 size={14} color="#ffffff" style={{ marginRight: 4 }} />
-                  <Text style={styles.ficheEditBtnText}>Modifier</Text>
-                </TouchableOpacity>
-              </View>
-            </MotiView>
-          </View>
+                <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
+                  {(() => {
+                    const activeClient = customers.find(c => c.id === selectedClient.id) || selectedClient;
+                    return (
+                      <>
+                        <View style={styles.detailCard}>
+                          {activeClient.adresse ? (
+                            <View style={styles.ficheInfoRow}><MapPin size={13} color="#71717a" /><Text style={styles.ficheInfoText}>{activeClient.adresse}</Text></View>
+                          ) : null}
+                          <View style={styles.ficheInfoRow}>
+                            <Text style={styles.ficheInfoLabel}>Preferences :</Text>
+                            <Text style={styles.ficheInfoValue}>
+                              {activeClient.preferences_pliage === 'Cintre' ? 'Sur Cintre' : (activeClient.preferences_pliage || 'Plié')}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Fidélité & Dette */}
+                        <View style={styles.detailCard}>
+                          <View style={styles.ficheInfoRow}>
+                            <Award size={13} color="#71717a" style={{ marginRight: 6 }} />
+                            <Text style={styles.ficheInfoLabel}>Points Fidélité :</Text>
+                            <Text style={[styles.ficheInfoValue, { color: '#059669', fontWeight: '700' }]}>
+                              {activeClient.points_fidelite || 0} pts
+                            </Text>
+                          </View>
+                          <View style={styles.ficheInfoRow}>
+                            <CreditCard size={13} color="#71717a" style={{ marginRight: 6 }} />
+                            <Text style={styles.ficheInfoLabel}>Solde Dette :</Text>
+                            <Text style={[styles.ficheInfoValue, { color: (activeClient.solde_dette || 0) > 0 ? '#ef4444' : '#64748b', fontWeight: '700' }]}>
+                              {formatPrice(activeClient.solde_dette || 0)}
+                            </Text>
+                          </View>
+                          <View style={styles.ficheInfoRow}>
+                            <Calendar size={13} color="#71717a" style={{ marginRight: 6 }} />
+                            <Text style={styles.ficheInfoLabel}>Membre depuis :</Text>
+                            <Text style={styles.ficheInfoValue}>
+                              {activeClient.created_at ? new Date(activeClient.created_at).toLocaleDateString('fr-FR') : 'N/A'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Abonnement Card */}
+                        <Text style={styles.sectionTitle}>Forfait d'Abonnement</Text>
+                        <View style={styles.detailCard}>
+                          <View style={styles.subscriptionHeader}>
+                            <Text style={styles.subscriptionTitle}>Abonnement</Text>
+                            {activeClient.active_subscription && (
+                              <View style={styles.subActiveBadge}><Text style={styles.subActiveBadgeText}>ACTIF</Text></View>
+                            )}
+                          </View>
+                          {activeClient.active_subscription ? (
+                            <View style={{ gap: 8 }}>
+                              <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
+                              <Text style={styles.subPlanBalance}>{activeClient.active_subscription.remaining_clothes} vet. restants / {activeClient.active_subscription.total_clothes} vet.</Text>
+                              {(() => {
+                                const rem = activeClient.active_subscription.remaining_clothes;
+                                const tot = activeClient.active_subscription.total_clothes;
+                                const pct = Math.max(0, Math.min(100, Math.round(((tot - rem) / tot) * 100)));
+                                return (
+                                  <View style={[styles.progressBarBg, { marginTop: 4 }]}>
+                                    <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+                                  </View>
+                                );
+                              })()}
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                                <Text style={{ fontSize: 10, color: '#64748b' }}>
+                                  Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
+                                </Text>
+                                <Text style={{ fontSize: 10, color: '#64748b' }}>
+                                  Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
+                                </Text>
+                              </View>
+                              <TouchableOpacity onPress={() => handleUnsubscribeCrm(activeClient.id)} style={styles.unsubscribeBtn} activeOpacity={0.8}>
+                                <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                              <View style={{ flex: 1 }}>
+                                <CustomSelect
+                                  value={selectedCrmSubId}
+                                  onChange={(val) => setSelectedCrmSubId(val)}
+                                  options={[
+                                    { label: "-- Choisir une formule --", value: "" },
+                                    ...catalog.filter(item => item.service === 'abonnement').map(sub => ({
+                                      label: `${sub.article} (${sub.prix.toLocaleString('fr-FR')} F/m)`,
+                                      value: sub.id
+                                    }))
+                                  ]}
+                                  placeholder="Choisir une formule"
+                                />
+                              </View>
+                              <TouchableOpacity
+                                onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
+                                style={styles.subscribeBtn}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.subscribeBtnText}>Souscrire</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                      </>
+                    );
+                  })()}
+                </ScrollView>
+                <View style={styles.ficheActions}>
+                  <TouchableOpacity onPress={() => handleDeleteCustomer(selectedClient.id)} style={styles.ficheDeleteBtn}>
+                    <Trash2 size={14} color="#ef4444" style={{ marginRight: 4 }} />
+                    <Text style={styles.ficheDeleteBtnText}>Supprimer</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleEditCustomer(selectedClient)} style={styles.ficheEditBtn}>
+                    <Edit3 size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                    <Text style={styles.ficheEditBtnText}>Modifier</Text>
+                  </TouchableOpacity>
+                </View>
+              </MotiView>
+            </View>
+          </MotiView>
         </Modal>
       )}
 
-      {showCustomerModal && renderForm(false, handleCloseCustomerModal)}
-      {showEditModal && renderForm(true, handleCloseEditModal)}
+      {renderForm(false, handleCloseCustomerModal, showCustomerModal)}
+      {renderForm(true, handleCloseEditModal, showEditModal)}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8fafc" },
   header: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8, backgroundColor: "#f8fafc" },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -408,20 +602,183 @@ const styles = StyleSheet.create({
   ficheDeleteBtnText: { fontSize: 13, fontWeight: "700", color: "#ef4444" },
   ficheEditBtn: { flex: 2, flexDirection: "row", justifyContent: "center", alignItems: "center", backgroundColor: "#002cf7", borderRadius: 14, paddingVertical: 12 },
   ficheEditBtnText: { fontSize: 13, fontWeight: "700", color: "#ffffff" },
-  formModalWrapper: { flex: 1, justifyContent: "flex-end" },
-  formModal: { backgroundColor: "#ffffff", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 36, maxHeight: "85%", shadowColor: "#0f172a", shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 12 },
-  formHandle: { width: 40, height: 4, backgroundColor: "#e2e8f0", borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  formHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
-  formTitle: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
-  formSubtitle: { fontSize: 12, color: "#64748b", marginTop: 2, fontWeight: "500" },
-  formClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#f1f5f9", justifyContent: "center", alignItems: "center" },
-  formLabel: { fontSize: 12, fontWeight: "700", color: "#64748b", marginBottom: 6, marginTop: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-  formInput: { backgroundColor: "#f8fafc", borderRadius: 14, borderWidth: 1.5, borderColor: "#e2e8f0", paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: "#0f172a" },
-  prefRow: { flexDirection: "row", gap: 8, marginTop: 4 },
-  prefBtn: { flex: 1, borderWidth: 1.5, borderColor: "#e2e8f0", borderRadius: 12, paddingVertical: 10, alignItems: "center", backgroundColor: "#f8fafc" },
-  prefBtnActive: { backgroundColor: "#eff6ff", borderColor: "#002cf7" },
-  prefBtnText: { fontSize: 13, fontWeight: "600", color: "#64748b" },
-  prefBtnTextActive: { color: "#002cf7" },
-  saveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#002cf7", borderRadius: 16, paddingVertical: 15, marginTop: 20, shadowColor: "#002cf7", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 5 },
-  saveBtnText: { color: "#ffffff", fontSize: 15, fontWeight: "700" },
+  compactInputRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  compactLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 6,
+  },
+  compactInput: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    height: 44,
+    paddingHorizontal: 14,
+    fontSize: 13,
+    color: '#0f172a',
+    fontWeight: '500',
+    marginBottom: 12,
+    width: '100%',
+  },
+  prefSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 16,
+  },
+  prefOption: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  prefOptionActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  prefText: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  prefTextActive: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  compactSubmitBtn: {
+    backgroundColor: '#2563eb',
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 10,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    width: '100%',
+  },
+  compactSubmitBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  unsubscribeBtn: {
+    backgroundColor: '#fff1f2',
+    borderWidth: 1,
+    borderColor: '#ffe4e6',
+    borderRadius: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  unsubscribeBtnText: {
+    fontSize: 12,
+    color: '#ef4444',
+    fontWeight: '600',
+  },
+  subscribeBtn: {
+    backgroundColor: '#002cf7',
+    borderRadius: 12,
+    height: 44,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  subscribeBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
+
+const getStyles = (isDarkMode) => {
+  if (!isDarkMode) return baseStyles;
+  
+  const overrides = {
+    container: { backgroundColor: '#0f172a' },
+    header: { backgroundColor: '#0f172a' },
+    headerTitle: { color: '#ffffff' },
+    backBtn: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    filterHeader: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+    searchContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    searchInput: { color: '#ffffff' },
+    chip: { backgroundColor: '#334155' },
+    chipActive: { backgroundColor: '#002cf7' },
+    chipText: { color: '#cbd5e1' },
+    chipTextActive: { color: '#ffffff' },
+    clientCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    clientAvatar: { backgroundColor: 'rgba(56, 189, 248, 0.1)' },
+    clientAvatarText: { color: '#38bdf8' },
+    clientName: { color: '#ffffff' },
+    clientPhone: { color: '#cbd5e1' },
+    clientFooter: { borderTopColor: '#334155' },
+    clientMetaText: { color: '#cbd5e1' },
+    emptyStateContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    emptyStateText: { color: '#94a3b8' },
+    
+    // Modal & Form overrides
+    modalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
+    modalContent: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    modalTitle: { color: '#ffffff' },
+    modalLabel: { color: '#e2e8f0' },
+    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    
+    // Compact Modal & Form overrides
+    compactModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
+    compactModalView: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+    compactModalTitle: { color: '#ffffff' },
+    compactLabel: { color: '#cbd5e1' },
+    compactInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    
+    // Fiche client details card overrides
+    detailCard: { backgroundColor: '#0f172a', borderColor: '#334155', borderWidth: 1 },
+    ficheAvatarLarge: { backgroundColor: 'rgba(56, 189, 248, 0.1)' },
+    ficheAvatarTextLarge: { color: '#38bdf8' },
+    ficheSubtitle: { color: '#cbd5e1' },
+    ficheInfoLabel: { color: '#cbd5e1' },
+    ficheInfoText: { color: '#ffffff' },
+    ficheInfoValue: { color: '#ffffff' },
+    sectionTitle: { color: '#cbd5e1' },
+    subscriptionTitle: { color: '#ffffff' },
+    subPlanName: { color: '#38bdf8' },
+    subPlanBalance: { color: '#cbd5e1' },
+    progressBarBg: { backgroundColor: '#334155' },
+    unsubscribeBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444' },
+    unsubscribeBtnText: { color: '#f87171' },
+    ficheDeleteBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444' },
+    ficheDeleteBtnText: { color: '#f87171' },
+    
+    // Segmented controller overrides
+    prefSelector: { backgroundColor: '#0f172a' },
+    prefOptActive: { backgroundColor: '#1e293b' },
+    prefOptText: { color: '#cbd5e1' },
+    prefOptTextActive: { color: '#ffffff' },
+    
+    // Subscriptions overrides
+    subContainer: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    subActiveTitle: { color: '#ffffff' },
+    subMetaRow: { borderTopColor: '#334155' },
+    subMetaLabel: { color: '#94a3b8' },
+    subMetaValue: { color: '#ffffff' },
+    subProgressTrack: { backgroundColor: '#334155' },
+  };
+
+  const merged = {};
+  Object.keys(baseStyles).forEach(key => {
+    merged[key] = StyleSheet.flatten(baseStyles[key]);
+  });
+  Object.keys(overrides).forEach(key => {
+    merged[key] = { ...merged[key], ...overrides[key] };
+  });
+  return merged;
+};

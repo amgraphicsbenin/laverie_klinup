@@ -8,14 +8,17 @@ import { CustomSelect } from '../components/CustomSelect';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { MotiView } from 'moti';
+import { useDbState } from '../hooks/useDbState';
 
 export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger, onSelectClient }) {
+  const { isDarkMode } = useDbState();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, delivered, late
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const scrollPaddingBottom = useScrollPaddingBottom();
+  const styles = getStyles(isDarkMode);
 
   // Close details modal when trigger increments
   useEffect(() => {
@@ -778,7 +781,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -1488,3 +1491,50 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+const getStyles = (isDarkMode) => {
+  if (!isDarkMode) return baseStyles;
+  
+  const overrides = {
+    container: { backgroundColor: '#0f172a' },
+    header: { backgroundColor: '#0f172a' },
+    headerTitle: { color: '#ffffff' },
+    filterHeader: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+    searchContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    searchInput: { color: '#ffffff' },
+    chip: { backgroundColor: '#334155' },
+    chipActive: { backgroundColor: '#002cf7' },
+    chipText: { color: '#cbd5e1' },
+    chipTextActive: { color: '#ffffff' },
+    historyCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    clientName: { color: '#ffffff' },
+    ticketNo: { color: '#cbd5e1' },
+    cardFooter: { borderTopColor: '#334155' },
+    dateText: { color: '#cbd5e1' },
+    totalAmount: { color: '#ffffff' },
+    modalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
+    modalContent: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    modalTitle: { color: '#ffffff' },
+    modalLabel: { color: '#e2e8f0' },
+    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    invoiceSectionTitle: { color: '#ffffff', borderBottomColor: '#334155' },
+    invoiceItemRow: { borderBottomColor: '#334155' },
+    invoiceItemName: { color: '#ffffff' },
+    invoiceItemQty: { color: '#cbd5e1' },
+    invoiceItemTotal: { color: '#ffffff' },
+    invoiceSummaryRow: { borderTopColor: '#334155' },
+    invoiceTotalValue: { color: '#ffffff' },
+    clientPillBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
+    clientPillBtnText: { color: '#38bdf8' },
+  };
+
+  const merged = {};
+  Object.keys(baseStyles).forEach(key => {
+    if (overrides[key]) {
+      merged[key] = { ...StyleSheet.flatten(baseStyles[key]), ...overrides[key] };
+    } else {
+      merged[key] = baseStyles[key];
+    }
+  });
+  return merged;
+};

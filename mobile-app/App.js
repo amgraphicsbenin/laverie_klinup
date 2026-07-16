@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, BackHandler } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, BackHandler, StatusBar as RNStatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -59,9 +59,9 @@ export default function App() {
   }, []);
 
 
-  // Hook to get live updates
   const dbState = useDbState();
   const currentUser = dbState.currentUser;
+  const isDarkMode = dbState.isDarkMode;
 
   // Adapt tabs automatically for specific roles
   useEffect(() => {
@@ -188,12 +188,12 @@ export default function App() {
   };
 
   const appContent = (
-    <View style={{ flex: 1 }}>
-      <StatusBar style="dark" translucent={Platform.OS === 'android'} backgroundColor="transparent" />
+    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }}>
+      <StatusBar style={isDarkMode ? "light" : "dark"} translucent={Platform.OS === 'android'} backgroundColor="transparent" />
       {!currentUser ? (
         <LoginScreen />
       ) : (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }]}>
           <View style={styles.content}>
             <MotiView
               key={activeTab}
@@ -213,6 +213,8 @@ export default function App() {
           height: 82 + insets.bottom,          // 48dp icons + 12dp top/22dp bottom padding + native safe bottom inset
           paddingTop: 12,
           paddingBottom: 22 + insets.bottom,
+          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+          borderTopColor: isDarkMode ? '#334155' : 'rgba(0, 0, 0, 0.05)',
         }
       ]}>
         <TouchableOpacity 
@@ -357,7 +359,7 @@ export default function App() {
   if (Platform.OS === 'web') {
     return (
       <View style={styles.webOuter}>
-        <View style={styles.webPhone}>
+        <View style={[styles.webPhone, { backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }]}>
           {appContent}
         </View>
       </View>

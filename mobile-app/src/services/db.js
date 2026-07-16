@@ -205,7 +205,8 @@ let memoryDb = {
   catalog: DEFAULT_CATALOG,
   current_user: null,
   pin_reset_requests: [],
-  sync_queue: []
+  sync_queue: [],
+  dark_mode: false
 };
 
 const listeners = new Set();
@@ -253,6 +254,7 @@ export async function loadFromLocalStorage() {
   memoryDb.current_user = await loadData(STORAGE_KEYS.CURRENT_USER, null);
   memoryDb.pin_reset_requests = await loadData('klin_up_pin_reset_requests', []);
   memoryDb.sync_queue = await loadData('klin_up_sync_queue', []);
+  memoryDb.dark_mode = await loadData('klin_up_dark_mode', false);
   notifyListeners();
 }
 
@@ -585,6 +587,12 @@ export const db = {
   },
   notify: () => {
     notifyListeners();
+  },
+  isDarkMode: () => memoryDb.dark_mode || false,
+  setDarkMode: (val) => {
+    memoryDb.dark_mode = val;
+    saveData('klin_up_dark_mode', val);
+    db.notify();
   },
 
   getStaff: () => [...memoryDb.staff],

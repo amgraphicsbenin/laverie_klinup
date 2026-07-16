@@ -4,6 +4,8 @@ import { Mail, ChevronLeft, Lock } from 'lucide-react-native';
 import { db } from '../services/db';
 
 export default function LoginScreen() {
+  const isDarkMode = db.isDarkMode ? db.isDarkMode() : false;
+  const styles = getStyles(isDarkMode);
   const [email, setEmail] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [pin, setPin] = useState('');
@@ -200,7 +202,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -407,3 +409,44 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
+
+const getStyles = (isDarkMode) => {
+  if (!isDarkMode) return baseStyles;
+  
+  const overrides = {
+    container: { backgroundColor: '#0f172a' },
+    card: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    title: { color: '#ffffff' },
+    subtitle: { color: '#cbd5e1' },
+    label: { color: '#e2e8f0' },
+    inputContainer: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    input: { color: '#ffffff' },
+    
+    // User card overrides (user selection list)
+    userCard: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    userName: { color: '#ffffff' },
+    userRole: { color: '#94a3b8' },
+    
+    // Keypad and PIN entry overrides
+    pinDot: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    pinDotFilled: { borderColor: '#002cf7', backgroundColor: 'rgba(0, 44, 247, 0.05)' },
+    dotText: { color: '#ffffff' },
+    keypadContainer: { borderTopColor: '#334155' },
+    keypadButton: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    keypadButtonText: { color: '#ffffff' },
+    backspaceButton: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    
+    // Header back button
+    backBtn: { backgroundColor: '#0f172a', borderColor: '#334155' },
+  };
+
+  const merged = {};
+  Object.keys(baseStyles).forEach(key => {
+    if (overrides[key]) {
+      merged[key] = { ...StyleSheet.flatten(baseStyles[key]), ...overrides[key] };
+    } else {
+      merged[key] = baseStyles[key];
+    }
+  });
+  return merged;
+};

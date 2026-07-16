@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, FlatList } from 'react-native';
 import { ChevronDown, Check } from 'lucide-react-native';
+import { db } from '../services/db';
 
 export const CustomSelect = ({ value, onChange, options, placeholder, disabled, style, buttonStyle }) => {
+  const isDarkMode = db.isDarkMode ? db.isDarkMode() : false;
+  const styles = getStyles(isDarkMode);
   const [isOpen, setIsOpen] = useState(false);
   const selectedOption = options.find(o => String(o.value) === String(value));
 
@@ -63,7 +66,7 @@ export const CustomSelect = ({ value, onChange, options, placeholder, disabled, 
   );
 };
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     width: '100%',
     position: 'relative',
@@ -141,3 +144,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+const getStyles = (isDarkMode) => {
+  if (!isDarkMode) return baseStyles;
+  
+  const overrides = {
+    button: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    disabledButton: { backgroundColor: '#1e293b' },
+    buttonText: { color: '#ffffff' },
+    placeholderText: { color: '#64748b' },
+    dropdownMenu: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    optionText: { color: '#cbd5e1' },
+    selectedOptionItem: { backgroundColor: 'rgba(0, 44, 247, 0.15)' },
+    selectedOptionText: { color: '#38bdf8' },
+  };
+
+  const merged = {};
+  Object.keys(baseStyles).forEach(key => {
+    if (overrides[key]) {
+      merged[key] = { ...StyleSheet.flatten(baseStyles[key]), ...overrides[key] };
+    } else {
+      merged[key] = baseStyles[key];
+    }
+  });
+  return merged;
+};
