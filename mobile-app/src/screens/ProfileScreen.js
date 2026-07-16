@@ -6,7 +6,7 @@ import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
 import { useDbState } from '../hooks/useDbState';
 
-export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigger }) {
+export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigger, onShowSuccess }) {
   const { currentUser, isRemote, isDarkMode } = useDbState();
   const syncQueue = db.getSyncQueue ? db.getSyncQueue() : [];
 
@@ -122,7 +122,11 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 
     try {
       await db.updateStaffPin(currentUser.id, newPin);
-      Alert.alert("Succès", "Votre code PIN a été modifié avec succès.");
+      if (onShowSuccess) {
+        onShowSuccess("Votre code PIN a été modifié avec succès.");
+      } else {
+        Alert.alert("Succès", "Votre code PIN a été modifié avec succès.");
+      }
       setCurrentPin('');
       setNewPin('');
       setShowPinModal(false);

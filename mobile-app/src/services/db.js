@@ -1204,6 +1204,16 @@ export const db = {
     return order;
   },
 
+  deleteOrder: (id) => {
+    const idx = memoryDb.orders.findIndex(o => o.id === id);
+    if (idx !== -1) {
+      memoryDb.orders.splice(idx, 1);
+      performMutation('delete', 'orders', id, null);
+      persist();
+      db.notify();
+    }
+  },
+
   addStaff: (member) => {
     const newMember = {
       id: 'u_' + Math.random().toString(36).substr(2, 9),

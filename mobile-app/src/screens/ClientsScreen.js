@@ -156,7 +156,12 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
     Alert.alert("Confirmation", "Voulez-vous vraiment supprimer ce client ?", [
       { text: "Annuler", style: "cancel" },
       { text: "Supprimer", style: "destructive", onPress: async () => {
-        try { await db.deleteCustomer(id); setSelectedClient(null); refreshCustomers(); }
+        try {
+          await db.deleteCustomer(id);
+          setSelectedClient(null);
+          refreshCustomers();
+          if (onShowSuccess) onShowSuccess("Profil client supprimé avec succès.");
+        }
         catch (e) { Alert.alert("Erreur", "Impossible de supprimer ce client."); }
       }}
     ]);

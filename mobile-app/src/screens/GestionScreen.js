@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform, BackHandler } from 'react-native';
-import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, Download, Award } from 'lucide-react-native';
+import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, Download, Award, Ban } from 'lucide-react-native';
 import { db } from '../services/db';
 import { CustomSelect } from '../components/CustomSelect';
 import { BlurView } from 'expo-blur';
@@ -262,6 +262,62 @@ export default function GestionScreen({
     }
   };
 
+  const handleCancelOrder = (order) => {
+    Alert.alert(
+      "Annuler la commande",
+      `Voulez-vous vraiment annuler la commande #${getDisplayTicketId(order)} ? Cette action ajustera automatiquement la dette du client.`,
+      [
+        { text: "Non", style: "cancel" },
+        {
+          text: "Oui, annuler",
+          style: "destructive",
+          onPress: () => {
+            try {
+              db.cancelOrder(order.id);
+              if (onShowSuccess) {
+                onShowSuccess("Commande annulée avec succès.");
+              }
+              if (showOrderDetails) {
+                setShowOrderDetails(false);
+                setSelectedOrder(null);
+              }
+            } catch (e) {
+              Alert.alert("Erreur", "Impossible d'annuler cette commande.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteOrder = (order) => {
+    Alert.alert(
+      "Supprimer la commande",
+      `Voulez-vous vraiment supprimer définitivement la commande #${getDisplayTicketId(order)} ? Cette action est irréversible.`,
+      [
+        { text: "Non", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: () => {
+            try {
+              db.deleteOrder(order.id);
+              if (onShowSuccess) {
+                onShowSuccess("Commande supprimée avec succès.");
+              }
+              if (showOrderDetails) {
+                setShowOrderDetails(false);
+                setSelectedOrder(null);
+              }
+            } catch (e) {
+              Alert.alert("Erreur", "Impossible de supprimer cette commande.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // Customer Management
   const handleSaveCustomer = async () => {
     if (!custNom || !custTelephone) {
@@ -338,6 +394,9 @@ export default function GestionScreen({
           try {
             await db.deleteCustomer(id);
             setSelectedClient(null);
+            if (onShowSuccess) {
+              onShowSuccess("Profil client supprimé avec succès.");
+            }
           } catch (e) {
             Alert.alert("Erreur", "Impossible de supprimer ce client.");
           }
@@ -355,7 +414,11 @@ export default function GestionScreen({
     }
     const updatedCust = db.subscribeCustomer(customerId, planId);
     if (updatedCust) {
-      Alert.alert("Succès", `Abonnement souscrit avec succès pour ${updatedCust.prenom} ${updatedCust.nom} !`);
+      if (onShowSuccess) {
+        onShowSuccess(`Abonnement souscrit pour ${updatedCust.prenom} ${updatedCust.nom} !`);
+      } else {
+        Alert.alert("Succès", `Abonnement souscrit avec succès pour ${updatedCust.prenom} ${updatedCust.nom} !`);
+      }
       setSelectedCrmSubId('');
       setSelectedClient({ ...updatedCust });
     }
@@ -373,7 +436,11 @@ export default function GestionScreen({
           onPress: () => {
             const updatedCust = db.unsubscribeCustomer(customerId);
             if (updatedCust) {
-              Alert.alert("Succès", "Abonnement résilié avec succès !");
+              if (onShowSuccess) {
+                onShowSuccess("Abonnement résilié avec succès !");
+              } else {
+                Alert.alert("Succès", "Abonnement résilié avec succès !");
+              }
               setSelectedClient({ ...updatedCust });
             }
           }
@@ -906,6 +973,16 @@ export default function GestionScreen({
                         <Receipt size={13} color="#002cf7" style={{ marginRight: 4 }} />
                         <Text style={styles.factureBtnText}>Facture</Text>
                       </TouchableOpacity>
+                      {item.statut !== 'annule' && item.statut !== 'livre' && item.statut !== 'restitue' && (
+                        <TouchableOpacity
+                          onPress={(e) => { e.stopPropagation(); handleCancelOrder(item); }}
+                          style={[styles.factureBtn, { marginLeft: 8, borderColor: '#ef4444' }]}
+                          activeOpacity={0.7}
+                        >
+                          <Ban size={13} color="#ef4444" style={{ marginRight: 4 }} />
+                          <Text style={[styles.factureBtnText, { color: '#ef4444' }]}>Annuler</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
 
                     {/* Next Status Button */}
@@ -1215,8 +1292,34 @@ export default function GestionScreen({
                       Date retrait prévue : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
                     </Text>
                     <Text style={styles.logisticsText}>Mode de paiement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement}</Text>
-                          {/* Action Button for changing status */}
-                 {selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && (() => {
+                  </View>
+                </View>
+
+                {/* Cancel & Delete Buttons */}
+                {selectedOrder.statut !== 'annule' && selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && (
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 4, paddingHorizontal: 2 }}>
+                    <TouchableOpacity
+                      onPress={() => handleCancelOrder(selectedOrder)}
+                      activeOpacity={0.8}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
+                    >
+                      <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
+                      <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteOrder(selectedOrder)}
+                      activeOpacity={0.8}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef44441a', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 10, paddingVertical: 10 }}
+                    >
+                      <Trash2 size={14} color="#ef4444" style={{ marginRight: 6 }} />
+                      <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                 {/* Action Button for changing status */}
+                 <View style={{ paddingHorizontal: 2 }}>
+                 {selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && selectedOrder.statut !== 'annule' && (() => {
                    const status = selectedOrder.statut;
                    
                    // If status is 'pret', render two buttons side by side
@@ -1405,7 +1508,6 @@ export default function GestionScreen({
                    );
                  })()}
                   </View>
-                </View>
 
               </ScrollView>
             </MotiView>

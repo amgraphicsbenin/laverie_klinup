@@ -178,6 +178,7 @@ export default function App() {
             setGestionFilter={setGestionFilter}
             onModalStateChange={setLocalModalOpen}
             closeAllModalsTrigger={closeModalsTrigger}
+            onShowSuccess={triggerSuccess}
           />
         );
       case 'gestion':
@@ -207,10 +208,11 @@ export default function App() {
               setActiveTab('gestion');
               setInitSelectedClient(client);
             }}
+            onShowSuccess={triggerSuccess}
           />
         );
       case 'profile':
-        return <ProfileScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} />;
+        return <ProfileScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} onShowSuccess={triggerSuccess} />;
       default:
         return (
           <DashboardScreen 
@@ -219,6 +221,7 @@ export default function App() {
             setGestionFilter={setGestionFilter}
             onModalStateChange={setLocalModalOpen}
             closeAllModalsTrigger={closeModalsTrigger}
+            onShowSuccess={triggerSuccess}
           />
         );
     }

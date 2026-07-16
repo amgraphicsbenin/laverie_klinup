@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert } from 'react-native';
-import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download, Award, Edit3, Trash2, User } from 'lucide-react-native';
+import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download, Award, Edit3, Trash2, User, Ban } from 'lucide-react-native';
 import { db } from '../services/db';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
@@ -10,7 +10,7 @@ import * as Sharing from 'expo-sharing';
 import { MotiView } from 'moti';
 import { useDbState } from '../hooks/useDbState';
 
-export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger, onSelectClient }) {
+export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { isDarkMode } = useDbState();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, delivered, late
@@ -55,6 +55,52 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
 
   const orders = db.getOrders();
   const customers = db.getCustomers();
+
+  const handleCancelOrder = (order) => {
+    Alert.alert(
+      "Annuler la commande",
+      `Voulez-vous vraiment annuler la commande #${getDisplayTicketId(order)} ?`,
+      [
+        { text: "Non", style: "cancel" },
+        {
+          text: "Oui, annuler",
+          style: "destructive",
+          onPress: () => {
+            try {
+              db.cancelOrder(order.id);
+              setSelectedOrder(null);
+              if (onShowSuccess) onShowSuccess("Commande annul\u00e9e avec succ\u00e8s.");
+            } catch (e) {
+              Alert.alert("Erreur", "Impossible d'annuler cette commande.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteOrder = (order) => {
+    Alert.alert(
+      "Supprimer la commande",
+      `Voulez-vous vraiment supprimer d\u00e9finitivement la commande #${getDisplayTicketId(order)} ? Cette action est irr\u00e9versible.`,
+      [
+        { text: "Non", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: () => {
+            try {
+              db.deleteOrder(order.id);
+              setSelectedOrder(null);
+              if (onShowSuccess) onShowSuccess("Commande supprim\u00e9e avec succ\u00e8s.");
+            } catch (e) {
+              Alert.alert("Erreur", "Impossible de supprimer cette commande.");
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const getDisplayTicketId = (order) => {
     if (order.ticket_numero && /^\d+$/.test(order.ticket_numero)) return order.ticket_numero;
@@ -633,6 +679,28 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 <View style={styles.detailCard}>
                   <Text style={styles.logisticsText}>Mode de règlement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement || 'Non spécifié'}</Text>
                 </View>
+
+                {/* Cancel & Delete Buttons */}
+                {selectedOrder.statut !== 'annule' && selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && (
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => handleCancelOrder(selectedOrder)}
+                      activeOpacity={0.8}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
+                    >
+                      <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
+                      <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteOrder(selectedOrder)}
+                      activeOpacity={0.8}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef44441a', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 10, paddingVertical: 10 }}
+                    >
+                      <Trash2 size={14} color="#ef4444" style={{ marginRight: 6 }} />
+                      <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </ScrollView>
             </View>
           </View>
