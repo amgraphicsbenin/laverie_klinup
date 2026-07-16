@@ -14,6 +14,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
 import { OrderFormModal } from './src/components/OrderFormModal';
+import './src/services/alert';
+import { registerAlertHandler } from './src/services/alert';
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -28,6 +30,18 @@ export default function App() {
   const [closeModalsTrigger, setCloseModalsTrigger] = useState(0);
   const [initSelectedClient, setInitSelectedClient] = useState(null);
   const [successToast, setSuccessToast] = useState({ visible: false, message: '' });
+  const [customAlertState, setCustomAlertState] = useState({ visible: false, title: '', message: '', buttons: [] });
+
+  useEffect(() => {
+    registerAlertHandler(({ title, message, buttons }) => {
+      setCustomAlertState({
+        visible: true,
+        title: title || 'Information',
+        message: message || '',
+        buttons: buttons && buttons.length > 0 ? buttons : [{ text: 'OK' }]
+      });
+    });
+  }, []);
 
   const triggerSuccess = (message) => {
     setSuccessToast({ visible: true, message });
@@ -62,6 +76,29 @@ export default function App() {
   const dbState = useDbState();
   const currentUser = dbState.currentUser;
   const isDarkMode = dbState.isDarkMode;
+
+  const getAlertIcon = (title, message) => {
+    const t = (title || '').toLowerCase();
+    const m = (message || '').toLowerCase();
+    
+    if (t.includes('erreur') || t.includes('fail') || t.includes('impossible') || m.includes('erreur') || m.includes('échoué') || t.includes('insuffisant')) {
+      return { name: 'alert-circle', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' };
+    }
+    if (t.includes('succès') || t.includes('success') || t.includes('confirme') || m.includes('succès') || t.includes('enregistré')) {
+      return { name: 'check-circle', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' };
+    }
+    if (t.includes('attention') || t.includes('warning') || m.includes('attention') || t.includes('supprimer') || t.includes('résilier') || t.includes('confirmation')) {
+      return { name: 'alert', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' };
+    }
+    return { name: 'information', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)' };
+  };
+
+  const handleButtonPress = (btn) => {
+    setCustomAlertState(prev => ({ ...prev, visible: false }));
+    if (btn.onPress) {
+      btn.onPress();
+    }
+  };
 
   // Adapt tabs automatically for specific roles
   useEffect(() => {
@@ -352,7 +389,141 @@ export default function App() {
       </MotiView>
     </SafeAreaView>
   )}
-</View>
+      {/* GLOBAL CUSTOM PREMIUM ALERT MODAL */}
+      {customAlertState.visible && (
+        <MotiView
+          pointerEvents="auto"
+          animate={{ opacity: 1 }}
+          from={{ opacity: 0 }}
+          transition={{ type: 'timing', duration: 150 }}
+          style={[StyleSheet.absoluteFill, { zIndex: 100000, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.5)' }]}
+        >
+          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => {
+            if (customAlertState.buttons.length <= 1) {
+              setCustomAlertState(prev => ({ ...prev, visible: false }));
+            }
+          }}>
+            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+          </TouchableOpacity>
+          
+          <MotiView
+            animate={{ opacity: 1, scale: 1, translateY: 0 }}
+            from={{ opacity: 0, scale: 0.9, translateY: 15 }}
+            transition={{ type: 'spring', damping: 18, mass: 0.8 }}
+            style={{
+              backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+              padding: 24,
+              width: '90%',
+              maxWidth: 340,
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: isDarkMode ? 0.4 : 0.15,
+              shadowRadius: 24,
+              elevation: 20,
+            }}
+          >
+            {/* Alert Icon */}
+            {(() => {
+              const iconInfo = getAlertIcon(customAlertState.title, customAlertState.message);
+              return (
+                <View style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: iconInfo.bg,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}>
+                  <MaterialCommunityIcons name={iconInfo.name} size={28} color={iconInfo.color} />
+                </View>
+              );
+            })()}
+            
+            {/* Title */}
+            <Text style={{
+              fontSize: 16,
+              fontWeight: '700',
+              color: isDarkMode ? '#ffffff' : '#0f172a',
+              textAlign: 'center',
+              marginBottom: 10,
+            }}>
+              {customAlertState.title}
+            </Text>
+            
+            {/* Message */}
+            <Text style={{
+              fontSize: 13,
+              color: isDarkMode ? '#cbd5e1' : '#475569',
+              textAlign: 'center',
+              lineHeight: 18,
+              marginBottom: 24,
+            }}>
+              {customAlertState.message}
+            </Text>
+            
+            {/* Buttons Row */}
+            <View style={{
+              flexDirection: customAlertState.buttons.length > 2 ? 'column' : 'row',
+              gap: 10,
+              width: '100%',
+              justifyContent: 'center',
+            }}>
+              {customAlertState.buttons.map((btn, index) => {
+                const isDestructive = btn.style === 'destructive' || btn.text.toLowerCase() === 'supprimer' || btn.text.toLowerCase() === 'résilier';
+                const isCancel = btn.style === 'cancel' || btn.text.toLowerCase() === 'annuler' || btn.text.toLowerCase() === 'non';
+                
+                let btnBg = '#002cf7';
+                let textColor = '#ffffff';
+                let borderW = 0;
+                let borderC = 'transparent';
+                
+                if (isDestructive) {
+                  btnBg = '#ef4444';
+                } else if (isCancel) {
+                  btnBg = 'transparent';
+                  textColor = isDarkMode ? '#cbd5e1' : '#475569';
+                  borderW = 1.5;
+                  borderC = isDarkMode ? '#334155' : '#e2e8f0';
+                }
+                
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    activeOpacity={0.8}
+                    onPress={() => handleButtonPress(btn)}
+                    style={{
+                      flex: customAlertState.buttons.length > 2 ? 0 : 1,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: btnBg,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: borderW,
+                      borderColor: borderC,
+                      paddingHorizontal: 12,
+                      width: '100%',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 13,
+                      fontWeight: '600',
+                      color: textColor,
+                    }}>
+                      {btn.text}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </MotiView>
+        </MotiView>
+      )}
+    </View>
   );
 
   // On web: wrap in a phone-sized container centered in the browser
