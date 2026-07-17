@@ -2122,147 +2122,166 @@ export default function GestionScreen({
         animationType="fade"
         onRequestClose={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
       >
-        {invoiceOrder && (
-          <View style={styles.absoluteModalContainer}>
-            <View style={styles.popupModalOverlay}>
-              <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-              </TouchableOpacity>
-              <View style={styles.popupModalView}>
-                <View style={styles.compactModalHeader}>
-                  <Text style={styles.compactModalTitle}>Facture Client</Text>
-                  <TouchableOpacity onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                    <X size={20} color="#71717a" />
-                  </TouchableOpacity>
-                </View>
+        {invoiceOrder && (() => {
+          const itemsList = invoiceOrder.items || invoiceOrder.articles || [];
+          let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+          if (itemsSum === 0 && itemsList.length === 0) {
+            const catalogItem = db.getCatalog ? db.getCatalog().find(c => c.article === invoiceOrder.type_article && c.service === invoiceOrder.type_service) : null;
+            itemsSum = catalogItem ? catalogItem.prix : 1500;
+          }
+          const isExpress = invoiceOrder.niveau_urgence === 'Express';
+          const expressMarkupItem = db.getCatalog().find(c => c.id === 'setting_express_markup');
+          const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+          const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+          const netPrice = invoiceOrder.prix_total || invoiceOrder.total || 0;
+          
+          const displayBrut = invoiceOrder.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
+          const displayRemiseMontant = invoiceOrder.remise_montant || Math.max(0, displayBrut - netPrice);
+          const displayRemisePourcent = invoiceOrder.remise_pourcentage || (displayBrut > 0 ? Math.round((displayRemiseMontant / displayBrut) * 100) : 0);
+          const hasDiscount = displayRemiseMontant > 0;
 
-                <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
-                  {/* TPE Thermal Receipt Wrapper */}
-                  <View style={styles.tpeReceiptContainer}>
-                    {/* Receipt Header */}
-                    <Text style={styles.tpeBrand}>KLIN UP</Text>
-                    <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
-                    <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
-                    <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
-                    
-                    <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+          return (
+            <View style={styles.absoluteModalContainer}>
+              <View style={styles.popupModalOverlay}>
+                <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
+                  <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                </TouchableOpacity>
+                <View style={styles.popupModalView}>
+                  <View style={styles.compactModalHeader}>
+                    <Text style={styles.compactModalTitle}>Facture Client</Text>
+                    <TouchableOpacity onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
+                      <X size={20} color="#71717a" />
+                    </TouchableOpacity>
+                  </View>
 
-                    {/* Receipt Metadata */}
-                    <View style={styles.tpeMetaRow}>
-                      <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
-                      <Text style={styles.tpeMetaVal}>#{getDisplayTicketId(invoiceOrder)}</Text>
-                    </View>
-                    <View style={styles.tpeMetaRow}>
-                      <Text style={styles.tpeMetaLabel}>Code :</Text>
-                      <Text style={styles.tpeMetaVal}>{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
-                    </View>
-                    <View style={styles.tpeMetaRow}>
-                      <Text style={styles.tpeMetaLabel}>Date :</Text>
-                      <Text style={styles.tpeMetaVal}>
-                        {invoiceOrder.created_at ? new Date(invoiceOrder.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
-                      </Text>
-                    </View>
-                    <View style={styles.tpeMetaRow}>
-                      <Text style={styles.tpeMetaLabel}>Client :</Text>
-                      <Text style={styles.tpeMetaVal}>
-                        {(() => {
-                          const c = customers.find(cust => cust.id === invoiceOrder.customer_id);
-                          return c ? `${c.prenom} ${c.nom}` : 'Client Inconnu';
-                        })()}
-                      </Text>
-                    </View>
+                  <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
+                    {/* TPE Thermal Receipt Wrapper */}
+                    <View style={styles.tpeReceiptContainer}>
+                      {/* Receipt Header */}
+                      <Text style={styles.tpeBrand}>KLIN UP</Text>
+                      <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
+                      <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
+                      <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
+                      
+                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
 
-                    <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                    {/* Items list */}
-                    <Text style={styles.tpeSectionTitle}>ARTICLES & SERVICES</Text>
-                    {(invoiceOrder.items || invoiceOrder.articles || []).map((art, idx) => (
-                      <View key={idx} style={styles.tpeItemRow}>
-                        <View style={{ flex: 1.8 }}>
-                          <Text style={styles.tpeItemName}>{art.article}</Text>
-                          <Text style={styles.tpeItemService}>{art.service.replace(/_/g, ' ')}</Text>
-                        </View>
-                        <Text style={styles.tpeItemQty}>x{art.quantite || art.quantity}</Text>
-                        <Text style={styles.tpeItemPrice}>{formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</Text>
+                      {/* Receipt Metadata */}
+                      <View style={styles.tpeMetaRow}>
+                        <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
+                        <Text style={styles.tpeMetaVal}>#{getDisplayTicketId(invoiceOrder)}</Text>
                       </View>
-                    ))}
-
-                    <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                    {/* Billing Details */}
-                    <View style={styles.tpeTotalRow}>
-                      <Text style={styles.tpeTotalLabel}>TOTAL BRUT</Text>
-                      <Text style={styles.tpeTotalVal}>
-                        {formatPrice(invoiceOrder.prix_base_avant_remise || (invoiceOrder.prix_total || invoiceOrder.total || 0) + (invoiceOrder.remise_montant || 0))}
-                      </Text>
-                    </View>
-                    
-                    {(invoiceOrder.remise_pourcentage > 0 || invoiceOrder.remise_montant > 0) && (
-                      <View style={styles.tpeTotalRow}>
-                        <Text style={styles.tpeTotalLabel}>
-                          REMISE ({invoiceOrder.remise_pourcentage || Math.round(((invoiceOrder.remise_montant || 0) / ((invoiceOrder.prix_base_avant_remise || (invoiceOrder.prix_total || invoiceOrder.total || 0) + (invoiceOrder.remise_montant || 0)) || 1)) * 100)}%)
+                      <View style={styles.tpeMetaRow}>
+                        <Text style={styles.tpeMetaLabel}>Code :</Text>
+                        <Text style={styles.tpeMetaVal}>{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
+                      </View>
+                      <View style={styles.tpeMetaRow}>
+                        <Text style={styles.tpeMetaLabel}>Date :</Text>
+                        <Text style={styles.tpeMetaVal}>
+                          {invoiceOrder.created_at ? new Date(invoiceOrder.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
                         </Text>
-                        <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(invoiceOrder.remise_montant || 0)}</Text>
                       </View>
-                    )}
+                      <View style={styles.tpeMetaRow}>
+                        <Text style={styles.tpeMetaLabel}>Client :</Text>
+                        <Text style={styles.tpeMetaVal}>
+                          {(() => {
+                            const c = customers.find(cust => cust.id === invoiceOrder.customer_id);
+                            return c ? `${c.prenom} ${c.nom}` : 'Client Inconnu';
+                          })()}
+                        </Text>
+                      </View>
 
-                    <View style={styles.tpeTotalRow}>
-                      <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
-                      <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
+                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                      {/* Items list */}
+                      <Text style={styles.tpeSectionTitle}>ARTICLES & SERVICES</Text>
+                      {(invoiceOrder.items || invoiceOrder.articles || []).map((art, idx) => (
+                        <View key={idx} style={styles.tpeItemRow}>
+                          <View style={{ flex: 1.8 }}>
+                            <Text style={styles.tpeItemName}>{art.article}</Text>
+                            <Text style={styles.tpeItemService}>{art.service.replace(/_/g, ' ')}</Text>
+                          </View>
+                          <Text style={styles.tpeItemQty}>x{art.quantite || art.quantity}</Text>
+                          <Text style={styles.tpeItemPrice}>{formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</Text>
+                        </View>
+                      ))}
+
+                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                      {/* Billing Details */}
+                      <View style={styles.tpeTotalRow}>
+                        <Text style={styles.tpeTotalLabel}>TOTAL BRUT</Text>
+                        <Text style={styles.tpeTotalVal}>
+                          {formatPrice(displayBrut)}
+                        </Text>
+                      </View>
+                      
+                      {hasDiscount && (
+                        <View style={styles.tpeTotalRow}>
+                          <Text style={[styles.tpeTotalLabel, { color: '#ef4444' }]}>
+                            REMISE ({displayRemisePourcent}%)
+                          </Text>
+                          <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(displayRemiseMontant)}</Text>
+                        </View>
+                      )}
+
+                      <View style={styles.tpeTotalRow}>
+                        <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
+                        <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
+                      </View>
+
+                      <View style={styles.tpeTotalRow}>
+                        <Text style={styles.tpeTotalLabel}>AVANCE PAYEE</Text>
+                        <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.avance_payee || invoiceOrder.avance || 0)}</Text>
+                      </View>
+
+                      <View style={styles.tpeTotalRow}>
+                        <Text style={styles.tpeTotalLabelBold}>RESTE A PAYER</Text>
+                        <Text style={[styles.tpeTotalValBold, { color: (invoiceOrder.reste || 0) > 0 ? '#ef4444' : '#10b981' }]}>
+                          {formatPrice(invoiceOrder.reste || 0)}
+                        </Text>
+                      </View>
+
+                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                      {/* Footer & Barcode placeholder */}
+                      <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
+                      
+                      <View style={{ height: 16 }} />
                     </View>
 
-                    <View style={styles.tpeTotalRow}>
-                      <Text style={styles.tpeTotalLabel}>AVANCE PAYEE</Text>
-                      <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.avance_payee || invoiceOrder.avance || 0)}</Text>
+                    {/* Print/Download controls */}
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                      <TouchableOpacity
+                        onPress={() => handleSharePdf(invoiceOrder)}
+                        style={styles.invoiceDownloadBtn}
+                        activeOpacity={0.8}
+                      >
+                        <Download size={14} color="#002cf7" style={{ marginRight: 6 }} />
+                        <Text style={styles.invoiceDownloadBtnText}>Télécharger</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => handlePrintInvoice(invoiceOrder)}
+                        style={styles.invoicePrintBtn}
+                        activeOpacity={0.8}
+                      >
+                        <Printer size={14} color="#ffffff" style={{ marginRight: 6 }} />
+                        <Text style={styles.invoicePrintBtnText}>Imprimer</Text>
+                      </TouchableOpacity>
                     </View>
 
-                    <View style={styles.tpeTotalRow}>
-                      <Text style={styles.tpeTotalLabelBold}>RESTE A PAYER</Text>
-                      <Text style={[styles.tpeTotalValBold, { color: (invoiceOrder.reste || 0) > 0 ? '#ef4444' : '#10b981' }]}>
-                        {formatPrice(invoiceOrder.reste || 0)}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                    {/* Footer & Barcode placeholder */}
-                    <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
-                    
-                    <View style={{ height: 16 }} />
-                  </View>
-
-                  {/* Print/Download controls */}
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
                     <TouchableOpacity
-                      onPress={() => handleSharePdf(invoiceOrder)}
-                      style={styles.invoiceDownloadBtn}
-                      activeOpacity={0.8}
+                      onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+                      style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
                     >
-                      <Download size={14} color="#002cf7" style={{ marginRight: 6 }} />
-                      <Text style={styles.invoiceDownloadBtnText}>Télécharger</Text>
+                      <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => handlePrintInvoice(invoiceOrder)}
-                      style={styles.invoicePrintBtn}
-                      activeOpacity={0.8}
-                    >
-                      <Printer size={14} color="#ffffff" style={{ marginRight: 6 }} />
-                      <Text style={styles.invoicePrintBtnText}>Imprimer</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
-                    style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
-                  >
-                    <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
-                  </TouchableOpacity>
-                </ScrollView>
+                  </ScrollView>
+                </View>
               </View>
             </View>
-          </View>
-        )}
+          );
+        })()}
       </Modal>
 
       {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}

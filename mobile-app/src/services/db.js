@@ -245,10 +245,28 @@ const saveData = async (key, data) => {
   }
 };
 
+export function hydrateOrder(order) {
+  if (!order) return order;
+  const hydrated = { ...order };
+  if (order.subscription_details) {
+    if (order.subscription_details.remise_pourcentage !== undefined) {
+      hydrated.remise_pourcentage = Number(order.subscription_details.remise_pourcentage) || 0;
+    }
+    if (order.subscription_details.remise_montant !== undefined) {
+      hydrated.remise_montant = Number(order.subscription_details.remise_montant) || 0;
+    }
+    if (order.subscription_details.prix_base_avant_remise !== undefined) {
+      hydrated.prix_base_avant_remise = Number(order.subscription_details.prix_base_avant_remise) || 0;
+    }
+  }
+  return hydrated;
+}
+
 export async function loadFromLocalStorage() {
   memoryDb.staff = await loadData(STORAGE_KEYS.STAFF, DEFAULT_STAFF);
   memoryDb.customers = await loadData(STORAGE_KEYS.CUSTOMERS, DEFAULT_CUSTOMERS);
-  memoryDb.orders = await loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
+  const loadedOrders = await loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
+  memoryDb.orders = (loadedOrders || []).map(hydrateOrder);
   memoryDb.logs = await loadData(STORAGE_KEYS.LOGS, DEFAULT_LOGS);
   memoryDb.catalog = await loadData(STORAGE_KEYS.CATALOG, DEFAULT_CATALOG);
   memoryDb.current_user = await loadData(STORAGE_KEYS.CURRENT_USER, null);
@@ -454,10 +472,11 @@ export async function initDb(isRetry = false) {
         const remoteOrders = orderRes.value.data || [];
         memoryDb.orders = remoteOrders.map(ro => {
           const localOrder = memoryDb.orders.find(lo => lo.id === ro.id);
+          let merged = { ...ro };
           if (localOrder && localOrder.motif_annulation && !ro.motif_annulation) {
-            return { ...ro, motif_annulation: localOrder.motif_annulation };
+            merged.motif_annulation = localOrder.motif_annulation;
           }
-          return ro;
+          return hydrateOrder(merged);
         });
       }
       if (logsRes.status === 'fulfilled' && !logsRes.value?.error) {
@@ -551,10 +570,11 @@ async function startPeriodicSync() {
         const remoteOrders = orderRes.value.data || [];
         memoryDb.orders = remoteOrders.map(ro => {
           const localOrder = memoryDb.orders.find(lo => lo.id === ro.id);
+          let merged = { ...ro };
           if (localOrder && localOrder.motif_annulation && !ro.motif_annulation) {
-            return { ...ro, motif_annulation: localOrder.motif_annulation };
+            merged.motif_annulation = localOrder.motif_annulation;
           }
-          return ro;
+          return hydrateOrder(merged);
         });
         changed = true;
       }
@@ -588,22 +608,27 @@ function setupRealtime() {
         if (eventType === 'INSERT') {
           const exists = targetList.some(x => x.id === newRow.id);
           if (!exists) {
+            const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
             if (table === 'activity_logs') {
-              targetList.unshift(newRow);
+              targetList.unshift(rowToAdd);
             } else {
-              targetList.push(newRow);
+              targetList.push(rowToAdd);
             }
           }
         } else if (eventType === 'UPDATE') {
           const idx = targetList.findIndex(x => x.id === newRow.id);
           if (idx !== -1) {
-            const mergedRow = { ...newRow };
+            let mergedRow = { ...newRow };
             if (table === 'orders' && targetList[idx].motif_annulation && !mergedRow.motif_annulation) {
               mergedRow.motif_annulation = targetList[idx].motif_annulation;
             }
+            if (table === 'orders') {
+              mergedRow = hydrateOrder(mergedRow);
+            }
             targetList[idx] = mergedRow;
           } else {
-            targetList.push(newRow);
+            const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
+            targetList.push(rowToAdd);
           }
         } else if (eventType === 'DELETE') {
           const idx = targetList.findIndex(x => x.id === oldRow.id);
@@ -1036,6 +1061,13 @@ export const db = {
         };
       }
     }
+
+    newOrder.subscription_details = {
+      ...(newOrder.subscription_details || {}),
+      remise_pourcentage: discountPercent,
+      remise_montant: discountAmount,
+      prix_base_avant_remise: basePriceBeforeRemise
+    };
 
     memoryDb.orders.push(newOrder);
 
