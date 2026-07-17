@@ -17,7 +17,32 @@ import { OrderFormModal } from './src/components/OrderFormModal';
 import './src/services/alert';
 import { registerAlertHandler } from './src/services/alert';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('App crash:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#fff' }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ef4444', marginBottom: 12 }}>Erreur détectée</Text>
+          <Text style={{ fontSize: 11, color: '#374151', textAlign: 'center' }}>{String(this.state.error)}</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
+
   const dbState = useDbState();
   const currentUser = dbState.currentUser;
   const isDarkMode = dbState.isDarkMode;
@@ -530,15 +555,17 @@ export default function App() {
   // On web: wrap in a phone-sized container centered in the browser
   if (Platform.OS === 'web') {
     return (
-      <View style={styles.webOuter}>
-        <View style={[styles.webPhone, { backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }]}>
-          {appContent}
+      <ErrorBoundary>
+        <View style={styles.webOuter}>
+          <View style={[styles.webPhone, { backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }]}>
+            {appContent}
+          </View>
         </View>
-      </View>
+      </ErrorBoundary>
     );
   }
 
-  return appContent;
+  return <ErrorBoundary>{appContent}</ErrorBoundary>;
 }
 
 const PHONE_W = 393;
