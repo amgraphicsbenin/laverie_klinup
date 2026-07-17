@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, BackHandler, StatusBar as RNStatusBar, ScrollView, Dimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase, db } from './src/services/db';
@@ -17,7 +17,7 @@ import { OrderFormModal } from './src/components/OrderFormModal';
 import './src/services/alert';
 import { registerAlertHandler } from './src/services/alert';
 
-export default function App() {
+function AppContent() {
   const dbState = useDbState();
   const currentUser = dbState.currentUser;
   const isDarkMode = dbState.isDarkMode;
@@ -636,6 +636,14 @@ export default function App() {
   }
 
   return appContent;
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
 }
 
 const PHONE_W = 393;
