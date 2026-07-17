@@ -772,6 +772,8 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                     >
                       <Trash2 size={14} color="#ef4444" style={{ marginRight: 6 }} />
                       <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </ScrollView>
             </View>
