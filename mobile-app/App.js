@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, BackHandler, StatusBar as RNStatusBar, ScrollView, Dimensions } from 'react-native';
-import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, BackHandler, StatusBar as RNStatusBar, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase, db } from './src/services/db';
@@ -37,50 +37,8 @@ export default function App() {
   const [successToast, setSuccessToast] = useState({ visible: false, message: '' });
   const [customAlertState, setCustomAlertState] = useState({ visible: false, title: '', message: '', buttons: [] });
 
-  const { width: SCREEN_WIDTH } = Dimensions.get('window');
-  const activeWidth = Platform.OS === 'web' ? 393 : SCREEN_WIDTH;
-
-  // Tabs list based on permissions
-  const getTabsList = () => {
-    const list = ['accueil'];
-    if (currentUser && currentUser.role !== 'agent_lavage_repassage') {
-      list.push('gestion');
-      list.push('historique');
-    }
-    list.push('profile');
-    return list;
-  };
-  const tabs = currentUser ? getTabsList() : ['accueil'];
-
-  const scrollViewRef = React.useRef(null);
-  const [isScrollingFromSwipe, setIsScrollingFromSwipe] = useState(false);
-  const [contentHeight, setContentHeight] = useState(0);
-
-  useEffect(() => {
-    if (!currentUser) return;
-    const tabIndex = tabs.indexOf(activeTab);
-    if (tabIndex !== -1 && scrollViewRef.current && !isScrollingFromSwipe) {
-      scrollViewRef.current.scrollTo({ x: tabIndex * activeWidth, animated: true });
-    }
-  }, [activeTab, currentUser]);
-
-  const handleMomentumScrollEnd = (event) => {
-    const contentOffset = event.nativeEvent.contentOffset.x;
-    const tabIndex = Math.round(contentOffset / activeWidth);
-    if (tabIndex >= 0 && tabIndex < tabs.length) {
-      setIsScrollingFromSwipe(true);
-      setActiveTab(tabs[tabIndex]);
-      setTimeout(() => setIsScrollingFromSwipe(false), 100);
-    }
-  };
-
-  const handleTabPress = (tabName) => {
-    setIsScrollingFromSwipe(false);
+  const switchTab = (tabName) => {
     setActiveTab(tabName);
-    const tabIndex = tabs.indexOf(tabName);
-    if (tabIndex !== -1 && scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ x: tabIndex * activeWidth, animated: true });
-    }
   };
 
   useEffect(() => {
@@ -284,74 +242,15 @@ export default function App() {
         <LoginScreen />
       ) : (
         <View style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', paddingTop: insets.top }]}>
-          <View
-            style={styles.content}
-            onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}
-          >
-            <ScrollView
-              ref={scrollViewRef}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={handleMomentumScrollEnd}
-              scrollEventThrottle={16}
-              style={{ flex: 1 }}
-              bounces={false}
-            >
-              <View style={{ width: activeWidth, height: contentHeight }}>
-                <DashboardScreen 
-                  onNavigate={(tab) => handleTabPress(tab)}
-                  setSelectedOrder={setSelectedOrder}
-                  setGestionFilter={setGestionFilter}
-                  onModalStateChange={setLocalModalOpen}
-                  closeAllModalsTrigger={closeModalsTrigger}
-                  onShowSuccess={triggerSuccess}
-                />
-              </View>
-              {currentUser.role !== 'agent_lavage_repassage' && (
-                <>
-                  <View style={{ width: activeWidth, height: contentHeight }}>
-                    <GestionScreen 
-                      selectedOrder={selectedOrder}
-                      setSelectedOrder={setSelectedOrder}
-                      gestionFilter={gestionFilter}
-                      setGestionFilter={setGestionFilter}
-                      openOrderFormOnMount={openOrderFormOnMount}
-                      onCloseOrderFormOnMount={() => setOpenOrderFormOnMount(false)}
-                      orderFormVisible={orderFormVisible}
-                      setOrderFormVisible={setOrderFormVisible}
-                      onOpenOrderForm={() => { setOrderFormKey(prev => prev + 1); setOrderFormVisible(true); }}
-                      onModalStateChange={setLocalModalOpen}
-                      closeAllModalsTrigger={closeModalsTrigger}
-                      initialSelectedClient={initSelectedClient}
-                      onClearInitialSelectedClient={() => setInitSelectedClient(null)}
-                      onShowSuccess={triggerSuccess}
-                    />
-                  </View>
-                  <View style={{ width: activeWidth, height: contentHeight }}>
-                    <HistoryScreen 
-                      onModalStateChange={setLocalModalOpen} 
-                      closeAllModalsTrigger={closeModalsTrigger}
-                      onSelectClient={(client) => {
-                        handleTabPress('gestion');
-                        setInitSelectedClient(client);
-                      }}
-                      onShowSuccess={triggerSuccess}
-                    />
-                  </View>
-                </>
-              )}
-              <View style={{ width: activeWidth, height: contentHeight }}>
-                <ProfileScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} onShowSuccess={triggerSuccess} />
-              </View>
-            </ScrollView>
+          <View style={styles.content}>
+            {renderActiveScreen()}
           </View>
 
       {/* BOTTOM TAB BAR */}
       <View style={[
         styles.tabBar,
         {
-          height: 82 + insets.bottom,          // 48dp icons + 12dp top/22dp bottom padding + native safe bottom inset
+          height: 82 + insets.bottom,
           paddingTop: 12,
           paddingBottom: 22 + insets.bottom,
           backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
@@ -359,7 +258,7 @@ export default function App() {
         }
       ]}>
         <TouchableOpacity 
-          onPress={() => { handleTabPress('accueil'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+          onPress={() => { switchTab('accueil'); setOrderFormVisible(false); setLocalModalOpen(false); }}
           style={styles.tabItem}
         >
           <MotiView
@@ -377,7 +276,7 @@ export default function App() {
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={() => { handleTabPress('gestion'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+            onPress={() => { switchTab('gestion'); setOrderFormVisible(false); setLocalModalOpen(false); }}
             style={styles.tabItem}
           >
             <MotiView
@@ -424,7 +323,7 @@ export default function App() {
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={() => { handleTabPress('historique'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+            onPress={() => { switchTab('historique'); setOrderFormVisible(false); setLocalModalOpen(false); }}
             style={styles.tabItem}
           >
             <MotiView
@@ -442,7 +341,7 @@ export default function App() {
         )}
 
         <TouchableOpacity 
-          onPress={() => { handleTabPress('profile'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+          onPress={() => { switchTab('profile'); setOrderFormVisible(false); setLocalModalOpen(false); }}
           style={styles.tabItem}
         >
           <MotiView
