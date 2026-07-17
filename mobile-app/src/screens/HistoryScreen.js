@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert, RefreshControl } from 'react-native';
 import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download, Award, Edit3, Trash2, User, Ban } from 'lucide-react-native';
 import { db } from '../services/db';
 import { BlurView } from 'expo-blur';
@@ -11,14 +11,65 @@ import { MotiView } from 'moti';
 import { useDbState } from '../hooks/useDbState';
 
 export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
-  const { isDarkMode } = useDbState();
+  const { orders, customers, currentUser, isDarkMode } = useDbState();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await db.refreshData();
+    } catch (e) {
+      console.warn("Refresh error:", e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const styles = getStyles(isDarkMode);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, delivered, late
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const scrollPaddingBottom = useScrollPaddingBottom();
-  const styles = getStyles(isDarkMode);
+
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReasonError, setCancelReasonError] = useState('');
+
+  const validateCancelReason = (text) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return "Le motif de l'annulation est obligatoire.";
+    }
+    const hasLetter = /[a-zA-Z\u00C0-\u00FF]/.test(trimmed);
+    if (!hasLetter) {
+      return "Le motif doit contenir des lettres explicatives (pas seulement des chiffres ou symboles).";
+    }
+    return null;
+  };
+
+  const handleConfirmCancelOrder = () => {
+    const error = validateCancelReason(cancelReason);
+    if (error) {
+      setCancelReasonError(error);
+      return;
+    }
+
+    const order = orderToCancel;
+    if (!order) return;
+
+    setCancelModalVisible(false);
+    
+    try {
+      db.cancelOrder(order.id, cancelReason.trim());
+      setSelectedOrder(null);
+      if (onShowSuccess) onShowSuccess("Commande annulée avec succès.");
+    } catch (e) {
+      Alert.alert("Erreur", "Impossible d'annuler cette commande.");
+    }
+  };
 
   // Close details modal when trigger increments
   useEffect(() => {
@@ -53,30 +104,13 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
     return () => backHandler.remove();
   }, [selectedOrder]);
 
-  const orders = db.getOrders();
-  const customers = db.getCustomers();
+
 
   const handleCancelOrder = (order) => {
-    Alert.alert(
-      "Annuler la commande",
-      `Voulez-vous vraiment annuler la commande #${getDisplayTicketId(order)} ?`,
-      [
-        { text: "Non", style: "cancel" },
-        {
-          text: "Oui, annuler",
-          style: "destructive",
-          onPress: () => {
-            try {
-              db.cancelOrder(order.id);
-              setSelectedOrder(null);
-              if (onShowSuccess) onShowSuccess("Commande annul\u00e9e avec succ\u00e8s.");
-            } catch (e) {
-              Alert.alert("Erreur", "Impossible d'annuler cette commande.");
-            }
-          }
-        }
-      ]
-    );
+    setOrderToCancel(order);
+    setCancelReason('');
+    setCancelReasonError('');
+    setCancelModalVisible(true);
   };
 
   const handleDeleteOrder = (order) => {
@@ -411,21 +445,22 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
     setShowInvoiceModal(true);
   };
 
-  // Filtering orders
-  const filteredOrders = orders.filter(o => {
-    const clientName = getCustomerName(o.customer_id).toLowerCase();
-    const ticketNo = (o.ticket_numero || '').toLowerCase();
-    const orderId = (o.id || '').toLowerCase();
-    const query = searchQuery.toLowerCase();
-    const matchesQuery = clientName.includes(query) || ticketNo.includes(query) || orderId.includes(query);
+  const filteredOrders = orders
+    .filter(o => {
+      const clientName = getCustomerName(o.customer_id).toLowerCase();
+      const ticketNo = (o.ticket_numero || '').toLowerCase();
+      const orderId = (o.id || '').toLowerCase();
+      const query = searchQuery.toLowerCase();
+      const matchesQuery = clientName.includes(query) || ticketNo.includes(query) || orderId.includes(query);
 
-    if (!matchesQuery) return false;
+      if (!matchesQuery) return false;
 
-    if (filterType === 'delivered') return o.statut === 'livre' || o.statut === 'restitue';
-    if (filterType === 'late') return o.est_en_retard || o.statut === 'retard' || (o.statut !== 'restitue' && o.statut !== 'livre' && o.due_date && new Date(o.due_date) < new Date());
-    if (filterType === 'cancelled') return o.statut === 'annule';
-    return true;
-  });
+      if (filterType === 'delivered') return o.statut === 'livre' || o.statut === 'restitue';
+      if (filterType === 'late') return o.est_en_retard || o.statut === 'retard' || (o.statut !== 'restitue' && o.statut !== 'livre' && o.due_date && new Date(o.due_date) < new Date());
+      if (filterType === 'cancelled') return o.statut === 'annule';
+      return true;
+    })
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
   return (
     <View style={styles.container}>
@@ -483,7 +518,18 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       </View>
 
       {/* History List */}
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#002cf7']}
+            tintColor={isDarkMode ? '#ffffff' : '#002cf7'}
+          />
+        }
+      >
         {filteredOrders.length === 0 ? (
           <Text style={styles.noResultsText}>Aucune archive correspondante</Text>
         ) : (
@@ -692,8 +738,20 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   <Text style={styles.logisticsText}>Mode de règlement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement || 'Non spécifié'}</Text>
                 </View>
 
+                {selectedOrder.statut === 'annule' && selectedOrder.motif_annulation && (
+                  <>
+                    <Text style={[styles.sectionTitle, { color: '#ef4444' }]}>Motif d'annulation</Text>
+                    <View style={[styles.detailCard, { borderColor: 'rgba(239, 68, 68, 0.2)', borderWidth: 1, backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.05)' : 'rgba(239, 68, 68, 0.03)' }]}>
+                      <Text style={[styles.logisticsText, { color: '#ef4444', fontWeight: '600' }]}>
+                        {selectedOrder.motif_annulation}
+                      </Text>
+                    </View>
+                  </>
+                )}
+
                 {/* Cancel & Delete Buttons */}
-                {selectedOrder.statut !== 'annule' && selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && (
+                {selectedOrder.statut !== 'annule' && selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && 
+                 currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage' && (
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 8 }}>
                     <TouchableOpacity
                       onPress={() => handleCancelOrder(selectedOrder)}
@@ -857,6 +915,117 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           </View>
         </View>
       )}
+
+      {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}
+      <Modal
+        visible={cancelModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCancelModalVisible(false)}
+      >
+        <View style={styles.absoluteModalContainer}>
+          <View style={styles.compactModalOverlay}>
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setCancelModalVisible(false)}>
+              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
+            
+            <MotiView
+              from={{ opacity: 0, scale: 0.97, translateY: 10 }}
+              animate={{ opacity: 1, scale: 1, translateY: 0 }}
+              transition={{ type: 'timing', duration: 150 }}
+              style={[styles.popupModalView, { width: '92%', maxWidth: 350, padding: 20 }]}
+            >
+              <View style={styles.compactModalHeader}>
+                <Text style={styles.compactModalTitle}>Annuler la commande</Text>
+                <TouchableOpacity onPress={() => setCancelModalVisible(false)}>
+                  <X size={20} color="#71717a" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ alignItems: 'center', marginVertical: 10 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                  <Ban size={22} color="#ef4444" />
+                </View>
+                <Text style={{ fontSize: 13, color: isDarkMode ? '#cbd5e1' : '#64748b', textAlign: 'center', paddingHorizontal: 10 }}>
+                  Veuillez spécifier le motif d'annulation de la commande #{orderToCancel ? (orderToCancel.ticket_numero || orderToCancel.id) : ''}.
+                </Text>
+              </View>
+
+              <View style={{ marginVertical: 10 }}>
+                <TextInput
+                  style={[
+                    styles.modalInput || {
+                      height: 80,
+                      padding: 12,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      textAlignVertical: 'top',
+                    },
+                    {
+                      height: 80,
+                      textAlignVertical: 'top',
+                      padding: 12,
+                      borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                      color: isDarkMode ? '#ffffff' : '#09090b',
+                    }
+                  ]}
+                  placeholder="Ex: Erreur de saisie, client absent..."
+                  placeholderTextColor={isDarkMode ? '#64748b' : '#a1a1aa'}
+                  multiline={true}
+                  numberOfLines={3}
+                  value={cancelReason}
+                  onChangeText={(text) => {
+                    setCancelReason(text);
+                    if (cancelReasonError) setCancelReasonError('');
+                  }}
+                />
+                {cancelReasonError ? (
+                  <Text style={{ color: '#ef4444', fontSize: 10, marginTop: 6, fontWeight: '600' }}>
+                    {cancelReasonError}
+                  </Text>
+                ) : null}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+                <TouchableOpacity
+                  onPress={() => setCancelModalVisible(false)}
+                  style={{
+                    flex: 1,
+                    backgroundColor: isDarkMode ? '#334155' : '#f4f4f5',
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: isDarkMode ? '#e2e8f0' : '#27272a', fontWeight: '700', fontSize: 13 }}>
+                    Retour
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleConfirmCancelOrder}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#ef4444',
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>
+                    Confirmer
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </MotiView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

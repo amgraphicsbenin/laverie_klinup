@@ -353,6 +353,7 @@ async function performMutation(action, table, recordId, data, rollbackFn) {
     
     if (res && res.error) {
       const errMsg = res.error.message || '';
+      const errCode = res.error.code || '';
       const isNetworkError = errMsg.includes('Failed to fetch') || errMsg.includes('network') || errMsg.includes('load');
       if (isNetworkError) {
         console.warn(`[DB] Mutation échouée pour raison réseau, mise en file d'attente.`);
@@ -360,6 +361,28 @@ async function performMutation(action, table, recordId, data, rollbackFn) {
         db.notify();
         await addToSyncQueue(action, table, recordId, data);
         startAutoReconnect();
+      } else if (errCode === '42703' || (errMsg.includes('column') && errMsg.includes('does not exist'))) {
+        console.warn(`[DB] La colonne n'existe pas dans Supabase. Tentative de repli sans motif_annulation.`);
+        if (table === 'orders' && sanitizedData.motif_annulation !== undefined) {
+          const retriedData = { ...sanitizedData };
+          delete retriedData.motif_annulation;
+          
+          let retryRes;
+          if (action === 'insert') {
+            retryRes = await supabase.from(table).insert(retriedData);
+          } else if (action === 'update') {
+            retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
+          }
+          
+          if (retryRes && retryRes.error) {
+            console.error(`[DB] Échec du repli de la mutation :`, retryRes.error.message);
+            if (rollbackFn) rollbackFn(retryRes.error);
+          } else {
+            console.log(`[DB] ✅ Repli de la mutation réussi (sans motif_annulation).`);
+          }
+        } else {
+          if (rollbackFn) rollbackFn(res.error);
+        }
       } else {
         console.error(`[DB] Erreur de validation de base de données :`, res.error.message);
         if (rollbackFn) rollbackFn(res.error);
@@ -428,7 +451,14 @@ export async function initDb(isRetry = false) {
         memoryDb.customers = custRes.value.data || [];
       }
       if (orderRes.status === 'fulfilled' && !orderRes.value?.error) {
-        memoryDb.orders = orderRes.value.data || [];
+        const remoteOrders = orderRes.value.data || [];
+        memoryDb.orders = remoteOrders.map(ro => {
+          const localOrder = memoryDb.orders.find(lo => lo.id === ro.id);
+          if (localOrder && localOrder.motif_annulation && !ro.motif_annulation) {
+            return { ...ro, motif_annulation: localOrder.motif_annulation };
+          }
+          return ro;
+        });
       }
       if (logsRes.status === 'fulfilled' && !logsRes.value?.error) {
         memoryDb.logs = logsRes.value.data || [];
@@ -517,7 +547,17 @@ async function startPeriodicSync() {
       ]);
       let changed = false;
       if (custRes.status === 'fulfilled' && !custRes.value?.error) { memoryDb.customers = custRes.value.data || []; changed = true; }
-      if (orderRes.status === 'fulfilled' && !orderRes.value?.error) { memoryDb.orders = orderRes.value.data || []; changed = true; }
+      if (orderRes.status === 'fulfilled' && !orderRes.value?.error) {
+        const remoteOrders = orderRes.value.data || [];
+        memoryDb.orders = remoteOrders.map(ro => {
+          const localOrder = memoryDb.orders.find(lo => lo.id === ro.id);
+          if (localOrder && localOrder.motif_annulation && !ro.motif_annulation) {
+            return { ...ro, motif_annulation: localOrder.motif_annulation };
+          }
+          return ro;
+        });
+        changed = true;
+      }
       if (logsRes.status === 'fulfilled' && !logsRes.value?.error) { memoryDb.logs = logsRes.value.data || []; changed = true; }
       if (reqsRes.status === 'fulfilled' && !reqsRes.value?.error) { memoryDb.pin_reset_requests = reqsRes.value.data || []; changed = true; }
       if (changed) { persist(); db.notify(); }
@@ -557,7 +597,11 @@ function setupRealtime() {
         } else if (eventType === 'UPDATE') {
           const idx = targetList.findIndex(x => x.id === newRow.id);
           if (idx !== -1) {
-            targetList[idx] = newRow;
+            const mergedRow = { ...newRow };
+            if (table === 'orders' && targetList[idx].motif_annulation && !mergedRow.motif_annulation) {
+              mergedRow.motif_annulation = targetList[idx].motif_annulation;
+            }
+            targetList[idx] = mergedRow;
           } else {
             targetList.push(newRow);
           }
@@ -587,6 +631,9 @@ export const db = {
   },
   notify: () => {
     notifyListeners();
+  },
+  refreshData: async () => {
+    await initDb(true);
   },
   isDarkMode: () => memoryDb.dark_mode || false,
   setDarkMode: (val) => {
@@ -1101,7 +1148,7 @@ export const db = {
     return order;
   },
 
-  deliverOrderWithPayment: (orderId, amountPaid, paymentMethod, finalStatus = 'restitue') => {
+  deliverOrderWithPayment: (orderId, amountPaid, paymentMethod, finalStatus = 'restitue', referencePaiement = null) => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
@@ -1114,6 +1161,10 @@ export const db = {
     const oldStatus = order.statut;
     order.statut = normalizedFinalStatus;
     order.mode_reglement = paymentMethod;
+    if (referencePaiement) {
+      order.reference_momo = referencePaiement;
+      order.reference_paiement = referencePaiement;
+    }
     
     order.avance_payee = Number(order.avance_payee) + Number(amountPaid);
     order.solde_paid_at = new Date().toISOString();
@@ -1147,7 +1198,7 @@ export const db = {
 
     db.logAction(
       'PAIEMENT_FINAL', 
-      `Livraison commande ${order.identifiant_unique_marquage}. Paiement reçu : ${amountPaid} FCFA (Méthode: ${paymentMethod === 'especes' ? 'Espèces' : 'Mobile Money'})`
+      `Livraison commande ${order.identifiant_unique_marquage}. Paiement reçu : ${amountPaid} FCFA (Méthode: ${paymentMethod})` + (referencePaiement ? ` (Réf: ${referencePaiement})` : '')
     );
     db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage} passée de '${oldStatus}' à '${finalStatus}'`);
     persist();
@@ -1158,7 +1209,9 @@ export const db = {
       mode_reglement: order.mode_reglement,
       avance_payee: order.avance_payee,
       solde_paid_at: order.solde_paid_at,
-      subscription_details: order.subscription_details
+      subscription_details: order.subscription_details,
+      reference_momo: order.reference_momo,
+      reference_paiement: order.reference_paiement
     };
 
     performMutation('update', 'orders', orderId, updateData, () => {
@@ -1172,7 +1225,7 @@ export const db = {
     return order;
   },
 
-  cancelOrder: (orderId) => {
+  cancelOrder: (orderId, reason = '') => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
@@ -1182,6 +1235,7 @@ export const db = {
 
     const oldStatus = order.statut;
     order.statut = 'annule';
+    order.motif_annulation = reason;
 
     const unpaid = order.prix_total - order.avance_payee;
     if (unpaid > 0 && customer) {
@@ -1189,11 +1243,11 @@ export const db = {
       performMutation('update', 'customers', customer.id, { solde_dette: customer.solde_dette });
     }
 
-    db.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage} annulée par l'administrateur`);
+    db.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage} annulée. Motif : ${reason}`);
     persist();
     db.notify();
 
-    performMutation('update', 'orders', orderId, { statut: 'annule' }, () => {
+    performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason }, () => {
       Object.assign(order, originalOrderState);
       if (customer && originalCustomerState) {
         Object.assign(customer, originalCustomerState);

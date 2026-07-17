@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, FlatList, Platform, Modal, BackHandler } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, FlatList, Platform, Modal, BackHandler, RefreshControl } from 'react-native';
 import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, Plus, ArrowUpRight, X, Percent, ShoppingBag, Clock } from 'lucide-react-native';
 import { db } from '../services/db';
 import { MotiView } from 'moti';
@@ -9,12 +9,23 @@ import { useScrollPaddingBottom, useTabBarHeight } from '../hooks/useTabBarHeigh
 import { useDbState } from '../hooks/useDbState';
 
 export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger }) {
-  const { currentUser, isRemote, isDarkMode } = useDbState();
+  const { orders, customers, currentUser, isRemote, isDarkMode } = useDbState();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await db.refreshData();
+    } catch (e) {
+      console.warn("Refresh error:", e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const scrollPaddingBottom = useScrollPaddingBottom();
   const tabBarHeight = useTabBarHeight();
   const staff = db.getStaff();
-  const orders = db.getOrders();
-  const customers = db.getCustomers();
   const styles = getStyles(isDarkMode);
 
   // State for active KPI details modal
@@ -64,7 +75,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   };
 
   // Filter orders by active statuses
-  const activeOrders = orders.filter(o => o.statut !== 'livre' && o.statut !== 'restitue');
+  const activeOrders = orders.filter(o => o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule');
   const readyOrders = orders.filter(o => o.statut === 'pret' || o.statut === 'a_recuperer' || o.statut === 'a_livrer');
   
   // Calculate revenue of the day
@@ -148,6 +159,9 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   };
 
   const formatPrice = (price) => {
+    if (currentUser && (currentUser.role === 'livreur' || currentUser.role === 'agent_lavage_repassage')) {
+      return '******';
+    }
     return (price || 0).toLocaleString('fr-FR') + ' FCFA';
   };
 
@@ -431,10 +445,20 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#002cf7']}
+            tintColor={isDarkMode ? '#ffffff' : '#002cf7'}
+          />
+        }
+      >
         {/* ADVANCED KPI CAROUSEL */}
-        {(!currentUser || currentUser.role !== 'agent_lavage_repassage') && (
-          <ScrollView 
+        <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
             style={{ marginHorizontal: -20 }}
@@ -520,9 +544,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               </MotiView>
             </TouchableOpacity>
           </ScrollView>
-        )}
 
-        {(!currentUser || currentUser.role !== 'agent_lavage_repassage') && (
           <TouchableOpacity 
             activeOpacity={0.9}
             onPress={() => setActiveKpiDetail('ca_jour')}
@@ -584,7 +606,6 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               </View>
             </MotiView>
           </TouchableOpacity>
-        )}
 
         {/* 2X2 GRID STATS */}
         <View style={styles.gridRow}>

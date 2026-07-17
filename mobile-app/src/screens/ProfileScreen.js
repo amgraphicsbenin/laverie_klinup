@@ -89,6 +89,9 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
   };
 
   const formatPrice = (price) => {
+    if (currentUser && (currentUser.role === 'livreur' || currentUser.role === 'agent_lavage_repassage')) {
+      return '******';
+    }
     return `${(price || 0).toLocaleString('fr-FR')} FCFA`;
   };
 

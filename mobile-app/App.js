@@ -295,31 +295,33 @@ export default function App() {
           </TouchableOpacity>
         )}
 
-        {/* Center Plus Button (always visible, turns red & 'x' to close other active modals) */}
-        <View 
-          style={styles.centerTabItem}
-          pointerEvents="auto"
-        >
-          <TouchableOpacity 
-            onPress={isAnyModalVisible ? handleCloseActiveModal : () => {
-              if (!orderFormVisible) setOrderFormKey(prev => prev + 1);
-              setOrderFormVisible(!orderFormVisible);
-            }}
-            activeOpacity={0.85}
+        {/* Center Plus Button (always visible for non-atelier staff, turns red & 'x' to close other active modals) */}
+        {currentUser.role !== 'agent_lavage_repassage' && (
+          <View 
+            style={styles.centerTabItem}
+            pointerEvents="auto"
           >
-            <MotiView
-              animate={{ 
-                backgroundColor: isAnyModalVisible ? '#ef4444' : '#002cf7',
-                scale: (isAnyModalVisible || orderFormVisible) ? 1.05 : 1,
-                rotate: (isAnyModalVisible || orderFormVisible) ? '135deg' : '0deg'
+            <TouchableOpacity 
+              onPress={isAnyModalVisible ? handleCloseActiveModal : () => {
+                if (!orderFormVisible) setOrderFormKey(prev => prev + 1);
+                setOrderFormVisible(!orderFormVisible);
               }}
-              transition={{ type: 'timing', duration: 250 }}
-              style={styles.scanButtonCircle}
+              activeOpacity={0.85}
             >
-              <MaterialCommunityIcons name="plus" size={26} color="#ffffff" />
-            </MotiView>
-          </TouchableOpacity>
-        </View>
+              <MotiView
+                animate={{ 
+                  backgroundColor: isAnyModalVisible ? '#ef4444' : '#002cf7',
+                  scale: (isAnyModalVisible || orderFormVisible) ? 1.05 : 1,
+                  rotate: (isAnyModalVisible || orderFormVisible) ? '135deg' : '0deg'
+                }}
+                transition={{ type: 'timing', duration: 250 }}
+                style={styles.scanButtonCircle}
+              >
+                <MaterialCommunityIcons name="plus" size={26} color="#ffffff" />
+              </MotiView>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
@@ -404,7 +406,7 @@ export default function App() {
           animate={{ opacity: 1 }}
           from={{ opacity: 0 }}
           transition={{ type: 'timing', duration: 150 }}
-          style={[StyleSheet.absoluteFill, { zIndex: 100000, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.5)' }]}
+          style={[StyleSheet.absoluteFill, { zIndex: 100000, elevation: 100000, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.5)' }]}
         >
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => {
             if (customAlertState.buttons.length <= 1) {
@@ -607,10 +609,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 8,
-    // height + paddingBottom set dynamically below via tabBarDynamic()
+    // Shadows for premium elevated card look
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -4,
+    },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 10,
   },
   tabItem: {
     alignItems: 'center',

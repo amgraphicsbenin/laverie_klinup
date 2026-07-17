@@ -12,7 +12,7 @@ import { CustomSelect } from "../components/CustomSelect";
 import { useDbState } from "../hooks/useDbState";
 
 export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess }) {
-  const { isDarkMode } = useDbState();
+  const { currentUser, isDarkMode } = useDbState();
   const styles = getStyles(isDarkMode);
   const [customers, setCustomers] = useState(() => db.getCustomers());
   const [searchQuery, setSearchQuery] = useState("");
@@ -482,34 +482,42 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                                   Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
                                 </Text>
                               </View>
-                              <TouchableOpacity onPress={() => handleUnsubscribeCrm(activeClient.id)} style={styles.unsubscribeBtn} activeOpacity={0.8}>
-                                <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
-                              </TouchableOpacity>
+                              {currentUser && currentUser.role !== 'livreur' && (
+                                <TouchableOpacity onPress={() => handleUnsubscribeCrm(activeClient.id)} style={styles.unsubscribeBtn} activeOpacity={0.8}>
+                                  <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
+                                </TouchableOpacity>
+                              )}
                             </View>
                           ) : (
-                            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                              <View style={{ flex: 1 }}>
-                                <CustomSelect
-                                  value={selectedCrmSubId}
-                                  onChange={(val) => setSelectedCrmSubId(val)}
-                                  options={[
-                                    { label: "-- Choisir une formule --", value: "" },
-                                    ...catalog.filter(item => item.service === 'abonnement').map(sub => ({
-                                      label: `${sub.article} (${sub.prix.toLocaleString('fr-FR')} F/m)`,
-                                      value: sub.id
-                                    }))
-                                  ]}
-                                  placeholder="Choisir une formule"
-                                />
+                            currentUser && currentUser.role !== 'livreur' ? (
+                              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                                <View style={{ flex: 1 }}>
+                                  <CustomSelect
+                                    value={selectedCrmSubId}
+                                    onChange={(val) => setSelectedCrmSubId(val)}
+                                    options={[
+                                      { label: "-- Choisir une formule --", value: "" },
+                                      ...catalog.filter(item => item.service === 'abonnement').map(sub => ({
+                                        label: `${sub.article} (${sub.prix.toLocaleString('fr-FR')} F/m)`,
+                                        value: sub.id
+                                      }))
+                                    ]}
+                                    placeholder="Choisir une formule"
+                                  />
+                                </View>
+                                <TouchableOpacity
+                                  onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
+                                  style={styles.subscribeBtn}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text style={styles.subscribeBtnText}>Souscrire</Text>
+                                </TouchableOpacity>
                               </View>
-                              <TouchableOpacity
-                                onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
-                                style={styles.subscribeBtn}
-                                activeOpacity={0.8}
-                              >
-                                <Text style={styles.subscribeBtnText}>Souscrire</Text>
-                              </TouchableOpacity>
-                            </View>
+                            ) : (
+                              <Text style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', marginTop: 4 }}>
+                                Souscription réservée aux gérants et agents d'accueil
+                              </Text>
+                            )
                           )}
                         </View>
                       </>
@@ -517,10 +525,12 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                   })()}
                 </ScrollView>
                 <View style={styles.ficheActions}>
-                  <TouchableOpacity onPress={() => handleDeleteCustomer(selectedClient.id)} style={styles.ficheDeleteBtn}>
-                    <Trash2 size={14} color="#ef4444" style={{ marginRight: 4 }} />
-                    <Text style={styles.ficheDeleteBtnText}>Supprimer</Text>
-                  </TouchableOpacity>
+                  {currentUser && currentUser.role !== 'livreur' && (
+                    <TouchableOpacity onPress={() => handleDeleteCustomer(selectedClient.id)} style={styles.ficheDeleteBtn}>
+                      <Trash2 size={14} color="#ef4444" style={{ marginRight: 4 }} />
+                      <Text style={styles.ficheDeleteBtnText}>Supprimer</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity onPress={() => handleEditCustomer(selectedClient)} style={styles.ficheEditBtn}>
                     <Edit3 size={14} color="#ffffff" style={{ marginRight: 4 }} />
                     <Text style={styles.ficheEditBtnText}>Modifier</Text>
