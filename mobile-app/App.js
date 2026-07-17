@@ -17,7 +17,7 @@ import { OrderFormModal } from './src/components/OrderFormModal';
 import './src/services/alert';
 import { registerAlertHandler } from './src/services/alert';
 
-function AppContent() {
+export default function App() {
   const dbState = useDbState();
   const currentUser = dbState.currentUser;
   const isDarkMode = dbState.isDarkMode;
@@ -54,6 +54,7 @@ function AppContent() {
 
   const scrollViewRef = React.useRef(null);
   const [isScrollingFromSwipe, setIsScrollingFromSwipe] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -283,7 +284,10 @@ function AppContent() {
         <LoginScreen />
       ) : (
         <View style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', paddingTop: insets.top }]}>
-          <View style={styles.content}>
+          <View
+            style={styles.content}
+            onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}
+          >
             <ScrollView
               ref={scrollViewRef}
               horizontal
@@ -294,7 +298,7 @@ function AppContent() {
               style={{ flex: 1 }}
               bounces={false}
             >
-              <View style={{ width: activeWidth, flex: 1 }}>
+              <View style={{ width: activeWidth, height: contentHeight }}>
                 <DashboardScreen 
                   onNavigate={(tab) => handleTabPress(tab)}
                   setSelectedOrder={setSelectedOrder}
@@ -306,7 +310,7 @@ function AppContent() {
               </View>
               {currentUser.role !== 'agent_lavage_repassage' && (
                 <>
-                  <View style={{ width: activeWidth, flex: 1 }}>
+                  <View style={{ width: activeWidth, height: contentHeight }}>
                     <GestionScreen 
                       selectedOrder={selectedOrder}
                       setSelectedOrder={setSelectedOrder}
@@ -324,7 +328,7 @@ function AppContent() {
                       onShowSuccess={triggerSuccess}
                     />
                   </View>
-                  <View style={{ width: activeWidth, flex: 1 }}>
+                  <View style={{ width: activeWidth, height: contentHeight }}>
                     <HistoryScreen 
                       onModalStateChange={setLocalModalOpen} 
                       closeAllModalsTrigger={closeModalsTrigger}
@@ -337,7 +341,7 @@ function AppContent() {
                   </View>
                 </>
               )}
-              <View style={{ width: activeWidth, flex: 1 }}>
+              <View style={{ width: activeWidth, height: contentHeight }}>
                 <ProfileScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} onShowSuccess={triggerSuccess} />
               </View>
             </ScrollView>
@@ -636,14 +640,6 @@ function AppContent() {
   }
 
   return appContent;
-}
-
-export default function App() {
-  return (
-    <SafeAreaProvider>
-      <AppContent />
-    </SafeAreaProvider>
-  );
 }
 
 const PHONE_W = 393;
