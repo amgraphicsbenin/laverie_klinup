@@ -923,7 +923,7 @@ export default function GestionScreen({
       <MotiView
         from={{ opacity: 0, translateX: 40 }}
         animate={{ opacity: 1, translateX: 0 }}
-        transition={{ type: 'timing', duration: 280 }}
+        transition={{ type: 'timing', duration: 120 }}
         style={{ flex: 1 }}
       >
         <ClientsScreen
@@ -1093,8 +1093,8 @@ export default function GestionScreen({
                   }}
                   transition={{
                     type: 'timing',
-                    duration: 500,
-                    delay: isFinished ? 300 : 0,
+                    duration: 120,
+                    delay: isFinished ? 100 : 0,
                   }}
                   style={{ overflow: 'hidden', marginBottom: 14 }}
                 >
@@ -1303,7 +1303,7 @@ export default function GestionScreen({
                             }}
                             transition={{
                               type: 'timing',
-                              duration: 1000,
+                              duration: 150,
                             }}
                             style={styles.cardNextStatusBlockBtn}
                           >
@@ -1311,7 +1311,7 @@ export default function GestionScreen({
                               key={iconName}
                               from={{ opacity: 0, scale: 0.5 }}
                               animate={{ opacity: 1, scale: 1 }}
-                              transition={{ type: 'timing', duration: 800 }}
+                              transition={{ type: 'timing', duration: 120 }}
                               style={{ marginRight: 6 }}
                             >
                               {iconName === 'Sparkles' && <Sparkles size={13} color={canTransition ? '#ffffff' : '#94a3b8'} />}
@@ -1326,7 +1326,7 @@ export default function GestionScreen({
                               key={nextStyle.label}
                               from={{ opacity: 0, translateX: 5 }}
                               animate={{ opacity: 1, translateX: 0 }}
-                              transition={{ type: 'timing', duration: 800 }}
+                              transition={{ type: 'timing', duration: 120 }}
                             >
                               <Text style={[styles.cardNextStatusBlockBtnText, { color: canTransition ? '#ffffff' : '#94a3b8' }]}>
                                 {nextStyle.label}
@@ -1382,7 +1382,7 @@ export default function GestionScreen({
                       <MotiView
                         from={{ opacity: 0, translateY: 10 }}
                         animate={{ opacity: 1, translateY: 0 }}
-                        transition={{ type: 'timing', duration: 300, delay: 200 }}
+                        transition={{ type: 'timing', duration: 120, delay: 50 }}
                       >
                         <Text style={{
                           color: '#ffffff',
@@ -1549,21 +1549,20 @@ export default function GestionScreen({
                       </View>
                     ))}
                     <View style={styles.detailDivider} />
-                    {selectedOrder.remise_pourcentage > 0 && (
+                    {(selectedOrder.remise_pourcentage > 0 || selectedOrder.remise_montant > 0) && (
                       <>
                         <View style={styles.detailArticleRow}>
                           <Text style={styles.detailLabelMuted}>Sous-total</Text>
                           <Text style={styles.detailTextMuted}>
-                            {formatPrice((selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0))}
+                            {formatPrice(selectedOrder.prix_base_avant_remise || (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0))}
                           </Text>
                         </View>
                         <View style={styles.detailArticleRow}>
-                          <Text style={[styles.detailLabelMuted, { color: '#ef4444' }]}>Réduction ({selectedOrder.remise_pourcentage}%)</Text>
+                          <Text style={[styles.detailLabelMuted, { color: '#ef4444' }]}>
+                            Réduction ({selectedOrder.remise_pourcentage || Math.round(((selectedOrder.remise_montant || 0) / (selectedOrder.prix_base_avant_remise || (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) || 1)) * 100)}%)
+                          </Text>
                           <Text style={[styles.detailTextMuted, { color: '#ef4444', fontWeight: '600' }]}>
-                            -{formatPrice(
-                              (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) - 
-                              (selectedOrder.prix_total || selectedOrder.total)
-                            )}
+                            -{formatPrice(selectedOrder.remise_montant || ((selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) - (selectedOrder.prix_total || selectedOrder.total)))}
                           </Text>
                         </View>
                       </>
@@ -1786,11 +1785,11 @@ export default function GestionScreen({
                      >
                        <MotiView
                          animate={{
-                           backgroundColor: canTransition ? btn.color : (isDarkMode ? '#334155' : '#f1f5f9')
+                           backgroundColor: canTransition ? btn.color : (isDarkMode ? '#334155' : '#ffffff')
                          }}
                          transition={{
                            type: 'timing',
-                           duration: 1200
+                           duration: 150
                          }}
                          style={styles.statusChangeBtn}
                        >
@@ -1803,7 +1802,7 @@ export default function GestionScreen({
                              rotate: '0deg',
                              ...(canTransition && btn.animation ? btn.animation.animate : {})
                            }}
-                           transition={canTransition && btn.animation ? btn.animation.transition : { type: 'timing', duration: 300 }}
+                           transition={canTransition && btn.animation ? btn.animation.transition : { type: 'timing', duration: 120 }}
                            style={{ marginRight: 8 }}
                          >
                             {btn.icon === 'Sparkles' && <Sparkles size={16} color={canTransition ? btn.iconColor : '#94a3b8'} />}
@@ -1819,7 +1818,7 @@ export default function GestionScreen({
                            key={btn.label}
                            from={{ opacity: 0, translateY: 10 }}
                            animate={{ opacity: 1, translateY: 0 }}
-                           transition={{ type: 'timing', duration: 1000 }}
+                           transition={{ type: 'timing', duration: 150 }}
                          >
                            <Text style={[styles.statusChangeBtnText, { color: canTransition ? '#ffffff' : '#94a3b8' }]}>
                               {btn.label}
@@ -2116,7 +2115,12 @@ export default function GestionScreen({
       )}
 
       {/* MODAL 5 : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
-      {showInvoiceModal && invoiceOrder && (
+      <Modal
+        visible={!!(showInvoiceModal && invoiceOrder)}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+      >
         <View style={styles.absoluteModalContainer}>
           <View style={styles.popupModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
@@ -2186,19 +2190,23 @@ export default function GestionScreen({
                   {/* Billing Details */}
                   <View style={styles.tpeTotalRow}>
                     <Text style={styles.tpeTotalLabel}>TOTAL BRUT</Text>
-                    <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
+                    <Text style={styles.tpeTotalVal}>
+                      {formatPrice(invoiceOrder.prix_base_avant_remise || (invoiceOrder.prix_total || invoiceOrder.total || 0) + (invoiceOrder.remise_montant || 0))}
+                    </Text>
                   </View>
                   
-                  {invoiceOrder.remise_pourcentage > 0 && (
+                  {(invoiceOrder.remise_pourcentage > 0 || invoiceOrder.remise_montant > 0) && (
                     <View style={styles.tpeTotalRow}>
-                      <Text style={styles.tpeTotalLabel}>REMISE ({invoiceOrder.remise_pourcentage}%)</Text>
+                      <Text style={styles.tpeTotalLabel}>
+                        REMISE ({invoiceOrder.remise_pourcentage || Math.round(((invoiceOrder.remise_montant || 0) / ((invoiceOrder.prix_base_avant_remise || (invoiceOrder.prix_total || invoiceOrder.total || 0) + (invoiceOrder.remise_montant || 0)) || 1)) * 100)}%)
+                      </Text>
                       <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(invoiceOrder.remise_montant || 0)}</Text>
                     </View>
                   )}
 
                   <View style={styles.tpeTotalRow}>
                     <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
-                    <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.total || invoiceOrder.prix_total)}</Text>
+                    <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
                   </View>
 
                   <View style={styles.tpeTotalRow}>
@@ -2218,16 +2226,13 @@ export default function GestionScreen({
                   {/* Footer & Barcode placeholder */}
                   <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
                   
-                  <View style={styles.barcodeContainer}>
-                    <Text style={styles.barcodeText}>* {invoiceOrder.identifiant_unique_marquage || invoiceOrder.id} *</Text>
-                  </View>
-
-                  <Text style={styles.tpeTextMutedCentred}>Rejoignez KLIN UP pour un service premium</Text>
+                  <View style={{ height: 16 }} />
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+                {/* Print/Download controls */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
                   <TouchableOpacity
-                    onPress={() => handleDownloadInvoice(invoiceOrder)}
+                    onPress={() => handleSharePdf(invoiceOrder)}
                     style={styles.invoiceDownloadBtn}
                     activeOpacity={0.8}
                   >
@@ -2255,7 +2260,7 @@ export default function GestionScreen({
             </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}
       <Modal
@@ -2536,7 +2541,7 @@ export default function GestionScreen({
 const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#ffffff',
   },
   absoluteModalContainer: {
     position: 'absolute',
@@ -2547,7 +2552,7 @@ const baseStyles = StyleSheet.create({
     zIndex: 1000,
   },
   tabHeader: {
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#ffffff',
     paddingTop: 0,
     paddingBottom: 10,
   },
@@ -2587,7 +2592,7 @@ const baseStyles = StyleSheet.create({
     paddingBottom: 12,
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#ffffff',
   },
   searchContainer: {
     flex: 1,
@@ -2614,7 +2619,7 @@ const baseStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 10,
     flexDirection: 'row',
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#ffffff',
   },
   filterPill: {
     flexDirection: 'row',
@@ -3465,7 +3470,7 @@ const baseStyles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 8,
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#ffffff',
   },
   headerTitle: {
     fontSize: 28,
@@ -3481,7 +3486,7 @@ const baseStyles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 12,
     gap: 12,
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#ffffff',
   },
   topActionBtnBlue: {
     flex: 1.1,
@@ -3524,7 +3529,7 @@ const baseStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 14,
     gap: 8,
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#ffffff',
   },
   statusFilterBtn: {
     flex: 1,

@@ -151,7 +151,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }}>
+    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
       {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profil</Text>
@@ -333,14 +333,14 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 const getStyles = (isDarkMode) => StyleSheet.create({
   container: {
     padding: 20,
-    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+    backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
     paddingBottom: 110,
   },
   header: {
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 8,
-    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+    backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
   },
   headerTitle: {
     fontSize: 28,

@@ -469,18 +469,18 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 250 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff' }]}
+                transition={{ type: 'timing', duration: 120 }}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#002cf7' }]}
               >
                 <View style={styles.kpiHeader}>
-                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(0, 44, 247, 0.05)' }]}>
-                    <TrendingUp size={15} color="#002cf7" />
+                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                    <TrendingUp size={15} color="#ffffff" />
                   </View>
-                  <Text style={styles.kpiGrowthText}>+12.4%</Text>
+                  <Text style={[styles.kpiGrowthText, { color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>+12.4%</Text>
                 </View>
-                <Text style={styles.kpiLabel}>CA Mensuel</Text>
-                <Text style={styles.kpiValue}>{formatPrice(monthlyRevenue)}</Text>
-                <Text style={styles.kpiSub}>Mois en cours</Text>
+                <Text style={[styles.kpiLabel, { color: 'rgba(255, 255, 255, 0.8)' }]}>CA Mensuel</Text>
+                <Text style={[styles.kpiValue, { color: '#ffffff' }]}>{formatPrice(monthlyRevenue)}</Text>
+                <Text style={[styles.kpiSub, { color: 'rgba(255, 255, 255, 0.65)' }]}>Mois en cours</Text>
               </MotiView>
             </TouchableOpacity>
 
@@ -489,18 +489,18 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 250, delay: 50 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(168, 85, 247, 0.15)' : '#f3e8ff' }]}
+                transition={{ type: 'timing', duration: 120, delay: 20 }}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(168, 85, 247, 0.25)' : '#a855f7' }]}
               >
                 <View style={styles.kpiHeader}>
-                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(168, 85, 247, 0.05)' }]}>
-                    <ShoppingBag size={15} color="#a855f7" />
+                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                    <ShoppingBag size={15} color="#ffffff" />
                   </View>
-                  <Text style={[styles.kpiGrowthText, { color: '#a855f7', backgroundColor: 'rgba(168, 85, 247, 0.05)' }]}>Panier</Text>
+                  <Text style={[styles.kpiGrowthText, { color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>Panier</Text>
                 </View>
-                <Text style={styles.kpiLabel}>Panier Moyen</Text>
-                <Text style={styles.kpiValue}>{formatPrice(averageBasket)}</Text>
-                <Text style={styles.kpiSub}>Par commande</Text>
+                <Text style={[styles.kpiLabel, { color: 'rgba(255, 255, 255, 0.8)' }]}>Panier Moyen</Text>
+                <Text style={[styles.kpiValue, { color: '#ffffff' }]}>{formatPrice(averageBasket)}</Text>
+                <Text style={[styles.kpiSub, { color: 'rgba(255, 255, 255, 0.65)' }]}>Par commande</Text>
               </MotiView>
             </TouchableOpacity>
 
@@ -509,18 +509,18 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 250, delay: 100 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#d1fae5' }]}
+                transition={{ type: 'timing', duration: 120, delay: 40 }}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.25)' : '#10b981' }]}
               >
                 <View style={styles.kpiHeader}>
-                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.05)' }]}>
-                    <Percent size={15} color="#10b981" />
+                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                    <Percent size={15} color="#ffffff" />
                   </View>
-                  <Text style={[styles.kpiGrowthText, { color: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.05)' }]}>{recoveryRate}%</Text>
+                  <Text style={[styles.kpiGrowthText, { color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>{recoveryRate}%</Text>
                 </View>
-                <Text style={styles.kpiLabel}>Recouvrement</Text>
-                <Text style={styles.kpiValue}>{recoveryRate}% Encaissé</Text>
-                <Text style={styles.kpiSub}>Sur volume total</Text>
+                <Text style={[styles.kpiLabel, { color: 'rgba(255, 255, 255, 0.8)' }]}>Recouvrement</Text>
+                <Text style={[styles.kpiValue, { color: '#ffffff' }]}>{recoveryRate}% Encaissé</Text>
+                <Text style={[styles.kpiSub, { color: 'rgba(255, 255, 255, 0.65)' }]}>Sur volume total</Text>
               </MotiView>
             </TouchableOpacity>
 
@@ -529,18 +529,18 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 250, delay: 150 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2' }]}
+                transition={{ type: 'timing', duration: 120, delay: 60 }}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.25)' : '#ef4444' }]}
               >
                 <View style={styles.kpiHeader}>
-                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
-                    <Clock size={15} color="#ef4444" />
+                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                    <Clock size={15} color="#ffffff" />
                   </View>
-                  <Text style={[styles.kpiGrowthText, { color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>Express</Text>
+                  <Text style={[styles.kpiGrowthText, { color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>Express</Text>
                 </View>
-                <Text style={styles.kpiLabel}>Part Express</Text>
-                <Text style={styles.kpiValue}>{expressRate}% Ratio</Text>
-                <Text style={styles.kpiSub}>{expressOrdersCount} commandes</Text>
+                <Text style={[styles.kpiLabel, { color: 'rgba(255, 255, 255, 0.8)' }]}>Part Express</Text>
+                <Text style={[styles.kpiValue, { color: '#ffffff' }]}>{expressRate}% Ratio</Text>
+                <Text style={[styles.kpiSub, { color: 'rgba(255, 255, 255, 0.65)' }]}>{expressOrdersCount} commandes</Text>
               </MotiView>
             </TouchableOpacity>
           </ScrollView>
@@ -553,7 +553,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 300 }}
+              transition={{ type: 'timing', duration: 120 }}
               style={styles.mainSpendCard}
             >
               <View style={styles.spendHeader}>
@@ -618,7 +618,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 300, delay: 40 }}
+              transition={{ type: 'timing', duration: 120, delay: 15 }}
               style={[styles.gridCard, styles.gridCardPastelBlue]}
             >
               <View style={styles.cardHeaderRow}>
@@ -641,7 +641,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 300, delay: 80 }}
+              transition={{ type: 'timing', duration: 120, delay: 30 }}
               style={[styles.gridCard, styles.gridCardPastelGreen]}
             >
               <View style={styles.cardHeaderRow}>
@@ -666,7 +666,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 300, delay: 120 }}
+              transition={{ type: 'timing', duration: 120, delay: 45 }}
               style={[styles.gridCard, styles.gridCardPastelRed]}
             >
               <View style={styles.cardHeaderRow}>
@@ -689,7 +689,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 300, delay: 160 }}
+              transition={{ type: 'timing', duration: 120, delay: 60 }}
               style={[styles.gridCard, styles.gridCardPastelSlate]}
             >
               <View style={styles.cardHeaderRow}>
@@ -765,7 +765,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#ffffff',
   },
   header: {
     flexDirection: 'row',
@@ -774,7 +774,7 @@ const baseStyles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 16,
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#ffffff',
   },
   headerTitle: {
     fontSize: 28,
@@ -1136,12 +1136,12 @@ const baseStyles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#e2e8f0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   caTotalSection: {
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#f1f5f9',
     padding: 16,
     alignItems: 'center',
     marginBottom: 20,
@@ -1166,7 +1166,7 @@ const baseStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#f4f5f7',
+    borderBottomColor: '#f1f5f9',
     paddingBottom: 8,
   },
   caRowLabel: {
@@ -1193,7 +1193,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f4f5f7',
+    borderBottomColor: '#f1f5f9',
   },
   detailsOrderRowClickable: {
     flexDirection: 'row',
@@ -1201,7 +1201,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f4f5f7',
+    borderBottomColor: '#f1f5f9',
   },
   detailsClientName: {
     fontSize: 13,

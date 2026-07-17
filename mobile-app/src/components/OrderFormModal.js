@@ -184,7 +184,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
       animate={{
         opacity: visible ? 1 : 0
       }}
-      transition={{ type: 'timing', duration: 220 }}
+      transition={{ type: 'timing', duration: 120 }}
       style={[
         StyleSheet.absoluteFill,
         { 

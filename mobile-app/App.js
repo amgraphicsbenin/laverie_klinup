@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, BackHandler, StatusBar as RNStatusBar } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, BackHandler, StatusBar as RNStatusBar, ScrollView, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,6 +18,10 @@ import './src/services/alert';
 import { registerAlertHandler } from './src/services/alert';
 
 export default function App() {
+  const dbState = useDbState();
+  const currentUser = dbState.currentUser;
+  const isDarkMode = dbState.isDarkMode;
+
   const [dbReady, setDbReady] = useState(false);
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('accueil');
@@ -32,6 +36,51 @@ export default function App() {
   const [initSelectedClient, setInitSelectedClient] = useState(null);
   const [successToast, setSuccessToast] = useState({ visible: false, message: '' });
   const [customAlertState, setCustomAlertState] = useState({ visible: false, title: '', message: '', buttons: [] });
+
+  const { width: SCREEN_WIDTH } = Dimensions.get('window');
+  const activeWidth = Platform.OS === 'web' ? 393 : SCREEN_WIDTH;
+
+  // Tabs list based on permissions
+  const getTabsList = () => {
+    const list = ['accueil'];
+    if (currentUser && currentUser.role !== 'agent_lavage_repassage') {
+      list.push('gestion');
+      list.push('historique');
+    }
+    list.push('profile');
+    return list;
+  };
+  const tabs = currentUser ? getTabsList() : ['accueil'];
+
+  const scrollViewRef = React.useRef(null);
+  const [isScrollingFromSwipe, setIsScrollingFromSwipe] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const tabIndex = tabs.indexOf(activeTab);
+    if (tabIndex !== -1 && scrollViewRef.current && !isScrollingFromSwipe) {
+      scrollViewRef.current.scrollTo({ x: tabIndex * activeWidth, animated: true });
+    }
+  }, [activeTab, currentUser]);
+
+  const handleMomentumScrollEnd = (event) => {
+    const contentOffset = event.nativeEvent.contentOffset.x;
+    const tabIndex = Math.round(contentOffset / activeWidth);
+    if (tabIndex >= 0 && tabIndex < tabs.length) {
+      setIsScrollingFromSwipe(true);
+      setActiveTab(tabs[tabIndex]);
+      setTimeout(() => setIsScrollingFromSwipe(false), 100);
+    }
+  };
+
+  const handleTabPress = (tabName) => {
+    setIsScrollingFromSwipe(false);
+    setActiveTab(tabName);
+    const tabIndex = tabs.indexOf(tabName);
+    if (tabIndex !== -1 && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ x: tabIndex * activeWidth, animated: true });
+    }
+  };
 
   useEffect(() => {
     registerAlertHandler(({ title, message, buttons }) => {
@@ -74,9 +123,7 @@ export default function App() {
   }, []);
 
 
-  const dbState = useDbState();
-  const currentUser = dbState.currentUser;
-  const isDarkMode = dbState.isDarkMode;
+
 
   const getAlertIcon = (title, message) => {
     const t = (title || '').toLowerCase();
@@ -230,22 +277,70 @@ export default function App() {
   };
 
   const appContent = (
-    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }}>
-      <StatusBar style={isDarkMode ? "light" : "dark"} translucent={Platform.OS === 'android'} backgroundColor="transparent" />
+    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
+      <StatusBar style={isDarkMode ? "light" : "dark"} translucent={true} backgroundColor="transparent" />
       {!currentUser ? (
         <LoginScreen />
       ) : (
-        <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }]}>
+        <View style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', paddingTop: insets.top }]}>
           <View style={styles.content}>
-            <MotiView
-              key={activeTab}
-              from={{ opacity: 0, scale: 0.98, translateY: 6 }}
-              animate={{ opacity: 1, scale: 1, translateY: 0 }}
-              transition={{ type: 'spring', damping: 16, mass: 0.6 }}
+            <ScrollView
+              ref={scrollViewRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={handleMomentumScrollEnd}
+              scrollEventThrottle={16}
               style={{ flex: 1 }}
+              bounces={false}
             >
-              {renderActiveScreen()}
-            </MotiView>
+              <View style={{ width: activeWidth, flex: 1 }}>
+                <DashboardScreen 
+                  onNavigate={(tab) => handleTabPress(tab)}
+                  setSelectedOrder={setSelectedOrder}
+                  setGestionFilter={setGestionFilter}
+                  onModalStateChange={setLocalModalOpen}
+                  closeAllModalsTrigger={closeModalsTrigger}
+                  onShowSuccess={triggerSuccess}
+                />
+              </View>
+              {currentUser.role !== 'agent_lavage_repassage' && (
+                <>
+                  <View style={{ width: activeWidth, flex: 1 }}>
+                    <GestionScreen 
+                      selectedOrder={selectedOrder}
+                      setSelectedOrder={setSelectedOrder}
+                      gestionFilter={gestionFilter}
+                      setGestionFilter={setGestionFilter}
+                      openOrderFormOnMount={openOrderFormOnMount}
+                      onCloseOrderFormOnMount={() => setOpenOrderFormOnMount(false)}
+                      orderFormVisible={orderFormVisible}
+                      setOrderFormVisible={setOrderFormVisible}
+                      onOpenOrderForm={() => { setOrderFormKey(prev => prev + 1); setOrderFormVisible(true); }}
+                      onModalStateChange={setLocalModalOpen}
+                      closeAllModalsTrigger={closeModalsTrigger}
+                      initialSelectedClient={initSelectedClient}
+                      onClearInitialSelectedClient={() => setInitSelectedClient(null)}
+                      onShowSuccess={triggerSuccess}
+                    />
+                  </View>
+                  <View style={{ width: activeWidth, flex: 1 }}>
+                    <HistoryScreen 
+                      onModalStateChange={setLocalModalOpen} 
+                      closeAllModalsTrigger={closeModalsTrigger}
+                      onSelectClient={(client) => {
+                        handleTabPress('gestion');
+                        setInitSelectedClient(client);
+                      }}
+                      onShowSuccess={triggerSuccess}
+                    />
+                  </View>
+                </>
+              )}
+              <View style={{ width: activeWidth, flex: 1 }}>
+                <ProfileScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} onShowSuccess={triggerSuccess} />
+              </View>
+            </ScrollView>
           </View>
 
       {/* BOTTOM TAB BAR */}
@@ -260,12 +355,12 @@ export default function App() {
         }
       ]}>
         <TouchableOpacity 
-          onPress={() => { setActiveTab('accueil'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+          onPress={() => { handleTabPress('accueil'); setOrderFormVisible(false); setLocalModalOpen(false); }}
           style={styles.tabItem}
         >
           <MotiView
             animate={{ scale: activeTab === 'accueil' ? 1.06 : 1 }}
-            transition={{ type: 'timing', duration: 200 }}
+            transition={{ type: 'timing', duration: 120 }}
           >
             <MaterialCommunityIcons
               name={activeTab === 'accueil' ? 'home' : 'home-outline'}
@@ -278,12 +373,12 @@ export default function App() {
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={() => { setActiveTab('gestion'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+            onPress={() => { handleTabPress('gestion'); setOrderFormVisible(false); setLocalModalOpen(false); }}
             style={styles.tabItem}
           >
             <MotiView
               animate={{ scale: activeTab === 'gestion' ? 1.06 : 1 }}
-              transition={{ type: 'timing', duration: 200 }}
+              transition={{ type: 'timing', duration: 120 }}
             >
               <MaterialCommunityIcons
                 name={activeTab === 'gestion' ? 'clipboard-list' : 'clipboard-list-outline'}
@@ -314,7 +409,7 @@ export default function App() {
                   scale: (isAnyModalVisible || orderFormVisible) ? 1.05 : 1,
                   rotate: (isAnyModalVisible || orderFormVisible) ? '135deg' : '0deg'
                 }}
-                transition={{ type: 'timing', duration: 250 }}
+                transition={{ type: 'timing', duration: 120 }}
                 style={styles.scanButtonCircle}
               >
                 <MaterialCommunityIcons name="plus" size={26} color="#ffffff" />
@@ -325,12 +420,12 @@ export default function App() {
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={() => { setActiveTab('historique'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+            onPress={() => { handleTabPress('historique'); setOrderFormVisible(false); setLocalModalOpen(false); }}
             style={styles.tabItem}
           >
             <MotiView
               animate={{ scale: activeTab === 'historique' ? 1.06 : 1 }}
-              transition={{ type: 'timing', duration: 200 }}
+              transition={{ type: 'timing', duration: 120 }}
             >
               <MaterialCommunityIcons
                 name={activeTab === 'historique' ? 'history' : 'history'}
@@ -343,12 +438,12 @@ export default function App() {
         )}
 
         <TouchableOpacity 
-          onPress={() => { setActiveTab('profile'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+          onPress={() => { handleTabPress('profile'); setOrderFormVisible(false); setLocalModalOpen(false); }}
           style={styles.tabItem}
         >
           <MotiView
             animate={{ scale: activeTab === 'profile' ? 1.06 : 1 }}
-            transition={{ type: 'timing', duration: 200 }}
+            transition={{ type: 'timing', duration: 120 }}
           >
             <MaterialCommunityIcons
               name={activeTab === 'profile' ? 'account-circle' : 'account-circle-outline'}
@@ -361,51 +456,44 @@ export default function App() {
       </View>
       <OrderFormModal key={orderFormKey} visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
 
-      {/* GLOBAL FLOATING SUCCESS TOAST */}
-      <MotiView
-        pointerEvents={successToast.visible ? 'auto' : 'none'}
-        animate={{
-          opacity: successToast.visible ? 1 : 0,
-          translateY: successToast.visible ? (Platform.OS === 'ios' ? 50 : 25) : -120,
-          scale: successToast.visible ? 1 : 0.88,
-        }}
-        transition={{ type: 'spring', damping: 15, mass: 0.8 }}
-        style={styles.globalToastContainer}
-      >
-        <BlurView intensity={Platform.OS === 'ios' ? 45 : 95} tint="light" style={StyleSheet.absoluteFill} />
-        <View style={styles.globalToastContent}>
-          <MotiView
-            animate={{
-              scale: successToast.visible ? 1 : 0.5,
-              rotate: successToast.visible ? '0deg' : '-45deg',
-            }}
-            transition={{ type: 'spring', damping: 10, delay: 150 }}
-            style={styles.toastIconCircle}
-          >
-            <MaterialCommunityIcons name="check-bold" size={16} color="#ffffff" />
-          </MotiView>
-          <MotiView
-            animate={{
-              opacity: successToast.visible ? 1 : 0,
-              translateX: successToast.visible ? 0 : 15,
-            }}
-            transition={{ type: 'timing', duration: 400, delay: 250 }}
-            style={{ flex: 1 }}
-          >
-            <Text style={styles.toastTitle}>Succès</Text>
-            <Text style={styles.toastMessage}>{successToast.message}</Text>
-          </MotiView>
         </View>
-      </MotiView>
-    </SafeAreaView>
-  )}
+      )}
+      {/* GLOBAL FLOATING SUCCESS TOAST */}
+      {successToast.visible && (
+        <MotiView
+          pointerEvents="auto"
+          animate={{
+            opacity: 1,
+            translateY: Platform.OS === 'ios' ? 50 : 25,
+            scale: 1,
+          }}
+          from={{
+            opacity: 0,
+            translateY: -120,
+            scale: 0.88,
+          }}
+          transition={{ type: 'timing', duration: 150 }}
+          style={styles.globalToastContainer}
+        >
+          <BlurView intensity={Platform.OS === 'ios' ? 45 : 95} tint="light" style={StyleSheet.absoluteFill} />
+          <View style={styles.globalToastContent}>
+            <View style={styles.toastIconCircle}>
+              <MaterialCommunityIcons name="check-bold" size={16} color="#ffffff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toastTitle}>Succès</Text>
+              <Text style={styles.toastMessage}>{successToast.message}</Text>
+            </View>
+          </View>
+        </MotiView>
+      )}
       {/* GLOBAL CUSTOM PREMIUM ALERT MODAL */}
       {customAlertState.visible && (
         <MotiView
           pointerEvents="auto"
           animate={{ opacity: 1 }}
           from={{ opacity: 0 }}
-          transition={{ type: 'timing', duration: 150 }}
+          transition={{ type: 'timing', duration: 100 }}
           style={[StyleSheet.absoluteFill, { zIndex: 100000, elevation: 100000, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.5)' }]}
         >
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => {
@@ -566,7 +654,7 @@ const styles = StyleSheet.create({
     height: PHONE_H,
     borderRadius: 0,
     overflow: 'hidden',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 40 },
     shadowOpacity: 0.5,
@@ -575,15 +663,15 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
+    backgroundColor: '#ffffff',
+    paddingTop: 0, // dynamic safe area applied in App render
   },
   content: {
     flex: 1,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
   },

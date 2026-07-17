@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert, RefreshControl, FlatList } from 'react-native';
 import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download, Award, Edit3, Trash2, User, Ban } from 'lucide-react-native';
 import { db } from '../services/db';
 import { BlurView } from 'expo-blur';
@@ -518,7 +518,13 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       </View>
 
       {/* History List */}
-      <ScrollView
+      <FlatList
+        data={filteredOrders}
+        keyExtractor={(item) => item.id}
+        initialNumToRender={12}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -529,90 +535,88 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             tintColor={isDarkMode ? '#ffffff' : '#002cf7'}
           />
         }
-      >
-        {filteredOrders.length === 0 ? (
+        ListEmptyComponent={
           <Text style={styles.noResultsText}>Aucune archive correspondante</Text>
-        ) : (
-          filteredOrders.map((item) => {
-            const status = getStatusColor(item.statut);
-            const clientObj = customers.find(c => c.id === item.customer_id);
-            return (
-              <TouchableOpacity
-                key={item.id}
-                activeOpacity={0.7}
-                onPress={() => setSelectedOrder(item)}
-                style={styles.historyCard}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={{ flex: 1 }}>
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        if (clientObj && onSelectClient) onSelectClient(clientObj);
-                      }}
-                      activeOpacity={0.8}
-                      style={styles.clientPillBtn}
-                    >
-                      <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
-                      <Text style={styles.clientPillBtnText}>
-                        {getCustomerName(item.customer_id)}
-                      </Text>
-                    </TouchableOpacity>
-                    <Text style={[styles.ticketNo, { marginTop: 6 }]}>Ticket #{getDisplayTicketId(item)}</Text>
-                  </View>
-                  <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, borderWidth: 1 }]}>
-                    <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
-                  </View>
-                </View>
-
-                {clientObj && clientObj.active_subscription && (
-                  <View style={styles.cardSubscriptionGaugeContainer}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={styles.cardSubText}>Abonnement : {clientObj.active_subscription.name}</Text>
-                      <Text style={styles.cardSubTextBold}>
-                        {clientObj.active_subscription.remaining_clothes} / {clientObj.active_subscription.total_clothes} vêt.
-                      </Text>
-                    </View>
-                    {(() => {
-                      const remaining = clientObj.active_subscription.remaining_clothes;
-                      const total = clientObj.active_subscription.total_clothes;
-                      const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                      return (
-                        <View style={styles.cardProgressBarBg}>
-                          <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
-                        </View>
-                      );
-                    })()}
-                  </View>
-                )}
-
-                <View style={styles.cardDivider} />
-
-                <View style={styles.cardFooter}>
-                  <View style={styles.dateBlock}>
-                    <Calendar size={12} color="#71717a" style={{ marginRight: 4 }} />
-                    <Text style={styles.dateText}>{item.created_at.split('T')[0]}</Text>
-                  </View>
-                  <Text style={styles.totalAmount}>{formatPrice(item.prix_total || item.total)}</Text>
-                </View>
-
-                <View style={styles.cardDivider} />
-
-                <View style={styles.cardFooterArea}>
+        }
+        renderItem={({ item }) => {
+          const status = getStatusColor(item.statut);
+          const clientObj = customers.find(c => c.id === item.customer_id);
+          return (
+            <TouchableOpacity
+              key={item.id}
+              activeOpacity={0.7}
+              onPress={() => setSelectedOrder(item)}
+              style={styles.historyCard}
+            >
+              <View style={styles.cardHeader}>
+                <View style={{ flex: 1 }}>
                   <TouchableOpacity
-                    onPress={(e) => handleShowInvoice(item, e)}
-                    style={styles.factureBtn}
-                    activeOpacity={0.7}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      if (clientObj && onSelectClient) onSelectClient(clientObj);
+                    }}
+                    activeOpacity={0.8}
+                    style={styles.clientPillBtn}
                   >
-                    <Receipt size={13} color="#002cf7" style={{ marginRight: 4 }} />
-                    <Text style={styles.factureBtnText}>Facture</Text>
+                    <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                    <Text style={styles.clientPillBtnText}>
+                      {getCustomerName(item.customer_id)}
+                    </Text>
                   </TouchableOpacity>
+                  <Text style={[styles.ticketNo, { marginTop: 6 }]}>Ticket #{getDisplayTicketId(item)}</Text>
                 </View>
-              </TouchableOpacity>
-            );
-          })
-        )}
-      </ScrollView>
+                <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, borderWidth: 1 }]}>
+                  <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
+                </View>
+              </View>
+
+              {clientObj && clientObj.active_subscription && (
+                <View style={styles.cardSubscriptionGaugeContainer}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={styles.cardSubText}>Abonnement : {clientObj.active_subscription.name}</Text>
+                    <Text style={styles.cardSubTextBold}>
+                      {clientObj.active_subscription.remaining_clothes} / {clientObj.active_subscription.total_clothes} vêt.
+                    </Text>
+                  </View>
+                  {(() => {
+                    const remaining = clientObj.active_subscription.remaining_clothes;
+                    const total = clientObj.active_subscription.total_clothes;
+                    const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                    return (
+                      <View style={styles.cardProgressBarBg}>
+                        <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
+                      </View>
+                    );
+                  })()}
+                </View>
+              )}
+
+              <View style={styles.cardDivider} />
+
+              <View style={styles.cardFooter}>
+                <View style={styles.dateBlock}>
+                  <Calendar size={12} color="#71717a" style={{ marginRight: 4 }} />
+                  <Text style={styles.dateText}>{item.created_at.split('T')[0]}</Text>
+                </View>
+                <Text style={styles.totalAmount}>{formatPrice(item.prix_total || item.total)}</Text>
+              </View>
+
+              <View style={styles.cardDivider} />
+
+              <View style={styles.cardFooterArea}>
+                <TouchableOpacity
+                  onPress={(e) => handleShowInvoice(item, e)}
+                  style={styles.factureBtn}
+                  activeOpacity={0.7}
+                >
+                  <Receipt size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                  <Text style={styles.factureBtnText}>Facture</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+      />
 
       {/* Detailed Order Modal (BOTTOM SHEET) */}
       <Modal
@@ -768,8 +772,6 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                     >
                       <Trash2 size={14} color="#ef4444" style={{ marginRight: 6 }} />
                       <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Supprimer</Text>
-                    </TouchableOpacity>
-                  </View>
                 )}
               </ScrollView>
             </View>
@@ -778,7 +780,12 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       </Modal>
 
       {/* MODAL : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
-      {showInvoiceModal && invoiceOrder && (
+      <Modal
+        visible={!!(showInvoiceModal && invoiceOrder)}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+      >
         <View style={styles.absoluteModalContainer}>
           <View style={styles.popupModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
@@ -845,19 +852,23 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   {/* Billing Details */}
                   <View style={styles.tpeTotalRow}>
                     <Text style={styles.tpeTotalLabel}>TOTAL BRUT</Text>
-                    <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
+                    <Text style={styles.tpeTotalVal}>
+                      {formatPrice(invoiceOrder.prix_base_avant_remise || (invoiceOrder.prix_total || invoiceOrder.total || 0) + (invoiceOrder.remise_montant || 0))}
+                    </Text>
                   </View>
                   
-                  {invoiceOrder.remise_pourcentage > 0 && (
+                  {(invoiceOrder.remise_pourcentage > 0 || invoiceOrder.remise_montant > 0) && (
                     <View style={styles.tpeTotalRow}>
-                      <Text style={styles.tpeTotalLabel}>REMISE ({invoiceOrder.remise_pourcentage}%)</Text>
+                      <Text style={styles.tpeTotalLabel}>
+                        REMISE ({invoiceOrder.remise_pourcentage || Math.round(((invoiceOrder.remise_montant || 0) / ((invoiceOrder.prix_base_avant_remise || (invoiceOrder.prix_total || invoiceOrder.total || 0) + (invoiceOrder.remise_montant || 0)) || 1)) * 100)}%)
+                      </Text>
                       <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(invoiceOrder.remise_montant || 0)}</Text>
                     </View>
                   )}
 
                   <View style={styles.tpeTotalRow}>
                     <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
-                    <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.total || invoiceOrder.prix_total)}</Text>
+                    <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
                   </View>
 
                   <View style={styles.tpeTotalRow}>
@@ -877,16 +888,13 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   {/* Footer & Barcode placeholder */}
                   <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
                   
-                  <View style={styles.barcodeContainer}>
-                    <Text style={styles.barcodeText}>* {invoiceOrder.identifiant_unique_marquage || invoiceOrder.id} *</Text>
-                  </View>
-
-                  <Text style={styles.tpeTextMutedCentred}>Rejoignez KLIN UP pour un service premium</Text>
+                  <View style={{ height: 16 }} />
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+                {/* Print/Download controls */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
                   <TouchableOpacity
-                    onPress={() => handleDownloadInvoice(invoiceOrder)}
+                    onPress={() => handleSharePdf(invoiceOrder)}
                     style={styles.invoiceDownloadBtn}
                     activeOpacity={0.8}
                   >
@@ -914,7 +922,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}
       <Modal
@@ -932,7 +940,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             <MotiView
               from={{ opacity: 0, scale: 0.97, translateY: 10 }}
               animate={{ opacity: 1, scale: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 150 }}
+              transition={{ type: 'timing', duration: 100 }}
               style={[styles.popupModalView, { width: '92%', maxWidth: 350, padding: 20 }]}
             >
               <View style={styles.compactModalHeader}>
@@ -968,7 +976,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                       borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#334155' : '#e2e8f0'),
                       borderRadius: 12,
                       borderWidth: 1,
-                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                      backgroundColor: isDarkMode ? '#0f172a' : '#f1f5f9',
                       color: isDarkMode ? '#ffffff' : '#09090b',
                     }
                   ]}
@@ -1033,13 +1041,13 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
 const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
   },
   header: {
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 8,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
   },
   headerTitle: {
     fontSize: 28,
@@ -1173,7 +1181,7 @@ const baseStyles = StyleSheet.create({
   },
   modalView: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     paddingTop: 40,
   },
   modalHeaderClose: {

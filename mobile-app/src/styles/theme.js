@@ -1,7 +1,7 @@
 export const getThemeColors = (isDarkMode) => {
   return {
-    bg: isDarkMode ? '#0f172a' : '#f8fafc',
-    bgAlt: isDarkMode ? '#0f172a' : '#f4f5f7',
+    bg: isDarkMode ? '#0f172a' : '#ffffff',
+    bgAlt: isDarkMode ? '#0f172a' : '#ffffff',
     card: isDarkMode ? '#1e293b' : '#ffffff',
     border: isDarkMode ? '#334155' : '#e2e8f0',
     borderLight: isDarkMode ? '#334155' : 'rgba(0, 0, 0, 0.05)',

@@ -323,7 +323,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
             const clientOrders = getClientOrders(client.id);
             const hasActiveSub = client.active_subscription && client.active_subscription.remaining_clothes > 0;
             return (
-              <MotiView key={client.id} from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 300, delay: index * 40 }}>
+              <MotiView key={client.id} from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 120, delay: index * 15 }}>
                 <TouchableOpacity activeOpacity={0.7} onPress={() => handleSelectClientForFiche(client)} style={styles.clientCard}>
                   <View style={styles.cardHeader}>
                     <View style={styles.clientAvatar}>
@@ -378,7 +378,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
           <MotiView
             from={{ opacity: 0 }}
             animate={{ opacity: isFicheVisible ? 1 : 0 }}
-            transition={{ type: 'timing', duration: 220 }}
+            transition={{ type: 'timing', duration: 100 }}
             style={{ flex: 1 }}
           >
             <View style={styles.compactModalOverlay}>
@@ -549,8 +549,8 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
 }
 
 const baseStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8fafc" },
-  header: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8, backgroundColor: "#f8fafc" },
+  container: { flex: 1, backgroundColor: "#ffffff" },
+  header: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8, backgroundColor: "#ffffff" },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#ffffff", borderWidth: 1.5, borderColor: "#e2e8f0", justifyContent: "center", alignItems: "center" },
   headerTitle: { fontSize: 28, fontWeight: "700", color: "#09090b", letterSpacing: -0.5 },
