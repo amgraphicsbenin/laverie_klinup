@@ -68,7 +68,7 @@ export default function App() {
     ? ['accueil', 'profile'] 
     : ['accueil', 'gestion', 'historique', 'profile'];
 
-  const switchTab = (tabName, animated = true) => {
+  const switchTab = (tabName, animated = false) => {
     setActiveTab(tabName);
     const targetIndex = availableTabs.indexOf(tabName);
     if (targetIndex !== -1 && scrollViewRef.current && containerWidth > 0) {
@@ -92,9 +92,9 @@ export default function App() {
   useEffect(() => {
     const targetIndex = availableTabs.indexOf(activeTab);
     if (targetIndex !== -1 && scrollViewRef.current && containerWidth > 0) {
-      scrollViewRef.current.scrollTo({ x: targetIndex * containerWidth, animated: true });
+      scrollViewRef.current.scrollTo({ x: targetIndex * containerWidth, animated: false });
     }
-  }, [activeTab, containerWidth, currentUser?.role]);
+  }, [containerWidth, currentUser?.role]);
 
   useEffect(() => {
     registerAlertHandler(({ title, message, buttons }) => {
@@ -329,7 +329,7 @@ export default function App() {
               keyboardShouldPersistTaps="handled"
             >
               {availableTabs.map((tabKey) => (
-                <View key={tabKey} style={{ width: containerWidth, flex: 1 }}>
+                <View key={tabKey} style={{ width: containerWidth, flex: 1, overflow: 'hidden' }}>
                   {renderTabScreen(tabKey)}
                 </View>
               ))}
