@@ -63,6 +63,7 @@ export default function App() {
 
   const scrollViewRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(393);
+  const [tabLayouts, setTabLayouts] = useState({});
 
   const availableTabs = currentUser?.role === 'agent_lavage_repassage' 
     ? ['accueil', 'profile'] 
@@ -322,17 +323,43 @@ export default function App() {
           borderColor: isDarkMode ? '#334155' : 'rgba(226, 232, 240, 0.8)',
         }
       ]}>
+        {/* Sliding Active Pill Background Indicator */}
+        {tabLayouts[activeTab] && (
+          <MotiView
+            animate={{
+              translateX: tabLayouts[activeTab].x + (tabLayouts[activeTab].width - 64) / 2,
+              opacity: 1,
+            }}
+            transition={{
+              type: 'spring',
+              damping: 20,
+              stiffness: 170,
+              mass: 0.6,
+            }}
+            style={{
+              position: 'absolute',
+              top: 6,
+              width: 64,
+              height: 54,
+              borderRadius: 18,
+              backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff',
+              zIndex: 0,
+            }}
+          />
+        )}
+
         <TouchableOpacity 
           onPress={() => { switchTab('accueil'); setOrderFormVisible(false); setLocalModalOpen(false); }}
-          style={styles.tabItem}
+          onLayout={(e) => {
+            const { x, width } = e.nativeEvent.layout;
+            setTabLayouts(prev => ({ ...prev, accueil: { x, width } }));
+          }}
+          style={[styles.tabItem, { zIndex: 1 }]}
           activeOpacity={0.8}
         >
           <MotiView
             animate={{ 
-              backgroundColor: activeTab === 'accueil' 
-                ? (isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff') 
-                : 'transparent',
-              scale: activeTab === 'accueil' ? 1.02 : 1
+              scale: activeTab === 'accueil' ? 1.04 : 1
             }}
             transition={{ type: 'timing', duration: 150 }}
             style={styles.tabItemInner}
@@ -355,15 +382,16 @@ export default function App() {
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
             onPress={() => { switchTab('gestion'); setOrderFormVisible(false); setLocalModalOpen(false); }}
-            style={styles.tabItem}
+            onLayout={(e) => {
+              const { x, width } = e.nativeEvent.layout;
+              setTabLayouts(prev => ({ ...prev, gestion: { x, width } }));
+            }}
+            style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
             <MotiView
               animate={{ 
-                backgroundColor: activeTab === 'gestion' 
-                  ? (isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff') 
-                  : 'transparent',
-                scale: activeTab === 'gestion' ? 1.02 : 1
+                scale: activeTab === 'gestion' ? 1.04 : 1
               }}
               transition={{ type: 'timing', duration: 150 }}
               style={styles.tabItemInner}
@@ -387,7 +415,7 @@ export default function App() {
         {/* Center Plus Button (always visible for non-atelier staff, turns red & 'x' to close other active modals) */}
         {currentUser.role !== 'agent_lavage_repassage' && (
           <View 
-            style={styles.centerTabItem}
+            style={[styles.centerTabItem, { zIndex: 1 }]}
             pointerEvents="auto"
           >
             <TouchableOpacity 
@@ -415,15 +443,16 @@ export default function App() {
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
             onPress={() => { switchTab('historique'); setOrderFormVisible(false); setLocalModalOpen(false); }}
-            style={styles.tabItem}
+            onLayout={(e) => {
+              const { x, width } = e.nativeEvent.layout;
+              setTabLayouts(prev => ({ ...prev, historique: { x, width } }));
+            }}
+            style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
             <MotiView
               animate={{ 
-                backgroundColor: activeTab === 'historique' 
-                  ? (isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff') 
-                  : 'transparent',
-                scale: activeTab === 'historique' ? 1.02 : 1
+                scale: activeTab === 'historique' ? 1.04 : 1
               }}
               transition={{ type: 'timing', duration: 150 }}
               style={styles.tabItemInner}
@@ -446,15 +475,16 @@ export default function App() {
 
         <TouchableOpacity 
           onPress={() => { switchTab('profile'); setOrderFormVisible(false); setLocalModalOpen(false); }}
-          style={styles.tabItem}
+          onLayout={(e) => {
+            const { x, width } = e.nativeEvent.layout;
+            setTabLayouts(prev => ({ ...prev, profile: { x, width } }));
+          }}
+          style={[styles.tabItem, { zIndex: 1 }]}
           activeOpacity={0.8}
         >
           <MotiView
             animate={{ 
-              backgroundColor: activeTab === 'profile' 
-                ? (isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff') 
-                : 'transparent',
-              scale: activeTab === 'profile' ? 1.02 : 1
+              scale: activeTab === 'profile' ? 1.04 : 1
             }}
             transition={{ type: 'timing', duration: 150 }}
             style={styles.tabItemInner}
