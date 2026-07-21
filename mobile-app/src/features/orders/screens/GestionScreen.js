@@ -2287,6 +2287,13 @@ export default function GestionScreen({
                     >
                       <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
                     </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
+      </MotiView>
                     {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}
       <MotiView
         pointerEvents={cancelModalVisible ? 'auto' : 'none'}
