@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ActivityIndicator, BackHandler } from 'react-native';
-import { Mail, ChevronLeft, Lock } from 'lucide-react-native';
-import { db } from '../services/db';
+import { Mail, ChevronLeft } from 'lucide-react-native';
+import { db } from '../../../services/db';
 
 export default function LoginScreen() {
   const isDarkMode = db.isDarkMode ? db.isDarkMode() : false;
@@ -48,7 +48,7 @@ export default function LoginScreen() {
 
   const handlePinInput = (val) => {
     // Only numeric digits
-    const cleaned = val.replace(/[^0-9]/g, '');
+    const cleaned = val.replace(/\D/g, '');
     setPin(cleaned);
 
     if (cleaned.length === 6 && selectedUser) {
@@ -88,7 +88,7 @@ export default function LoginScreen() {
             <View style={styles.logoContainer}>
               <View style={styles.logoCircle}>
                 <Image 
-                  source={require('../../assets/icon.png')} 
+                  source={require('../../../../assets/icon.png')} 
                   style={styles.logo}
                   resizeMode="contain"
                 />

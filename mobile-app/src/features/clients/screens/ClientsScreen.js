@@ -3,13 +3,13 @@ import {
   StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity,
   Alert, BackHandler, Platform, KeyboardAvoidingView, Modal
 } from "react-native";
-import { Search, Plus, User, MapPin, Phone, ChevronRight, X, Check, Edit3, Trash2, Award, CreditCard, Calendar } from "lucide-react-native";
-import { db } from "../services/db";
+import { Search, Plus, MapPin, Phone, ChevronRight, X, Edit3, Trash2, Award, CreditCard, Calendar } from "lucide-react-native";
+import { db } from "../../../services/db";
 import { MotiView } from "moti";
 import { BlurView } from "expo-blur";
-import { useScrollPaddingBottom } from "../hooks/useTabBarHeight";
-import { CustomSelect } from "../components/CustomSelect";
-import { useDbState } from "../hooks/useDbState";
+import { useScrollPaddingBottom } from "../../../hooks/useTabBarHeight";
+import { CustomSelect } from "../../../components/CustomSelect";
+import { useDbState } from "../../../hooks/useDbState";
 
 export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess }) {
   const { currentUser, isDarkMode } = useDbState();
@@ -141,34 +141,40 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
     try {
       const isEditing = !!editingCustomer;
       if (isEditing) {
-        await db.updateCustomer(editingCustomer.id, { nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences });
+        db.updateCustomer(editingCustomer.id, { nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences });
         handleCloseEditModal();
       } else {
-        await db.addCustomer({ nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences });
+        db.addCustomer({ nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences });
         handleCloseCustomerModal();
       }
       refreshCustomers();
       if (onShowSuccess) onShowSuccess(isEditing ? "Profil client modifie !" : "Nouveau client cree !");
-    } catch (e) { Alert.alert("Erreur", "Impossible d enregistrer le profil client."); }
+    } catch (e) {
+      console.error("Error saving customer:", e);
+      Alert.alert("Erreur", "Impossible d enregistrer le profil client.");
+    }
   };
 
   const handleDeleteCustomer = (id) => {
     Alert.alert("Confirmation", "Voulez-vous vraiment supprimer ce client ?", [
       { text: "Annuler", style: "cancel" },
-      { text: "Supprimer", style: "destructive", onPress: async () => {
+      { text: "Supprimer", style: "destructive", onPress: () => {
         try {
-          await db.deleteCustomer(id);
+          db.deleteCustomer(id);
           setSelectedClient(null);
           refreshCustomers();
           if (onShowSuccess) onShowSuccess("Profil client supprimé avec succès.");
         }
-        catch (e) { Alert.alert("Erreur", "Impossible de supprimer ce client."); }
+        catch (e) {
+          console.error("Error deleting customer:", e);
+          Alert.alert("Erreur", "Impossible de supprimer ce client.");
+        }
       }}
     ]);
   };
 
   const getClientOrders = (clientId) => db.getOrders().filter(o => o.customer_id === clientId);
-  const formatDate = (dateStr) => { if (!dateStr) return "N/A"; try { return new Date(dateStr).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }); } catch { return dateStr; } };
+
   const formatPrice = (price) => (price || 0).toLocaleString("fr-FR") + " FCFA";
 
   const renderForm = (isEditing, onClose, visible) => (
@@ -452,44 +458,39 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                         </View>
 
                         {/* Abonnement Card */}
-                        <Text style={styles.sectionTitle}>Forfait d'Abonnement</Text>
-                        <View style={styles.detailCard}>
-                          <View style={styles.subscriptionHeader}>
-                            <Text style={styles.subscriptionTitle}>Abonnement</Text>
-                            {activeClient.active_subscription && (
-                              <View style={styles.subActiveBadge}><Text style={styles.subActiveBadgeText}>ACTIF</Text></View>
-                            )}
-                          </View>
-                          {activeClient.active_subscription ? (
-                            <View style={{ gap: 8 }}>
-                              <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
-                              <Text style={styles.subPlanBalance}>{activeClient.active_subscription.remaining_clothes} vet. restants / {activeClient.active_subscription.total_clothes} vet.</Text>
-                              {(() => {
-                                const rem = activeClient.active_subscription.remaining_clothes;
-                                const tot = activeClient.active_subscription.total_clothes;
-                                const pct = Math.max(0, Math.min(100, Math.round(((tot - rem) / tot) * 100)));
-                                return (
-                                  <View style={[styles.progressBarBg, { marginTop: 4 }]}>
-                                    <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
-                                  </View>
-                                );
-                              })()}
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                                <Text style={{ fontSize: 10, color: '#64748b' }}>
-                                  Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
-                                </Text>
-                                <Text style={{ fontSize: 10, color: '#64748b' }}>
-                                  Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
-                                </Text>
+                        {(() => {
+                          const canSubscribe = currentUser?.role !== 'livreur';
+                          let subscriptionForm = null;
+
+                          if (activeClient.active_subscription) {
+                            const rem = activeClient.active_subscription.remaining_clothes;
+                            const tot = activeClient.active_subscription.total_clothes;
+                            const pct = Math.max(0, Math.min(100, Math.round(((tot - rem) / tot) * 100)));
+                            
+                            subscriptionForm = (
+                              <View style={{ gap: 8 }}>
+                                <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
+                                <Text style={styles.subPlanBalance}>{activeClient.active_subscription.remaining_clothes} vet. restants / {activeClient.active_subscription.total_clothes} vet.</Text>
+                                <View style={[styles.progressBarBg, { marginTop: 4 }]}>
+                                  <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+                                </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                                  <Text style={{ fontSize: 10, color: '#64748b' }}>
+                                    Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
+                                  </Text>
+                                  <Text style={{ fontSize: 10, color: '#64748b' }}>
+                                    Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
+                                  </Text>
+                                </View>
+                                {canSubscribe && (
+                                  <TouchableOpacity onPress={() => handleUnsubscribeCrm(activeClient.id)} style={styles.unsubscribeBtn} activeOpacity={0.8}>
+                                    <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
+                                  </TouchableOpacity>
+                                )}
                               </View>
-                              {currentUser && currentUser.role !== 'livreur' && (
-                                <TouchableOpacity onPress={() => handleUnsubscribeCrm(activeClient.id)} style={styles.unsubscribeBtn} activeOpacity={0.8}>
-                                  <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
-                                </TouchableOpacity>
-                              )}
-                            </View>
-                          ) : (
-                            currentUser && currentUser.role !== 'livreur' ? (
+                            );
+                          } else if (canSubscribe) {
+                            subscriptionForm = (
                               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
                                 <View style={{ flex: 1 }}>
                                   <CustomSelect
@@ -513,13 +514,30 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                                   <Text style={styles.subscribeBtnText}>Souscrire</Text>
                                 </TouchableOpacity>
                               </View>
-                            ) : (
+                            );
+                          } else {
+                            subscriptionForm = (
                               <Text style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', marginTop: 4 }}>
                                 Souscription réservée aux gérants et agents d'accueil
                               </Text>
-                            )
-                          )}
-                        </View>
+                            );
+                          }
+
+                          return (
+                            <>
+                              <Text style={styles.sectionTitle}>Forfait d'Abonnement</Text>
+                              <View style={styles.detailCard}>
+                                <View style={styles.subscriptionHeader}>
+                                  <Text style={styles.subscriptionTitle}>Abonnement</Text>
+                                  {activeClient.active_subscription && (
+                                    <View style={styles.subActiveBadge}><Text style={styles.subActiveBadgeText}>ACTIF</Text></View>
+                                  )}
+                                </View>
+                                {subscriptionForm}
+                              </View>
+                            </>
+                          );
+                        })()}
                       </>
                     );
                   })()}

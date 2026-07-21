@@ -1,20 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, BackHandler, StatusBar as RNStatusBar, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { initializeDatabase, db } from './src/services/db';
+import { initializeDatabase } from './src/services/db';
 import { useDbState } from './src/hooks/useDbState';
-import LoginScreen from './src/screens/LoginScreen';
-import DashboardScreen from './src/screens/DashboardScreen';
-import GestionScreen from './src/screens/GestionScreen';
-import HistoryScreen from './src/screens/HistoryScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
+import LoginScreen from './src/features/auth/screens/LoginScreen';
+import DashboardScreen from './src/features/dashboard/screens/DashboardScreen';
+import GestionScreen from './src/features/orders/screens/GestionScreen';
+import HistoryScreen from './src/features/orders/screens/HistoryScreen';
+import ProfileScreen from './src/features/profile/screens/ProfileScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
 import { OrderFormModal } from './src/components/OrderFormModal';
-import './src/services/alert';
 import { registerAlertHandler } from './src/services/alert';
 
 class ErrorBoundary extends React.Component {
@@ -62,9 +61,40 @@ export default function App() {
   const [successToast, setSuccessToast] = useState({ visible: false, message: '' });
   const [customAlertState, setCustomAlertState] = useState({ visible: false, title: '', message: '', buttons: [] });
 
-  const switchTab = (tabName) => {
+  const scrollViewRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(393);
+
+  const availableTabs = currentUser?.role === 'agent_lavage_repassage' 
+    ? ['accueil', 'profile'] 
+    : ['accueil', 'gestion', 'historique', 'profile'];
+
+  const switchTab = (tabName, animated = true) => {
     setActiveTab(tabName);
+    const targetIndex = availableTabs.indexOf(tabName);
+    if (targetIndex !== -1 && scrollViewRef.current && containerWidth > 0) {
+      scrollViewRef.current.scrollTo({ x: targetIndex * containerWidth, animated });
+    }
   };
+
+  const handleMomentumScrollEnd = (e) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    if (containerWidth > 0) {
+      const pageIndex = Math.round(offsetX / containerWidth);
+      if (pageIndex >= 0 && pageIndex < availableTabs.length) {
+        const targetTab = availableTabs[pageIndex];
+        if (targetTab !== activeTab) {
+          setActiveTab(targetTab);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    const targetIndex = availableTabs.indexOf(activeTab);
+    if (targetIndex !== -1 && scrollViewRef.current && containerWidth > 0) {
+      scrollViewRef.current.scrollTo({ x: targetIndex * containerWidth, animated: true });
+    }
+  }, [activeTab, containerWidth, currentUser?.role]);
 
   useEffect(() => {
     registerAlertHandler(({ title, message, buttons }) => {
@@ -106,9 +136,6 @@ export default function App() {
     setup();
   }, []);
 
-
-
-
   const getAlertIcon = (title, message) => {
     const t = (title || '').toLowerCase();
     const m = (message || '').toLowerCase();
@@ -134,8 +161,8 @@ export default function App() {
 
   // Adapt tabs automatically for specific roles
   useEffect(() => {
-    if (currentUser && currentUser.role === 'agent_lavage_repassage') {
-      setActiveTab('accueil');
+    if (currentUser?.role === 'agent_lavage_repassage') {
+      switchTab('accueil');
     }
   }, [currentUser]);
 
@@ -158,7 +185,7 @@ export default function App() {
       
       // 3. If we are not on the main tab, go back to the main tab
       if (activeTab !== 'accueil') {
-        setActiveTab('accueil');
+        switchTab('accueil');
         return true;
       }
       
@@ -200,19 +227,8 @@ export default function App() {
     );
   }
 
-  const renderActiveScreen = () => {
-    switch (activeTab) {
-      case 'accueil':
-        return (
-          <DashboardScreen 
-            onNavigate={(tab) => { setActiveTab(tab); setOrderFormVisible(false); }}
-            setSelectedOrder={setSelectedOrder}
-            setGestionFilter={setGestionFilter}
-            onModalStateChange={setLocalModalOpen}
-            closeAllModalsTrigger={closeModalsTrigger}
-            onShowSuccess={triggerSuccess}
-          />
-        );
+  const renderTabScreen = (tabKey) => {
+    switch (tabKey) {
       case 'gestion':
         return (
           <GestionScreen 
@@ -238,7 +254,7 @@ export default function App() {
             onModalStateChange={setLocalModalOpen} 
             closeAllModalsTrigger={closeModalsTrigger}
             onSelectClient={(client) => {
-              setActiveTab('gestion');
+              switchTab('gestion');
               setInitSelectedClient(client);
             }}
             onShowSuccess={triggerSuccess}
@@ -246,10 +262,11 @@ export default function App() {
         );
       case 'profile':
         return <ProfileScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} onShowSuccess={triggerSuccess} />;
+      case 'accueil':
       default:
         return (
           <DashboardScreen 
-            onNavigate={(tab) => { setActiveTab(tab); setOrderFormVisible(false); }} 
+            onNavigate={(tab) => { switchTab(tab); setOrderFormVisible(false); }}
             setSelectedOrder={setSelectedOrder}
             setGestionFilter={setGestionFilter}
             onModalStateChange={setLocalModalOpen}
@@ -267,8 +284,33 @@ export default function App() {
         <LoginScreen />
       ) : (
         <View style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', paddingTop: insets.top }]}>
-          <View style={styles.content}>
-            {renderActiveScreen()}
+          <View 
+            style={styles.content}
+            onLayout={(e) => {
+              const w = e.nativeEvent.layout.width;
+              if (w > 0 && Math.abs(w - containerWidth) > 1) {
+                setContainerWidth(w);
+              }
+            }}
+          >
+            <ScrollView
+              ref={scrollViewRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              bounces={false}
+              scrollEventThrottle={16}
+              onMomentumScrollEnd={handleMomentumScrollEnd}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ width: containerWidth * availableTabs.length }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {availableTabs.map((tabKey) => (
+                <View key={tabKey} style={{ width: containerWidth, flex: 1 }}>
+                  {renderTabScreen(tabKey)}
+                </View>
+              ))}
+            </ScrollView>
           </View>
 
       {/* BOTTOM TAB BAR */}
@@ -356,7 +398,7 @@ export default function App() {
               transition={{ type: 'timing', duration: 120 }}
             >
               <MaterialCommunityIcons
-                name={activeTab === 'historique' ? 'history' : 'history'}
+                name="history"
                 size={22}
                 color={activeTab === 'historique' ? '#002cf7' : '#a1a1aa'}
               />
@@ -519,7 +561,7 @@ export default function App() {
                 
                 return (
                   <TouchableOpacity
-                    key={index}
+                    key={btn.text}
                     activeOpacity={0.8}
                     onPress={() => handleButtonPress(btn)}
                     style={{

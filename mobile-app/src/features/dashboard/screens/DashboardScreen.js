@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, FlatList, Platform, Modal, BackHandler, RefreshControl } from 'react-native';
-import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, Plus, ArrowUpRight, X, Percent, ShoppingBag, Clock } from 'lucide-react-native';
-import { db } from '../services/db';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl } from 'react-native';
+import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock } from 'lucide-react-native';
+import { db } from '../../../services/db';
 import { MotiView } from 'moti';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import Svg, { Rect } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
-import { useScrollPaddingBottom, useTabBarHeight } from '../hooks/useTabBarHeight';
-import { useDbState } from '../hooks/useDbState';
+import { useScrollPaddingBottom, useTabBarHeight } from '../../../hooks/useTabBarHeight';
+import { useDbState } from '../../../hooks/useDbState';
 
 export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger }) {
-  const { orders, customers, currentUser, isRemote, isDarkMode } = useDbState();
+  const { orders, customers, currentUser, isDarkMode } = useDbState();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
@@ -25,7 +25,6 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 
   const scrollPaddingBottom = useScrollPaddingBottom();
   const tabBarHeight = useTabBarHeight();
-  const staff = db.getStaff();
   const styles = getStyles(isDarkMode);
 
   // State for active KPI details modal
@@ -80,7 +79,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   
   // Calculate revenue of the day
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayOrders = orders.filter(o => o.created_at && o.created_at.startsWith(todayStr));
+  const todayOrders = orders.filter(o => o.created_at?.startsWith(todayStr));
   const todayRevenue = todayOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
 
   // Cash vs Mobile Money for today's orders
@@ -90,7 +89,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   // Advanced KPIs
   // Monthly Revenue (current month)
   const currentMonthStr = new Date().toISOString().substring(0, 7);
-  const monthlyOrders = orders.filter(o => o.created_at && o.created_at.startsWith(currentMonthStr));
+  const monthlyOrders = orders.filter(o => o.created_at?.startsWith(currentMonthStr));
   const monthlyRevenue = monthlyOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
 
   // Average Basket
@@ -120,7 +119,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
       const dateStr = d.toISOString().split('T')[0];
       const dayName = days[d.getDay()];
       
-      const dayOrders = orders.filter(o => o.created_at && o.created_at.startsWith(dateStr));
+      const dayOrders = orders.filter(o => o.created_at?.startsWith(dateStr));
       const revenue = dayOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
       revenueData.push({ day: dayName, revenue, isToday: i === 0 });
     }
@@ -217,7 +216,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listItems = [...monthlyOrders].sort((a, b) => (b.prix_total || b.total || 0) - (a.prix_total || a.total || 0)).slice(0, 5);
         break;
         
-      case 'panier_moyen':
+      case 'panier_moyen': {
         heroValue = formatPrice(averageBasket);
         heroLabel = "Valeur moyenne d'une commande";
         const highValueOrders = orders.filter(o => (o.prix_total || o.total || 0) > averageBasket * 1.5).length;
@@ -231,8 +230,9 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listTitle = "Commandes Proches de la Moyenne";
         listItems = [...orders].sort((a, b) => Math.abs((a.prix_total || a.total || 0) - averageBasket) - Math.abs((b.prix_total || b.total || 0) - averageBasket)).slice(0, 5);
         break;
+      }
         
-      case 'recouvrement':
+      case 'recouvrement': {
         heroValue = `${recoveryRate}%`;
         heroLabel = "Taux de recouvrement du chiffre d'affaires";
         const totalReste = orders.reduce((sum, o) => sum + (o.reste || 0), 0);
@@ -245,6 +245,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listTitle = "Commandes avec Reste à Payer";
         listItems = orders.filter(o => (o.reste || 0) > 0).slice(0, 8);
         break;
+      }
         
       case 'part_express':
         heroValue = `${expressRate}%`;
@@ -272,7 +273,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listItems = activeOrders.slice(0, 8);
         break;
         
-      case 'pretes':
+      case 'pretes': {
         heroValue = String(readyOrders.length);
         heroLabel = "Commandes prêtes à être récupérées";
         const readyValue = readyOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
@@ -285,6 +286,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listTitle = "Commandes Prêtes en Attente";
         listItems = readyOrders.slice(0, 8);
         break;
+      }
         
       case 'retards':
         heroValue = String(lateOrders.length);
@@ -296,7 +298,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           { label: "Taux de retard", val: activeOrders.length > 0 ? `${Math.round((lateOrders.length / activeOrders.length)*100)}%` : '0%' }
         ];
         listTitle = "Commandes en Retard / Urgences";
-        listItems = [...lateOrders, ...activeOrders.filter(o => o.niveau_urgence === 'Express' && !lateOrders.find(l => l.id === o.id))].slice(0, 8);
+        listItems = [...lateOrders, ...activeOrders.filter(o => o.niveau_urgence === 'Express' && !lateOrders.some(l => l.id === o.id))].slice(0, 8);
         break;
         
       case 'ca_jour':
@@ -387,8 +389,8 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             {/* Sub-statistics Grid */}
             <Text style={styles.premiumModalSectionTitle}>Mesures Clés</Text>
             <View style={styles.kpiSubGrid}>
-              {subStats.map((stat, idx) => (
-                <View key={idx} style={styles.premiumKpiSubBox}>
+              {subStats.map((stat) => (
+                <View key={stat.label} style={styles.premiumKpiSubBox}>
                   <Text style={styles.kpiSubBoxLabel}>{stat.label}</Text>
                   <Text style={[styles.premiumKpiSubBoxVal, { color: theme.primary }]}>{stat.val}</Text>
                 </View>
@@ -470,7 +472,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 120 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#002cf7' }]}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? '#1e293b' : '#475569' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
@@ -490,7 +492,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 120, delay: 20 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(168, 85, 247, 0.25)' : '#a855f7' }]}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? '#1e293b' : '#475569' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
@@ -510,7 +512,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 120, delay: 40 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.25)' : '#10b981' }]}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? '#1e293b' : '#475569' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
@@ -530,7 +532,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 120, delay: 60 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.25)' : '#ef4444' }]}
+                style={[styles.kpiCard, { backgroundColor: isDarkMode ? '#1e293b' : '#475569' }]}
               >
                 <View style={styles.kpiHeader}>
                   <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
@@ -569,12 +571,12 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 
               {/* Premium Batonnet (Bar Chart) of Last 7 Days */}
               <View style={styles.barChartContainer}>
-                {last7DaysData.map((d, index) => {
+                {last7DaysData.map((d) => {
                   const barHeight = maxRevenue > 0 ? (d.revenue / maxRevenue) * 45 : 3;
                   const barWidth = 12;
                   
                   return (
-                    <View key={index} style={styles.barColumn}>
+                    <View key={d.day} style={styles.barColumn}>
                       <View style={styles.barWrapper}>
                         <Svg height="55" width="20" style={{ alignSelf: 'center' }}>
                           {/* Background track bar */}
@@ -1238,13 +1240,13 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 22,
     padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#ffffff',
-    shadowColor: '#002cf7',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.03,
-    shadowRadius: 20,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.09,
+    shadowRadius: 12,
+    elevation: 4,
   },
   kpiHeader: {
     flexDirection: 'row',
@@ -1468,7 +1470,7 @@ const getStyles = (isDarkMode) => {
     subHeadline: { color: '#94a3b8' },
     boldText: { color: '#ffffff' },
     circleButtonBlack: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
-    kpiCard: { borderColor: '#334155' },
+    kpiCard: { borderColor: '#334155', shadowColor: '#000000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 5 },
     kpiLabel: { color: '#cbd5e1' },
     kpiValue: { color: '#ffffff' },
     kpiSub: { color: '#94a3b8' },

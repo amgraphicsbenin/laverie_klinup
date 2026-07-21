@@ -36,11 +36,20 @@ import {
   Trash2,
   UserPlus,
   ShieldCheck,
-  Download
+  Download,
+  GripVertical
 } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 
+import DashboardTab from '../features/dashboard/components/DashboardTab';
+import OrdersTab from '../features/orders/components/OrdersTab';
+import CustomersTab from '../features/customers/components/CustomersTab';
+import CatalogTab from '../features/catalog/components/CatalogTab';
+import LogsTab from '../features/logs/components/LogsTab';
+import SettingsTab from '../features/settings/components/SettingsTab';
+
 export default function AdminView({ activeTab, searchQuery }) {
+  const currentUser = db.getCurrentUser();
   const [catalog, setCatalog] = useState([]);
   const [orders, setOrders] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -74,6 +83,14 @@ export default function AdminView({ activeTab, searchQuery }) {
   const [delivOrder, setDelivOrder] = useState(null);
   const [delivPaymentMethod, setDelivPaymentMethod] = useState('especes');
   const [delivAmountPaid, setDelivAmountPaid] = useState('');
+  const [momoRefNumber, setMomoRefNumber] = useState('');
+  const [momoRefError, setMomoRefError] = useState('');
+
+  // Flow d'Annulation de Commande
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReasonError, setCancelReasonError] = useState('');
 
   // Modale de création de commande
   const [showOrderRegistrationModal, setShowOrderRegistrationModal] = useState(false);
@@ -190,6 +207,81 @@ export default function AdminView({ activeTab, searchQuery }) {
 
   // Category sub-tab for catalog
   const [catalogCategory, setCatalogCategory] = useState('individuel'); // 'individuel' or 'abonnement'
+  const [selectedCatalogIds, setSelectedCatalogIds] = useState([]);
+  const [catalogSearchText, setCatalogSearchText] = useState('');
+  const [catalogServiceFilter, setCatalogServiceFilter] = useState('all');
+  const [catalogPriceFilter, setCatalogPriceFilter] = useState('all');
+  const [catalogSortOrder, setCatalogSortOrder] = useState('name_asc');
+  const [catalogCurrentPage, setCatalogCurrentPage] = useState(1);
+
+  // Advanced Catalog Edit Modal states
+  const [showEditCatalogModal, setShowEditCatalogModal] = useState(false);
+  const [editArtName, setEditArtName] = useState('');
+  const [editArtPrice, setEditArtPrice] = useState('');
+  const [editArtDescription, setEditArtDescription] = useState('');
+  const [editArtCategory, setEditArtCategory] = useState('individuel');
+  
+  // Service-specific edit prices (Traitement / Repassage)
+  const [editArtTraitementActive, setEditArtTraitementActive] = useState(false);
+  const [editArtTraitementPrice, setEditArtTraitementPrice] = useState('');
+  const [editArtTraitementUrgentPrice, setEditArtTraitementUrgentPrice] = useState('');
+  const [editArtRepassageActive, setEditArtRepassageActive] = useState(false);
+  const [editArtRepassagePrice, setEditArtRepassagePrice] = useState('');
+  const [editArtRepassageUrgentPrice, setEditArtRepassageUrgentPrice] = useState('');
+
+  // Service-specific add prices (Traitement / Repassage)
+  const [newArtTraitementActive, setNewArtTraitementActive] = useState(true);
+  const [newArtTraitementPrice, setNewArtTraitementPrice] = useState('');
+  const [newArtTraitementUrgentPrice, setNewArtTraitementUrgentPrice] = useState('');
+  const [newArtRepassageActive, setNewArtRepassageActive] = useState(false);
+  const [newArtRepassagePrice, setNewArtRepassagePrice] = useState('');
+  const [newArtRepassageUrgentPrice, setNewArtRepassageUrgentPrice] = useState('');
+
+  // Validation errors
+  const [newArtNameError, setNewArtNameError] = useState('');
+  const [editArtNameError, setEditArtNameError] = useState('');
+
+  // Subscription config states (Add Modal)
+  const [newArtNombreVetements, setNewArtNombreVetements] = useState('');
+  const [newArtRamassage, setNewArtRamassage] = useState(false);
+  const [newArtNombreRamassages, setNewArtNombreRamassages] = useState('');
+  const [newArtRamassageGratuit, setNewArtRamassageGratuit] = useState(false);
+  const [newArtLivraisonGratuite, setNewArtLivraisonGratuite] = useState(false);
+
+  // Subscription config states (Edit Modal)
+  const [editArtNombreVetements, setEditArtNombreVetements] = useState('');
+  const [editArtRamassage, setEditArtRamassage] = useState(false);
+  const [editArtNombreRamassages, setEditArtNombreRamassages] = useState('');
+  const [editArtRamassageGratuit, setEditArtRamassageGratuit] = useState(false);
+  const [editArtLivraisonGratuite, setEditArtLivraisonGratuite] = useState(false);
+
+  // Subscription advantages list states (for vertical draggable list)
+  const [newArtAdvantages, setNewArtAdvantages] = useState(['']);
+  const [editArtAdvantages, setEditArtAdvantages] = useState(['']);
+  const [dragAllowedIndex, setDragAllowedIndex] = useState(null);
+
+  useEffect(() => {
+    setSelectedCatalogIds([]);
+    setCatalogSearchText('');
+    setCatalogServiceFilter('all');
+    setCatalogPriceFilter('all');
+    setCatalogSortOrder('name_asc');
+    setCatalogCurrentPage(1);
+    setNewArtNameError('');
+    setEditArtNameError('');
+    // reset add states
+    setNewArtPrice('');
+    setNewArtTraitementActive(true);
+    setNewArtTraitementPrice('');
+    setNewArtTraitementUrgentPrice('');
+    setNewArtRepassageActive(false);
+    setNewArtRepassagePrice('');
+    setNewArtRepassageUrgentPrice('');
+  }, [catalogCategory]);
+
+  useEffect(() => {
+    setCatalogCurrentPage(1);
+  }, [catalogSearchText, catalogServiceFilter, catalogPriceFilter, catalogSortOrder]);
 
   const [timerSeconds, setTimerSeconds] = useState(5048); // 01:24:08 by default
   const [isTimerRunning, setIsTimerRunning] = useState(true);
@@ -393,14 +485,15 @@ export default function AdminView({ activeTab, searchQuery }) {
   const pendingOrdersCount = orders.filter(o => o.statut === 'en_attente').length;
 
   const statusDisplayLabels = {
-    en_attente: 'En attente de traitement',
-    en_cours_lavage: 'En attente de repassage',
-    en_cours_repassage: 'Repassé',
+    en_attente: 'En attente',
+    traitement: 'Traitement',
+    en_cours_lavage: 'Lavage',
+    en_cours_repassage: 'Repassage',
     pret: 'Prêt',
-    a_recuperer: 'En attente de Récupération',
-    a_livrer: 'En attente de Livraison',
-    en_cours_livraison: 'En cours de livraison',
-    restitue: 'Livré / Récupéré',
+    a_recuperer: 'À récupérer',
+    a_livrer: 'À livrer',
+    en_cours_livraison: 'En livraison',
+    restitue: 'Récupéré / Livré',
     annule: 'Annulé'
   };
 
@@ -935,21 +1028,98 @@ export default function AdminView({ activeTab, searchQuery }) {
   }
 
   // --- FILTRES CATALOGUE ---
-  const filteredCatalog = catalog.filter(item => {
-    // Filter by active category tab
-    if (item.categorie !== catalogCategory) return false;
+  const getGroupedCatalog = () => {
+    const rawGroupedCatalog = [];
+    const groups = {};
 
-    // Filter by topbar search query
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        item.article.toLowerCase().includes(q) ||
-        (item.description && item.description.toLowerCase().includes(q)) ||
-        serviceLabels[item.service].toLowerCase().includes(q)
-      );
+    catalog.forEach(item => {
+      if (item.categorie === 'individuel') {
+        const articleKey = item.article.trim().toLowerCase();
+        if (!groups[articleKey]) {
+          groups[articleKey] = {
+            id: item.id,
+            article: item.article,
+            categorie: 'individuel',
+            traitement: null,
+            repassage: null,
+            allIds: []
+          };
+        }
+        groups[articleKey].allIds.push(item.id);
+        if (item.service === 'lavage_simple') {
+          groups[articleKey].traitement = {
+            id: item.id,
+            prix: item.prix,
+            prix_urgent: item.prix_urgent || Math.round(item.prix * 1.5)
+          };
+        } else if (item.service === 'repassage') {
+          groups[articleKey].repassage = {
+            id: item.id,
+            prix: item.prix,
+            prix_urgent: item.prix_urgent || Math.round(item.prix * 1.5)
+          };
+        }
+      } else if (item.categorie === 'abonnement' && catalogCategory === 'abonnement') {
+        rawGroupedCatalog.push(item);
+      }
+    });
+
+    if (catalogCategory === 'individuel') {
+      Object.values(groups).forEach(g => {
+        rawGroupedCatalog.push(g);
+      });
     }
-    return true;
-  });
+
+    return rawGroupedCatalog.filter(item => {
+      // Search query
+      const activeSearch = catalogSearchText || searchQuery;
+      if (activeSearch) {
+        const q = activeSearch.toLowerCase();
+        const matchName = item.article.toLowerCase().includes(q);
+        const matchDesc = item.description && item.description.toLowerCase().includes(q);
+        return matchName || matchDesc;
+      }
+      
+      // Service filter for clothes
+      if (catalogCategory === 'individuel') {
+        if (catalogServiceFilter === 'lavage_simple' && !item.traitement) return false;
+        if (catalogServiceFilter === 'repassage' && !item.repassage) return false;
+        
+        // Price range filter
+        if (catalogPriceFilter !== 'all') {
+          const prices = [];
+          if (item.traitement) prices.push(item.traitement.prix);
+          if (item.repassage) prices.push(item.repassage.prix);
+          if (prices.length === 0) return false;
+          
+          const matchesRange = prices.some(p => {
+            if (catalogPriceFilter === 'low') return p < 1500;
+            if (catalogPriceFilter === 'medium') return p >= 1500 && p <= 3000;
+            if (catalogPriceFilter === 'high') return p > 3000;
+            return true;
+          });
+          if (!matchesRange) return false;
+        }
+      }
+      return true;
+    }).sort((a, b) => {
+      if (catalogSortOrder === 'name_asc') return a.article.localeCompare(b.article);
+      if (catalogSortOrder === 'name_desc') return b.article.localeCompare(a.article);
+      if (catalogSortOrder === 'price_asc') {
+        const priceA = a.categorie === 'abonnement' ? a.prix : Math.min(a.traitement?.prix || Infinity, a.repassage?.prix || Infinity);
+        const priceB = b.categorie === 'abonnement' ? b.prix : Math.min(b.traitement?.prix || Infinity, b.repassage?.prix || Infinity);
+        return priceA - priceB;
+      }
+      if (catalogSortOrder === 'price_desc') {
+        const priceA = a.categorie === 'abonnement' ? a.prix : Math.max(a.traitement?.prix || 0, a.repassage?.prix || 0);
+        const priceB = b.categorie === 'abonnement' ? b.prix : Math.max(b.traitement?.prix || 0, b.repassage?.prix || 0);
+        return priceB - priceA;
+      }
+      return 0;
+    });
+  };
+
+  const filteredCatalog = getGroupedCatalog();
 
   // --- FILTRES LOGS ---
   const filteredLogs = logs.filter(log => {
@@ -969,6 +1139,77 @@ export default function AdminView({ activeTab, searchQuery }) {
     return true;
   });
 
+  // --- GESTION DES AVANTAGES (LISTE VERTICALE ET DRAG & DROP) ---
+  const handleDragStart = (e, index) => {
+    e.dataTransfer.setData('text/plain', index.toString());
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e, targetIndex, isEdit) => {
+    e.preventDefault();
+    const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
+
+    if (isEdit) {
+      setEditArtAdvantages(prev => {
+        const next = [...prev];
+        const [movedItem] = next.splice(sourceIndex, 1);
+        next.splice(targetIndex, 0, movedItem);
+        return next;
+      });
+    } else {
+      setNewArtAdvantages(prev => {
+        const next = [...prev];
+        const [movedItem] = next.splice(sourceIndex, 1);
+        next.splice(targetIndex, 0, movedItem);
+        return next;
+      });
+    }
+    setDragAllowedIndex(null);
+  };
+
+  const handleUpdateAdvantage = (idx, value, isEdit) => {
+    if (isEdit) {
+      setEditArtAdvantages(prev => {
+        const next = [...prev];
+        next[idx] = value;
+        return next;
+      });
+    } else {
+      setNewArtAdvantages(prev => {
+        const next = [...prev];
+        next[idx] = value;
+        return next;
+      });
+    }
+  };
+
+  const handleAddAdvantageField = (isEdit) => {
+    if (isEdit) {
+      setEditArtAdvantages(prev => [...prev, '']);
+    } else {
+      setNewArtAdvantages(prev => [...prev, '']);
+    }
+  };
+
+  const handleDeleteAdvantageField = (idx, isEdit) => {
+    if (isEdit) {
+      setEditArtAdvantages(prev => {
+        if (prev.length <= 1) return [''];
+        return prev.filter((_, i) => i !== idx);
+      });
+    } else {
+      setNewArtAdvantages(prev => {
+        if (prev.length <= 1) return [''];
+        return prev.filter((_, i) => i !== idx);
+      });
+    }
+  };
+
   // --- ACTIONS CATALOGUE ---
   const handleStartEditPrice = (item) => {
     setEditingItem(item);
@@ -984,45 +1225,275 @@ export default function AdminView({ activeTab, searchQuery }) {
     refreshAdminData();
   };
 
-  const handleStartEditSub = (item) => {
-    setEditingItem(item);
-    setEditSubName(item.article);
-    setEditSubPrice(item.prix.toString());
-    setEditSubDescription(item.description || '');
-    setShowEditSubModal(true);
+  const handleStartEditProduct = (groupedItem) => {
+    setEditingItem(groupedItem);
+    setEditArtName(groupedItem.article);
+    setEditArtDescription(groupedItem.description || '');
+    
+    // Parse description for vertical draggable list
+    const desc = groupedItem.description || '';
+    const initialAdvantages = desc.split('|').map(s => s.trim()).filter(Boolean);
+    setEditArtAdvantages(initialAdvantages.length > 0 ? initialAdvantages : ['']);
+
+    setEditArtCategory(groupedItem.categorie || 'individuel');
+    setEditArtNameError('');
+
+    if (groupedItem.categorie === 'individuel') {
+      // Set Traitement values
+      if (groupedItem.traitement) {
+        setEditArtTraitementActive(true);
+        setEditArtTraitementPrice(groupedItem.traitement.prix.toString());
+        setEditArtTraitementUrgentPrice(groupedItem.traitement.prix_urgent.toString());
+      } else {
+        setEditArtTraitementActive(false);
+        setEditArtTraitementPrice('');
+        setEditArtTraitementUrgentPrice('');
+      }
+      // Set Repassage values
+      if (groupedItem.repassage) {
+        setEditArtRepassageActive(true);
+        setEditArtRepassagePrice(groupedItem.repassage.prix.toString());
+        setEditArtRepassageUrgentPrice(groupedItem.repassage.prix_urgent.toString());
+      } else {
+        setEditArtRepassageActive(false);
+        setEditArtRepassagePrice('');
+        setEditArtRepassageUrgentPrice('');
+      }
+    } else {
+      // Subscription case
+      setEditArtPrice(groupedItem.prix.toString());
+      setEditArtNombreVetements(groupedItem.nombre_vetements !== undefined && groupedItem.nombre_vetements !== null ? groupedItem.nombre_vetements.toString() : '');
+      setEditArtRamassage(!!groupedItem.ramassage);
+      setEditArtNombreRamassages(groupedItem.nombre_ramassages !== undefined && groupedItem.nombre_ramassages !== null ? groupedItem.nombre_ramassages.toString() : '');
+      setEditArtRamassageGratuit(!!groupedItem.ramassage_gratuit);
+      setEditArtLivraisonGratuite(!!groupedItem.livraison_gratuite);
+    }
+    setShowEditCatalogModal(true);
   };
 
-  const handleSaveSub = (e) => {
+  const handleSaveProductAdvanced = (e) => {
     e.preventDefault();
-    if (!editingItem || !editSubName || !editSubPrice) return;
+    if (!editingItem || !editArtName) return;
 
-    db.updateCatalogItem(editingItem.id, {
-      article: editSubName,
-      prix: Number(editSubPrice),
-      description: editSubDescription
-    });
+    if (editArtCategory === 'individuel') {
+      if (!editArtTraitementActive && !editArtRepassageActive) {
+        alert("Veuillez sélectionner au moins un service (Traitement ou Repassage) pour cet article.");
+        return;
+      }
+      if (editArtTraitementActive && (!editArtTraitementPrice || !editArtTraitementUrgentPrice)) {
+        alert("Veuillez saisir les tarifs de traitement.");
+        return;
+      }
+      if (editArtRepassageActive && (!editArtRepassagePrice || !editArtRepassageUrgentPrice)) {
+        alert("Veuillez saisir les tarifs de repassage.");
+        return;
+      }
+    } else {
+      if (!editArtPrice) return;
+    }
+
+    // Check unique name constraint (excluding current item records)
+    const nameExists = catalog.some(
+      item => !editingItem.allIds?.includes(item.id) && item.id !== editingItem.id && item.article.trim().toLowerCase() === editArtName.trim().toLowerCase()
+    );
+    if (nameExists) {
+      setEditArtNameError(`Le produit "${editArtName}" existe déjà. Chaque nom de produit doit être unique.`);
+      return;
+    }
+
+    if (editArtCategory === 'individuel') {
+      // Traitement
+      if (editArtTraitementActive) {
+        if (editingItem.traitement) {
+          db.updateCatalogItem(editingItem.traitement.id, {
+            article: editArtName.trim(),
+            service: 'lavage_simple',
+            prix: Number(editArtTraitementPrice),
+            prix_urgent: Number(editArtTraitementUrgentPrice),
+            description: ''
+          });
+        } else {
+          db.addCatalogItem(
+            editArtName.trim(),
+            'lavage_simple',
+            Number(editArtTraitementPrice),
+            'individuel',
+            '',
+            Number(editArtTraitementUrgentPrice)
+          );
+        }
+      } else {
+        if (editingItem.traitement) {
+          db.deleteCatalogItem(editingItem.traitement.id);
+        }
+      }
+
+      // Repassage
+      if (editArtRepassageActive) {
+        if (editingItem.repassage) {
+          db.updateCatalogItem(editingItem.repassage.id, {
+            article: editArtName.trim(),
+            service: 'repassage',
+            prix: Number(editArtRepassagePrice),
+            prix_urgent: Number(editArtRepassageUrgentPrice),
+            description: ''
+          });
+        } else {
+          db.addCatalogItem(
+            editArtName.trim(),
+            'repassage',
+            Number(editArtRepassagePrice),
+            'individuel',
+            '',
+            Number(editArtRepassageUrgentPrice)
+          );
+        }
+      } else {
+        if (editingItem.repassage) {
+          db.deleteCatalogItem(editingItem.repassage.id);
+        }
+      }
+    } else {
+      // Subscription case
+      const finalDescription = editArtAdvantages.map(a => a.trim()).filter(Boolean).join(' | ');
+      db.updateCatalogItem(editingItem.id, {
+        article: editArtName.trim(),
+        service: 'abonnement',
+        prix: Number(editArtPrice),
+        description: finalDescription,
+        nombre_vetements: editArtNombreVetements ? Number(editArtNombreVetements) : null,
+        ramassage: editArtRamassage,
+        nombre_ramassages: editArtRamassage && editArtNombreRamassages ? Number(editArtNombreRamassages) : null,
+        ramassage_gratuit: editArtRamassage ? editArtRamassageGratuit : false,
+        livraison_gratuite: editArtLivraisonGratuite
+      });
+    }
+
     setEditingItem(null);
-    setShowEditSubModal(false);
+    setShowEditCatalogModal(false);
+    setEditArtName('');
+    setEditArtPrice('');
+    setEditArtDescription('');
+    setEditArtAdvantages(['']);
+    setEditArtNombreVetements('');
+    setEditArtRamassage(false);
+    setEditArtNombreRamassages('');
+    setEditArtRamassageGratuit(false);
+    setEditArtLivraisonGratuite(false);
+    setEditArtNameError('');
     refreshAdminData();
   };
 
+  const handleDeleteCatalogItem = async (groupedItem) => {
+    const name = groupedItem.article;
+    const idsToDelete = groupedItem.allIds || [groupedItem.id];
+    if (await confirm(`Voulez-vous vraiment supprimer l'article "${name}" du catalogue ?`)) {
+      db.deleteCatalogItemsBatch(idsToDelete);
+      setSelectedCatalogIds(prev => prev.filter(x => x !== groupedItem.id));
+      refreshAdminData();
+    }
+  };
+
+  const handleDeleteCatalogItemsBatch = async () => {
+    if (selectedCatalogIds.length === 0) return;
+    if (await confirm(`Voulez-vous vraiment supprimer ces ${selectedCatalogIds.length} articles sélectionnés du catalogue ?`)) {
+      const idsToDelete = [];
+      selectedCatalogIds.forEach(id => {
+        const groupedItem = filteredCatalog.find(item => item.id === id);
+        if (groupedItem) {
+          if (groupedItem.allIds) {
+            idsToDelete.push(...groupedItem.allIds);
+          } else {
+            idsToDelete.push(groupedItem.id);
+          }
+        }
+      });
+      db.deleteCatalogItemsBatch(idsToDelete);
+      setSelectedCatalogIds([]);
+      refreshAdminData();
+    }
+  };
 
   const handleAddCatalogItem = (e) => {
     e.preventDefault();
-    if (!newArtName || !newArtPrice) return;
+    if (!newArtName) return;
 
-    db.addCatalogItem(
-      newArtName,
-      newArtCategory === 'individuel' ? newArtService : 'abonnement',
-      Number(newArtPrice),
-      newArtCategory,
-      newArtCategory === 'abonnement' ? newArtDescription : ''
+    if (newArtCategory === 'individuel') {
+      if (!newArtTraitementActive && !newArtRepassageActive) {
+        alert("Veuillez sélectionner au moins un service (Traitement ou Repassage) pour cet article.");
+        return;
+      }
+      if (newArtTraitementActive && (!newArtTraitementPrice || !newArtTraitementUrgentPrice)) {
+        alert("Veuillez saisir les tarifs de traitement.");
+        return;
+      }
+      if (newArtRepassageActive && (!newArtRepassagePrice || !newArtRepassageUrgentPrice)) {
+        alert("Veuillez saisir les tarifs de repassage.");
+        return;
+      }
+    } else {
+      if (!newArtPrice) return;
+    }
+
+    // Check unique name constraint
+    const nameExists = catalog.some(
+      item => item.article.trim().toLowerCase() === newArtName.trim().toLowerCase()
     );
+    if (nameExists) {
+      setNewArtNameError(`Le produit "${newArtName}" existe déjà. Chaque nom de produit doit être unique.`);
+      return;
+    }
+
+    if (newArtCategory === 'individuel') {
+      if (newArtTraitementActive) {
+        db.addCatalogItem(
+          newArtName.trim(),
+          'lavage_simple',
+          Number(newArtTraitementPrice),
+          'individuel',
+          '',
+          Number(newArtTraitementUrgentPrice)
+        );
+      }
+      if (newArtRepassageActive) {
+        db.addCatalogItem(
+          newArtName.trim(),
+          'repassage',
+          Number(newArtRepassagePrice),
+          'individuel',
+          '',
+          Number(newArtRepassageUrgentPrice)
+        );
+      }
+    } else {
+      const finalDescription = newArtAdvantages.map(a => a.trim()).filter(Boolean).join(' | ');
+      db.addCatalogItem(
+        newArtName.trim(),
+        'abonnement',
+        Number(newArtPrice),
+        newArtCategory,
+        finalDescription,
+        null, // prix_urgent
+        newArtNombreVetements ? Number(newArtNombreVetements) : null,
+        newArtRamassage,
+        newArtRamassage && newArtNombreRamassages ? Number(newArtNombreRamassages) : null,
+        newArtRamassage ? newArtRamassageGratuit : false,
+        newArtLivraisonGratuite
+      );
+    }
+
     refreshAdminData();
     setShowAddCatalogModal(false);
     setNewArtName('');
     setNewArtPrice('');
     setNewArtDescription('');
+    setNewArtAdvantages(['']);
+    setNewArtNombreVetements('');
+    setNewArtRamassage(false);
+    setNewArtNombreRamassages('');
+    setNewArtRamassageGratuit(false);
+    setNewArtLivraisonGratuite(false);
+    setNewArtNameError('');
   };
 
   const renderArrowBtn = () => (
@@ -1040,6 +1511,25 @@ export default function AdminView({ activeTab, searchQuery }) {
     const datePart = d.toLocaleDateString('fr-FR');
     const timePart = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     return `${datePart} à ${timePart}`;
+  };
+
+  const getAssetIcon = (itemName) => {
+    const name = (itemName || '').toLowerCase();
+    if (name.includes('chemise') || name.includes('polo') || name.includes('haut')) return <Sparkles size={14} color="var(--primary)" />;
+    if (name.includes('pantalon') || name.includes('jeans') || name.includes('culotte') || name.includes('jupe')) return <Layers size={14} color="var(--primary)" />;
+    if (name.includes('robe') || name.includes('costume') || name.includes('veste')) return <Award size={14} color="var(--primary)" />;
+    if (name.includes('couette') || name.includes('drap') || name.includes('serviette') || name.includes('rideau')) return <Zap size={14} color="var(--primary)" />;
+    return <ShoppingBag size={14} color="var(--primary)" />;
+  };
+
+  const getDynamicSku = (item) => {
+    if (item.sku) return item.sku;
+    const artCode = (item.article || 'ART').trim().substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
+    const srvCode = (item.service || 'SRV').trim() === 'lavage_simple' ? 'LAV' :
+                    (item.service || 'SRV').trim() === 'repassage' ? 'REP' :
+                    (item.service || 'SRV').trim() === 'nettoyage_a_sec' ? 'SEC' : 'GEN';
+    const idSuffix = item.id ? item.id.substring(item.id.indexOf('_') + 1).toUpperCase().substring(0, 4) : '0000';
+    return `KLIN-${artCode}-${srvCode}-${idSuffix}`;
   };
 
   const formatDateOnly = (dateStr) => {
@@ -1269,7 +1759,18 @@ export default function AdminView({ activeTab, searchQuery }) {
     e.preventDefault();
     if (!delivOrder) return;
 
-    db.deliverOrderWithPayment(delivOrder.id, Number(delivAmountPaid || 0), delivPaymentMethod, delivFinalStatus);
+    if (delivPaymentMethod === 'mobile_money' && !momoRefNumber.trim()) {
+      setMomoRefError("Le numéro de référence est obligatoire.");
+      return;
+    }
+
+    db.deliverOrderWithPayment(
+      delivOrder.id, 
+      Number(delivAmountPaid || 0), 
+      delivPaymentMethod, 
+      delivFinalStatus,
+      delivPaymentMethod === 'mobile_money' ? momoRefNumber.trim() : null
+    );
     refreshAdminData();
     setShowDeliveryPaymentModal(false);
 
@@ -1282,6 +1783,8 @@ export default function AdminView({ activeTab, searchQuery }) {
     }
 
     setDelivOrder(null);
+    setMomoRefNumber('');
+    setMomoRefError('');
   };
 
   const handlePayDebt = (e) => {
@@ -1317,8 +1820,12 @@ export default function AdminView({ activeTab, searchQuery }) {
       const customer = customers.find(c => c.id === order.customer_id);
       if (customer) {
         let text = '';
-        if (nextStatus === 'en_cours_lavage') {
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est maintenant en cours de traitement (Lavage/Séchage) chez KLIN UP.`;
+        if (nextStatus === 'traitement') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est maintenant prise en charge et en cours de traitement chez KLIN UP.`;
+        } else if (nextStatus === 'en_cours_lavage') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est en cours de lavage/séchage chez KLIN UP.`;
+        } else if (nextStatus === 'en_cours_repassage') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est en cours de repassage chez KLIN UP.`;
         } else if (nextStatus === 'pret') {
           const remaining = order.prix_total - order.avance_payee;
           text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer.\nReste à payer: ${remaining.toLocaleString()} FCFA.\nÀ bientôt chez KLIN UP !`;
@@ -1338,21 +1845,50 @@ export default function AdminView({ activeTab, searchQuery }) {
     }
   };
 
-  const handleCancelOrder = async (orderId) => {
-    if (await confirm("Êtes-vous sûr de vouloir annuler cette commande ?")) {
-      const order = orders.find(o => o.id === orderId);
-      db.cancelOrder(orderId);
-      refreshAdminData();
-
-      // Notification WhatsApp annulation
-      if (order) {
-        const customer = customers.find(c => c.id === order.customer_id);
-        if (customer) {
-          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été annulée.`;
-          sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
-        }
-      }
+  const validateCancelReason = (text) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return "Le motif de l'annulation est obligatoire.";
     }
+    const hasLetter = /[a-zA-Z\u00C0-\u00FF]/.test(trimmed);
+    if (!hasLetter) {
+      return "Le motif doit contenir des lettres explicatives (pas seulement des chiffres ou symboles).";
+    }
+    return null;
+  };
+
+  const handleCancelOrder = (orderId) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    setOrderToCancel(order);
+    setCancelReason('');
+    setCancelReasonError('');
+    setShowCancelModal(true);
+  };
+
+  const handleConfirmCancelOrder = (e) => {
+    e.preventDefault();
+    const error = validateCancelReason(cancelReason);
+    if (error) {
+      setCancelReasonError(error);
+      return;
+    }
+    if (!orderToCancel) return;
+
+    db.cancelOrder(orderToCancel.id, cancelReason.trim());
+    refreshAdminData();
+    setShowCancelModal(false);
+
+    // Notification WhatsApp annulation
+    const customer = customers.find(c => c.id === orderToCancel.customer_id);
+    if (customer) {
+      const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${orderToCancel.identifiant_unique_marquage} a été annulée.\nMotif : ${cancelReason.trim()}`;
+      sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+    }
+
+    setOrderToCancel(null);
+    setCancelReason('');
+    setCancelReasonError('');
   };
 
 
@@ -1372,1784 +1908,170 @@ export default function AdminView({ activeTab, searchQuery }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-      {/* ========================================================
-         ONGLET : DASHBOARD (VUE D'ENSEMBLE)
-         ======================================================== */}
       {activeTab === 'dashboard' && (
-        <>
-          {/* Cartes KPI Donezo Style */}
-          <div className="kpi-container">
-
-            {/* Chiffre d'Affaires - Forest Green Theme */}
-            <div className="card kpi-card green-theme" style={{ cursor: 'pointer' }} onClick={() => setActiveDetailsCard('ca')}>
-              <div className="kpi-card-header">
-                <span>Chiffre d'Affaires (CA)</span>
-                {renderArrowBtn()}
-              </div>
-              <div className="kpi-card-body">
-                <h3>{earnedRevenue.toLocaleString()} F</h3>
-                <p>
-                  <TrendingUp size={12} />
-                  +12.5% par rapport au mois dernier
-                </p>
-              </div>
-            </div>
-
-            {/* Commandes Livrées - White Theme */}
-            <div className="card kpi-card white-theme" style={{ cursor: 'pointer' }} onClick={() => setActiveDetailsCard('completed')}>
-              <div className="kpi-card-header">
-                <span>Commandes Livrées</span>
-                {renderArrowBtn()}
-              </div>
-              <div className="kpi-card-body">
-                <h3>{completedOrdersCount}</h3>
-                <p>
-                  <TrendingUp size={12} color="var(--primary)" />
-                  +6.2% par rapport au mois dernier
-                </p>
-              </div>
-            </div>
-
-            {/* Commandes Actives - White Theme */}
-            <div className="card kpi-card white-theme" style={{ cursor: 'pointer' }} onClick={() => setActiveDetailsCard('active')}>
-              <div className="kpi-card-header">
-                <span>Commandes Actives</span>
-                {renderArrowBtn()}
-              </div>
-              <div className="kpi-card-body">
-                <h3>{activeOrdersCount}</h3>
-                <p>
-                  <TrendingUp size={12} color="var(--primary)" />
-                  Traitement en cours en atelier
-                </p>
-              </div>
-            </div>
-
-            {/* Commandes en Attente - White Theme */}
-            <div className="card kpi-card white-theme" style={{ cursor: 'pointer' }} onClick={() => setActiveDetailsCard('pending')}>
-              <div className="kpi-card-header">
-                <span>Commandes en Attente</span>
-                {renderArrowBtn()}
-              </div>
-              <div className="kpi-card-body">
-                <h3>{pendingOrdersCount}</h3>
-                <p style={{ color: 'var(--status-pending)' }}>
-                  Nouvelles arrivées à trier
-                </p>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Grille Principale */}
-          <div className="grid-2">
-
-            {/* Project Analytics Weekly Bar Chart (Volume de linge) */}
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Volume de Linge Traité</h3>
-                  <CustomSelect 
-                    value={chartPeriod} 
-                    onChange={(e) => setChartPeriod(e.target.value)}
-                    style={{
-                      padding: '0.2rem 0.5rem',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-color)',
-                      background: 'var(--bg-app)',
-                      color: 'var(--text-primary)',
-                      cursor: 'pointer',
-                      outline: 'none'
-                    }}
-                  >
-                    <option value="7_days">7 derniers jours</option>
-                    <option value="30_days">30 derniers jours</option>
-                    <option value="all">Tout l'historique</option>
-                  </CustomSelect>
-                </div>
-                <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.72rem', fontWeight: 600 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ width: '8px', height: '8px', background: 'var(--primary)', borderRadius: '50%' }}></span> Lavage
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ width: '8px', height: '8px', background: 'var(--secondary)', borderRadius: '50%' }}></span> Repassage
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ width: '8px', height: '8px', background: '#e2e8e2', border: '1px solid var(--border-color)', borderRadius: '50%' }}></span> Attente
-                  </div>
-                </div>
-              </div>
-
-              <div className="column-chart-container" style={{ marginTop: '0.75rem' }}>
-                {daysOfWeek.map((day, idx) => {
-                  const maxVal = Math.max(...baseLavage, ...baseRepassage, 30);
-                  const lavageHeight = (baseLavage[idx] / maxVal) * 100;
-                  const repassageHeight = (baseRepassage[idx] / maxVal) * 100;
-
-                  // Dimanche, Jeudi, Vendredi, Samedi hachurés (rest / low volume)
-                  const isLowVolume = idx === 0 || idx === 4 || idx === 5 || idx === 6;
-
-                  return (
-                    <div className="column-chart-bar-group" key={day}>
-                      <div className="column-chart-bars">
-                        {isLowVolume ? (
-                          <>
-                            <div className="column-bar striped" style={{ height: `${lavageHeight}%` }} data-value="Basse charge" />
-                            <div className="column-bar striped" style={{ height: `${repassageHeight}%` }} data-value="Basse charge" />
-                          </>
-                        ) : (
-                          <>
-                            {idx === 2 ? (
-                              <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'end' }}>
-                                <div className="column-bar filled-secondary" style={{ height: `${lavageHeight}%` }} data-value={`${baseLavage[idx]} Lavages`}>
-                                  <div style={{
-                                    position: 'absolute',
-                                    top: '-26px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    background: 'var(--secondary)',
-                                    color: '#fff',
-                                    fontSize: '0.65rem',
-                                    fontWeight: '700',
-                                    padding: '2px 5px',
-                                    borderRadius: '8px',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                                  }}>{restitutionRate}%</div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="column-bar filled-primary" style={{ height: `${lavageHeight}%` }} data-value={`${baseLavage[idx]} Lavages`} />
-                            )}
-                            <div className="column-bar filled-secondary" style={{ height: `${repassageHeight}%` }} data-value={`${baseRepassage[idx]} Repassages`} />
-                          </>
-                        )}
-                      </div>
-                      <div className="column-label">{day}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Reminders widget / Machine tambour maintenance card */}
-            <div className="card reminder-card">
-              <div>
-                <span className="reminder-title">Rappels & Maintenance</span>
-                <h4 className="reminder-text">Maintenance Tambour - Machine N°2</h4>
-                <p className="reminder-time">Horaire: 14h00 - 16h00 (Aujourd'hui)</p>
-              </div>
-              <button
-                className="btn btn-primary"
-                style={{ display: 'flex', gap: '0.5rem' }}
-                onClick={() => alert('Cycle de maintenance démarré sur la Machine N°2.')}
-              >
-                <Video size={16} />
-                Lancer la Maintenance
-              </button>
-            </div>
-
-          </div>
-
-          <div className="grid-2">
-
-            {/* Personnel & Roles (replaces general team collaboration) */}
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Personnel de Service</h3>
-                <button
-                  className="btn btn-outline"
-                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '10px' }}
-                  onClick={() => alert('Le personnel est géré via la base de données principale.')}
-                >
-                  Gérer
-                </button>
-              </div>
-
-              <div className="team-list">
-                {staff.map(s => {
-                  const isSuper = s.role === 'super_admin';
-                  const isMgr = s.role === 'manager';
-                  const isLivreur = s.role === 'livreur';
-                  const isAtelier = s.role === 'agent_lavage_repassage';
-                  const roleLabel = isSuper ? 'Super Admin' : isMgr ? 'Manager' : isLivreur ? 'Livreur' : isAtelier ? 'Lavage & Repassage' : "Agent d'accueil";
-                  const taskLabel = isSuper ? "Supervision générale d'atelier" : isMgr ? "Gestion Caisse & Tarifs" : isLivreur ? "Livraison & Distribution" : isAtelier ? "Atelier & Production" : "Accueil & Marquage";
-                  const isOnline = s.role !== 'agent_accueil' && s.role !== 'livreur' && s.role !== 'agent_lavage_repassage'; // simulate Pierre Diallo offline/mobile active
-
-                  return (
-                    <div className="team-item" key={s.id}>
-                      <div className="team-item-left">
-                        <div className="user-avatar" style={{ background: isSuper ? 'var(--primary)' : isMgr ? 'var(--secondary)' : '#64748b', width: '32px', height: '32px', fontSize: '0.75rem' }}>
-                          {s.prenom.charAt(0)}{s.nom.charAt(0)}
-                        </div>
-                        <div className="team-item-info">
-                          <h5>{s.prenom} {s.nom}</h5>
-                          <p>{roleLabel} | <strong>{taskLabel}</strong></p>
-                        </div>
-                      </div>
-                      <span
-                        className="badge"
-                        style={{
-                          fontSize: '0.65rem',
-                          borderRadius: '6px',
-                          background: isOnline ? 'var(--success-light)' : 'var(--warning-light)',
-                          color: isOnline ? 'var(--success)' : 'var(--warning)'
-                        }}
-                      >
-                        {isOnline ? 'En ligne' : 'Terrain (5174)'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Grid 2-column for SVG semi-circle Gauge & Time Tracker */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-
-              {/* Taux de Livraison (Horizontal Progress Bar Layout) */}
-              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', justifyContent: 'space-between', padding: '1.25rem' }}>
-                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                  Taux de Livraison
-                </h3>
-
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginTop: '0.5rem' }}>
-                  <span style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>
-                    {restitutionRate}%
-                  </span>
-                  <span className="badge" style={{
-                    background: restitutionRate >= 90 ? 'var(--success-light)' : 'var(--warning-light)',
-                    color: restitutionRate >= 90 ? 'var(--success)' : 'var(--warning)',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    padding: '0.25rem 0.6rem',
-                    borderRadius: '20px'
-                  }}>
-                    {restitutionRate >= 90 ? 'Optimal' : restitutionRate >= 50 ? 'Satisfaisant' : 'Attention'}
-                  </span>
-                </div>
-
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  Proportion des commandes terminées et restituées avec succès au client par rapport au volume total.
-                </p>
-
-                <div style={{ width: '100%', height: '12px', background: 'rgba(226, 232, 240, 0.8)', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
-                  <div style={{
-                    width: `${restitutionRate}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, #3b82f6 0%, #d946ef 100%)',
-                    borderRadius: '6px',
-                    boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
-                    transition: 'width 0.8s ease-in-out'
-                  }} />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 600, borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', color: 'var(--text-secondary)' }}>
-                  <div>
-                    Livrées: <strong style={{ color: 'var(--text-primary)' }}>{completedOrdersCount}</strong>
-                  </div>
-                  <div>
-                    En attente/Cours: <strong style={{ color: 'var(--text-primary)' }}>{totalOrdersCount - completedOrdersCount}</strong>
-                  </div>
-                  <div>
-                    Total: <strong style={{ color: 'var(--text-primary)' }}>{totalOrdersCount}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Performance Ventes & Services KPI Card */}
-              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'space-between', padding: '1.25rem' }}>
-                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                  Performance Services
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', margin: '0.25rem 0' }}>
-                  <div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      Panier Moyen
-                    </span>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1.2, marginTop: '0.1rem' }}>
-                      {averageOrderValue.toLocaleString()} F CFA
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.25rem' }}>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
-                        Service Populaire
-                      </span>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.1rem' }}>
-                        {mostPopularService}
-                      </div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
-                        Abonnés Actifs
-                      </span>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.1rem' }}>
-                        {activeSubscriptionsCount} clients
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: 600, borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', color: 'var(--text-secondary)' }}>
-                  <span>Volume total: {nonCancelledOrdersCount} commandes</span>
-                  <span style={{ color: 'var(--success)', fontWeight: 700 }}>+15% ce mois-ci</span>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* Active / Client Projects list (replaces by real active orders) */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Commandes Récentes</h3>
-              <button type="button" className="btn btn-outline" style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '10px' }} onClick={() => setShowOrderRegistrationModal(true)}>
-                + Nouvelle
-              </button>
-            </div>
-
-            <div className="project-list">
-              {orders.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 4).map(order => {
-                const customer = customers.find(c => c.id === order.customer_id);
-                const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
-                const serviceName = serviceLabels[order.type_service] || order.type_service;
-                const isExpress = order.niveau_urgence === 'Express';
-
-                // Status Bullet Color mapping
-                let bulletBg = 'var(--status-pending)'; // pending/en_attente
-                if (order.statut === 'en_cours_lavage') bulletBg = 'var(--status-washing)';
-                if (order.statut === 'pret') bulletBg = 'var(--status-ready)';
-                if (order.statut === 'restitue') bulletBg = 'var(--status-delivered)';
-                if (order.statut === 'a_livrer') bulletBg = 'var(--primary)';
-                if (order.statut === 'a_recuperer') bulletBg = 'var(--status-ready)';
-                if (order.statut === 'annule') bulletBg = 'var(--status-late)';
-
-                return (
-                  <div className="project-item" key={order.id}>
-                    <div className="project-item-left">
-                      <span className="project-item-bullet" style={{ background: bulletBg }}></span>
-                      <div className="project-details">
-                        <span className="project-item-title">
-                          {order.type_article} | {serviceName} ({clientName})
-                        </span>
-                        <div className="project-item-date">
-                          Code : <strong>{order.identifiant_unique_marquage}</strong> | Échéance : {new Date(order.due_date).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      {isExpress && <span className="badge badge-en_retard" style={{ fontSize: '0.6rem', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>Express</span>}
-                      <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.65rem' }}>
-                        {getOrderStatusLabel(order)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </>
+        <DashboardTab
+          earnedRevenue={earnedRevenue}
+          completedOrdersCount={completedOrdersCount}
+          activeOrdersCount={activeOrdersCount}
+          pendingOrdersCount={pendingOrdersCount}
+          chartPeriod={chartPeriod}
+          setChartPeriod={setChartPeriod}
+          daysOfWeek={daysOfWeek}
+          baseLavage={baseLavage}
+          baseRepassage={baseRepassage}
+          restitutionRate={restitutionRate}
+          averageOrderValue={averageOrderValue}
+          mostPopularService={mostPopularService}
+          activeSubscriptionsCount={activeSubscriptionsCount}
+          nonCancelledOrdersCount={nonCancelledOrdersCount}
+          totalOrdersCount={totalOrdersCount}
+          orders={orders}
+          customers={customers}
+          staff={staff}
+          serviceLabels={serviceLabels}
+          getOrderStatusLabel={getOrderStatusLabel}
+          setActiveDetailsCard={setActiveDetailsCard}
+          setShowOrderRegistrationModal={setShowOrderRegistrationModal}
+        />
       )}
+
 
       {/* ========================================================
          ONGLET : GESTION DES COMMANDES (ORDERS MANAGEMENT)
          ======================================================== */}
       {activeTab === 'orders_management' && (
-        <div className="grid-2" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: '1.5rem', alignItems: 'start' }}>
-
-          {/* COLONNE GAUCHE : SUIVI D'ATELIER (WORKSHOP TRACKING) */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
-                Suivi d'Atelier & Caisse Terrain
-              </h3>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  className={`btn ${atelierFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setAtelierFilter('all')}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderRadius: '8px' }}
-                >
-                  Tous
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${atelierFilter === 'urgent' ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setAtelierFilter('urgent')}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderRadius: '8px' }}
-                >
-                  Urgent
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${atelierFilter === 'retard' ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setAtelierFilter('retard')}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', borderRadius: '8px' }}
-                >
-                  En Retard
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '600px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-              {(() => {
-                const filteredAtelierOrders = orders.filter(o => {
-                  if (o.statut === 'restitue' || o.statut === 'annule') return false;
-                  if (atelierFilter === 'urgent') return o.niveau_urgence === 'Express';
-                  if (atelierFilter === 'retard') return isOrderLate(o);
-                  return true;
-                }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-                if (filteredAtelierOrders.length === 0) {
-                  return (
-                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem 1rem' }}>
-                      <AlertCircle size={32} style={{ margin: '0 auto 0.5rem', color: 'var(--text-muted)' }} />
-                      <p>Aucune commande active en atelier.</p>
-                    </div>
-                  );
-                }
-
-                const statusLabels = {
-                  en_attente: 'En attente de traitement',
-                  en_cours_lavage: 'En attente de repassage',
-                  en_cours_repassage: 'Repassé',
-                  pret: 'Prêt',
-                  a_livrer: 'En attente de Livraison',
-                  a_recuperer: 'En attente de Récupération',
-                  en_cours_livraison: 'En cours de livraison'
-                };
-
-                return filteredAtelierOrders.map(order => {
-                  const customer = customers.find(c => c.id === order.customer_id);
-                  const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
-                  const clientPhone = customer ? customer.telephone : '-';
-                  const isExpress = order.niveau_urgence === 'Express';
-                  const isLate = isOrderLate(order);
-                  const remainingToPay = order.prix_total - order.avance_payee;
-
-                  return (
-                    <div
-                      key={order.id}
-                      className={`card ${isExpress ? 'pulse-express' : ''}`}
-                      style={{
-                        padding: '1rem',
-                        borderRadius: '16px',
-                        border: '1px solid var(--border-color)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.75rem',
-                        background: 'var(--bg-card)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                              {order.identifiant_unique_marquage}
-                            </span>
-                            {isExpress && (
-                              <span className="badge badge-en_retard" style={{ fontSize: '0.65rem', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>
-                                Express
-                              </span>
-                            )}
-                          </div>
-                          <h4 style={{ fontSize: '0.82rem', fontWeight: 700, margin: '0.2rem 0 0', color: 'var(--text-primary)' }}>
-                            {order.type_article} ({serviceLabels[order.type_service] || order.type_service})
-                          </h4>
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0' }}>
-                            Client: <strong>{clientName}</strong> ({clientPhone})
-                          </p>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'end', gap: '0.2rem' }}>
-                          <span
-                            className={`badge badge-${order.statut}`}
-                            style={{
-                              fontSize: '0.65rem',
-                              cursor: (order.statut === 'a_livrer' || order.statut === 'a_recuperer' || order.statut === 'en_cours_livraison') ? 'pointer' : 'default'
-                            }}
-                            onClick={(e) => {
-                              if (order.statut === 'a_livrer') {
-                                e.stopPropagation();
-                                handleStatusChange(order.id, 'en_cours_livraison');
-                              } else if (order.statut === 'a_recuperer' || order.statut === 'en_cours_livraison') {
-                                e.stopPropagation();
-                                handleStartDelivery(order, 'restitue');
-                              }
-                            }}
-                          >
-                            {statusLabels[order.statut] || order.statut.replace(/_/g, ' ')}
-                          </span>
-                          {isLate && (
-                            <span className="badge badge-en_retard" style={{ fontSize: '0.55rem', padding: '0.05rem 0.25rem' }}>
-                              RETARD
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', background: 'var(--bg-app)', padding: '0.35rem 0.6rem', borderRadius: '8px' }}>
-                        <span>Dépôt: {formatDateTime(order.created_at)}</span>
-                        <span>Échéance: {formatDateTime(order.due_date)}</span>
-                      </div>
-
-                      {order.statut === 'a_livrer' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'var(--primary-light)', padding: '0.45rem 0.6rem', borderRadius: '10px', marginTop: '0.1rem' }}>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700, display: 'flex', gap: '0.25rem' }}>
-                            <span>📍 Adresse :</span>
-                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{customer?.adresse || 'Non renseignée'}</span>
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700, display: 'flex', gap: '0.25rem' }}>
-                            <span>📞 Téléphone :</span>
-                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{customer ? `+${customer.indicatif || '229'} ${customer.telephone}` : 'Non renseigné'}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            style={{ padding: '0.2rem 0.45rem', fontSize: '0.65rem', borderRadius: '6px', width: 'fit-content', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.2rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyToClipboard(`Client: ${customer ? `${customer.prenom} ${customer.nom}` : ''}\nTél: ${customer ? `+${customer.indicatif || '229'} ${customer.telephone}` : ''}\nAdresse: ${customer?.adresse || 'Non renseignée'}`);
-                            }}
-                          >
-                            Copier
-                          </button>
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
-                        <div>
-                          <span>Total: <strong>{order.prix_total.toLocaleString()} F</strong></span>
-                          <span style={{ marginLeft: '0.75rem' }}>Acompte: <strong style={{ color: 'var(--primary)' }}>{order.avance_payee.toLocaleString()} F</strong></span>
-                        </div>
-                        <div>
-                          {remainingToPay > 0 ? (
-                            <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Reste: {remainingToPay.toLocaleString()} F</span>
-                          ) : (
-                            <span style={{ color: 'var(--success)', fontWeight: 700 }}>Réglé</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                        {order.statut === 'en_attente' && (
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                            onClick={() => handleStatusChange(order.id, 'en_cours_lavage')}
-                          >
-                            Lancer le traitement
-                          </button>
-                        )}
-                        {order.statut === 'en_cours_lavage' && (
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                            onClick={() => handleStatusChange(order.id, 'en_cours_repassage')}
-                          >
-                            Lancer le repassage
-                          </button>
-                        )}
-                        {order.statut === 'en_cours_repassage' && (
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                            onClick={() => handleStatusChange(order.id, 'pret')}
-                          >
-                            Marquer comme prêt
-                          </button>
-                        )}
-                        {order.statut === 'pret' && (
-                          <>
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                              onClick={() => handleStatusChange(order.id, 'a_livrer')}
-                            >
-                              À livrer
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                              onClick={() => handleStatusChange(order.id, 'a_recuperer')}
-                            >
-                              À récupérer
-                            </button>
-                          </>
-                        )}
-                        {order.statut === 'a_livrer' && (
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                            onClick={() => handleStatusChange(order.id, 'en_cours_livraison')}
-                          >
-                            Livrer
-                          </button>
-                        )}
-                        {order.statut === 'a_recuperer' && (
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                            onClick={() => handleStartDelivery(order, 'restitue')}
-                          >
-                            Récupérer
-                          </button>
-                        )}
-                        {order.statut === 'en_cours_livraison' && (
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            style={{ flex: 1, padding: '0.45rem', fontSize: '0.72rem', borderRadius: '8px', background: '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', border: 'none' }}
-                            onClick={() => handleStartDelivery(order, 'restitue')}
-                          >
-                            Marquer comme livré
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{ padding: '0.45rem', color: 'var(--danger)', borderColor: 'var(--border-color)', borderRadius: '8px' }}
-                          title="Annuler la commande"
-                          onClick={() => handleCancelOrder(order.id)}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
-
-          {/* COLONNE DROITE : HISTORIQUE DE TOUTES LES COMMANDES */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', alignItems: 'center' }}>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
-                Historique des Commandes
-              </h3>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setShowOrderRegistrationModal(true)}
-                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px' }}
-              >
-                + Nouvelle
-              </button>
-            </div>
-
-            {/* Filters */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem' }}>
-              <div style={{ flexGrow: 1, position: 'relative' }}>
-                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  className="input-control"
-                  style={{ paddingLeft: '2.2rem', width: '100%', borderRadius: '10px', fontSize: '0.8rem' }}
-                  placeholder="Rechercher par Code/Client..."
-                  value={historySearchQuery}
-                  onChange={(e) => setHistorySearchQuery(e.target.value)}
-                />
-              </div>
-              <CustomSelect
-                className="input-control"
-                style={{ borderRadius: '10px', fontSize: '0.8rem', width: '120px', padding: '0.25rem 0.5rem' }}
-                value={historyFilterStatus}
-                onChange={(e) => setHistoryFilterStatus(e.target.value)}
-              >
-                <option value="all">Tous statuts</option>
-                <option value="en_attente">En attente</option>
-                <option value="en_cours_lavage">En cours</option>
-                <option value="pret">Prêt</option>
-                <option value="a_livrer">À livrer</option>
-                <option value="a_recuperer">À récupérer</option>
-                <option value="restitue">Livré</option>
-                <option value="annule">Annulé</option>
-              </CustomSelect>
-            </div>
-
-            <div style={{ overflowY: 'auto', maxHeight: '550px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {(() => {
-                const query = historySearchQuery.toLowerCase();
-                const filteredHistory = orders.filter(o => {
-                  const customer = customers.find(c => c.id === o.customer_id);
-                  const clientName = customer ? `${customer.prenom} ${customer.nom}`.toLowerCase() : '';
-                  const code = o.identifiant_unique_marquage.toLowerCase();
-
-                  const matchesSearch = clientName.includes(query) || code.includes(query);
-                  const matchesStatus = historyFilterStatus === 'all' || o.statut === historyFilterStatus;
-
-                  return matchesSearch && matchesStatus;
-                }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-                if (filteredHistory.length === 0) {
-                  return (
-                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
-                      Aucune commande dans l'historique.
-                    </div>
-                  );
-                }
-
-                return filteredHistory.map(order => {
-                  const customer = customers.find(c => c.id === order.customer_id);
-                  const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
-                  const serviceName = serviceLabels[order.type_service] || order.type_service;
-
-                  return (
-                    <div
-                      key={order.id}
-                      style={{
-                        padding: '0.75rem',
-                        borderRadius: '12px',
-                        border: '1px solid var(--border-color)',
-                        background: 'var(--bg-app)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.4rem',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => setCreatedOrder(order)}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>{order.identifiant_unique_marquage}</span>
-                        <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
-                          {getOrderStatusLabel(order)}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                        {order.type_article} | {serviceName}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Client: {clientName}</span>
-                        <span>Total: <strong>{order.prix_total.toLocaleString()} F</strong></span>
-                      </div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'right', borderTop: '1px solid rgba(0,0,0,0.03)', paddingTop: '0.25rem' }}>
-                        Cliquer pour Voir Ticket
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
-
-        </div>
+        <OrdersTab
+          orders={orders}
+          customers={customers}
+          atelierFilter={atelierFilter}
+          setAtelierFilter={setAtelierFilter}
+          isOrderLate={isOrderLate}
+          serviceLabels={serviceLabels}
+          handleStatusChange={handleStatusChange}
+          handleStartDelivery={handleStartDelivery}
+          copyToClipboard={copyToClipboard}
+          formatDateTime={formatDateTime}
+          handleCancelOrder={handleCancelOrder}
+          setShowOrderRegistrationModal={setShowOrderRegistrationModal}
+          historySearchQuery={historySearchQuery}
+          setHistorySearchQuery={setHistorySearchQuery}
+          historyFilterStatus={historyFilterStatus}
+          setHistoryFilterStatus={setHistoryFilterStatus}
+          getOrderStatusLabel={getOrderStatusLabel}
+          setCreatedOrder={setCreatedOrder}
+        />
       )}
 
       {/* ========================================================
          ONGLET : CLIENTS CRM (CRM MANAGEMENT)
          ======================================================== */}
       {activeTab === 'crm_management' && (
-        <div className="grid-2" style={{ gridTemplateColumns: '0.8fr 1.2fr', gap: '1.5rem', alignItems: 'start' }}>
-
-          {/* COLONNE GAUCHE : LISTE DES CLIENTS + RECHERCHE */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', alignItems: 'center' }}>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
-                Fiches Clients
-              </h3>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setShowNewCustomerModal(true)}
-                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-              >
-                <UserPlus size={14} /> Nouveau
-              </button>
-            </div>
-
-            <div style={{ position: 'relative' }}>
-              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                className="input-control"
-                style={{ paddingLeft: '2.2rem', width: '100%', borderRadius: '10px', fontSize: '0.8rem' }}
-                placeholder="Nom, prénom ou téléphone..."
-                value={crmSearch}
-                onChange={(e) => setCrmSearch(e.target.value)}
-              />
-            </div>
-
-            <div style={{ overflowY: 'auto', maxHeight: '550px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {(() => {
-                const query = crmSearch.toLowerCase();
-                const filteredCrm = customers.filter(c =>
-                  c.nom.toLowerCase().includes(query) ||
-                  c.prenom.toLowerCase().includes(query) ||
-                  c.telephone.includes(query)
-                );
-
-                if (filteredCrm.length === 0) {
-                  return (
-                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
-                      Aucun client correspondant.
-                    </div>
-                  );
-                }
-
-                return filteredCrm.map(c => {
-                  const isSelected = selectedCrmCustomer?.id === c.id;
-                  return (
-                    <div
-                      key={c.id}
-                      style={{
-                        padding: '0.85rem',
-                        borderRadius: '12px',
-                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                        background: isSelected ? 'var(--primary-light)' : 'var(--bg-app)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                      }}
-                      onClick={() => setSelectedCrmCustomer(c)}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: '0.85rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>
-                          {c.prenom} {c.nom}
-                        </strong>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                          {c.points_fidelite} pts
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
-                        <span>Tel: {c.telephone}</span>
-                        {c.solde_dette > 0 && (
-                          <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Dette: {c.solde_dette.toLocaleString()} F</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
-
-          {/* COLONNE DROITE : PROFIL CLIENT SÉLECTIONNÉ & HISTORIQUE PERSONNEL */}
-          <div className="card" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-            {selectedCrmCustomer ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%' }}>
-
-                {/* Header profil */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                  <div className="user-avatar" style={{ background: 'var(--primary)', color: '#fff', width: '48px', height: '48px', fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
-                    {selectedCrmCustomer.prenom.charAt(0)}{selectedCrmCustomer.nom.charAt(0)}
-                  </div>
-                  <div>
-                    <h4 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                      {selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}
-                    </h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0' }}>
-                      Téléphone : <strong>{selectedCrmCustomer.telephone}</strong>
-                    </p>
-                  </div>
-                </div>
-
-                {/* KPI mini-cards client */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                  <div className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', background: 'var(--bg-app)', border: 'none', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Points Fidélité</span>
-                    <strong style={{ fontSize: '1.15rem', color: 'var(--primary)' }}>{selectedCrmCustomer.points_fidelite} pts</strong>
-                  </div>
-
-                  <div className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', background: 'var(--bg-app)', border: 'none', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Dette Restante</span>
-                    <strong style={{ fontSize: '1.15rem', color: selectedCrmCustomer.solde_dette > 0 ? 'var(--accent)' : 'var(--success)' }}>
-                      {selectedCrmCustomer.solde_dette.toLocaleString()} F
-                    </strong>
-                    {selectedCrmCustomer.solde_dette > 0 && (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => {
-                          setDebtPaymentAmount(selectedCrmCustomer.solde_dette.toString());
-                          setShowDebtPaymentModal(true);
-                        }}
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.65rem', borderRadius: '6px', marginTop: '0.4rem' }}
-                      >
-                        Régler dette
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', background: 'var(--bg-app)', border: 'none', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Préférence Pliage</span>
-                    <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', marginTop: '0.15rem' }}>{selectedCrmCustomer.preferences_pliage}</strong>
-                  </div>
-                </div>
-
-                {/* Section Abonnement CRM */}
-                <div className="card" style={{ padding: '1rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <Award size={15} color="var(--primary)" />
-                      Forfait d'Abonnement
-                    </span>
-                    {selectedCrmCustomer.active_subscription && (
-                      <span className="badge badge-pret" style={{ fontSize: '0.62rem', padding: '0.1rem 0.35rem' }}>Actif</span>
-                    )}
-                  </div>
-
-                  {selectedCrmCustomer.active_subscription ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>{selectedCrmCustomer.active_subscription.name}</strong>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                          Solde : {selectedCrmCustomer.active_subscription.remaining_clothes} / {selectedCrmCustomer.active_subscription.total_clothes} vêtements
-                        </span>
-                      </div>
-
-                      {/* Barre de progression premium */}
-                      {(() => {
-                        const remaining = selectedCrmCustomer.active_subscription.remaining_clothes;
-                        const total = selectedCrmCustomer.active_subscription.total_clothes;
-                        const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                        return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                            <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${percentUsed}%`, background: 'var(--primary)', borderRadius: '10px', transition: 'width 0.4s ease' }}></div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--text-muted)' }}>
-                              <span>Consommé : {percentUsed}%</span>
-                              <span>Disponible : {remaining} vêtements</span>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
-                        <span>Souscrit le : {new Date(selectedCrmCustomer.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}</span>
-                        <span>Expire le : {new Date(selectedCrmCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}</span>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => handleUnsubscribeCrm(selectedCrmCustomer.id)}
-                        style={{ padding: '0.4rem', fontSize: '0.72rem', borderRadius: '8px', color: 'var(--status-late)', borderColor: '#fecaca', background: '#fff5f5', marginTop: '0.2rem' }}
-                      >
-                        Résilier l'abonnement
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <CustomSelect
-                        className="input-control"
-                        style={{ flexGrow: 1, padding: '0.4rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                        value={selectedCrmSubId}
-                        onChange={(e) => setSelectedCrmSubId(e.target.value)}
-                      >
-                        <option value="">-- Choisir une formule --</option>
-                        {catalog.filter(item => item.service === 'abonnement').map(sub => (
-                          <option key={sub.id} value={sub.id}>{sub.article} ({sub.prix.toLocaleString()} F/mois)</option>
-                        ))}
-                      </CustomSelect>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => handleSubscribeCrm(selectedCrmCustomer.id, selectedCrmSubId)}
-                        style={{ padding: '0.4rem 0.85rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                      >
-                        Souscrire
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Historique individuel */}
-                <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <h4 style={{ fontSize: '0.9rem', fontWeight: 800, margin: 0 }}>Historique des Commandes</h4>
-
-                  <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Code</th>
-                          <th>Article / Service</th>
-                          <th>Total</th>
-                          <th>Statut</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const clientOrders = orders.filter(o => o.customer_id === selectedCrmCustomer.id)
-                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                          if (clientOrders.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan="5" style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-secondary)' }}>
-                                  Aucune commande enregistrée pour ce client.
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return clientOrders.map(o => (
-                            <tr key={o.id}>
-                              <td><strong>{o.identifiant_unique_marquage}</strong></td>
-                              <td style={{ fontSize: '0.8rem' }}>
-                                {o.type_article}
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{serviceLabels[o.type_service] || o.type_service}</div>
-                              </td>
-                              <td style={{ fontWeight: 600 }}>{o.prix_total.toLocaleString()} F</td>
-                              <td>
-                                <span className={`badge badge-${o.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
-                                  {getOrderStatusLabel(o)}
-                                </span>
-                              </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="btn btn-outline"
-                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.68rem', borderRadius: '6px' }}
-                                  onClick={() => setCreatedOrder(o)}
-                                >
-                                  Reçu
-                                </button>
-                              </td>
-                            </tr>
-                          ));
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-              </div>
-            ) : (
-              <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '0.5rem' }}>
-                <User size={48} style={{ color: 'var(--text-muted)' }} />
-                <span>Sélectionnez un client dans la liste pour voir sa fiche détaillée.</span>
-              </div>
-            )}
-          </div>
-
-        </div>
+        <CustomersTab
+          customers={customers}
+          selectedCrmCustomer={selectedCrmCustomer}
+          setSelectedCrmCustomer={setSelectedCrmCustomer}
+          crmSearch={crmSearch}
+          setCrmSearch={setCrmSearch}
+          setShowNewCustomerModal={setShowNewCustomerModal}
+          setShowDebtPaymentModal={setShowDebtPaymentModal}
+          setDebtPaymentAmount={setDebtPaymentAmount}
+          handleUnsubscribeCrm={handleUnsubscribeCrm}
+          selectedCrmSubId={selectedCrmSubId}
+          setSelectedCrmSubId={setSelectedCrmSubId}
+          handleSubscribeCrm={handleSubscribeCrm}
+          catalog={catalog}
+          orders={orders}
+          serviceLabels={serviceLabels}
+          getOrderStatusLabel={getOrderStatusLabel}
+          setCreatedOrder={setCreatedOrder}
+        />
       )}
 
       {/* ========================================================
          ONGLET : CATALOGUE TARIFS (CATALOG)
          ======================================================== */}
       {activeTab === 'catalog' && (
-        <div className="card" id="catalog-section" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-              <Sparkles size={18} color="var(--primary)" />
-              Grille Tarifaire
-            </h3>
-            <button className="btn btn-primary" onClick={() => setShowAddCatalogModal(true)}>
-              <Plus size={16} /> Nouveau tarif
-            </button>
-          </div>
-
-          {/* Sub-tabs for Individual Clothes vs Subscriptions */}
-          <div style={{ display: 'flex', gap: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-            <button
-              className={`btn ${catalogCategory === 'individuel' ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setCatalogCategory('individuel')}
-              style={{ padding: '0.4rem 1rem', borderRadius: '8px' }}
-            >
-              Vêtements individuels
-            </button>
-            <button
-              className={`btn ${catalogCategory === 'abonnement' ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setCatalogCategory('abonnement')}
-              style={{ padding: '0.4rem 1rem', borderRadius: '8px' }}
-            >
-              Abonnements
-            </button>
-          </div>
-
-          <div className="table-container">
-            {catalogCategory === 'individuel' ? (
-              // Table of Individual Clothing Prices
-              <table>
-                <thead>
-                  <tr>
-                    <th>Article</th>
-                    <th>Service</th>
-                    <th>Tarif Base (FCFA)</th>
-                    <th>Tarif Urgent (Express +50%)</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCatalog.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
-                        <AlertCircle size={24} style={{ margin: '0 auto 0.5rem', color: 'var(--text-muted)' }} />
-                        Aucun article trouvé.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredCatalog.map(item => (
-                      <tr key={item.id}>
-                        <td><strong>{item.article}</strong></td>
-                        <td>
-                          <span style={{ fontSize: '0.8rem', background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 700 }}>
-                            {serviceLabels[item.service]}
-                          </span>
-                        </td>
-                        <td>
-                          {editingItem?.id === item.id ? (
-                            <form onSubmit={handleSavePrice} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                              <input
-                                type="number"
-                                className="input-control"
-                                style={{ width: '90px', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
-                                value={editingPrice}
-                                onChange={(e) => setEditingPrice(e.target.value)}
-                                autoFocus
-                              />
-                              <button type="submit" className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '6px' }}>OK</button>
-                              <button type="button" className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '6px' }} onClick={() => setEditingItem(null)}>X</button>
-                            </form>
-                          ) : (
-                            <span style={{ fontWeight: 600 }}>{item.prix.toLocaleString()} F</span>
-                          )}
-                        </td>
-                        <td style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                          {Math.round(item.prix * 1.5).toLocaleString()} F
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-outline" style={{ padding: '0.35rem', borderRadius: '8px' }} onClick={() => handleStartEditPrice(item)}>
-                            <Edit size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            ) : (
-              // Table of Subscription Packages
-              <table>
-                <thead>
-                  <tr>
-                    <th>Formule</th>
-                    <th>Tarif Mensuel</th>
-                    <th>Avantages & Conditions de service</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCatalog.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
-                        <AlertCircle size={24} style={{ margin: '0 auto 0.5rem', color: 'var(--text-muted)' }} />
-                        Aucun abonnement trouvé.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredCatalog.map(item => (
-                      <tr key={item.id}>
-                        <td><strong style={{ fontSize: '0.95rem', color: 'var(--primary)' }}>{item.article}</strong></td>
-                        <td>
-                          <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{item.prix.toLocaleString()} FCFA / mois</span>
-                        </td>
-                        <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                          <ul style={{ paddingLeft: '1rem', margin: 0 }}>
-                            {item.description.split('|').map((adv, aIdx) => (
-                              <li key={aIdx}>{adv.trim()}</li>
-                            ))}
-                          </ul>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-outline" style={{ padding: '0.35rem', borderRadius: '8px' }} onClick={() => handleStartEditSub(item)}>
-                            <Edit size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+        <CatalogTab
+          catalogCategory={catalogCategory}
+          setCatalogCategory={setCatalogCategory}
+          selectedCatalogIds={selectedCatalogIds}
+          setSelectedCatalogIds={setSelectedCatalogIds}
+          handleDeleteCatalogItemsBatch={handleDeleteCatalogItemsBatch}
+          catalogSearchText={catalogSearchText}
+          setCatalogSearchText={setCatalogSearchText}
+          catalogServiceFilter={catalogServiceFilter}
+          setCatalogServiceFilter={setCatalogServiceFilter}
+          catalogPriceFilter={catalogPriceFilter}
+          setCatalogPriceFilter={setCatalogPriceFilter}
+          catalogSortOrder={catalogSortOrder}
+          setCatalogSortOrder={setCatalogSortOrder}
+          filteredCatalog={filteredCatalog}
+          catalogCurrentPage={catalogCurrentPage}
+          setCatalogCurrentPage={setCatalogCurrentPage}
+          getAssetIcon={getAssetIcon}
+          handleStartEditProduct={handleStartEditProduct}
+          handleDeleteCatalogItem={handleDeleteCatalogItem}
+          setShowAddCatalogModal={setShowAddCatalogModal}
+        />
       )}
 
       {/* ========================================================
          ONGLET : JOURNAL D'AUDIT (LOGS)
          ======================================================== */}
       {activeTab === 'logs' && (
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <h3 className="chart-title" style={{ margin: 0 }}>Traces d'Audit & Sécurité Opérationnelle</h3>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ flexGrow: 1, position: 'relative' }}>
-              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                className="input-control"
-                style={{ paddingLeft: '2.5rem', width: '100%', borderRadius: '12px' }}
-                placeholder="Filtrer localement par description, employé..."
-                value={logSearchText}
-                onChange={(e) => setLogSearchText(e.target.value)}
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Filter size={15} color="var(--text-muted)" />
-              <CustomSelect
-                className="input-control"
-                style={{ borderRadius: '12px', fontSize: '0.8rem', padding: '0.5rem 1rem' }}
-                value={logFilterAction}
-                onChange={(e) => setLogFilterAction(e.target.value)}
-              >
-                <option value="all">Toutes les actions</option>
-                <option value="CONNEXION">Connexion</option>
-                <option value="CREATION_COMMANDE">Création Commande</option>
-                <option value="MISE_A_JOUR_STATUT">Changements Statuts</option>
-                <option value="ANNULATION_COMMANDE">Annulations</option>
-                <option value="RÈGLEMENT_DETTE">Règlements Dette</option>
-                <option value="MODIFICATION_TARIF">Changements Tarifs</option>
-              </CustomSelect>
-            </div>
-          </div>
-
-          <div className="table-container" style={{ maxHeight: '450px', overflowY: 'auto' }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Horodatage</th>
-                  <th>Employé</th>
-                  <th>Action</th>
-                  <th>Détails</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
-                      <AlertCircle size={24} style={{ margin: '0 auto 0.5rem', color: 'var(--text-muted)' }} />
-                      Aucune ligne de log correspondante.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredLogs.map(log => {
-                    const user = staff.find(s => s.id === log.user_id);
-                    const userName = user ? `${user.prenom} ${user.nom}` : 'Système';
-                    const userRole = user ? user.role : 'Automate';
-
-                    return (
-                      <tr key={log.id}>
-                        <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                          {new Date(log.timestamp).toLocaleString()}
-                        </td>
-                        <td>
-                          <div><strong>{userName}</strong></div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{userRole}</div>
-                        </td>
-                        <td>
-                          <span className="badge text-uppercase" style={{
-                            background: log.action.includes('ANNULATION') || log.action.includes('SUPPR') ? 'var(--status-late-light)' : 'var(--primary-light)',
-                            color: log.action.includes('ANNULATION') || log.action.includes('SUPPR') ? 'var(--status-late)' : 'var(--primary)',
-                            fontSize: '0.68rem',
-                            fontWeight: 700
-                          }}>
-                            {log.action}
-                          </span>
-                        </td>
-                        <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                          {log.details}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <LogsTab
+          logSearchText={logSearchText}
+          setLogSearchText={setLogSearchText}
+          logFilterAction={logFilterAction}
+          setLogFilterAction={setLogFilterAction}
+          filteredLogs={filteredLogs}
+          staff={staff}
+        />
       )}
 
       {/* ========================================================
          ONGLET : GESTION DES ACCÈS / PERSONNEL (STAFF ACCESS)
          ======================================================== */}
       {activeTab === 'staff_management' && (
-        <div className="grid-2" style={{ gridTemplateColumns: '0.8fr 1.2fr', gap: '1.5rem', alignItems: 'start' }}>
-
-          {/* COLONNE GAUCHE : LISTE DES EMPLOYÉS & DEMANDES DE PIN */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-            {/* Membres de l'Équipe */}
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', alignItems: 'center' }}>
-                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
-                  Membres de l'Équipe
-                </h3>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => setShowNewStaffModal(true)}
-                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                >
-                  <UserPlus size={14} /> Ajouter
-                </button>
-              </div>
-
-              <div style={{ overflowY: 'auto', maxHeight: '380px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {staff.map(s => {
-                  const isSelected = selectedStaffId === s.id;
-                  const isSuper = s.role === 'super_admin';
-                  const isMgr = s.role === 'manager';
-                  const roleLabel = isSuper ? 'Admin' : isMgr ? 'Manager' : s.role === 'livreur' ? 'Livreur' : s.role === 'agent_lavage_repassage' ? 'Atelier' : "Accueil";
-                  const isSuspended = s.statut === 'suspendu';
-
-                  return (
-                    <div
-                      key={s.id}
-                      style={{
-                        padding: '0.85rem',
-                        borderRadius: '12px',
-                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                        background: isSelected ? 'var(--primary-light)' : 'var(--bg-app)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        opacity: isSuspended ? 0.65 : 1
-                      }}
-                      onClick={() => setSelectedStaffId(s.id)}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: '0.85rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>
-                          {s.prenom} {s.nom}
-                        </strong>
-                        <span
-                          className="badge"
-                          style={{
-                            fontSize: '0.65rem',
-                            padding: '0.15rem 0.4rem',
-                            borderRadius: '6px',
-                            background: isSuper ? 'var(--primary)' : isMgr ? 'var(--secondary)' : '#64748b',
-                            color: '#fff'
-                          }}
-                        >
-                          {roleLabel}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
-                        <span>{s.email || `${s.prenom.toLowerCase()}.${s.nom.toLowerCase()}@klinup.com`}</span>
-                        {isSuspended ? (
-                          <span style={{ color: 'var(--status-late)', fontWeight: 700 }}>Suspendu</span>
-                        ) : (
-                          <span style={{ color: 'var(--status-ready)', fontWeight: 700 }}>Actif</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Demandes de réinitialisation PIN */}
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <ShieldCheck size={18} color="var(--primary)" />
-                  Demandes de Reset PIN
-                </h3>
-              </div>
-
-              <div style={{ overflowY: 'auto', maxHeight: '250px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {db.getPinResetRequests().filter(r => r.status === 'pending').length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    Aucune demande en attente
-                  </div>
-                ) : (
-                  db.getPinResetRequests().filter(r => r.status === 'pending').map(req => (
-                    <div
-                      key={req.id}
-                      style={{
-                        padding: '0.75rem',
-                        borderRadius: '10px',
-                        border: '1px solid var(--border-color)',
-                        background: 'var(--bg-app)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.45rem'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                        <div>
-                          <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{req.staff_name}</strong>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>{req.email}</div>
-                        </div>
-                        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
-                          {new Date(req.created_at).toLocaleDateString('fr-FR')}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.3rem', fontSize: '0.7rem', borderRadius: '6px', background: 'var(--status-ready)' }}
-                          onClick={() => {
-                            const res = db.approvePinResetRequest(req.id);
-                            if (res) {
-                              alert(`Demande approuvée pour ${res.staffMember.prenom} ${res.staffMember.nom} !\n\nNouveau PIN généré : ${res.newPin}\n(Envoyé par email à ${res.staffMember.email})`);
-                              refreshAdminData();
-                            } else {
-                              alert("Erreur: Impossible d'approuver (l'employé n'existe plus ou l'email est invalide).");
-                            }
-                          }}
-                        >
-                          Approuver
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{ flex: 1, padding: '0.3rem', fontSize: '0.7rem', borderRadius: '6px', color: 'var(--status-late)', borderColor: '#fee2e2' }}
-                          onClick={async () => {
-                            if (await confirm("Rejeter cette demande de réinitialisation ?")) {
-                              db.rejectPinResetRequest(req.id);
-                              refreshAdminData();
-                            }
-                          }}
-                        >
-                          Rejeter
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* COLONNE DROITE : FICHE DÉTAILLÉE ET CONFIGURATION DES ACCÈS */}
-          <div className="card" style={{ minHeight: '450px', display: 'flex', flexDirection: 'column' }}>
-            {selectedMember ? (
-              <form onSubmit={handleSaveStaff} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
-                {/* Header Profil */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                  <div className="user-avatar" style={{ background: selectedMember.role === 'super_admin' ? 'var(--primary)' : selectedMember.role === 'manager' ? 'var(--secondary)' : selectedMember.role === 'livreur' ? '#3b82f6' : selectedMember.role === 'agent_lavage_repassage' ? '#8b5cf6' : '#64748b', color: '#fff', width: '48px', height: '48px', fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
-                    {selectedMember.prenom.charAt(0)}{selectedMember.nom.charAt(0)}
-                  </div>
-                  <div style={{ flexGrow: 1 }}>
-                    <h4 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                      {selectedMember.prenom} {selectedMember.nom}
-                    </h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0' }}>
-                      Rôle principal : <strong style={{ color: 'var(--primary)' }}>{selectedMember.role === 'super_admin' ? 'Super Administrateur' : selectedMember.role === 'manager' ? 'Manager Caisse' : selectedMember.role === 'livreur' ? 'Livreur' : selectedMember.role === 'agent_lavage_repassage' ? 'Agent Lavage/Repassage' : "Agent d'accueil"}</strong>
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    style={{ padding: '0.45rem', color: 'var(--status-late)', borderColor: '#fee2e2' }}
-                    onClick={() => handleDeleteStaff(selectedMember.id)}
-                    title="Supprimer le profil"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-
-                {/* Formulaire d'information */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div className="form-group">
-                    <label>Prénom</label>
-                    <input
-                      type="text"
-                      className="input-control"
-                      required
-                      value={editStaffPrenom}
-                      onChange={(e) => setEditStaffPrenom(e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Nom</label>
-                    <input
-                      type="text"
-                      className="input-control"
-                      required
-                      value={editStaffNom}
-                      onChange={(e) => setEditStaffNom(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.75rem' }}>
-                  <div className="form-group">
-                    <label>Email professionnel</label>
-                    <input
-                      type="email"
-                      className="input-control"
-                      required
-                      value={editStaffEmail}
-                      onChange={(e) => setEditStaffEmail(e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Téléphone</label>
-                    <input
-                      type="text"
-                      className="input-control"
-                      placeholder="Non renseigné"
-                      value={editStaffTel}
-                      onChange={(e) => setEditStaffTel(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div className="form-group">
-                    <label>Rôle Système</label>
-                    <CustomSelect
-                      className="input-control"
-                      value={editStaffRole}
-                      onChange={(e) => handleRoleChangeInForm(e.target.value)}
-                    >
-                      <option value="super_admin">Super Administrateur (CMS)</option>
-                      <option value="manager">Manager Caisse (CMS)</option>
-                      <option value="agent_accueil">Agent d'accueil (Mobile App)</option>
-                      <option value="livreur">Livreur (Mobile App)</option>
-                      <option value="agent_lavage_repassage">Agent de lavage / Repassage (Mobile App)</option>
-                    </CustomSelect>
-                  </div>
-                  <div className="form-group">
-                    <label>Statut d'Accès</label>
-                    <CustomSelect
-                      className="input-control"
-                      value={editStaffStatut}
-                      onChange={(e) => setEditStaffStatut(e.target.value)}
-                    >
-                      <option value="actif">Compte Actif (Autorisé)</option>
-                      <option value="suspendu">Compte Suspendu (Bloqué)</option>
-                    </CustomSelect>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.75rem', alignItems: 'end' }}>
-                  <div className="form-group">
-                    <label>Code PIN actuel</label>
-                    <input
-                      type="text"
-                      className="input-control"
-                      readOnly
-                      disabled
-                      value={selectedMember.code_pin || 'Non défini'}
-                      style={{ background: '#f1f5f9', cursor: 'not-allowed', fontWeight: 'bold', letterSpacing: '2px', textAlign: 'center' }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{ padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, width: '100%' }}
-                    onClick={() => {
-                      const newPin = Math.floor(100000 + Math.random() * 900000).toString();
-                      db.resetStaffPin(selectedMember.id, newPin);
-                      alert(`Code PIN réinitialisé pour ${selectedMember.prenom} ${selectedMember.nom} !\n\nNouveau PIN : ${newPin}\n(Un email a été envoyé à ${selectedMember.email})`);
-                      refreshAdminData();
-                    }}
-                  >
-                    Générer nouveau PIN
-                  </button>
-                </div>
-
-                {/* Habilitations Détaillées */}
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <h4 style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                    <Sliders size={16} color="var(--primary)" />
-                    Matrice de Permissions Granulaires
-                  </h4>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>
-                    Configurez précisément les droits d'accès de cet utilisateur au sein de la plateforme.
-                  </p>
-
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '0.65rem',
-                    background: 'var(--bg-app)',
-                    padding: '0.75rem',
-                    borderRadius: '12px',
-                    border: '1px solid var(--border-color)'
-                  }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!editStaffPermissions.can_view_dashboard}
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_view_dashboard: e.target.checked }))}
-                      />
-                      Accès Tableau de Bord
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!editStaffPermissions.can_manage_orders}
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_orders: e.target.checked }))}
-                      />
-                      Gérer les Commandes
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!editStaffPermissions.can_manage_crm}
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_crm: e.target.checked }))}
-                      />
-                      Consulter le CRM Clients
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!editStaffPermissions.can_edit_catalog}
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_edit_catalog: e.target.checked }))}
-                      />
-                      Modifier les Tarifs
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!editStaffPermissions.can_view_logs}
-                        disabled={editStaffRole !== 'super_admin'}
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_view_logs: e.target.checked }))}
-                      />
-                      Voir Journal d'Audit
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!editStaffPermissions.can_manage_staff}
-                        disabled={editStaffRole !== 'super_admin'}
-                        onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, can_manage_staff: e.target.checked }))}
-                      />
-                      Gérer le Personnel
-                    </label>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '0.55rem 1.5rem', fontSize: '0.85rem' }}>
-                    Sauvegarder les modifications
-                  </button>
-                </div>
-
-              </form>
-            ) : (
-              <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '0.5rem' }}>
-                <User size={48} style={{ color: 'var(--text-muted)' }} />
-                <span>Sélectionnez un employé pour gérer son profil et ses droits d'accès.</span>
-              </div>
-            )}
-          </div>
-
-        </div>
+        <StaffTab
+          staff={staff}
+          selectedStaffId={selectedStaffId}
+          setSelectedStaffId={setSelectedStaffId}
+          setShowNewStaffModal={setShowNewStaffModal}
+          refreshAdminData={refreshAdminData}
+          selectedMember={selectedMember}
+          handleSaveStaff={handleSaveStaff}
+          handleDeleteStaff={handleDeleteStaff}
+          editStaffPrenom={editStaffPrenom}
+          setEditStaffPrenom={setEditStaffPrenom}
+          editStaffNom={editStaffNom}
+          setEditStaffNom={setEditStaffNom}
+          editStaffEmail={editStaffEmail}
+          setEditStaffEmail={setEditStaffEmail}
+          editStaffTel={editStaffTel}
+          setEditStaffTel={setEditStaffTel}
+          editStaffRole={editStaffRole}
+          handleRoleChangeInForm={handleRoleChangeInForm}
+          editStaffStatut={editStaffStatut}
+          setEditStaffStatut={setEditStaffStatut}
+          editStaffPermissions={editStaffPermissions}
+          setEditStaffPermissions={setEditStaffPermissions}
+        />
       )}
 
       {/* ========================================================
          ONGLET : PARAMÈTRES SYSTÈME (SETTINGS)
          ======================================================== */}
       {activeTab === 'settings' && (
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '600px', margin: '0 auto' }}>
-          <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-              <Sliders size={18} color="var(--primary)" />
-              Configuration Délais & Majorations
-            </h3>
-          </div>
-
-          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Délai Express (heures)</label>
-                <input
-                  type="number"
-                  className="input-control"
-                  required
-                  min="1"
-                  max="168"
-                  value={inputExpressHours}
-                  onChange={(e) => setInputExpressHours(e.target.value)}
-                />
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Temps de traitement en urgence (ex: 6)</span>
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Majoration Express (%)</label>
-                <input
-                  type="number"
-                  className="input-control"
-                  required
-                  min="0"
-                  max="200"
-                  value={inputExpressMarkup}
-                  onChange={(e) => setInputExpressMarkup(e.target.value)}
-                />
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Taux additionnel sur les prix de base (ex: 50)</span>
-              </div>
-            </div>
-
-            <div className="form-group" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '1rem' }}>
-              <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Délai de Livraison Normal (heures)</label>
-              <input
-                type="number"
-                className="input-control"
-                required
-                min="1"
-                max="720"
-                value={inputNormalHours}
-                onChange={(e) => setInputNormalHours(e.target.value)}
-              />
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Temps de traitement standard de laverie (ex: 48)</span>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.5rem' }}>
-              <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 2rem', fontWeight: 700, fontSize: '0.85rem' }}>
-                Enregistrer les paramètres
-              </button>
-            </div>
-
-            <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700 }}>État de la Connexion</h4>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0, 0, 0, 0.02)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base de données principale</span>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                    {db.isRemote() ? "Connecté en temps réel au cloud Supabase" : "Exécution sur le stockage local (LocalStorage de secours)"}
-                  </span>
-                </div>
-                <span
-                  style={{
-                    fontSize: '0.65rem',
-                    fontWeight: 800,
-                    padding: '0.15rem 0.6rem',
-                    borderRadius: '20px',
-                    background: db.isRemote() ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                    color: db.isRemote() ? '#10b981' : '#f59e0b',
-                    border: db.isRemote() ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)',
-                    textTransform: 'uppercase'
-                  }}
-                >
-                  {db.isRemote() ? 'Supabase Cloud' : 'Mode Local'}
-                </span>
-              </div>
-            </div>
-
-          </form>
-        </div>
+        <SettingsTab
+          handleSaveSettings={handleSaveSettings}
+          inputExpressHours={inputExpressHours}
+          setInputExpressHours={setInputExpressHours}
+          inputExpressMarkup={inputExpressMarkup}
+          setInputExpressMarkup={setInputExpressMarkup}
+          inputNormalHours={inputNormalHours}
+          setInputNormalHours={setInputNormalHours}
+        />
       )}
 
       {/* ========================================================
@@ -3242,77 +2164,361 @@ export default function AdminView({ activeTab, searchQuery }) {
          ======================================================== */}
       {showAddCatalogModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
               Ajouter au Catalogue
             </h3>
 
             <form onSubmit={handleAddCatalogItem} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Category choice */}
-              <div className="form-group">
-                <label>Catégorie de tarif</label>
-                <CustomSelect
-                  className="input-control"
-                  value={newArtCategory}
-                  onChange={(e) => setNewArtCategory(e.target.value)}
-                >
-                  <option value="individuel">Vêtement individuel</option>
-                  <option value="abonnement">Formule d'abonnement</option>
-                </CustomSelect>
-              </div>
+              {/* Category choice & Name side-by-side */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '0.75rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Catégorie de tarif</label>
+                  <CustomSelect
+                    className="input-control"
+                    value={newArtCategory}
+                    onChange={(e) => setNewArtCategory(e.target.value)}
+                  >
+                    <option value="individuel">Vêtement individuel</option>
+                    <option value="abonnement">Formule d'abonnement</option>
+                  </CustomSelect>
+                </div>
 
-              <div className="form-group">
-                <label>{newArtCategory === 'individuel' ? "Nom de l'article" : "Nom de la formule d'abonnement"}</label>
-                <input
-                  type="text"
-                  className="input-control"
-                  placeholder={newArtCategory === 'individuel' ? "Ex: Chemise, Pull, Jeans" : "Ex: Offre Spéciale, Abonnement Prestige"}
-                  required
-                  value={newArtName}
-                  onChange={(e) => setNewArtName(e.target.value)}
-                />
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>{newArtCategory === 'individuel' ? "Nom de l'article" : "Nom de la formule d'abonnement"}</label>
+                  <input
+                    type="text"
+                    className="input-control"
+                    placeholder={newArtCategory === 'individuel' ? "Ex: Chemise, Pull, Jeans" : "Ex: Offre Spéciale, Abonnement Prestige"}
+                    required
+                    value={newArtName}
+                    onChange={(e) => setNewArtName(e.target.value)}
+                  />
+                  {newArtNameError && (
+                    <div style={{ color: 'var(--danger)', fontSize: '0.72rem', marginTop: '0.25rem', fontWeight: 600 }}>
+                      {newArtNameError}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {newArtCategory === 'individuel' ? (
-                // Input elements for Clothing items
-                <div className="form-group">
-                  <label>Service requis</label>
-                  <CustomSelect
-                    className="input-control"
-                    value={newArtService}
-                    onChange={(e) => setNewArtService(e.target.value)}
-                  >
-                    <option value="lavage_simple">Lavage Simple</option>
-                    <option value="nettoyage_a_sec">Nettoyage à sec</option>
-                    <option value="repassage">Repassage</option>
-                  </CustomSelect>
+                // Input elements for Clothing items (Traitement and Repassage simultaneous pricing)
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {/* Traitement check & prices */}
+                  <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-app)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={newArtTraitementActive}
+                        onChange={(e) => setNewArtTraitementActive(e.target.checked)}
+                      />
+                      Activer le service Traitement
+                    </label>
+                    {newArtTraitementActive && (
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                          <input
+                            type="number"
+                            className="input-control"
+                            style={{ height: '32px', fontSize: '0.8rem' }}
+                            required
+                            placeholder="Ex: 1000"
+                            value={newArtTraitementPrice}
+                            onChange={(e) => {
+                              setNewArtTraitementPrice(e.target.value);
+                              const val = Number(e.target.value);
+                              if (!isNaN(val)) {
+                                setNewArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
+                          <input
+                            type="number"
+                            className="input-control"
+                            style={{ height: '32px', fontSize: '0.8rem' }}
+                            required
+                            placeholder="Ex: 1500"
+                            value={newArtTraitementUrgentPrice}
+                            onChange={(e) => setNewArtTraitementUrgentPrice(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Repassage check & prices */}
+                  <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-app)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={newArtRepassageActive}
+                        onChange={(e) => setNewArtRepassageActive(e.target.checked)}
+                      />
+                      Activer le service Repassage
+                    </label>
+                    {newArtRepassageActive && (
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                          <input
+                            type="number"
+                            className="input-control"
+                            style={{ height: '32px', fontSize: '0.8rem' }}
+                            required
+                            placeholder="Ex: 500"
+                            value={newArtRepassagePrice}
+                            onChange={(e) => {
+                              setNewArtRepassagePrice(e.target.value);
+                              const val = Number(e.target.value);
+                              if (!isNaN(val)) {
+                                setNewArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
+                          <input
+                            type="number"
+                            className="input-control"
+                            style={{ height: '32px', fontSize: '0.8rem' }}
+                            required
+                            placeholder="Ex: 750"
+                            value={newArtRepassageUrgentPrice}
+                            onChange={(e) => setNewArtRepassageUrgentPrice(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 // Input elements for Subscriptions
-                <div className="form-group">
-                  <label>Avantages & Conditions (séparés par un | )</label>
-                  <textarea
-                    className="input-control"
-                    rows="3"
-                    placeholder="Ex: 50 vêtements max/mois | 2 ramassages max | Livraison gratuite"
-                    required
-                    value={newArtDescription}
-                    onChange={(e) => setNewArtDescription(e.target.value)}
-                  />
-                </div>
-              )}
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Tarif mensuel (FCFA)</label>
+                      <input
+                        type="number"
+                        className="input-control"
+                        placeholder="Ex: 25000"
+                        required
+                        value={newArtPrice}
+                        onChange={(e) => setNewArtPrice(e.target.value)}
+                      />
+                    </div>
 
-              <div className="form-group">
-                <label>{newArtCategory === 'individuel' ? "Prix de base (FCFA)" : "Tarif mensuel (FCFA)"}</label>
-                <input
-                  type="number"
-                  className="input-control"
-                  placeholder="Ex: 2500"
-                  required
-                  value={newArtPrice}
-                  onChange={(e) => setNewArtPrice(e.target.value)}
-                />
-              </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Nombre de vêtements inclus</label>
+                      <input
+                        type="number"
+                        className="input-control"
+                        placeholder="Ex: 50"
+                        required
+                        value={newArtNombreVetements}
+                        onChange={(e) => setNewArtNombreVetements(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'start' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontWeight: 600 }}>Service de ramassage ?</label>
+                      <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={newArtRamassage}
+                            onChange={() => setNewArtRamassage(true)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Oui
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={!newArtRamassage}
+                            onChange={() => setNewArtRamassage(false)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Non
+                        </label>
+                      </div>
+
+                      {newArtRamassage && (
+                        <div style={{
+                          background: 'var(--bg-app)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          padding: '0.65rem 0.75rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                          marginTop: '0.5rem'
+                        }}>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '0.73rem', fontWeight: 700, marginBottom: '0.2rem' }}>Nombre de ramassages / mois</label>
+                            <input
+                              type="number"
+                              className="input-control"
+                              style={{ height: '30px', fontSize: '0.8rem' }}
+                              placeholder="Ex: 4 (Laissez vide si illimité)"
+                              value={newArtNombreRamassages}
+                              onChange={(e) => setNewArtNombreRamassages(e.target.value)}
+                            />
+                          </div>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 700, margin: 0 }}>
+                            <input
+                              type="checkbox"
+                              checked={newArtRamassageGratuit}
+                              onChange={(e) => setNewArtRamassageGratuit(e.target.checked)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            Ramassage gratuit
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontWeight: 600 }}>Livraison gratuite ?</label>
+                      <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={newArtLivraisonGratuite}
+                            onChange={() => setNewArtLivraisonGratuite(true)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Oui
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={!newArtLivraisonGratuite}
+                            onChange={() => setNewArtLivraisonGratuite(false)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Non
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0 }}>
+                      <span>Avantages & Conditions</span>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                        Glissez les poignées ☰ pour réordonner
+                      </span>
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
+                      {newArtAdvantages.map((adv, idx) => (
+                        <div
+                          key={idx}
+                          draggable={dragAllowedIndex === idx}
+                          onDragStart={(e) => handleDragStart(e, idx)}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, idx, false)}
+                          onDragEnd={() => setDragAllowedIndex(null)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            padding: '0.25rem',
+                            background: 'var(--bg-app)',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border-color)',
+                            transition: 'all 0.2s ease',
+                            opacity: dragAllowedIndex === idx ? 0.7 : 1,
+                          }}
+                        >
+                          <div
+                            onMouseEnter={() => setDragAllowedIndex(idx)}
+                            onMouseLeave={() => setDragAllowedIndex(null)}
+                            style={{
+                              cursor: 'grab',
+                              padding: '0.25rem',
+                              color: 'var(--text-muted)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            title="Faire glisser pour réordonner"
+                          >
+                            <GripVertical size={14} />
+                          </div>
+                          <input
+                            type="text"
+                            className="input-control"
+                            style={{
+                              height: '30px',
+                              fontSize: '0.8rem',
+                              margin: 0,
+                              flex: 1,
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '0 0.25rem',
+                            }}
+                            placeholder="Ex: Livraison gratuite"
+                            required
+                            value={adv}
+                            onChange={(e) => handleUpdateAdvantage(idx, e.target.value, false)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAdvantageField(idx, false)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--text-muted)',
+                              padding: '0.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '4px',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => handleAddAdvantageField(false)}
+                      style={{
+                        padding: '0.35rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: 'var(--primary)',
+                        background: 'var(--primary-light)',
+                        border: '1px dashed rgba(59, 130, 246, 0.3)',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.25rem',
+                        marginTop: '0.15rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'var(--primary-light)'}
+                    >
+                      <Plus size={12} /> Ajouter un avantage
+                    </button>
+                  </div>
+                </>
+              )}
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Ajouter</button>
@@ -3324,52 +2530,363 @@ export default function AdminView({ activeTab, searchQuery }) {
       )}
 
       {/* ========================================================
-         MODAL DE MODIFICATION D'ABONNEMENT
+         MODAL DE MODIFICATION AVANCÉE D'ARTICLE OU ABONNEMENT
          ======================================================== */}
-      {showEditSubModal && (
+      {showEditCatalogModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              Modifier l'Abonnement
+              Options d'Édition Avancées
             </h3>
 
-            <form onSubmit={handleSaveSub} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className="form-group">
-                <label>Nom de la formule d'abonnement</label>
-                <input
-                  type="text"
-                  className="input-control"
-                  required
-                  value={editSubName}
-                  onChange={(e) => setEditSubName(e.target.value)}
-                />
+            <form onSubmit={handleSaveProductAdvanced} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* Category info & Name side-by-side */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '0.75rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Catégorie de tarif</label>
+                  <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-app)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {editArtCategory === 'individuel' ? 'Vêtement individuel' : "Formule d'abonnement"}
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>{editArtCategory === 'individuel' ? "Nom de l'article" : "Nom de la formule d'abonnement"}</label>
+                  <input
+                    type="text"
+                    className="input-control"
+                    required
+                    value={editArtName}
+                    onChange={(e) => setEditArtName(e.target.value)}
+                  />
+                  {editArtNameError && (
+                    <div style={{ color: 'var(--danger)', fontSize: '0.72rem', marginTop: '0.25rem', fontWeight: 600 }}>
+                      {editArtNameError}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>Avantages & Conditions (séparés par un | )</label>
-                <textarea
-                  className="input-control"
-                  rows="3"
-                  required
-                  value={editSubDescription}
-                  onChange={(e) => setEditSubDescription(e.target.value)}
-                />
-              </div>
+              {editArtCategory === 'individuel' ? (
+                // Input elements for Clothing items (Traitement and Repassage simultaneous pricing)
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {/* Traitement check & prices */}
+                  <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-app)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={editArtTraitementActive}
+                        onChange={(e) => setEditArtTraitementActive(e.target.checked)}
+                      />
+                      Activer le service Traitement
+                    </label>
+                    {editArtTraitementActive && (
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                          <input
+                            type="number"
+                            className="input-control"
+                            style={{ height: '32px', fontSize: '0.8rem' }}
+                            required
+                            placeholder="Ex: 1000"
+                            value={editArtTraitementPrice}
+                            onChange={(e) => {
+                              setEditArtTraitementPrice(e.target.value);
+                              const val = Number(e.target.value);
+                              if (!isNaN(val)) {
+                                setEditArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
+                          <input
+                            type="number"
+                            className="input-control"
+                            style={{ height: '32px', fontSize: '0.8rem' }}
+                            required
+                            placeholder="Ex: 1500"
+                            value={editArtTraitementUrgentPrice}
+                            onChange={(e) => setEditArtTraitementUrgentPrice(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-              <div className="form-group">
-                <label>Tarif mensuel (FCFA)</label>
-                <input
-                  type="number"
-                  className="input-control"
-                  required
-                  value={editSubPrice}
-                  onChange={(e) => setEditSubPrice(e.target.value)}
-                />
-              </div>
+                  {/* Repassage check & prices */}
+                  <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-app)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={editArtRepassageActive}
+                        onChange={(e) => setEditArtRepassageActive(e.target.checked)}
+                      />
+                      Activer le service Repassage
+                    </label>
+                    {editArtRepassageActive && (
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                          <input
+                            type="number"
+                            className="input-control"
+                            style={{ height: '32px', fontSize: '0.8rem' }}
+                            required
+                            placeholder="Ex: 500"
+                            value={editArtRepassagePrice}
+                            onChange={(e) => {
+                              setEditArtRepassagePrice(e.target.value);
+                              const val = Number(e.target.value);
+                              if (!isNaN(val)) {
+                                setEditArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
+                          <input
+                            type="number"
+                            className="input-control"
+                            style={{ height: '32px', fontSize: '0.8rem' }}
+                            required
+                            placeholder="Ex: 750"
+                            value={editArtRepassageUrgentPrice}
+                            onChange={(e) => setEditArtRepassageUrgentPrice(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                // Input elements for Subscriptions
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Tarif mensuel (FCFA)</label>
+                      <input
+                        type="number"
+                        className="input-control"
+                        required
+                        value={editArtPrice}
+                        onChange={(e) => setEditArtPrice(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Nombre de vêtements inclus</label>
+                      <input
+                        type="number"
+                        className="input-control"
+                        placeholder="Ex: 50"
+                        required
+                        value={editArtNombreVetements}
+                        onChange={(e) => setEditArtNombreVetements(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'start' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontWeight: 600 }}>Service de ramassage ?</label>
+                      <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={editArtRamassage}
+                            onChange={() => setEditArtRamassage(true)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Oui
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={!editArtRamassage}
+                            onChange={() => setEditArtRamassage(false)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Non
+                        </label>
+                      </div>
+
+                      {editArtRamassage && (
+                        <div style={{
+                          background: 'var(--bg-app)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          padding: '0.65rem 0.75rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                          marginTop: '0.5rem'
+                        }}>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '0.73rem', fontWeight: 700, marginBottom: '0.2rem' }}>Nombre de ramassages / mois</label>
+                            <input
+                              type="number"
+                              className="input-control"
+                              style={{ height: '30px', fontSize: '0.8rem' }}
+                              placeholder="Ex: 4 (Laissez vide si illimité)"
+                              value={editArtNombreRamassages}
+                              onChange={(e) => setEditArtNombreRamassages(e.target.value)}
+                            />
+                          </div>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 700, margin: 0 }}>
+                            <input
+                              type="checkbox"
+                              checked={editArtRamassageGratuit}
+                              onChange={(e) => setEditArtRamassageGratuit(e.target.checked)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            Ramassage gratuit
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontWeight: 600 }}>Livraison gratuite ?</label>
+                      <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={editArtLivraisonGratuite}
+                            onChange={() => setEditArtLivraisonGratuite(true)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Oui
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={!editArtLivraisonGratuite}
+                            onChange={() => setEditArtLivraisonGratuite(false)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Non
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0 }}>
+                      <span>Avantages & Conditions</span>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                        Glissez les poignées ☰ pour réordonner
+                      </span>
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
+                      {editArtAdvantages.map((adv, idx) => (
+                        <div
+                          key={idx}
+                          draggable={dragAllowedIndex === idx}
+                          onDragStart={(e) => handleDragStart(e, idx)}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, idx, true)}
+                          onDragEnd={() => setDragAllowedIndex(null)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            padding: '0.25rem',
+                            background: 'var(--bg-app)',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border-color)',
+                            transition: 'all 0.2s ease',
+                            opacity: dragAllowedIndex === idx ? 0.7 : 1,
+                          }}
+                        >
+                          <div
+                            onMouseEnter={() => setDragAllowedIndex(idx)}
+                            onMouseLeave={() => setDragAllowedIndex(null)}
+                            style={{
+                              cursor: 'grab',
+                              padding: '0.25rem',
+                              color: 'var(--text-muted)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            title="Faire glisser pour réordonner"
+                          >
+                            <GripVertical size={14} />
+                          </div>
+                          <input
+                            type="text"
+                            className="input-control"
+                            style={{
+                              height: '30px',
+                              fontSize: '0.8rem',
+                              margin: 0,
+                              flex: 1,
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '0 0.25rem',
+                            }}
+                            placeholder="Ex: Livraison gratuite"
+                            required
+                            value={adv}
+                            onChange={(e) => handleUpdateAdvantage(idx, e.target.value, true)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAdvantageField(idx, true)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--text-muted)',
+                              padding: '0.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '4px',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => handleAddAdvantageField(true)}
+                      style={{
+                        padding: '0.35rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: 'var(--primary)',
+                        background: 'var(--primary-light)',
+                        border: '1px dashed rgba(59, 130, 246, 0.3)',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.25rem',
+                        marginTop: '0.15rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'var(--primary-light)'}
+                    >
+                      <Plus size={12} /> Ajouter un avantage
+                    </button>
+                  </div>
+                </>
+              )}
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Enregistrer</button>
-                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowEditSubModal(false)}>Annuler</button>
+                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowEditCatalogModal(false)}>Annuler</button>
               </div>
             </form>
           </div>
@@ -3996,9 +3513,72 @@ export default function AdminView({ activeTab, searchQuery }) {
                 />
               </div>
 
+              {delivPaymentMethod === 'mobile_money' && (
+                <div className="form-group">
+                  <label>Numéro de Référence <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    type="text"
+                    className="input-control"
+                    placeholder="Ex: TXN12345678"
+                    required
+                    style={{ borderColor: momoRefError ? '#ef4444' : 'var(--border-color)' }}
+                    value={momoRefNumber}
+                    onChange={(e) => {
+                      setMomoRefNumber(e.target.value);
+                      if (e.target.value.trim()) setMomoRefError('');
+                    }}
+                  />
+                  {momoRefError && (
+                    <span style={{ fontSize: '0.7rem', color: '#ef4444', display: 'block', marginTop: '0.2rem' }}>{momoRefError}</span>
+                  )}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--success)', border: 'none' }}>Confirmer la Livraison</button>
-                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowDeliveryPaymentModal(false)}>Annuler</button>
+                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); }}>Annuler</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+         MODAL : ANNULATION DE COMMANDE AVEC MOTIF
+         ======================================================== */}
+      {showCancelModal && orderToCancel && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', color: 'var(--danger)' }}>
+              Annuler la Commande
+            </h3>
+
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Voulez-vous vraiment annuler la commande <strong>{orderToCancel.identifiant_unique_marquage}</strong> ? Cette opération va recréditer la dette du client si elle n'est pas encore soldée.
+            </div>
+
+            <form onSubmit={handleConfirmCancelOrder} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="form-group">
+                <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Motif de l'annulation <span style={{ color: '#ef4444' }}>*</span></label>
+                <textarea
+                  className="input-control"
+                  style={{ width: '100%', height: '80px', borderRadius: '8px', padding: '0.5rem', fontSize: '0.85rem', resize: 'none', border: cancelReasonError ? '1px solid #ef4444' : '1px solid var(--border-color)' }}
+                  placeholder="Expliquez la raison de l'annulation..."
+                  required
+                  value={cancelReason}
+                  onChange={(e) => {
+                    setCancelReason(e.target.value);
+                    if (e.target.value.trim()) setCancelReasonError('');
+                  }}
+                />
+                {cancelReasonError && (
+                  <span style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '0.2rem' }}>{cancelReasonError}</span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none', color: '#fff' }}>Annuler la commande</button>
+                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowCancelModal(false); setOrderToCancel(null); }}>Fermer</button>
               </div>
             </form>
           </div>
@@ -4047,7 +3627,10 @@ export default function AdminView({ activeTab, searchQuery }) {
                   <span style={{ color: '#f59e0b', fontWeight: '600' }}>{createdOrder.type_article} ({serviceLabels[createdOrder.type_service] || createdOrder.type_service})</span>
                 </div>
                 <div><span style={{ fontWeight: '700' }}>Urgence :</span> {createdOrder.niveau_urgence}</div>
-                <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement}</div>
+                <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement === 'mobile_money' ? 'Mobile Money' : createdOrder.mode_reglement === 'especes' ? 'Espèces' : createdOrder.mode_reglement}</div>
+                {createdOrder.reference_momo && (
+                  <div><span style={{ fontWeight: '700' }}>Réf. Paiement :</span> <strong style={{ color: 'var(--primary)' }}>{createdOrder.reference_momo}</strong></div>
+                )}
                 <div><span style={{ fontWeight: '700' }}>Dépôt :</span> {formatDateTime(createdOrder.created_at)}</div>
                 <div><span style={{ fontWeight: '700' }}>Échéance :</span> {formatDateTime(createdOrder.due_date)}</div>
                 {createdOrder.acompte_paid_at && (
@@ -4055,6 +3638,11 @@ export default function AdminView({ activeTab, searchQuery }) {
                 )}
                 {createdOrder.solde_paid_at && (
                   <div><span style={{ fontWeight: '700' }}>Règlement Solde :</span> {formatDateTime(createdOrder.solde_paid_at)}</div>
+                )}
+                {createdOrder.statut === 'annule' && (
+                  <div style={{ marginTop: '4px', padding: '6px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626' }}>
+                    <span style={{ fontWeight: '700' }}>Motif Annulation :</span> {createdOrder.motif_annulation || 'Non spécifié'}
+                  </div>
                 )}
               </div>
 
@@ -4164,6 +3752,23 @@ export default function AdminView({ activeTab, searchQuery }) {
                   ↓ Télécharger
                 </button>
               </div>
+              {currentUser && currentUser.role === 'super_admin' && (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ width: '100%', color: 'var(--danger)', borderColor: 'var(--danger)', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', marginBottom: '0.4rem', background: 'transparent' }}
+                  onClick={async () => {
+                    if (await confirm(`Voulez-vous vraiment supprimer définitivement la commande ${createdOrder.identifiant_unique_marquage} ? Cette action est irréversible.`)) {
+                      db.deleteOrder(createdOrder.id);
+                      refreshAdminData();
+                      setCreatedOrder(null);
+                      alert("Commande supprimée avec succès.");
+                    }
+                  }}
+                >
+                  Supprimer la commande
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-primary"

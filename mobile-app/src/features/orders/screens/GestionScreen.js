@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform, BackHandler, RefreshControl } from 'react-native';
 import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, Download, Award, Ban } from 'lucide-react-native';
-import { db } from '../services/db';
-import { CustomSelect } from '../components/CustomSelect';
+import { db } from '../../../services/db';
+import { CustomSelect } from '../../../components/CustomSelect';
 import { BlurView } from 'expo-blur';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
-import ClientsScreen from './ClientsScreen';
-import { useDbState } from '../hooks/useDbState';
+import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
+import ClientsScreen from '../../clients/screens/ClientsScreen';
+import { useDbState } from '../../../hooks/useDbState';
 
 export default function GestionScreen({ 
   selectedOrder, 

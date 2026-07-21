@@ -74,7 +74,12 @@ CREATE TABLE IF NOT EXISTS public.catalog (
   service TEXT NOT NULL,
   prix NUMERIC NOT NULL,
   categorie TEXT DEFAULT 'individuel',
-  description TEXT
+  description TEXT,
+  nombre_vetements INTEGER,
+  ramassage BOOLEAN DEFAULT FALSE,
+  nombre_ramassages INTEGER,
+  ramassage_gratuit BOOLEAN DEFAULT FALSE,
+  livraison_gratuite BOOLEAN DEFAULT FALSE
 );
 
 -- 6. Table: pin_reset_requests
@@ -223,13 +228,19 @@ INSERT INTO public.catalog (id, article, service, prix, categorie, description) 
 -- Foulard
 ('cat_foulard_ls', 'Foulard', 'lavage_simple', 0, 'individuel', ''),
 ('cat_foulard_nas', 'Foulard', 'nettoyage_a_sec', 0, 'individuel', ''),
-('cat_foulard_rep', 'Foulard', 'repassage', 0, 'individuel', ''),
--- Abonnements
-('sub1', 'Offre Active', 'abonnement', 20000, 'abonnement', '25 vêtements | Livraison et ramassage gratuits'),
-('sub2', 'Abonnement Premium', 'abonnement', 35000, 'abonnement', '50 vêtements max/mois | 2 ramassages max par mois | Ramassage et livraison gratuits'),
-('sub3', 'Abonnement Prestige', 'abonnement', 60000, 'abonnement', '100 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits'),
-('sub4', 'Abonnement VIP', 'abonnement', 100000, 'abonnement', '200 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits'),
--- Paramètres système
+('cat_foulard_rep', 'Foulard', 'repassage', 0, 'individuel', '')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seeds pour les Abonnements avec caractéristiques détaillées
+INSERT INTO public.catalog (id, article, service, prix, categorie, description, nombre_vetements, ramassage, nombre_ramassages, ramassage_gratuit, livraison_gratuite) VALUES
+('sub1', 'Offre Active', 'abonnement', 20000, 'abonnement', '25 vêtements | Livraison et ramassage gratuits', 25, true, null, true, true),
+('sub2', 'Abonnement Premium', 'abonnement', 35000, 'abonnement', '50 vêtements max/mois | 2 ramassages max par mois | Ramassage et livraison gratuits', 50, true, 2, true, true),
+('sub3', 'Abonnement Prestige', 'abonnement', 60000, 'abonnement', '100 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits', 100, true, 4, true, true),
+('sub4', 'Abonnement VIP', 'abonnement', 100000, 'abonnement', '200 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits', 200, true, 4, true, true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Seeds pour les paramètres système
+INSERT INTO public.catalog (id, article, service, prix, categorie, description) VALUES
 ('setting_express_hours', 'Délai Express (heures)', 'system', 6, 'system_setting', 'Configuration système'),
 ('setting_normal_hours', 'Délai Normal (heures)', 'system', 48, 'system_setting', 'Configuration système'),
 ('setting_express_markup', 'Majoration Express (%)', 'system', 50, 'system_setting', 'Configuration système')

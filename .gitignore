@@ -26,3 +26,5 @@ db.json
 # Antigravity IDE directories
 .agents/
 .antigravity/
+.claude/
+

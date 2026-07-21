@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert, RefreshControl, FlatList } from 'react-native';
-import { Search, Calendar, ChevronRight, X, Clock, Receipt, Printer, Download, Award, Edit3, Trash2, User, Ban } from 'lucide-react-native';
-import { db } from '../services/db';
+import { Search, Calendar, X, Receipt, Trash2, User, Ban, ChevronRight, Tag } from 'lucide-react-native';
+import { db } from '../../../services/db';
 import { BlurView } from 'expo-blur';
-import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
-import { CustomSelect } from '../components/CustomSelect';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
+import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { MotiView } from 'moti';
-import { useDbState } from '../hooks/useDbState';
+import { useDbState } from '../../../hooks/useDbState';
 
 export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { orders, customers, currentUser, isDarkMode } = useDbState();
@@ -37,6 +34,11 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   const [orderToCancel, setOrderToCancel] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelReasonError, setCancelReasonError] = useState('');
+
+  let cancelBorderColor = isDarkMode ? '#334155' : '#e2e8f0';
+  if (cancelReasonError) {
+    cancelBorderColor = '#ef4444';
+  }
 
   const validateCancelReason = (text) => {
     const trimmed = text.trim();
@@ -67,6 +69,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       setSelectedOrder(null);
       if (onShowSuccess) onShowSuccess("Commande annulée avec succès.");
     } catch (e) {
+      console.error("Error cancelling order:", e);
       Alert.alert("Erreur", "Impossible d'annuler cette commande.");
     }
   };
@@ -126,8 +129,9 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             try {
               db.deleteOrder(order.id);
               setSelectedOrder(null);
-              if (onShowSuccess) onShowSuccess("Commande supprim\u00e9e avec succ\u00e8s.");
+              if (onShowSuccess) onShowSuccess("Commande supprimée avec succès.");
             } catch (e) {
+              console.error("Error deleting order:", e);
               Alert.alert("Erreur", "Impossible de supprimer cette commande.");
             }
           }
@@ -149,74 +153,105 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   const getStatusColor = (statut) => {
     switch (statut) {
       case 'pret':
-        return { bg: 'rgba(5, 150, 105, 0.06)', text: '#059669', border: 'rgba(5, 150, 105, 0.12)', label: 'Prêt' };
+        return { 
+          bg: isDarkMode ? 'rgba(16, 185, 129, 0.18)' : '#d1fae5', 
+          text: isDarkMode ? '#34d399' : '#047857', 
+          border: isDarkMode ? 'rgba(16, 185, 129, 0.4)' : '#6ee7b7', 
+          label: 'Prêt à retirer', 
+          accent: '#10b981' 
+        };
       case 'a_recuperer':
-        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'À récupérer' };
+        return { 
+          bg: isDarkMode ? 'rgba(245, 158, 11, 0.18)' : '#fef3c7', 
+          text: isDarkMode ? '#fbbf24' : '#b45309', 
+          border: isDarkMode ? 'rgba(245, 158, 11, 0.4)' : '#fde68a', 
+          label: 'À récupérer', 
+          accent: '#f59e0b' 
+        };
       case 'a_livrer':
-        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'À livrer' };
+        return { 
+          bg: isDarkMode ? 'rgba(99, 102, 241, 0.18)' : '#e0e7ff', 
+          text: isDarkMode ? '#818cf8' : '#4338ca', 
+          border: isDarkMode ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe', 
+          label: 'À livrer', 
+          accent: '#6366f1' 
+        };
       case 'en_cours_livraison':
-        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'En livraison' };
+        return { 
+          bg: isDarkMode ? 'rgba(99, 102, 241, 0.18)' : '#e0e7ff', 
+          text: isDarkMode ? '#818cf8' : '#4338ca', 
+          border: isDarkMode ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe', 
+          label: 'En livraison', 
+          accent: '#6366f1' 
+        };
       case 'restitue':
-        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Récupéré' };
+        return { 
+          bg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#e6f4ea', 
+          text: isDarkMode ? '#34d399' : '#137333', 
+          border: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : '#a8dab5', 
+          label: 'Récupéré', 
+          accent: '#10b981' 
+        };
       case 'livre':
-        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Livré' };
+        return { 
+          bg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#e6f4ea', 
+          text: isDarkMode ? '#34d399' : '#137333', 
+          border: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : '#a8dab5', 
+          label: 'Livré', 
+          accent: '#10b981' 
+        };
       case 'lavage_cours':
       case 'en_cours_lavage':
-        return { bg: 'rgba(37, 99, 235, 0.06)', text: '#2563eb', border: 'rgba(37, 99, 235, 0.12)', label: 'Lavage' };
+        return { 
+          bg: isDarkMode ? 'rgba(59, 130, 246, 0.18)' : '#dbeafe', 
+          text: isDarkMode ? '#60a5fa' : '#1d4ed8', 
+          border: isDarkMode ? 'rgba(59, 130, 246, 0.4)' : '#bfdbfe', 
+          label: 'Lavage', 
+          accent: '#2563eb' 
+        };
       case 'repassage_cours':
       case 'en_cours_repassage':
-        return { bg: 'rgba(13, 148, 136, 0.06)', text: '#0d9488', border: 'rgba(13, 148, 136, 0.12)', label: 'Repassage' };
+        return { 
+          bg: isDarkMode ? 'rgba(13, 148, 136, 0.18)' : '#ccfbf1', 
+          text: isDarkMode ? '#2dd4bf' : '#0f766e', 
+          border: isDarkMode ? 'rgba(13, 148, 136, 0.4)' : '#99f6e4', 
+          label: 'Repassage', 
+          accent: '#0d9488' 
+        };
       case 'traitement':
-        return { bg: 'rgba(124, 58, 237, 0.06)', text: '#7c3aed', border: 'rgba(124, 58, 237, 0.12)', label: 'Traitement' };
+        return { 
+          bg: isDarkMode ? 'rgba(124, 58, 237, 0.18)' : '#f3e8ff', 
+          text: isDarkMode ? '#c084fc' : '#6b21a8', 
+          border: isDarkMode ? 'rgba(124, 58, 237, 0.4)' : '#e9d5ff', 
+          label: 'Traitement', 
+          accent: '#7c3aed' 
+        };
       case 'attente':
       case 'en_attente':
-        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'En attente' };
+        return { 
+          bg: isDarkMode ? 'rgba(217, 119, 6, 0.18)' : '#fff7ed', 
+          text: isDarkMode ? '#fbbf24' : '#c2410c', 
+          border: isDarkMode ? 'rgba(217, 119, 6, 0.4)' : '#ffedd5', 
+          label: 'En attente', 
+          accent: '#d97706' 
+        };
       case 'annule':
-        return { bg: 'rgba(220, 38, 38, 0.06)', text: '#dc2626', border: 'rgba(220, 38, 38, 0.15)', label: 'Annulée' };
+        return { 
+          bg: isDarkMode ? 'rgba(220, 38, 38, 0.18)' : '#ffe4e6', 
+          text: isDarkMode ? '#f87171' : '#be123c', 
+          border: isDarkMode ? 'rgba(220, 38, 38, 0.4)' : '#fecdd3', 
+          label: 'Annulée', 
+          accent: '#dc2626' 
+        };
       default:
-        return { bg: 'rgba(217, 119, 6, 0.06)', text: '#d97706', border: 'rgba(217, 119, 6, 0.12)', label: 'En attente' };
+        return { 
+          bg: isDarkMode ? 'rgba(217, 119, 6, 0.18)' : '#fff7ed', 
+          text: isDarkMode ? '#fbbf24' : '#c2410c', 
+          border: isDarkMode ? 'rgba(217, 119, 6, 0.4)' : '#ffedd5', 
+          label: 'En attente', 
+          accent: '#d97706' 
+        };
     }
-  };
-
-  const catalog = db.getCatalog();
-
-  const handleSubscribeCrm = (customerId, planId) => {
-    if (!planId) {
-      Alert.alert("Erreur", "Veuillez sélectionner un forfait d'abonnement.");
-      return;
-    }
-    const updatedCust = db.subscribeCustomer(customerId, planId);
-    if (updatedCust) {
-      Alert.alert("Succès", `Abonnement souscrit avec succès pour ${updatedCust.prenom} ${updatedCust.nom} !`);
-      setSelectedCrmSubId('');
-      setSelectedClient({ ...updatedCust });
-    }
-  };
-
-  const handleUnsubscribeCrm = (customerId) => {
-    Alert.alert(
-      "Confirmation",
-      "Êtes-vous sûr de vouloir résilier cet abonnement ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        { 
-          text: "Résilier", 
-          style: "destructive",
-          onPress: () => {
-            const updatedCust = db.unsubscribeCustomer(customerId);
-            if (updatedCust) {
-              Alert.alert("Succès", "Abonnement résilié avec succès !");
-              setSelectedClient({ ...updatedCust });
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const getItemsSummary = (items) => {
-    if (!items || items.length === 0) return 'Aucun article';
-    return items.map(a => `${a.article} x${a.quantite || a.quantity}`).join(', ');
   };
 
   const getCustomerName = (customerId) => {
@@ -226,218 +261,6 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
 
   const formatPrice = (price) => {
     return (price || 0).toLocaleString('fr-FR') + ' FCFA';
-  };
-
-  const generateInvoiceHtml = (order) => {
-    const client = customers.find(c => c.id === order.customer_id) || { prenom: 'Client', nom: 'Inconnu' };
-    const dateStr = order.created_at ? new Date(order.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
-    const displayTicketId = getDisplayTicketId(order);
-    
-    const articlesHtml = (order.items || order.articles || []).map(art => `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px;">
-        <div style="flex: 1.8; text-align: left;">
-          <div style="font-weight: bold; color: #000;">${art.article}</div>
-          <div style="font-size: 11px; color: #666; text-transform: uppercase;">${art.service.replace(/_/g, ' ')}</div>
-        </div>
-        <div style="width: 40px; text-align: center;">x${art.quantite || art.quantity}</div>
-        <div style="width: 100px; text-align: right; font-weight: bold;">${formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</div>
-      </div>
-    `).join('');
-
-    const remiseHtml = order.remise_pourcentage > 0 ? `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px;">
-        <div style="font-weight: bold;">REMISE (${order.remise_pourcentage}%)</div>
-        <div style="color: #ff3b30; font-weight: bold;">-${formatPrice(order.remise_montant || 0)}</div>
-      </div>
-    ` : '';
-
-    return `
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-          <style>
-            body {
-              font-family: 'Courier New', Courier, monospace, sans-serif;
-              color: #000000;
-              margin: 0;
-              padding: 24px;
-              background-color: #ffffff;
-            }
-            .container {
-              max-width: 380px;
-              margin: 0 auto;
-              padding: 10px;
-            }
-            .brand {
-              font-size: 24px;
-              font-weight: 900;
-              text-align: center;
-              margin-bottom: 2px;
-              letter-spacing: 2px;
-            }
-            .brand-sub {
-              font-size: 10px;
-              font-weight: bold;
-              text-align: center;
-              margin-bottom: 8px;
-              color: #333;
-            }
-            .text-muted {
-              font-size: 11px;
-              text-align: center;
-              color: #555;
-              margin: 2px 0;
-            }
-            .divider {
-              border-top: 1px dashed #000;
-              margin: 12px 0;
-            }
-            .meta-row {
-              display: flex;
-              justify-content: space-between;
-              font-size: 13px;
-              margin-bottom: 4px;
-            }
-            .meta-label {
-              font-weight: bold;
-              color: #333;
-            }
-            .meta-value {
-              text-align: right;
-            }
-            .section-title {
-              font-size: 12px;
-              font-weight: bold;
-              margin-bottom: 10px;
-              text-align: center;
-              letter-spacing: 1px;
-            }
-            .total-row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 6px;
-              font-size: 14px;
-            }
-            .total-bold {
-              font-weight: 900;
-              font-size: 15px;
-            }
-            .footer-msg {
-              font-size: 12px;
-              font-weight: bold;
-              text-align: center;
-              margin-top: 20px;
-              margin-bottom: 12px;
-            }
-            .barcode {
-              border: 1px dashed #000;
-              padding: 8px;
-              text-align: center;
-              font-size: 15px;
-              font-weight: bold;
-              margin: 10px 0;
-              letter-spacing: 4px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="brand">KLIN UP</div>
-            <div class="brand-sub">LAVERIE & PRESSING PREMIUM</div>
-            <div class="text-muted">Tél: +229 XX XX XX XX</div>
-            <div class="text-muted">Cotonou, Bénin</div>
-            
-            <div class="divider"></div>
-            
-            <div class="meta-row">
-              <div class="meta-label">Ticket N° :</div>
-              <div class="meta-value">#${displayTicketId}</div>
-            </div>
-            <div class="meta-row">
-              <div class="meta-label">Code :</div>
-              <div class="meta-value">${order.identifiant_unique_marquage || order.id}</div>
-            </div>
-            <div class="meta-row">
-              <div class="meta-label">Date :</div>
-              <div class="meta-value">${dateStr}</div>
-            </div>
-            <div class="meta-row">
-              <div class="meta-label">Client :</div>
-              <div class="meta-value">${client.prenom} ${client.nom}</div>
-            </div>
-            
-            <div class="divider"></div>
-            
-            <div class="section-title">ARTICLES & SERVICES</div>
-            ${articlesHtml}
-            
-            <div class="divider"></div>
-            
-            <div class="total-row">
-              <div>TOTAL BRUT</div>
-              <div>${formatPrice(order.prix_total || order.total)}</div>
-            </div>
-            ${remiseHtml}
-            <div class="total-row total-bold">
-              <div>NET A PAYER</div>
-              <div>${formatPrice(order.total || order.prix_total)}</div>
-            </div>
-            <div class="total-row">
-              <div>AVANCE PAYEE</div>
-              <div>${formatPrice(order.avance_payee || order.avance || 0)}</div>
-            </div>
-            <div class="total-row total-bold" style="color: ${(order.reste || 0) > 0 ? '#ff3b30' : '#34c759'};">
-              <div>RESTE A PAYER</div>
-              <div>${formatPrice(order.reste || 0)}</div>
-            </div>
-            
-            <div class="divider"></div>
-            
-            <div class="footer-msg">MERCI DE VOTRE CONFIANCE !</div>
-            
-            <div class="barcode">* ${order.identifiant_unique_marquage || order.id} *</div>
-            
-            <div class="text-muted" style="text-align: center;">Rejoignez KLIN UP pour un service premium</div>
-          </div>
-        </body>
-      </html>
-    `;
-  };
-
-  const handlePrintInvoice = async (order) => {
-    try {
-      const html = generateInvoiceHtml(order);
-      await Print.printAsync({ html });
-    } catch (error) {
-      Alert.alert("Erreur", "Impossible d'imprimer la facture.");
-      console.error(error);
-    }
-  };
-
-  const handleDownloadInvoice = async (order) => {
-    try {
-      const html = generateInvoiceHtml(order);
-      const { uri } = await Print.printToFileAsync({ html });
-      
-      if (Platform.OS === 'web') {
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `facture_${order.identifiant_unique_marquage || order.id || displayTicketId}.pdf`;
-        link.click();
-      } else {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Télécharger la facture',
-          UTI: 'com.adobe.pdf'
-        });
-      }
-    } catch (error) {
-      Alert.alert("Erreur", "Impossible de télécharger la facture.");
-      console.error(error);
-    }
   };
 
   const handleShowInvoice = (item, e) => {
@@ -544,77 +367,97 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
         renderItem={({ item }) => {
           const status = getStatusColor(item.statut);
           const clientObj = customers.find(c => c.id === item.customer_id);
+          const hasSub = clientObj?.active_subscription;
+          const subRemaining = hasSub ? hasSub.remaining_clothes : 0;
+          const subTotal = hasSub ? hasSub.total_clothes : 0;
+          const subPercentUsed = subTotal > 0 ? Math.max(0, Math.min(100, Math.round(((subTotal - subRemaining) / subTotal) * 100))) : 0;
+
           return (
             <TouchableOpacity
               key={item.id}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
               onPress={() => setSelectedOrder(item)}
               style={styles.historyCard}
             >
+              {/* Card Header: Client Pill & Status Badge */}
               <View style={styles.cardHeader}>
-                <View style={{ flex: 1 }}>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      if (clientObj && onSelectClient) onSelectClient(clientObj);
-                    }}
-                    activeOpacity={0.8}
-                    style={styles.clientPillBtn}
-                  >
-                    <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
-                    <Text style={styles.clientPillBtnText}>
-                      {getCustomerName(item.customer_id)}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={[styles.ticketNo, { marginTop: 6 }]}>Ticket #{getDisplayTicketId(item)}</Text>
-                </View>
-                <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, borderWidth: 1 }]}>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    if (clientObj && onSelectClient) onSelectClient(clientObj);
+                  }}
+                  activeOpacity={0.8}
+                  style={styles.clientPillBtn}
+                >
+                  <User size={13} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 5 }} />
+                  <Text style={styles.clientPillBtnText}>
+                    {getCustomerName(item.customer_id)}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border }]}>
+                  <View style={[styles.statusDot, { backgroundColor: status.accent }]} />
                   <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
                 </View>
               </View>
 
-              {clientObj && clientObj.active_subscription && (
+              {/* Ticket & Article summary */}
+              <View style={styles.ticketSummaryRow}>
+                <View style={styles.ticketBadge}>
+                  <Tag size={11} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 4 }} />
+                  <Text style={styles.ticketNoText}>Ticket #{getDisplayTicketId(item)}</Text>
+                </View>
+                {item.type_article ? (
+                  <Text style={styles.articleSummaryText} numberOfLines={1}>
+                    {item.type_article} {item.type_service ? `• ${item.type_service.replaceAll('_', ' ')}` : ''}
+                  </Text>
+                ) : null}
+              </View>
+
+              {hasSub && (
                 <View style={styles.cardSubscriptionGaugeContainer}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={styles.cardSubText}>Abonnement : {clientObj.active_subscription.name}</Text>
+                    <Text style={styles.cardSubText}>Abonnement : {hasSub.name}</Text>
                     <Text style={styles.cardSubTextBold}>
-                      {clientObj.active_subscription.remaining_clothes} / {clientObj.active_subscription.total_clothes} vêt.
+                      {subRemaining} / {subTotal} vêt.
                     </Text>
                   </View>
-                  {(() => {
-                    const remaining = clientObj.active_subscription.remaining_clothes;
-                    const total = clientObj.active_subscription.total_clothes;
-                    const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                    return (
-                      <View style={styles.cardProgressBarBg}>
-                        <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
-                      </View>
-                    );
-                  })()}
+                  <View style={styles.cardProgressBarBg}>
+                    <View style={[styles.cardProgressBarFill, { width: `${subPercentUsed}%` }]} />
+                  </View>
                 </View>
               )}
 
               <View style={styles.cardDivider} />
 
+              {/* Date & Price Row */}
               <View style={styles.cardFooter}>
                 <View style={styles.dateBlock}>
-                  <Calendar size={12} color="#71717a" style={{ marginRight: 4 }} />
-                  <Text style={styles.dateText}>{item.created_at.split('T')[0]}</Text>
+                  <Calendar size={12} color={isDarkMode ? '#94a3b8' : '#64748b'} style={{ marginRight: 5 }} />
+                  <Text style={styles.dateText}>
+                    {item.created_at ? new Date(item.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                  </Text>
                 </View>
                 <Text style={styles.totalAmount}>{formatPrice(item.prix_total || item.total)}</Text>
               </View>
 
               <View style={styles.cardDivider} />
 
-              <View style={styles.cardFooterArea}>
+              {/* Action Bar */}
+              <View style={styles.cardActionRow}>
                 <TouchableOpacity
                   onPress={(e) => handleShowInvoice(item, e)}
                   style={styles.factureBtn}
                   activeOpacity={0.7}
                 >
-                  <Receipt size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                  <Receipt size={13} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 5 }} />
                   <Text style={styles.factureBtnText}>Facture</Text>
                 </TouchableOpacity>
+
+                <View style={styles.detailsLinkBtn}>
+                  <Text style={styles.detailsLinkText}>Détails</Text>
+                  <ChevronRight size={14} color={isDarkMode ? '#38bdf8' : '#002cf7'} />
+                </View>
               </View>
             </TouchableOpacity>
           );
@@ -676,7 +519,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
 
                   {(() => {
                     const client = customers.find(c => c.id === selectedOrder.customer_id);
-                    if (client && client.active_subscription) {
+                    if (client?.active_subscription) {
                       const remaining = client.active_subscription.remaining_clothes;
                       const total = client.active_subscription.total_clothes;
                       const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
@@ -698,9 +541,9 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
 
                 <Text style={styles.sectionTitle}>Articles</Text>
                 <View style={styles.detailCard}>
-                  {(selectedOrder.items || selectedOrder.articles || []).map((art, idx) => (
-                    <View key={idx} style={styles.articleRow}>
-                      <Text style={styles.articleText}>{art.article} ({art.service.replace(/_/g, ' ')}) x{art.quantite}</Text>
+                  {(selectedOrder.items || selectedOrder.articles || []).map((art) => (
+                    <View key={`${art.article}-${art.service}`} style={styles.articleRow}>
+                      <Text style={styles.articleText}>{art.article} ({art.service.replaceAll('_', ' ')}) x{art.quantite}</Text>
                       <Text style={styles.articlePrice}>{formatPrice(art.prix * art.quantite)}</Text>
                     </View>
                   ))}
@@ -860,8 +703,8 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
 
                       {/* Articles list */}
                       <View style={{ marginVertical: 4 }}>
-                        {(invoiceOrder.items || invoiceOrder.articles || []).map((art, idx) => (
-                          <View key={idx} style={styles.tpeItemRow}>
+                        {(invoiceOrder.items || invoiceOrder.articles || []).map((art) => (
+                          <View key={`${art.article}-${art.service}`} style={styles.tpeItemRow}>
                             <Text style={styles.tpeItemName}>
                               {art.article} x{art.quantite || art.quantity}
                             </Text>
@@ -1000,7 +843,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                       height: 80,
                       textAlignVertical: 'top',
                       padding: 12,
-                      borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                      borderColor: cancelBorderColor,
                       borderRadius: 12,
                       borderWidth: 1,
                       backgroundColor: isDarkMode ? '#0f172a' : '#f1f5f9',
@@ -1065,6 +908,8 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   );
 }
 
+const FONT_FAMILY = Platform.select({ ios: 'System', android: 'sans-serif' });
+
 const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1081,6 +926,7 @@ const baseStyles = StyleSheet.create({
     fontWeight: '700',
     color: '#09090b',
     letterSpacing: -0.5,
+    fontFamily: FONT_FAMILY,
   },
   filterHeader: {
     backgroundColor: '#ffffff',
@@ -1109,6 +955,7 @@ const baseStyles = StyleSheet.create({
     color: '#0f172a',
     fontWeight: '500',
     height: '100%',
+    fontFamily: FONT_FAMILY,
   },
   chipRow: {
     flexDirection: 'row',
@@ -1128,10 +975,12 @@ const baseStyles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     fontWeight: '600',
+    fontFamily: FONT_FAMILY,
   },
   chipTextActive: {
     color: '#ffffff',
     fontWeight: '600',
+    fontFamily: FONT_FAMILY,
   },
   scrollContent: {
     padding: 16,
@@ -1143,68 +992,142 @@ const baseStyles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 30,
     fontWeight: '500',
+    fontFamily: FONT_FAMILY,
   },
   historyCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 22,
+    borderRadius: 20,
     padding: 16,
-    marginBottom: 12,
-    borderWidth: 1.5,
-    borderColor: '#ffffff',
-    shadowColor: '#002cf7',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.03,
-    shadowRadius: 20,
-    elevation: 3,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 10,
   },
   clientName: {
     fontSize: 14,
     fontWeight: '600',
     color: '#0f172a',
+    fontFamily: FONT_FAMILY,
   },
   ticketNo: {
     fontSize: 11,
     color: '#64748b',
     marginTop: 3,
     fontWeight: '500',
+    fontFamily: FONT_FAMILY,
   },
   statusTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
     borderWidth: 1,
   },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 5,
+  },
   statusTagText: {
-    fontSize: 9,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: FONT_FAMILY,
+  },
+  ticketSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  ticketBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  ticketNoText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+    fontFamily: FONT_FAMILY,
+  },
+  articleSummaryText: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+    maxWidth: '55%',
+    fontFamily: FONT_FAMILY,
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 10,
   },
   dateBlock: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   dateText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748b',
     fontWeight: '500',
+    fontFamily: FONT_FAMILY,
   },
   totalAmount: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#002cf7',
+    letterSpacing: -0.3,
+    fontFamily: FONT_FAMILY,
+  },
+  cardActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  factureBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 44, 247, 0.06)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 44, 247, 0.15)',
+  },
+  factureBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#002cf7',
+    fontFamily: FONT_FAMILY,
+  },
+  detailsLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  detailsLinkText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#002cf7',
+    marginRight: 2,
+    fontFamily: FONT_FAMILY,
   },
   modalView: {
     flex: 1,
@@ -1225,6 +1148,7 @@ const baseStyles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#0f172a',
+    fontFamily: FONT_FAMILY,
   },
   modalScroll: {
     padding: 20,
@@ -1234,23 +1158,26 @@ const baseStyles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.03,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
   },
   detailClientName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#0f172a',
+    fontFamily: FONT_FAMILY,
   },
   detailDate: {
     fontSize: 12,
     color: '#64748b',
     marginTop: 4,
     fontWeight: '500',
+    fontFamily: FONT_FAMILY,
   },
   sectionTitle: {
     fontSize: 12,
@@ -1259,6 +1186,7 @@ const baseStyles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    fontFamily: FONT_FAMILY,
   },
   articleRow: {
     flexDirection: 'row',
@@ -1269,11 +1197,13 @@ const baseStyles = StyleSheet.create({
     fontSize: 12,
     color: '#475569',
     fontWeight: '500',
+    fontFamily: FONT_FAMILY,
   },
   articlePrice: {
     fontSize: 12,
     fontWeight: '600',
     color: '#0f172a',
+    fontFamily: FONT_FAMILY,
   },
   divider: {
     height: 1,
@@ -1284,26 +1214,31 @@ const baseStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#0f172a',
+    fontFamily: FONT_FAMILY,
   },
   totalValue: {
     fontSize: 13,
     fontWeight: '600',
     color: '#2563eb',
+    fontFamily: FONT_FAMILY,
   },
   subLabel: {
     fontSize: 11,
     color: '#64748b',
     fontWeight: '500',
+    fontFamily: FONT_FAMILY,
   },
   subValue: {
     fontSize: 11,
     color: '#334155',
     fontWeight: '600',
+    fontFamily: FONT_FAMILY,
   },
   logisticsText: {
     fontSize: 12,
     color: '#334155',
     fontWeight: '500',
+    fontFamily: FONT_FAMILY,
   },
   compactModalOverlay: {
     flex: 1,
@@ -1338,6 +1273,7 @@ const baseStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0f172a',
+    fontFamily: FONT_FAMILY,
   },
   compactModalScroll: {
     paddingBottom: 24,
@@ -1790,12 +1726,19 @@ const getStyles = (isDarkMode) => {
     chipActive: { backgroundColor: '#002cf7' },
     chipText: { color: '#cbd5e1' },
     chipTextActive: { color: '#ffffff' },
-    historyCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    historyCard: { backgroundColor: '#1e293b', borderColor: '#334155', shadowColor: '#000000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 5 },
     clientName: { color: '#ffffff' },
     ticketNo: { color: '#cbd5e1' },
     cardFooter: { borderTopColor: '#334155' },
-    dateText: { color: '#cbd5e1' },
-    totalAmount: { color: '#ffffff' },
+    dateText: { color: '#94a3b8' },
+    totalAmount: { color: '#38bdf8' },
+    ticketBadge: { backgroundColor: '#0f172a' },
+    ticketNoText: { color: '#cbd5e1' },
+    articleSummaryText: { color: '#94a3b8' },
+    cardActionRow: { borderTopColor: 'rgba(255, 255, 255, 0.08)' },
+    factureBtn: { backgroundColor: 'rgba(56, 189, 248, 0.12)', borderColor: 'rgba(56, 189, 248, 0.3)' },
+    factureBtnText: { color: '#38bdf8' },
+    detailsLinkText: { color: '#38bdf8' },
     modalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
     modalContent: { backgroundColor: '#1e293b', borderColor: '#334155' },
     modalTitle: { color: '#ffffff' },
@@ -1808,7 +1751,7 @@ const getStyles = (isDarkMode) => {
     invoiceItemTotal: { color: '#ffffff' },
     invoiceSummaryRow: { borderTopColor: '#334155' },
     invoiceTotalValue: { color: '#ffffff' },
-    clientPillBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
+    clientPillBtn: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.3)' },
     clientPillBtnText: { color: '#38bdf8' },
   };
 

@@ -958,6 +958,11 @@ tr:hover td {
   background: var(--status-pending-light);
   color: var(--status-pending);
 }
+.badge-traitement {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
 .badge-en_cours_lavage {
   background: var(--status-washing-light);
   color: var(--status-washing);

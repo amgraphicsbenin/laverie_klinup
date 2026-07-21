@@ -1,0 +1,200 @@
+/**
+ * @file seeds.js
+ * @description Données par défaut pour l'initialisation de la base de données KLIN UP.
+ * Contient le personnel d'origine (DEFAULT_STAFF) et le catalogue de services (DEFAULT_CATALOG).
+ */
+
+export const DEFAULT_STAFF = [
+  { id: 'u1', nom: 'Gomez', prenom: 'Jean-Luc', role: 'super_admin', email: 'jean-luc.gomez@klinup.com', code_pin: '111111', created_at: new Date().toISOString() },
+  { id: 'u2', nom: 'Koffi', prenom: 'Marie-Antoinette', role: 'manager', email: 'marie.koffi@klinup.com', code_pin: '222222', created_at: new Date().toISOString() },
+  { id: 'u3', nom: 'Diallo', prenom: 'Pierre', role: 'agent_accueil', email: 'pierre.diallo@klinup.com', code_pin: '333333', created_at: new Date().toISOString() },
+  { id: 'u4', nom: 'Koutomi', prenom: 'André', role: 'super_admin', email: 'andre.koutomi98@gmail.com', code_pin: '000000', created_at: new Date().toISOString() },
+  { id: 'u5', nom: 'Sosso', prenom: 'Paul', role: 'livreur', email: 'paul.sosso@klinup.com', code_pin: '444444', created_at: new Date().toISOString() },
+  { id: 'u6', nom: 'Kole', prenom: 'Moussa', role: 'agent_lavage_repassage', email: 'moussa.kole@klinup.com', code_pin: '555555', created_at: new Date().toISOString() }
+];
+
+export const DEFAULT_CUSTOMERS = [];
+export const DEFAULT_ORDERS = [];
+export const DEFAULT_LOGS = [];
+
+export const DEFAULT_CATALOG = [
+  { id: 'cat1', article: 'Chemise', service: 'lavage_simple', prix: 1500, categorie: 'individuel' },
+  { id: 'cat2', article: 'Chemise', service: 'nettoyage_a_sec', prix: 3000, categorie: 'individuel' },
+  { id: 'cat3', article: 'Chemise', service: 'repassage', prix: 1000, categorie: 'individuel' },
+  { id: 'cat4', article: 'Pantalon', service: 'lavage_simple', prix: 2000, categorie: 'individuel' },
+  { id: 'cat5', article: 'Pantalon', service: 'nettoyage_a_sec', prix: 3500, categorie: 'individuel' },
+  { id: 'cat6', article: 'Pantalon', service: 'repassage', prix: 1200, categorie: 'individuel' },
+  { id: 'cat7', article: 'Robe', service: 'lavage_simple', prix: 2500, categorie: 'individuel' },
+  { id: 'cat8', article: 'Robe', service: 'nettoyage_a_sec', prix: 4500, categorie: 'individuel' },
+  { id: 'cat9', article: 'Robe', service: 'repassage', prix: 1500, categorie: 'individuel' },
+  { id: 'cat10', article: 'Combinaison', service: 'lavage_simple', prix: 3000, categorie: 'individuel' },
+  { id: 'cat11', article: 'Combinaison', service: 'nettoyage_a_sec', prix: 5000, categorie: 'individuel' },
+  { id: 'cat12', article: 'Combinaison', service: 'repassage', prix: 1800, categorie: 'individuel' },
+
+  // Jupe (Default 0)
+  { id: 'cat_jupe_ls', article: 'Jupe', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_jupe_nas', article: 'Jupe', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_jupe_rep', article: 'Jupe', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Pull (Default 0)
+  { id: 'cat_pull_ls', article: 'Pull', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_pull_nas', article: 'Pull', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_pull_rep', article: 'Pull', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Culotte (Default 0)
+  { id: 'cat_culotte_ls', article: 'Culotte', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_culotte_nas', article: 'Culotte', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_culotte_rep', article: 'Culotte', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // T-shirt (Default 0)
+  { id: 'cat_tshirt_ls', article: 'T-shirt', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_tshirt_nas', article: 'T-shirt', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_tshirt_rep', article: 'T-shirt', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Polo (Default 0)
+  { id: 'cat_polo_ls', article: 'Polo', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_polo_nas', article: 'Polo', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_polo_rep', article: 'Polo', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Blouson (Default 0)
+  { id: 'cat_blouson_ls', article: 'Blouson', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_blouson_nas', article: 'Blouson', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_blouson_rep', article: 'Blouson', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Veste (Default 0)
+  { id: 'cat_veste_ls', article: 'Veste', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_veste_nas', article: 'Veste', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_veste_rep', article: 'Veste', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Costume (Default 0)
+  { id: 'cat_costume_ls', article: 'Costume', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_costume_nas', article: 'Costume', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_costume_rep', article: 'Costume', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Cravate (Default 0)
+  { id: 'cat_cravate_ls', article: 'Cravate', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_cravate_nas', article: 'Cravate', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_cravate_rep', article: 'Cravate', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Haut (Default 0)
+  { id: 'cat_haut_ls', article: 'Haut', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_haut_nas', article: 'Haut', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_haut_rep', article: 'Haut', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Débardeur (Default 0)
+  { id: 'cat_debardeur_ls', article: 'Débardeur', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_debardeur_nas', article: 'Débardeur', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_debardeur_rep', article: 'Débardeur', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Jeans (Default 0)
+  { id: 'cat_jeans_ls', article: 'Jeans', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_jeans_nas', article: 'Jeans', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_jeans_rep', article: 'Jeans', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Robe de mariée (Default 0)
+  { id: 'cat_robemariee_ls', article: 'Robe de mariée', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_robemariee_nas', article: 'Robe de mariée', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_robemariee_rep', article: 'Robe de mariée', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Couette Legée (Default 0)
+  { id: 'cat_couettelegee_ls', article: 'Couette Legée', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_couettelegee_nas', article: 'Couette Legée', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_couettelegee_rep', article: 'Couette Legée', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Couette lourd (Default 0)
+  { id: 'cat_couettelourd_ls', article: 'Couette lourd', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_couettelourd_nas', article: 'Couette lourd', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_couettelourd_rep', article: 'Couette lourd', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // 1Draps+ 2 taies (Default 0)
+  { id: 'cat_1draps2taies_ls', article: '1Draps+ 2 taies', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_1draps2taies_nas', article: '1Draps+ 2 taies', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_1draps2taies_rep', article: '1Draps+ 2 taies', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // 2 draps+ 2 taies (Default 0)
+  { id: 'cat_2draps2taies_ls', article: '2 draps+ 2 taies', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_2draps2taies_nas', article: '2 draps+ 2 taies', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_2draps2taies_rep', article: '2 draps+ 2 taies', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Taies (Default 0)
+  { id: 'cat_taies_ls', article: 'Taies', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_taies_nas', article: 'Taies', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_taies_rep', article: 'Taies', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Petite serviette (Default 0)
+  { id: 'cat_petiteserviette_ls', article: 'Petite serviette', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_petiteserviette_nas', article: 'Petite serviette', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_petiteserviette_rep', article: 'Petite serviette', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Grandes serviettes (Default 0)
+  { id: 'cat_grandesserviettes_ls', article: 'Grandes serviettes', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_grandesserviettes_nas', article: 'Grandes serviettes', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_grandesserviettes_rep', article: 'Grandes serviettes', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Ensemble 2 pièce (Default 0)
+  { id: 'cat_ensemble2piece_ls', article: 'Ensemble 2 pièce', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_ensemble2piece_nas', article: 'Ensemble 2 pièce', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_ensemble2piece_rep', article: 'Ensemble 2 pièce', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Ensemble 3 pièces (Default 0)
+  { id: 'cat_ensemble3pieces_ls', article: 'Ensemble 3 pièces', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_ensemble3pieces_nas', article: 'Ensemble 3 pièces', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_ensemble3pieces_rep', article: 'Ensemble 3 pièces', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Chapeau (Default 0)
+  { id: 'cat_chapeau_ls', article: 'Chapeau', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_chapeau_nas', article: 'Chapeau', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_chapeau_rep', article: 'Chapeau', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // chausette (Default 0)
+  { id: 'cat_chausette_ls', article: 'chausette', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_chausette_nas', article: 'chausette', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_chausette_rep', article: 'chausette', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Nappe de table (Default 0)
+  { id: 'cat_nappetable_ls', article: 'Nappe de table', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_nappetable_nas', article: 'Nappe de table', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_nappetable_rep', article: 'Nappe de table', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Rideau (Default 0)
+  { id: 'cat_rideau_ls', article: 'Rideau', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_rideau_nas', article: 'Rideau', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_rideau_rep', article: 'Rideau', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Robe fantaisiste (Default 0)
+  { id: 'cat_robefantaisiste_ls', article: 'Robe fantaisiste', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_robefantaisiste_nas', article: 'Robe fantaisiste', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_robefantaisiste_rep', article: 'Robe fantaisiste', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Serpillière (Default 0)
+  { id: 'cat_serpilliere_ls', article: 'Serpillière', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_serpilliere_nas', article: 'Serpillière', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_serpilliere_rep', article: 'Serpillière', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Torchon (Default 0)
+  { id: 'cat_torchon_ls', article: 'Torchon', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_torchon_nas', article: 'Torchon', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_torchon_rep', article: 'Torchon', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  // Foulard (Default 0)
+  { id: 'cat_foulard_ls', article: 'Foulard', service: 'lavage_simple', prix: 0, categorie: 'individuel' },
+  { id: 'cat_foulard_nas', article: 'Foulard', service: 'nettoyage_a_sec', prix: 0, categorie: 'individuel' },
+  { id: 'cat_foulard_rep', article: 'Foulard', service: 'repassage', prix: 0, categorie: 'individuel' },
+
+  { id: 'sub1', article: 'Offre Active', service: 'abonnement', prix: 20000, description: '25 vêtements | Livraison et ramassage gratuits', categorie: 'abonnement' },
+  { id: 'sub2', article: 'Abonnement Premium', service: 'abonnement', prix: 35000, description: '50 vêtements max/mois | 2 ramassages max par mois | Ramassage et livraison gratuits', categorie: 'abonnement' },
+  { id: 'sub3', article: 'Abonnement Prestige', service: 'abonnement', prix: 60000, description: '100 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits', categorie: 'abonnement' },
+  { id: 'sub4', article: 'Abonnement VIP', service: 'abonnement', prix: 100000, description: '200 vêtements max/mois | 4 ramassages max par mois | Ramassage et livraison gratuits', categorie: 'abonnement' },
+  { id: 'setting_express_hours', article: 'Délai Express (heures)', service: 'system', prix: 6, categorie: 'system_setting', description: 'Configuration système' },
+  { id: 'setting_normal_hours', article: 'Délai Normal (heures)', service: 'system', prix: 48, categorie: 'system_setting', description: 'Configuration système' },
+  { id: 'setting_express_markup', article: 'Majoration Express (%)', service: 'system', prix: 50, categorie: 'system_setting', description: 'Configuration système' }
+];
+
+export const STORAGE_KEYS = {
+  STAFF: 'klin_up_staff_profiles',
+  CUSTOMERS: 'klin_up_customers',
+  ORDERS: 'klin_up_orders',
+  LOGS: 'klin_up_activity_logs',
+  CATALOG: 'klin_up_catalog',
+  CURRENT_USER: 'klin_up_current_user'
+};

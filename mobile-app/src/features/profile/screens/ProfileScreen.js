@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler, Switch } from 'react-native';
-import { User, Key, LogOut, X, Printer, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight } from 'lucide-react-native';
-import { db } from '../services/db';
+import { Key, LogOut, X, Printer, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight } from 'lucide-react-native';
+import { db } from '../../../services/db';
 import { BlurView } from 'expo-blur';
-import { useScrollPaddingBottom } from '../hooks/useTabBarHeight';
-import { useDbState } from '../hooks/useDbState';
+import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
+import { useDbState } from '../../../hooks/useDbState';
 
 export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigger, onShowSuccess }) {
-  const { currentUser, isRemote, isDarkMode } = useDbState();
-  const syncQueue = db.getSyncQueue ? db.getSyncQueue() : [];
+  const { currentUser, isDarkMode } = useDbState();
 
   const [showPinModal, setShowPinModal] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
@@ -124,7 +123,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
     }
 
     try {
-      await db.updateStaffPin(currentUser.id, newPin);
+      db.updateStaffPin(currentUser.id, newPin);
       if (onShowSuccess) {
         onShowSuccess("Votre code PIN a été modifié avec succès.");
       } else {
@@ -134,6 +133,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
       setNewPin('');
       setShowPinModal(false);
     } catch (e) {
+      console.error("Error updating PIN:", e);
       Alert.alert("Erreur", "Impossible de modifier le code PIN.");
     }
   };
