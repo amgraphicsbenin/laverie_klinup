@@ -651,99 +651,101 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             </MotiView>
           </TouchableOpacity>
 
-        {/* 2X2 GRID STATS */}
+        {/* 2X2 GRID STATS (DESIGN FIRST MODEL) */}
         <View style={styles.gridRow}>
-          {/* Card 1: En Cours (Pastel Blue) */}
+          {/* Card 1: En Cours */}
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.85}
             onPress={() => setActiveKpiDetail('en_cours')}
             style={{ flex: 1 }}
           >
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 120, delay: 15 }}
-              style={[styles.gridCard, styles.gridCardPastelBlue]}
+              transition={{ type: 'timing', duration: 150, delay: 15 }}
+              style={styles.newGridCard}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(3, 105, 161, 0.06)' }]}>
-                  <Layers size={14} color="#0369a1" />
+                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(2, 132, 199, 0.15)' : '#eff6ff' }]}>
+                  <Layers size={15} color="#0284c7" />
                 </View>
-                <Text style={[styles.gridCardLabel, { color: '#0369a1' }]}>En cours</Text>
+                <Text style={styles.newCardTitle}>En cours</Text>
               </View>
-              <Text style={[styles.gridCardValue, { color: '#0369a1' }]}>{activeOrders.length}</Text>
-              <Text style={[styles.gridCardSub, { color: '#0284c7' }]}>Lavage & Repassage</Text>
+              <Text style={styles.newCardBigValue}>{activeOrders.length}</Text>
+              <Text style={styles.newCardSub}>Lavage & Repassage</Text>
             </MotiView>
           </TouchableOpacity>
 
-          {/* Card 2: Prêtes (Vibrant Green) */}
+          {/* Card 2: Commandes Prêtes */}
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.85}
             onPress={() => setActiveKpiDetail('pretes')}
             style={{ flex: 1 }}
           >
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 120, delay: 30 }}
-              style={[styles.gridCard, styles.gridCardPastelGreen]}
+              transition={{ type: 'timing', duration: 150, delay: 30 }}
+              style={styles.newGridCard}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-                  <CheckCircle2 size={14} color="#ffffff" />
+                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5' }]}>
+                  <CheckCircle2 size={15} color="#10b981" />
                 </View>
-                <Text style={[styles.gridCardLabel, { color: '#ffffff' }]}>Commandes Prêtes</Text>
+                <Text style={styles.newCardTitle}>Prêtes</Text>
               </View>
-              <Text style={[styles.gridCardValue, { color: '#ffffff' }]}>{readyOrders.length}</Text>
-              <Text style={[styles.gridCardSub, { color: 'rgba(255, 255, 255, 0.8)' }]}>À récupérer</Text>
+              <Text style={styles.newCardBigValue}>{readyOrders.length}</Text>
+              <Text style={styles.newCardSub}>À récupérer</Text>
             </MotiView>
           </TouchableOpacity>
         </View>
 
         <View style={styles.gridRow}>
-          {/* Card 3: Retards/Urgences (Vibrant Red) */}
+          {/* Card 3: Retards / Urgences */}
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.85}
             onPress={() => setActiveKpiDetail('retards')}
             style={{ flex: 1 }}
           >
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 120, delay: 45 }}
-              style={[styles.gridCard, styles.gridCardPastelRed]}
+              transition={{ type: 'timing', duration: 150, delay: 45 }}
+              style={styles.newGridCard}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-                  <AlertTriangle size={14} color="#ffffff" />
+                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2' }]}>
+                  <AlertTriangle size={15} color="#ef4444" />
                 </View>
-                <Text style={[styles.gridCardLabel, { color: '#ffffff' }]}>Retards / Urgences</Text>
+                <Text style={[styles.newCardTitle, { color: isDarkMode ? '#fca5a5' : '#ef4444' }]}>Retards</Text>
               </View>
-              <Text style={[styles.gridCardValue, { color: '#ffffff' }]}>{lateOrders.length}</Text>
-              <Text style={[styles.gridCardSub, { color: 'rgba(255, 255, 255, 0.8)' }]}>Livraison alerte</Text>
+              <Text style={[styles.newCardBigValue, lateOrders.length > 0 && { color: '#ef4444' }]}>
+                {lateOrders.length}
+              </Text>
+              <Text style={styles.newCardSub}>Livraison alerte</Text>
             </MotiView>
           </TouchableOpacity>
 
-          {/* Card 4: Volume (Pastel Slate) */}
+          {/* Card 4: Commandes du Jour */}
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.85}
             onPress={() => setActiveKpiDetail('volume_jour')}
             style={{ flex: 1 }}
           >
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 120, delay: 60 }}
-              style={[styles.gridCard, styles.gridCardPastelSlate]}
+              transition={{ type: 'timing', duration: 150, delay: 60 }}
+              style={styles.newGridCard}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(51, 65, 85, 0.06)' }]}>
-                  <RefreshCw size={14} color="#334155" />
+                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(99, 102, 241, 0.15)' : '#f1f5f9' }]}>
+                  <RefreshCw size={15} color="#6366f1" />
                 </View>
-                <Text style={[styles.gridCardLabel, { color: '#334155' }]}>Commandes du Jour</Text>
+                <Text style={styles.newCardTitle}>Du jour</Text>
               </View>
-              <Text style={[styles.gridCardValue, { color: '#334155' }]}>{todayOrders.length}</Text>
-              <Text style={[styles.gridCardSub, { color: '#475569' }]}>Flux quotidien</Text>
+              <Text style={styles.newCardBigValue}>{todayOrders.length}</Text>
+              <Text style={styles.newCardSub}>Flux quotidien</Text>
             </MotiView>
           </TouchableOpacity>
         </View>
@@ -1305,6 +1307,28 @@ const baseStyles = StyleSheet.create({
     elevation: 3,
     marginBottom: 16,
   },
+  newGridCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 3,
+    justifyContent: 'space-between',
+    minHeight: 115,
+  },
+  newGridIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1608,6 +1632,7 @@ function getStyles(isDarkMode) {
     kpiCard: { borderColor: '#334155', shadowColor: '#000000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 5 },
     newKpiCard: { backgroundColor: '#1e293b', borderColor: '#334155', shadowOpacity: 0.2 },
     newMainCard: { backgroundColor: '#1e293b', borderColor: '#334155', shadowOpacity: 0.2 },
+    newGridCard: { backgroundColor: '#1e293b', borderColor: '#334155', shadowOpacity: 0.2 },
     newCardTitle: { color: '#cbd5e1' },
     newCardSub: { color: '#64748b' },
     newCardBigValue: { color: '#ffffff' },
