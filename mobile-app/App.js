@@ -297,7 +297,7 @@ export default function App() {
   };
 
   const activeSlotIndex = getActiveSlotIndex(activeTab);
-  const pillTranslateX = (activeSlotIndex * slotWidth) + (slotWidth - pillWidth) / 2 + 4;
+  const pillTranslateX = (activeSlotIndex * slotWidth) + (slotWidth - pillWidth) / 2;
 
   const appContent = (
     <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
@@ -352,12 +352,13 @@ export default function App() {
           }}
           transition={{
             type: 'spring',
-            damping: 20,
-            stiffness: 180,
-            mass: 0.6,
+            damping: 22,
+            stiffness: 190,
+            mass: 0.5,
           }}
           style={{
             position: 'absolute',
+            left: 4,
             top: 6,
             height: 54,
             borderRadius: 18,
