@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHan
 import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { MotiView } from 'moti';
-import Svg, { Rect, Path } from 'react-native-svg';
+import Svg, { Rect, Path, Circle } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom, useTabBarHeight } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
@@ -528,23 +528,28 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               >
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View>
-                    <Text style={styles.newCardBigValue}>{recoveryRate}%</Text>
+                    <Text style={styles.newCardBigValue}>{recoveryRate || 0}%</Text>
                     <Text style={styles.newCardSub}>Recouvrement</Text>
                   </View>
 
-                  <Svg height="46" width="46" viewBox="0 0 36 36">
-                    <Path
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  <Svg height="44" width="44" viewBox="0 0 36 36">
+                    <Circle
+                      cx="18"
+                      cy="18"
+                      r="15.9155"
                       fill="none"
                       stroke={isDarkMode ? '#334155' : '#f1f5f9'}
                       strokeWidth="3.8"
                     />
-                    <Path
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    <Circle
+                      cx="18"
+                      cy="18"
+                      r="15.9155"
                       fill="none"
                       stroke="#002cf7"
                       strokeWidth="3.8"
-                      strokeDasharray={`${recoveryRate}, 100`}
+                      strokeDasharray={`${Math.min(100, Math.max(0, recoveryRate || 0))} 100`}
+                      strokeDashoffset="25"
                       strokeLinecap="round"
                     />
                   </Svg>
