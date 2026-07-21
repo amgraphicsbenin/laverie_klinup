@@ -1735,12 +1735,36 @@ const baseStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  compactModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(241, 245, 249, 0.55)',
+    padding: 16,
+  },
+  popupModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(241, 245, 249, 0.55)',
+    padding: 16,
+  },
+  absoluteModalContainer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 86,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+  },
 });
 
 function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
+    compactModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
+    popupModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
     container: { backgroundColor: '#0f172a' },
     header: { backgroundColor: '#0f172a' },
     headerTitle: { color: '#ffffff' },
