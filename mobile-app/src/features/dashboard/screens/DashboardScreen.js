@@ -353,7 +353,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           style={StyleSheet.absoluteFill} 
           onPress={() => setActiveKpiDetail(null)}
         >
-          <BlurView tint="dark" intensity={30} style={StyleSheet.absoluteFill} />
+          <BlurView tint={isDarkMode ? "dark" : "light"} intensity={35} style={StyleSheet.absoluteFill} />
         </TouchableOpacity>
 
         <MotiView

@@ -1472,7 +1472,7 @@ export default function GestionScreen({
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseOrderDetails}>
-              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             <MotiView
               from={{ opacity: 0, scale: 0.88, translateY: 48 }}
@@ -2571,7 +2571,7 @@ const baseStyles = StyleSheet.create({
   absoluteModalContainer: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
+    bottom: 86,
     left: 0,
     right: 0,
     zIndex: 1000,
@@ -3091,7 +3091,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.55)' : 'rgba(241, 245, 249, 0.55)',
     padding: 16,
   },
   compactModalView: {
