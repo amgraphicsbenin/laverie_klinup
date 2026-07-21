@@ -340,7 +340,7 @@ export default function App() {
       <View style={[
         styles.tabBar,
         {
-          bottom: Platform.OS === 'ios' ? Math.max(12, insets.bottom) : 14,
+          bottom: Platform.OS === 'ios' ? Math.max(20, insets.bottom + 8) : 22,
           backgroundColor: isDarkMode ? '#1e293b' : '#f3f4f8',
           borderColor: isDarkMode ? '#334155' : 'rgba(226, 232, 240, 0.8)',
         }
@@ -361,8 +361,8 @@ export default function App() {
             position: 'absolute',
             left: 4,
             top: 6,
-            height: 54,
-            borderRadius: 18,
+            height: 62,
+            borderRadius: 20,
             backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff',
             zIndex: 0,
           }}
@@ -750,23 +750,23 @@ const styles = StyleSheet.create({
     right: 14,
     flexDirection: 'row',
     backgroundColor: '#f3f4f8',
-    borderRadius: 26,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 4,
     paddingVertical: 4,
-    height: 66,
+    height: 74,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     // Shadows for floating rounded card look
     shadowColor: '#0f172a',
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 10,
     },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 12,
   },
   tabItem: {
     alignItems: 'center',
@@ -777,15 +777,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 5,
-    borderRadius: 18,
+    borderRadius: 20,
     width: '100%',
-    height: 54,
+    height: 62,
   },
   centerTabItem: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    height: 54,
+    height: 62,
   },
   scanButtonCircle: {
     width: 44,
