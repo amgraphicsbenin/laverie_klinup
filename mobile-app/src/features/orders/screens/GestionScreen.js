@@ -1100,12 +1100,12 @@ export default function GestionScreen({
                     duration: 120,
                     delay: isFinished ? 100 : 0,
                   }}
-                  style={{ overflow: 'hidden', marginBottom: 14 }}
+                  style={{ marginBottom: 16 }}
                 >
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => setSelectedOrder(item)}
-                    style={[styles.orderCard, { marginBottom: 0 }]}
+                    style={styles.orderCard}
                   >
                   {/* HEADER : Ticket ID & Status pill */}
                   <View style={styles.cardHeader}>
@@ -2716,7 +2716,8 @@ const baseStyles = StyleSheet.create({
     elevation: 6,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    paddingTop: 6,
     paddingBottom: 110,
   },
   noResultsText: {
@@ -2730,7 +2731,6 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 16,
-    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
@@ -2739,7 +2739,6 @@ const baseStyles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 5,
     position: 'relative',
-    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
