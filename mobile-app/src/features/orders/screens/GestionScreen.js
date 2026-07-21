@@ -882,29 +882,32 @@ export default function GestionScreen({
     const matchesQuery = clientName.includes(query) || ticketNo.includes(query) || orderId.includes(query);
     if (!matchesQuery) return false;
 
+    // Helper: only active orders belong in the Management screen workflow
+    const isActive = o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule';
+
     // Filter by dashboard selected card (gestionFilter overrides local statusFilter)
     if (gestionFilter === 'en_cours') {
-      return o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule';
+      return isActive;
     }
     if (gestionFilter === 'pretes') {
-      return o.statut === 'pret' || o.statut === 'a_recuperer' || o.statut === 'a_livrer';
+      return isActive && (o.statut === 'pret' || o.statut === 'a_recuperer' || o.statut === 'a_livrer');
     }
     if (gestionFilter === 'retards') {
-      return o.est_en_retard || o.statut === 'retard' || (o.statut !== 'restitue' && o.statut !== 'livre' && o.due_date && new Date(o.due_date) < new Date());
+      return isActive && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < new Date()));
     }
 
     // Apply 3-button local status filter
     if (statusFilter === 'actives') {
-      return o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule';
+      return isActive;
     }
     if (statusFilter === 'urgentes') {
-      const isActive = o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule';
       return isActive && o.niveau_urgence === 'Express';
     }
     if (statusFilter === 'retard') {
-      return o.est_en_retard || o.statut === 'retard' || (o.statut !== 'restitue' && o.statut !== 'livre' && o.due_date && new Date(o.due_date) < new Date());
+      return isActive && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < new Date()));
     }
-    return true;
+
+    return isActive;
   });
 
   const filteredClients = customers.filter(c => {

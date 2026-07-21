@@ -106,8 +106,8 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   const expressOrdersCount = orders.filter(o => o.niveau_urgence === 'Express').length;
   const expressRate = orders.length > 0 ? Math.round((expressOrdersCount / orders.length) * 100) : 0;
 
-  // Late orders (example helper)
-  const lateOrders = orders.filter(o => o.est_en_retard || o.statut === 'retard' || (o.statut !== 'restitue' && o.statut !== 'livre' && o.due_date && new Date(o.due_date) < new Date()));
+  // Late orders (active orders only)
+  const lateOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'livre' && o.statut !== 'annule' && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < new Date())));
 
   // Last 7 days revenue for bar chart
   const getLast7DaysRevenue = () => {
