@@ -15,6 +15,8 @@ import {
   StyleSheet 
 } from 'react-native';
 import { X } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
+import { MotiView } from 'moti';
 
 /**
  * Composant de confirmation du paiement final.
