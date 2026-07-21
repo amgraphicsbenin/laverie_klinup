@@ -63,7 +63,6 @@ export default function App() {
 
   const scrollViewRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(393);
-  const [tabLayouts, setTabLayouts] = useState({});
 
   const availableTabs = currentUser?.role === 'agent_lavage_repassage' 
     ? ['accueil', 'profile'] 
@@ -278,6 +277,28 @@ export default function App() {
     }
   };
 
+  const isAtelier = currentUser?.role === 'agent_lavage_repassage';
+  const totalSlots = isAtelier ? 2 : 5;
+  const tabBarInnerWidth = Math.max(100, containerWidth - 28 - 8);
+  const slotWidth = tabBarInnerWidth / totalSlots;
+  const pillWidth = Math.min(64, slotWidth - 4);
+  
+  const getActiveSlotIndex = (tab) => {
+    if (isAtelier) {
+      return tab === 'profile' ? 1 : 0;
+    }
+    switch (tab) {
+      case 'gestion': return 1;
+      case 'historique': return 3;
+      case 'profile': return 4;
+      case 'accueil':
+      default: return 0;
+    }
+  };
+
+  const activeSlotIndex = getActiveSlotIndex(activeTab);
+  const pillTranslateX = (activeSlotIndex * slotWidth) + (slotWidth - pillWidth) / 2 + 4;
+
   const appContent = (
     <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
       <StatusBar style={isDarkMode ? "light" : "dark"} translucent={true} backgroundColor="transparent" />
@@ -324,36 +345,29 @@ export default function App() {
         }
       ]}>
         {/* Sliding Active Pill Background Indicator */}
-        {tabLayouts[activeTab] && (
-          <MotiView
-            animate={{
-              translateX: tabLayouts[activeTab].x + (tabLayouts[activeTab].width - 64) / 2,
-              opacity: 1,
-            }}
-            transition={{
-              type: 'spring',
-              damping: 20,
-              stiffness: 170,
-              mass: 0.6,
-            }}
-            style={{
-              position: 'absolute',
-              top: 6,
-              width: 64,
-              height: 54,
-              borderRadius: 18,
-              backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff',
-              zIndex: 0,
-            }}
-          />
-        )}
+        <MotiView
+          animate={{
+            translateX: pillTranslateX,
+            width: pillWidth,
+          }}
+          transition={{
+            type: 'spring',
+            damping: 20,
+            stiffness: 180,
+            mass: 0.6,
+          }}
+          style={{
+            position: 'absolute',
+            top: 6,
+            height: 54,
+            borderRadius: 18,
+            backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff',
+            zIndex: 0,
+          }}
+        />
 
         <TouchableOpacity 
           onPress={() => { switchTab('accueil'); setOrderFormVisible(false); setLocalModalOpen(false); }}
-          onLayout={(e) => {
-            const { x, width } = e.nativeEvent.layout;
-            setTabLayouts(prev => ({ ...prev, accueil: { x, width } }));
-          }}
           style={[styles.tabItem, { zIndex: 1 }]}
           activeOpacity={0.8}
         >
@@ -382,10 +396,6 @@ export default function App() {
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
             onPress={() => { switchTab('gestion'); setOrderFormVisible(false); setLocalModalOpen(false); }}
-            onLayout={(e) => {
-              const { x, width } = e.nativeEvent.layout;
-              setTabLayouts(prev => ({ ...prev, gestion: { x, width } }));
-            }}
             style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
@@ -443,10 +453,6 @@ export default function App() {
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
             onPress={() => { switchTab('historique'); setOrderFormVisible(false); setLocalModalOpen(false); }}
-            onLayout={(e) => {
-              const { x, width } = e.nativeEvent.layout;
-              setTabLayouts(prev => ({ ...prev, historique: { x, width } }));
-            }}
             style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
@@ -475,10 +481,6 @@ export default function App() {
 
         <TouchableOpacity 
           onPress={() => { switchTab('profile'); setOrderFormVisible(false); setLocalModalOpen(false); }}
-          onLayout={(e) => {
-            const { x, width } = e.nativeEvent.layout;
-            setTabLayouts(prev => ({ ...prev, profile: { x, width } }));
-          }}
           style={[styles.tabItem, { zIndex: 1 }]}
           activeOpacity={0.8}
         >
