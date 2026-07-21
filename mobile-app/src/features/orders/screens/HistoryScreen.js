@@ -1719,7 +1719,7 @@ const baseStyles = StyleSheet.create({
   },
 });
 
-const getStyles = (isDarkMode) => {
+function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {

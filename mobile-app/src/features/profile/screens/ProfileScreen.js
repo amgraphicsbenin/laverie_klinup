@@ -330,7 +330,8 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
   );
 }
 
-const getStyles = (isDarkMode) => StyleSheet.create({
+function getStyles(isDarkMode) {
+  return StyleSheet.create({
   container: {
     padding: 20,
     backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
@@ -608,3 +609,4 @@ const getStyles = (isDarkMode) => StyleSheet.create({
     fontWeight: '600',
   },
 });
+};

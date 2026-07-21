@@ -637,7 +637,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.55)' : 'rgba(241, 245, 249, 0.55)',
+    backgroundColor: 'rgba(241, 245, 249, 0.55)',
     padding: 16,
   },
   compactModalView: {
@@ -1016,7 +1016,7 @@ const baseStyles = StyleSheet.create({
   },
 });
 
-const getStyles = (isDarkMode) => {
+function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {

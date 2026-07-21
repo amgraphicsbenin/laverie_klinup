@@ -624,7 +624,7 @@ const baseStyles = StyleSheet.create({
   cardSubTextBold: { fontSize: 10, color: "#002cf7", fontWeight: "700" },
   cardProgressBarBg: { height: 6, backgroundColor: "#e2e8f0", borderRadius: 3, overflow: "hidden" },
   cardProgressBarFill: { height: "100%", backgroundColor: "#002cf7", borderRadius: 3 },
-  compactModalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: isDarkMode ? "rgba(15, 23, 42, 0.55)" : "rgba(241, 245, 249, 0.55)", padding: 16 },
+  compactModalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(241, 245, 249, 0.55)", padding: 16 },
   compactModalView: { backgroundColor: "#ffffff", borderRadius: 24, padding: 20, width: "100%", maxWidth: 380, maxHeight: "85%", shadowColor: "#0f172a", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10, borderWidth: 1, borderColor: "#e2e8f0", overflow: "hidden" },
   compactModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   ficheAvatarRow: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -754,7 +754,7 @@ const baseStyles = StyleSheet.create({
   },
 });
 
-const getStyles = (isDarkMode) => {
+function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
