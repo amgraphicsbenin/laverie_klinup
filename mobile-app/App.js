@@ -776,16 +776,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 5,
-    paddingHorizontal: 8,
     borderRadius: 18,
-    width: '92%',
+    width: '100%',
     height: 54,
   },
   centerTabItem: {
     alignItems: 'center',
     justifyContent: 'center',
+    flex: 1,
     height: 54,
-    width: 52,
   },
   scanButtonCircle: {
     width: 44,
