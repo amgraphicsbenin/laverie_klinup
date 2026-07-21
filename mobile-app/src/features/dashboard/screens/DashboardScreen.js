@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHan
 import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { MotiView } from 'moti';
-import Svg, { Rect } from 'react-native-svg';
+import Svg, { Rect, Path } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom, useTabBarHeight } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
@@ -469,87 +469,118 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
             onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
           >
-            {/* KPI 1: Chiffre d'Affaires Mensuel */}
-            <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveKpiDetail('ca_mensuel')}>
+            {/* KPI 1: CA Mensuel (Inspiré Card 1 & 8) */}
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('ca_mensuel')}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 120 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? '#1e293b' : '#475569' }]}
+                transition={{ type: 'timing', duration: 150 }}
+                style={styles.newKpiCard}
               >
-                <View style={styles.kpiHeader}>
-                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-                    <TrendingUp size={15} color="#ffffff" />
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.newCardTitle}>CA Mensuel</Text>
+                  <View style={styles.purpleBadge}>
+                    <Text style={styles.purpleBadgeText}>Mois</Text>
                   </View>
-                  <Text style={[styles.kpiGrowthText, { color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>+12.4%</Text>
                 </View>
-                <Text style={[styles.kpiLabel, { color: 'rgba(255, 255, 255, 0.8)' }]}>CA Mensuel</Text>
-                <Text style={[styles.kpiValue, { color: '#ffffff' }]}>{formatPrice(monthlyRevenue)}</Text>
-                <Text style={[styles.kpiSub, { color: 'rgba(255, 255, 255, 0.65)' }]}>Mois en cours</Text>
+                <Text style={styles.newCardSub}>Mois en cours</Text>
+                
+                <Text style={styles.newCardBigValue}>{formatPrice(monthlyRevenue)}</Text>
+                
+                <View style={styles.greenPillBadge}>
+                  <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
+                  <Text style={styles.greenPillText}>+12.4% ce mois</Text>
+                </View>
               </MotiView>
             </TouchableOpacity>
 
-            {/* KPI 2: Panier Moyen */}
-            <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveKpiDetail('panier_moyen')}>
+            {/* KPI 2: Panier Moyen (Inspiré Card 5 avec mini bâtonnets) */}
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('panier_moyen')}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 120, delay: 20 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? '#1e293b' : '#475569' }]}
+                transition={{ type: 'timing', duration: 150, delay: 30 }}
+                style={styles.newKpiCard}
               >
-                <View style={styles.kpiHeader}>
-                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-                    <ShoppingBag size={15} color="#ffffff" />
-                  </View>
-                  <Text style={[styles.kpiGrowthText, { color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>Panier</Text>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.newCardTitle}>Panier Moyen</Text>
                 </View>
-                <Text style={[styles.kpiLabel, { color: 'rgba(255, 255, 255, 0.8)' }]}>Panier Moyen</Text>
-                <Text style={[styles.kpiValue, { color: '#ffffff' }]}>{formatPrice(averageBasket)}</Text>
-                <Text style={[styles.kpiSub, { color: 'rgba(255, 255, 255, 0.65)' }]}>Par commande</Text>
+                <Text style={styles.newCardBigValue}>{formatPrice(averageBasket)}</Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 26, marginVertical: 4 }}>
+                  <View style={{ flex: 1, height: '40%', backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.18)', borderRadius: 4 }} />
+                  <View style={{ flex: 1, height: '65%', backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.18)', borderRadius: 4 }} />
+                  <View style={{ flex: 1, height: '45%', backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.18)', borderRadius: 4 }} />
+                  <View style={{ flex: 1, height: '90%', backgroundColor: '#002cf7', borderRadius: 4 }} />
+                </View>
+
+                <Text style={styles.newCardSub}>Par commande</Text>
               </MotiView>
             </TouchableOpacity>
 
-            {/* KPI 3: Taux d'Encaissement */}
-            <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveKpiDetail('recouvrement')}>
+            {/* KPI 3: Recouvrement (Inspiré Card 3 anneau de progression) */}
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('recouvrement')}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 120, delay: 40 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? '#1e293b' : '#475569' }]}
+                transition={{ type: 'timing', duration: 150, delay: 60 }}
+                style={styles.newKpiCard}
               >
-                <View style={styles.kpiHeader}>
-                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-                    <Percent size={15} color="#ffffff" />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View>
+                    <Text style={styles.newCardBigValue}>{recoveryRate}%</Text>
+                    <Text style={styles.newCardSub}>Recouvrement</Text>
                   </View>
-                  <Text style={[styles.kpiGrowthText, { color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>{recoveryRate}%</Text>
+
+                  <Svg height="46" width="46" viewBox="0 0 36 36">
+                    <Path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke={isDarkMode ? '#334155' : '#f1f5f9'}
+                      strokeWidth="3.8"
+                    />
+                    <Path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#002cf7"
+                      strokeWidth="3.8"
+                      strokeDasharray={`${recoveryRate}, 100`}
+                      strokeLinecap="round"
+                    />
+                  </Svg>
                 </View>
-                <Text style={[styles.kpiLabel, { color: 'rgba(255, 255, 255, 0.8)' }]}>Recouvrement</Text>
-                <Text style={[styles.kpiValue, { color: '#ffffff' }]}>{recoveryRate}% Encaissé</Text>
-                <Text style={[styles.kpiSub, { color: 'rgba(255, 255, 255, 0.65)' }]}>Sur volume total</Text>
+
+                <Text style={[styles.newCardSub, { marginTop: 6 }]}>Volume total encaissé</Text>
               </MotiView>
             </TouchableOpacity>
 
-            {/* KPI 4: Ratio Urgences */}
-            <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveKpiDetail('part_express')}>
+            {/* KPI 4: Part Express (Inspiré Card 7 jauges de progression) */}
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('part_express')}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 120, delay: 60 }}
-                style={[styles.kpiCard, { backgroundColor: isDarkMode ? '#1e293b' : '#475569' }]}
+                transition={{ type: 'timing', duration: 150, delay: 90 }}
+                style={styles.newKpiCard}
               >
-                <View style={styles.kpiHeader}>
-                  <View style={[styles.kpiIconWrap, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-                    <Clock size={15} color="#ffffff" />
-                  </View>
-                  <Text style={[styles.kpiGrowthText, { color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>Express</Text>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.newCardTitle}>Part Express</Text>
                 </View>
-                <Text style={[styles.kpiLabel, { color: 'rgba(255, 255, 255, 0.8)' }]}>Part Express</Text>
-                <Text style={[styles.kpiValue, { color: '#ffffff' }]}>{expressRate}% Ratio</Text>
-                <Text style={[styles.kpiSub, { color: 'rgba(255, 255, 255, 0.65)' }]}>{expressOrdersCount} commandes</Text>
+                <Text style={styles.newCardSub}>{expressOrdersCount} commandes urgentes</Text>
+
+                <View style={{ marginVertical: 6, gap: 5 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#475569' }}>Express</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#002cf7' }}>{expressRate}%</Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: isDarkMode ? '#334155' : '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.min(100, expressRate)}%`, height: '100%', backgroundColor: '#002cf7', borderRadius: 3 }} />
+                  </View>
+                </View>
               </MotiView>
             </TouchableOpacity>
           </ScrollView>
 
+          {/* CARTE CA DU JOUR (Inspirée de Card 8 "Sales report $17,900") */}
           <TouchableOpacity 
             activeOpacity={0.9}
             onPress={() => setActiveKpiDetail('ca_jour')}
@@ -558,17 +589,22 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 120 }}
-              style={styles.mainSpendCard}
+              transition={{ type: 'timing', duration: 150 }}
+              style={styles.newMainCard}
             >
-              <View style={styles.spendHeader}>
-                <View>
-                  <Text style={styles.spendLabel}>Chiffre d'affaires</Text>
-                  <Text style={styles.spendValue}>{formatPrice(todayRevenue)}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
+                <View style={styles.filterPill}>
+                  <Text style={styles.filterPillText}>Aujourd'hui ▾</Text>
                 </View>
-                <View style={styles.spendTrend}>
-                  <TrendingUp size={14} color="#002cf7" />
-                  <Text style={styles.spendTrendText}>CA du Jour</Text>
+              </View>
+
+              <Text style={styles.newMainBigValue}>{formatPrice(todayRevenue)}</Text>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <View style={styles.greenPillBadge}>
+                  <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
+                  <Text style={styles.greenPillText}>+80% (évolution jour)</Text>
                 </View>
               </View>
 
@@ -582,23 +618,21 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                     <View key={d.day} style={styles.barColumn}>
                       <View style={styles.barWrapper}>
                         <Svg height="55" width="20" style={{ alignSelf: 'center' }}>
-                          {/* Background track bar */}
                           <Rect
                             x="4"
                             y="5"
                             width={barWidth}
                             height="45"
                             rx="6"
-                            fill="rgba(9, 9, 11, 0.03)"
+                            fill={isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(9, 9, 11, 0.04)'}
                           />
-                          {/* Colored bar */}
                           <Rect
                             x="4"
                             y={50 - barHeight}
                             width={barWidth}
                             height={barHeight}
                             rx="6"
-                            fill={d.isToday ? '#002cf7' : 'rgba(0, 44, 247, 0.35)'}
+                            fill={d.isToday ? '#002cf7' : (isDarkMode ? 'rgba(56, 189, 248, 0.4)' : 'rgba(0, 44, 247, 0.35)')}
                           />
                         </Svg>
                       </View>
@@ -1237,6 +1271,99 @@ const baseStyles = StyleSheet.create({
     paddingVertical: 10,
     gap: 12,
     marginBottom: 8,
+  },
+  newKpiCard: {
+    width: 175,
+    minHeight: 135,
+    backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+    borderRadius: 24,
+    padding: 16,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#334155' : '#f1f5f9',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: isDarkMode ? 0.2 : 0.05,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  newMainCard: {
+    backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#334155' : '#f1f5f9',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: isDarkMode ? 0.2 : 0.05,
+    shadowRadius: 14,
+    elevation: 3,
+    marginBottom: 16,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  newCardTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: isDarkMode ? '#cbd5e1' : '#475569',
+  },
+  newCardSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: isDarkMode ? '#64748b' : '#94a3b8',
+  },
+  newCardBigValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: isDarkMode ? '#ffffff' : '#0f172a',
+    marginVertical: 4,
+  },
+  newMainBigValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: isDarkMode ? '#ffffff' : '#0f172a',
+    marginVertical: 4,
+  },
+  purpleBadge: {
+    backgroundColor: isDarkMode ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  purpleBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: isDarkMode ? '#818cf8' : '#4f46e5',
+  },
+  greenPillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 14,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  greenPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#10b981',
+  },
+  filterPill: {
+    backgroundColor: isDarkMode ? '#334155' : '#f1f5f9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  filterPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: isDarkMode ? '#cbd5e1' : '#64748b',
   },
   kpiCard: {
     width: 145,
