@@ -931,6 +931,8 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       </MotiView>
     </View>
   );
+}
+
 const FONT_FAMILY = Platform.select({ ios: 'System', android: 'sans-serif' });
 
 const baseStyles = StyleSheet.create({
