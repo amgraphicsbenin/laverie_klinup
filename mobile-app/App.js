@@ -319,6 +319,7 @@ export default function App() {
               ref={scrollViewRef}
               horizontal
               pagingEnabled
+              nestedScrollEnabled={true}
               showsHorizontalScrollIndicator={false}
               bounces={false}
               scrollEventThrottle={16}

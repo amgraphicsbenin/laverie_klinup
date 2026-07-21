@@ -462,9 +462,12 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         {/* ADVANCED KPI CAROUSEL */}
         <ScrollView 
             horizontal 
+            nestedScrollEnabled={true}
             showsHorizontalScrollIndicator={false} 
             style={{ marginHorizontal: -20 }}
             contentContainerStyle={styles.kpiContainer}
+            onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
+            onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
           >
             {/* KPI 1: Chiffre d'Affaires Mensuel */}
             <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveKpiDetail('ca_mensuel')}>

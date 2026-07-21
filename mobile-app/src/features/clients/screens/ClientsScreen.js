@@ -311,7 +311,15 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
             </TouchableOpacity>
           )}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+        {/* Horizontal filter chips */}
+        <ScrollView 
+          horizontal 
+          nestedScrollEnabled={true}
+          showsHorizontalScrollIndicator={false} 
+          style={styles.chipRow}
+          onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
+          onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
+        >
           <TouchableOpacity onPress={() => setFilterType("all")} style={[styles.chip, filterType === "all" && styles.chipActive]}>
             <Text style={[styles.chipText, filterType === "all" && styles.chipTextActive]}>Tous ({customers.length})</Text>
           </TouchableOpacity>

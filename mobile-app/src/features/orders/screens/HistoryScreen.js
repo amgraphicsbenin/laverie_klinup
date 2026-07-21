@@ -309,7 +309,14 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
         </View>
 
         {/* Horizontal filter chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+        <ScrollView 
+          horizontal 
+          nestedScrollEnabled={true}
+          showsHorizontalScrollIndicator={false} 
+          style={styles.chipRow}
+          onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
+          onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
+        >
           <TouchableOpacity 
             onPress={() => setFilterType('all')}
             style={[styles.chip, filterType === 'all' && styles.chipActive]}
