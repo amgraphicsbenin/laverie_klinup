@@ -472,16 +472,24 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       />
 
       {/* Detailed Order Modal (BOTTOM SHEET) */}
-      <Modal
-        animationType="slide"
-        visible={selectedOrder !== null}
-        onRequestClose={() => setSelectedOrder(null)}
-        transparent={true}
+      <MotiView
+        pointerEvents={selectedOrder !== null ? 'auto' : 'none'}
+        animate={{
+          opacity: selectedOrder !== null ? 1 : 0
+        }}
+        transition={{ type: 'timing', duration: 120 }}
+        style={[
+          StyleSheet.absoluteFill,
+          { 
+            zIndex: 9999,
+            bottom: 86
+          }
+        ]}
       >
         {selectedOrder && (
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedOrder(null)}>
-              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             <View style={[styles.compactModalView, { maxHeight: '90%' }]}>
               <View style={styles.compactModalHeader}>
@@ -632,14 +640,22 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             </View>
           </View>
         )}
-      </Modal>
+      </MotiView>
 
       {/* MODAL : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
-      <Modal
-        visible={!!(showInvoiceModal && invoiceOrder)}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+      <MotiView
+        pointerEvents={(showInvoiceModal && invoiceOrder) ? 'auto' : 'none'}
+        animate={{
+          opacity: (showInvoiceModal && invoiceOrder) ? 1 : 0
+        }}
+        transition={{ type: 'timing', duration: 120 }}
+        style={[
+          StyleSheet.absoluteFill,
+          { 
+            zIndex: 9999,
+            bottom: 86
+          }
+        ]}
       >
         {invoiceOrder && (() => {
           const itemsList = invoiceOrder.items || invoiceOrder.articles || [];
@@ -663,7 +679,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             <View style={styles.absoluteModalContainer}>
               <View style={styles.popupModalOverlay}>
                 <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                  <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                  <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
                 </TouchableOpacity>
                 <View style={styles.popupModalView}>
                   <View style={styles.compactModalHeader}>
@@ -799,19 +815,27 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             </View>
           );
         })()}
-      </Modal>
+      </MotiView>
 
       {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}
-      <Modal
-        visible={cancelModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setCancelModalVisible(false)}
+      <MotiView
+        pointerEvents={cancelModalVisible ? 'auto' : 'none'}
+        animate={{
+          opacity: cancelModalVisible ? 1 : 0
+        }}
+        transition={{ type: 'timing', duration: 120 }}
+        style={[
+          StyleSheet.absoluteFill,
+          { 
+            zIndex: 9999,
+            bottom: 86
+          }
+        ]}
       >
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setCancelModalVisible(false)}>
-              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             
             <MotiView
@@ -839,21 +863,15 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
               <View style={{ marginVertical: 10 }}>
                 <TextInput
                   style={[
-                    styles.modalInput || {
-                      height: 80,
-                      padding: 12,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      textAlignVertical: 'top',
-                    },
+                    styles.modalInput,
                     {
                       height: 80,
                       textAlignVertical: 'top',
                       padding: 12,
-                      borderColor: cancelBorderColor,
+                      borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#334155' : '#e2e8f0'),
                       borderRadius: 12,
                       borderWidth: 1,
-                      backgroundColor: isDarkMode ? '#0f172a' : '#f1f5f9',
+                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
                       color: isDarkMode ? '#ffffff' : '#09090b',
                     }
                   ]}
@@ -910,11 +928,9 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             </MotiView>
           </View>
         </View>
-      </Modal>
+      </MotiView>
     </View>
   );
-}
-
 const FONT_FAMILY = Platform.select({ ios: 'System', android: 'sans-serif' });
 
 const baseStyles = StyleSheet.create({

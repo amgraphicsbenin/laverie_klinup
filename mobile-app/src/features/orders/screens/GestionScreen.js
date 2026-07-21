@@ -2119,11 +2119,19 @@ export default function GestionScreen({
       )}
 
       {/* MODAL 5 : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
-      <Modal
-        visible={!!(showInvoiceModal && invoiceOrder)}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+      <MotiView
+        pointerEvents={(showInvoiceModal && invoiceOrder) ? 'auto' : 'none'}
+        animate={{
+          opacity: (showInvoiceModal && invoiceOrder) ? 1 : 0
+        }}
+        transition={{ type: 'timing', duration: 120 }}
+        style={[
+          StyleSheet.absoluteFill,
+          { 
+            zIndex: 9999,
+            bottom: 86
+          }
+        ]}
       >
         {invoiceOrder && (() => {
           const itemsList = invoiceOrder.items || invoiceOrder.articles || [];
@@ -2147,7 +2155,7 @@ export default function GestionScreen({
             <View style={styles.absoluteModalContainer}>
               <View style={styles.popupModalOverlay}>
                 <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                  <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                  <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
                 </TouchableOpacity>
                 <View style={styles.popupModalView}>
                   <View style={styles.compactModalHeader}>
@@ -2279,25 +2287,25 @@ export default function GestionScreen({
                     >
                       <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
                     </TouchableOpacity>
-                  </ScrollView>
-                </View>
-              </View>
-            </View>
-          );
-        })()}
-      </Modal>
-
-      {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}
-      <Modal
-        visible={cancelModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setCancelModalVisible(false)}
+                    {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}
+      <MotiView
+        pointerEvents={cancelModalVisible ? 'auto' : 'none'}
+        animate={{
+          opacity: cancelModalVisible ? 1 : 0
+        }}
+        transition={{ type: 'timing', duration: 120 }}
+        style={[
+          StyleSheet.absoluteFill,
+          { 
+            zIndex: 9999,
+            bottom: 86
+          }
+        ]}
       >
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setCancelModalVisible(false)}>
-              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             
             <MotiView
@@ -2390,19 +2398,27 @@ export default function GestionScreen({
             </MotiView>
           </View>
         </View>
-      </Modal>
+      </MotiView>
 
       {/* MODAL 5 : CONFIRMATION DU PAIEMENT DE LA COMMANDE */}
-      <Modal
-        visible={paymentModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setPaymentModalVisible(false)}
+      <MotiView
+        pointerEvents={paymentModalVisible ? 'auto' : 'none'}
+        animate={{
+          opacity: paymentModalVisible ? 1 : 0
+        }}
+        transition={{ type: 'timing', duration: 120 }}
+        style={[
+          StyleSheet.absoluteFill,
+          { 
+            zIndex: 9999,
+            bottom: 86
+          }
+        ]}
       >
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setPaymentModalVisible(false)}>
-              <View style={{ flex: 1 }} />
+              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             
             <View style={[styles.popupModalView, { width: '92%', maxWidth: 380, padding: 22 }]}>
@@ -2558,7 +2574,7 @@ export default function GestionScreen({
             </View>
           </View>
         </View>
-      </Modal>
+      </MotiView>
     </View>
   );
 }

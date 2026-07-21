@@ -178,11 +178,19 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
   const formatPrice = (price) => (price || 0).toLocaleString("fr-FR") + " FCFA";
 
   const renderForm = (isEditing, onClose, visible) => (
-    <Modal
-      animationType="fade"
-      visible={visible}
-      onRequestClose={onClose}
-      transparent={true}
+    <MotiView
+      pointerEvents={visible ? 'auto' : 'none'}
+      animate={{
+        opacity: visible ? 1 : 0
+      }}
+      transition={{ type: 'timing', duration: 120 }}
+      style={[
+        StyleSheet.absoluteFill,
+        { 
+          zIndex: 9999,
+          bottom: scrollPaddingBottom
+        }
+      ]}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -219,9 +227,8 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                     style={styles.compactInput}
                   />
                 </View>
-                <View style={{ width: 12 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.compactLabel}>Nom *</Text>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.compactLabel}>Nom</Text>
                   <TextInput
                     placeholder="Nom"
                     placeholderTextColor="#a1a1aa"
@@ -232,9 +239,9 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                 </View>
               </View>
 
-              <Text style={styles.compactLabel}>Téléphone *</Text>
+              <Text style={styles.compactLabel}>Téléphone</Text>
               <TextInput
-                placeholder="Ex: +229 97 00 00 00"
+                placeholder="Ex: 97000000"
                 placeholderTextColor="#a1a1aa"
                 keyboardType="phone-pad"
                 value={custTelephone}
@@ -244,7 +251,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
 
               <Text style={styles.compactLabel}>Adresse</Text>
               <TextInput
-                placeholder="Ex: Cotonou, Haie Vive"
+                placeholder="Quartier, Rue..."
                 placeholderTextColor="#a1a1aa"
                 value={custAdresse}
                 onChangeText={setCustAdresse}
@@ -277,7 +284,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
           </MotiView>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </MotiView>
   );
 
   return (
@@ -388,13 +395,18 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
       </ScrollView>
 
       {selectedClient && (
-        <Modal animationType="none" visible={!!selectedClient} onRequestClose={handleCloseFiche} transparent={true}>
-          <MotiView
-            from={{ opacity: 0 }}
-            animate={{ opacity: isFicheVisible ? 1 : 0 }}
-            transition={{ type: 'timing', duration: 100 }}
-            style={{ flex: 1 }}
-          >
+        <MotiView
+          pointerEvents={selectedClient ? 'auto' : 'none'}
+          animate={{ opacity: isFicheVisible ? 1 : 0 }}
+          transition={{ type: 'timing', duration: 120 }}
+          style={[
+            StyleSheet.absoluteFill,
+            { 
+              zIndex: 9999,
+              bottom: scrollPaddingBottom
+            }
+          ]}
+        >
             <View style={styles.compactModalOverlay}>
               <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseFiche}>
                 <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
@@ -564,8 +576,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                 </View>
               </MotiView>
             </View>
-          </MotiView>
-        </Modal>
+        </MotiView>
       )}
 
       {renderForm(false, handleCloseCustomerModal, showCustomerModal)}

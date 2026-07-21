@@ -77,11 +77,19 @@ export default function CancelModal({
 
   const inputBorderColor = cancelReasonError ? '#ef4444' : (isDarkMode ? '#334155' : '#e2e8f0');
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onClose}
+    <MotiView
+      pointerEvents={visible ? 'auto' : 'none'}
+      animate={{
+        opacity: visible ? 1 : 0
+      }}
+      transition={{ type: 'timing', duration: 120 }}
+      style={[
+        StyleSheet.absoluteFill,
+        { 
+          zIndex: 9999,
+          bottom: 86
+        }
+      ]}
     >
       <View style={styles.absoluteModalContainer}>
         <View style={styles.compactModalOverlay}>
@@ -90,7 +98,7 @@ export default function CancelModal({
             style={StyleSheet.absoluteFill} 
             onPress={onClose}
           >
-            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
           
           <MotiView
@@ -196,6 +204,6 @@ export default function CancelModal({
           </MotiView>
         </View>
       </View>
-    </Modal>
+    </MotiView>
   );
 }

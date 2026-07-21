@@ -56,11 +56,19 @@ export default function InvoiceModal({
   const clientFullName = associatedClient ? `${associatedClient.prenom} ${associatedClient.nom}` : 'Client Inconnu';
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onClose}
+    <MotiView
+      pointerEvents={visible ? 'auto' : 'none'}
+      animate={{
+        opacity: visible ? 1 : 0
+      }}
+      transition={{ type: 'timing', duration: 120 }}
+      style={[
+        StyleSheet.absoluteFill,
+        { 
+          zIndex: 9999,
+          bottom: 86
+        }
+      ]}
     >
       <View style={styles.absoluteModalContainer}>
         <View style={styles.popupModalOverlay}>
@@ -69,7 +77,7 @@ export default function InvoiceModal({
             style={StyleSheet.absoluteFill} 
             onPress={onClose}
           >
-            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
           
           <View style={styles.popupModalView}>
@@ -201,6 +209,6 @@ export default function InvoiceModal({
           </View>
         </View>
       </View>
-    </Modal>
+    </MotiView>
   );
 }

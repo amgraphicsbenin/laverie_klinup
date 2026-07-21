@@ -277,14 +277,24 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
         </View>
 
         {/* MODAL : MODIFIER PIN */}
-        <Modal
-          animationType="slide"
-          visible={showPinModal}
-          onRequestClose={() => setShowPinModal(false)}
-          transparent={true}
+        <MotiView
+          pointerEvents={showPinModal ? 'auto' : 'none'}
+          animate={{
+            opacity: showPinModal ? 1 : 0
+          }}
+          transition={{ type: 'timing', duration: 120 }}
+          style={[
+            StyleSheet.absoluteFill,
+            { 
+              zIndex: 9999,
+              bottom: 86
+            }
+          ]}
         >
           <View style={styles.modalOverlay}>
-            <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setShowPinModal(false)}>
+              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+            </TouchableOpacity>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Modifier mon PIN</Text>
@@ -323,7 +333,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
               </View>
             </View>
           </View>
-        </Modal>
+        </MotiView>
 
       </ScrollView>
     </View>
