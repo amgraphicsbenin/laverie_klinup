@@ -317,46 +317,70 @@ export default function App() {
       <View style={[
         styles.tabBar,
         {
-          height: 82 + insets.bottom,
-          paddingTop: 12,
-          paddingBottom: 22 + insets.bottom,
-          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-          borderTopColor: isDarkMode ? '#334155' : 'rgba(0, 0, 0, 0.05)',
+          bottom: Platform.OS === 'ios' ? Math.max(12, insets.bottom) : 14,
+          backgroundColor: isDarkMode ? '#1e293b' : '#f3f4f8',
+          borderColor: isDarkMode ? '#334155' : 'rgba(226, 232, 240, 0.8)',
         }
       ]}>
         <TouchableOpacity 
           onPress={() => { switchTab('accueil'); setOrderFormVisible(false); setLocalModalOpen(false); }}
           style={styles.tabItem}
+          activeOpacity={0.8}
         >
           <MotiView
-            animate={{ scale: activeTab === 'accueil' ? 1.06 : 1 }}
-            transition={{ type: 'timing', duration: 120 }}
+            animate={{ 
+              backgroundColor: activeTab === 'accueil' 
+                ? (isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff') 
+                : 'transparent',
+              scale: activeTab === 'accueil' ? 1.02 : 1
+            }}
+            transition={{ type: 'timing', duration: 150 }}
+            style={styles.tabItemInner}
           >
             <MaterialCommunityIcons
               name={activeTab === 'accueil' ? 'home' : 'home-outline'}
               size={22}
-              color={activeTab === 'accueil' ? '#002cf7' : '#a1a1aa'}
+              color={activeTab === 'accueil' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
             />
+            <Text style={[
+              styles.tabLabel, 
+              { color: activeTab === 'accueil' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+              activeTab === 'accueil' && styles.tabLabelActive
+            ]}>
+              Accueil
+            </Text>
           </MotiView>
-          <Text style={[styles.tabLabel, activeTab === 'accueil' && styles.tabLabelActive]}>Accueil</Text>
         </TouchableOpacity>
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
             onPress={() => { switchTab('gestion'); setOrderFormVisible(false); setLocalModalOpen(false); }}
             style={styles.tabItem}
+            activeOpacity={0.8}
           >
             <MotiView
-              animate={{ scale: activeTab === 'gestion' ? 1.06 : 1 }}
-              transition={{ type: 'timing', duration: 120 }}
+              animate={{ 
+                backgroundColor: activeTab === 'gestion' 
+                  ? (isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff') 
+                  : 'transparent',
+                scale: activeTab === 'gestion' ? 1.02 : 1
+              }}
+              transition={{ type: 'timing', duration: 150 }}
+              style={styles.tabItemInner}
             >
               <MaterialCommunityIcons
                 name={activeTab === 'gestion' ? 'clipboard-list' : 'clipboard-list-outline'}
                 size={22}
-                color={activeTab === 'gestion' ? '#002cf7' : '#a1a1aa'}
+                color={activeTab === 'gestion' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
+              <Text style={[
+                styles.tabLabel, 
+                { color: activeTab === 'gestion' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+                activeTab === 'gestion' && styles.tabLabelActive
+              ]}>
+                Gestion
+              </Text>
             </MotiView>
-            <Text style={[styles.tabLabel, activeTab === 'gestion' && styles.tabLabelActive]}>Gestion</Text>
           </TouchableOpacity>
         )}
 
@@ -382,7 +406,7 @@ export default function App() {
                 transition={{ type: 'timing', duration: 120 }}
                 style={styles.scanButtonCircle}
               >
-                <MaterialCommunityIcons name="plus" size={26} color="#ffffff" />
+                <MaterialCommunityIcons name="plus" size={24} color="#ffffff" />
               </MotiView>
             </TouchableOpacity>
           </View>
@@ -392,36 +416,62 @@ export default function App() {
           <TouchableOpacity 
             onPress={() => { switchTab('historique'); setOrderFormVisible(false); setLocalModalOpen(false); }}
             style={styles.tabItem}
+            activeOpacity={0.8}
           >
             <MotiView
-              animate={{ scale: activeTab === 'historique' ? 1.06 : 1 }}
-              transition={{ type: 'timing', duration: 120 }}
+              animate={{ 
+                backgroundColor: activeTab === 'historique' 
+                  ? (isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff') 
+                  : 'transparent',
+                scale: activeTab === 'historique' ? 1.02 : 1
+              }}
+              transition={{ type: 'timing', duration: 150 }}
+              style={styles.tabItemInner}
             >
               <MaterialCommunityIcons
                 name="history"
                 size={22}
-                color={activeTab === 'historique' ? '#002cf7' : '#a1a1aa'}
+                color={activeTab === 'historique' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
+              <Text style={[
+                styles.tabLabel, 
+                { color: activeTab === 'historique' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+                activeTab === 'historique' && styles.tabLabelActive
+              ]}>
+                Historique
+              </Text>
             </MotiView>
-            <Text style={[styles.tabLabel, activeTab === 'historique' && styles.tabLabelActive]}>Historique</Text>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity 
           onPress={() => { switchTab('profile'); setOrderFormVisible(false); setLocalModalOpen(false); }}
           style={styles.tabItem}
+          activeOpacity={0.8}
         >
           <MotiView
-            animate={{ scale: activeTab === 'profile' ? 1.06 : 1 }}
-            transition={{ type: 'timing', duration: 120 }}
+            animate={{ 
+              backgroundColor: activeTab === 'profile' 
+                ? (isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff') 
+                : 'transparent',
+              scale: activeTab === 'profile' ? 1.02 : 1
+            }}
+            transition={{ type: 'timing', duration: 150 }}
+            style={styles.tabItemInner}
           >
             <MaterialCommunityIcons
               name={activeTab === 'profile' ? 'account-circle' : 'account-circle-outline'}
               size={22}
-              color={activeTab === 'profile' ? '#002cf7' : '#a1a1aa'}
+              color={activeTab === 'profile' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
             />
+            <Text style={[
+              styles.tabLabel, 
+              { color: activeTab === 'profile' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+              activeTab === 'profile' && styles.tabLabelActive
+            ]}>
+              Profil
+            </Text>
           </MotiView>
-          <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive]}>Profil</Text>
         </TouchableOpacity>
       </View>
       <OrderFormModal key={orderFormKey} visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
@@ -662,39 +712,47 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    left: 14,
+    right: 14,
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.05)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#f3f4f8',
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 8,
-    // Shadows for premium elevated card look
-    shadowColor: '#000',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    height: 66,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    // Shadows for floating rounded card look
+    shadowColor: '#0f172a',
     shadowOffset: {
       width: 0,
-      height: -4,
+      height: 8,
     },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 10,
   },
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
     flex: 1,
+  },
+  tabItemInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    width: '92%',
+    height: 54,
   },
   centerTabItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
-    width: 60,
+    height: 54,
+    width: 52,
   },
   scanButtonCircle: {
     width: 44,
@@ -705,19 +763,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#002cf7',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   tabLabel: {
-    fontSize: 9,
-    color: '#a1a1aa',
-    marginTop: 3,
+    fontSize: 9.5,
+    color: '#64748b',
+    marginTop: 2,
     fontWeight: '600',
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
   },
   tabLabelActive: {
     color: '#002cf7',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   globalToastContainer: {
     position: 'absolute',
