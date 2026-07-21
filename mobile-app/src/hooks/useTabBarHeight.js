@@ -9,8 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  */
 export function useScrollPaddingBottom() {
   const insets = useSafeAreaInsets();
-  // Tab bar height (82 + insets.bottom) + 16 buffer
-  return 98 + insets.bottom;
+  // Tab bar height (74) + bottom margin (12 + insets.bottom) + 20 buffer
+  return 106 + insets.bottom;
 }
 
 /**
@@ -19,6 +19,6 @@ export function useScrollPaddingBottom() {
  */
 export function useTabBarHeight() {
   const insets = useSafeAreaInsets();
-  // Tab bar height (82 + insets.bottom)
-  return 82 + insets.bottom;
+  // Tab bar height (74) + bottom margin (12 + insets.bottom)
+  return 86 + insets.bottom;
 }

@@ -340,7 +340,7 @@ export default function App() {
       <View style={[
         styles.tabBar,
         {
-          bottom: Platform.OS === 'ios' ? Math.max(20, insets.bottom + 8) : 22,
+          bottom: Math.max(18, insets.bottom + 12),
           backgroundColor: isDarkMode ? '#1e293b' : '#f3f4f8',
           borderColor: isDarkMode ? '#334155' : 'rgba(226, 232, 240, 0.8)',
         }
