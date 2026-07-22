@@ -324,10 +324,6 @@ export default function App() {
               ref={scrollViewRef}
               horizontal
               pagingEnabled={true}
-              snapToInterval={containerWidth > 0 ? containerWidth : undefined}
-              snapToAlignment="center"
-              decelerationRate="fast"
-              disableIntervalMomentum={true}
               nestedScrollEnabled={true}
               showsHorizontalScrollIndicator={false}
               bounces={false}
