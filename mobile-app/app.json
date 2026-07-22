@@ -39,8 +39,7 @@
       "expo-asset",
       "expo-sharing",
       "expo-font",
-      "expo-status-bar",
-      "react-native-reanimated"
+      "expo-status-bar"
     ]
   }
 }
