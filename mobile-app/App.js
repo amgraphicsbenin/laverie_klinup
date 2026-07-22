@@ -10,6 +10,7 @@ import DashboardScreen from './src/features/dashboard/screens/DashboardScreen';
 import GestionScreen from './src/features/orders/screens/GestionScreen';
 import HistoryScreen from './src/features/orders/screens/HistoryScreen';
 import ProfileScreen from './src/features/profile/screens/ProfileScreen';
+import OrderCreateScreen from './src/features/orders/screens/OrderCreateScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 import SafeBlurView from './src/components/SafeBlurView';
 const BlurView = SafeBlurView;
@@ -82,7 +83,7 @@ export default function App() {
 
   const availableTabs = currentUser?.role === 'agent_lavage_repassage' 
     ? ['accueil', 'profile'] 
-    : ['accueil', 'gestion', 'historique', 'profile'];
+    : ['accueil', 'gestion', 'creer_commande', 'historique', 'profile'];
 
   const switchTab = (tabName, animated = false) => {
     setActiveTab(tabName);
@@ -263,6 +264,13 @@ export default function App() {
         );
       case 'profile':
         return <ProfileScreen onModalStateChange={setLocalModalOpen} closeAllModalsTrigger={closeModalsTrigger} onShowSuccess={triggerSuccess} />;
+      case 'creer_commande':
+        return (
+          <OrderCreateScreen
+            onNavigate={(tab) => { switchTab(tab); setOrderFormVisible(false); }}
+            onShowSuccess={triggerSuccess}
+          />
+        );
       case 'accueil':
       default:
         return (
@@ -294,6 +302,7 @@ export default function App() {
     }
     switch (tab) {
       case 'gestion': return 1;
+      case 'creer_commande': return 2;
       case 'historique': return 3;
       case 'profile': return 4;
       case 'accueil':
@@ -420,40 +429,25 @@ export default function App() {
           </TouchableOpacity>
         )}
 
-        {/* Add Order Tab Button ("Ajouter") */}
+        {/* Add Order Tab Button ("Ajouter" - Dedicated Page) */}
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={isAnyModalVisible ? handleCloseActiveModal : () => {
-              if (!orderFormVisible) setOrderFormKey(prev => prev + 1);
-              setOrderFormVisible(!orderFormVisible);
-            }}
+            onPress={() => { switchTab('creer_commande'); setOrderFormVisible(false); setLocalModalOpen(false); }}
             style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
             <View style={styles.tabItemInner}>
               <MaterialCommunityIcons
-                name={
-                  isAnyModalVisible 
-                    ? 'close-circle' 
-                    : (orderFormVisible ? 'plus-circle' : 'plus-circle-outline')
-                }
+                name={activeTab === 'creer_commande' ? 'plus-circle' : 'plus-circle-outline'}
                 size={22}
-                color={
-                  isAnyModalVisible
-                    ? '#ef4444'
-                    : (orderFormVisible ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b'))
-                }
+                color={activeTab === 'creer_commande' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
               <Text style={[
                 styles.tabLabel, 
-                { 
-                  color: isAnyModalVisible
-                    ? '#ef4444'
-                    : (orderFormVisible ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b'))
-                },
-                (orderFormVisible || isAnyModalVisible) && styles.tabLabelActive
+                { color: activeTab === 'creer_commande' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+                activeTab === 'creer_commande' && styles.tabLabelActive
               ]}>
-                {isAnyModalVisible ? 'Fermer' : 'Ajouter'}
+                Ajouter
               </Text>
             </View>
           </TouchableOpacity>
