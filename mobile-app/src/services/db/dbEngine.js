@@ -111,20 +111,23 @@ export const db = {
   getOrders: () => [...memoryDb.orders],
   getLogs: () => [...memoryDb.logs],
   getNotifications: () => {
-    if (!memoryDb.notifications || memoryDb.notifications.length === 0) {
-      if (memoryDb.logs && memoryDb.logs.length > 0) {
-        memoryDb.notifications = memoryDb.logs.map(log => ({
-          id: 'n_' + log.id,
-          action: log.action,
-          details: log.details,
-          timestamp: log.timestamp,
-          read: false
-        }));
-      } else {
-        memoryDb.notifications = [];
+    if (!memoryDb.notifications_initialized) {
+      memoryDb.notifications_initialized = true;
+      if (!memoryDb.notifications || memoryDb.notifications.length === 0) {
+        if (memoryDb.logs && memoryDb.logs.length > 0) {
+          memoryDb.notifications = memoryDb.logs.map(log => ({
+            id: 'n_' + log.id,
+            action: log.action,
+            details: log.details,
+            timestamp: log.timestamp,
+            read: false
+          }));
+        } else {
+          memoryDb.notifications = [];
+        }
       }
     }
-    return [...memoryDb.notifications];
+    return [...(memoryDb.notifications || [])];
   },
   markNotificationRead: (id) => {
     if (!memoryDb.notifications) return;
@@ -148,6 +151,7 @@ export const db = {
     db.notify();
   },
   clearAllNotifications: () => {
+    memoryDb.notifications_initialized = true;
     memoryDb.notifications = [];
     persist();
     db.notify();
