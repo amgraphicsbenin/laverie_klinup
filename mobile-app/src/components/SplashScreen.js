@@ -43,14 +43,14 @@ export default function SplashScreen({ onAnimationFinish, isReady = false }) {
       Animated.timing(logoOpacity, {
         toValue: 1,
         duration: 700,
-        useNativeDriver: true,
+        useNativeDriver: false,
         easing: Easing.out(Easing.cubic),
       }),
       Animated.spring(logoScale, {
         toValue: 1,
         friction: 6,
         tension: 40,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.sequence([
         Animated.delay(300),
@@ -58,12 +58,12 @@ export default function SplashScreen({ onAnimationFinish, isReady = false }) {
           Animated.timing(textOpacity, {
             toValue: 1,
             duration: 600,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
           Animated.timing(textTranslateY, {
             toValue: 0,
             duration: 600,
-            useNativeDriver: true,
+            useNativeDriver: false,
             easing: Easing.out(Easing.back(1.2)),
           }),
         ]),
@@ -86,13 +86,13 @@ export default function SplashScreen({ onAnimationFinish, isReady = false }) {
             Animated.timing(scaleVal, {
               toValue: 1.85,
               duration: 2400,
-              useNativeDriver: true,
+              useNativeDriver: false,
               easing: Easing.out(Easing.sine),
             }),
             Animated.timing(opacityVal, {
               toValue: 0,
               duration: 2400,
-              useNativeDriver: true,
+              useNativeDriver: false,
               easing: Easing.out(Easing.quad),
             }),
           ]),
@@ -100,12 +100,12 @@ export default function SplashScreen({ onAnimationFinish, isReady = false }) {
             Animated.timing(scaleVal, {
               toValue: 0.8,
               duration: 0,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
             Animated.timing(opacityVal, {
               toValue: 0.6,
               duration: 0,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
           ]),
         ])
@@ -123,13 +123,13 @@ export default function SplashScreen({ onAnimationFinish, isReady = false }) {
         Animated.timing(glowOpacity, {
           toValue: 0.85,
           duration: 1400,
-          useNativeDriver: true,
+          useNativeDriver: false,
           easing: Easing.inOut(Easing.sine),
         }),
         Animated.timing(glowOpacity, {
           toValue: 0.3,
           duration: 1400,
-          useNativeDriver: true,
+          useNativeDriver: false,
           easing: Easing.inOut(Easing.sine),
         }),
       ])
@@ -144,13 +144,13 @@ export default function SplashScreen({ onAnimationFinish, isReady = false }) {
           Animated.timing(animVal, {
             toValue: -distance,
             duration: duration,
-            useNativeDriver: true,
+            useNativeDriver: false,
             easing: Easing.inOut(Easing.sine),
           }),
           Animated.timing(animVal, {
             toValue: 0,
             duration: duration,
-            useNativeDriver: true,
+            useNativeDriver: false,
             easing: Easing.inOut(Easing.sine),
           }),
         ])
@@ -181,13 +181,13 @@ export default function SplashScreen({ onAnimationFinish, isReady = false }) {
         Animated.timing(containerOpacity, {
           toValue: 0,
           duration: 450,
-          useNativeDriver: true,
+          useNativeDriver: false,
           easing: Easing.out(Easing.quad),
         }),
         Animated.timing(containerScale, {
           toValue: 1.08,
           duration: 450,
-          useNativeDriver: true,
+          useNativeDriver: false,
           easing: Easing.out(Easing.quad),
         }),
       ]).start(() => {
