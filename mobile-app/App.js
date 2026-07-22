@@ -420,32 +420,43 @@ export default function App() {
           </TouchableOpacity>
         )}
 
-        {/* Center Plus Button (always visible for non-atelier staff, turns red & 'x' to close other active modals) */}
+        {/* Add Order Tab Button ("Ajouter") */}
         {currentUser.role !== 'agent_lavage_repassage' && (
-          <View 
-            style={[styles.centerTabItem, { zIndex: 1 }]}
-            pointerEvents="auto"
+          <TouchableOpacity 
+            onPress={isAnyModalVisible ? handleCloseActiveModal : () => {
+              if (!orderFormVisible) setOrderFormKey(prev => prev + 1);
+              setOrderFormVisible(!orderFormVisible);
+            }}
+            style={[styles.tabItem, { zIndex: 1 }]}
+            activeOpacity={0.8}
           >
-            <TouchableOpacity 
-              onPress={isAnyModalVisible ? handleCloseActiveModal : () => {
-                if (!orderFormVisible) setOrderFormKey(prev => prev + 1);
-                setOrderFormVisible(!orderFormVisible);
-              }}
-              activeOpacity={0.85}
-            >
-              <MotiView
-                animate={{ 
-                  backgroundColor: isAnyModalVisible ? '#ef4444' : '#002cf7',
-                  scale: (isAnyModalVisible || orderFormVisible) ? 1.05 : 1,
-                  rotate: (isAnyModalVisible || orderFormVisible) ? '135deg' : '0deg'
-                }}
-                transition={{ type: 'timing', duration: 120 }}
-                style={styles.scanButtonCircle}
-              >
-                <MaterialCommunityIcons name="plus" size={24} color="#ffffff" />
-              </MotiView>
-            </TouchableOpacity>
-          </View>
+            <View style={styles.tabItemInner}>
+              <MaterialCommunityIcons
+                name={
+                  isAnyModalVisible 
+                    ? 'close-circle' 
+                    : (orderFormVisible ? 'plus-circle' : 'plus-circle-outline')
+                }
+                size={22}
+                color={
+                  isAnyModalVisible
+                    ? '#ef4444'
+                    : (orderFormVisible ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b'))
+                }
+              />
+              <Text style={[
+                styles.tabLabel, 
+                { 
+                  color: isAnyModalVisible
+                    ? '#ef4444'
+                    : (orderFormVisible ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b'))
+                },
+                (orderFormVisible || isAnyModalVisible) && styles.tabLabelActive
+              ]}>
+                {isAnyModalVisible ? 'Fermer' : 'Ajouter'}
+              </Text>
+            </View>
+          </TouchableOpacity>
         )}
 
         {currentUser.role !== 'agent_lavage_repassage' && (
