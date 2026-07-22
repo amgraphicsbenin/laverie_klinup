@@ -3,6 +3,8 @@ name: Build Android APK
 on:
   push:
     branches: [ main ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -26,6 +28,25 @@ jobs:
           cache: 'npm'
           cache-dependency-path: mobile-app/package-lock.json
 
+      - name: Configure Versioning & Build Artifact Name
+        working-directory: mobile-app
+        run: |
+          VERSION_NAME=$(node -p "require('./app.json').expo.version")
+          BUILD_NUMBER=${{ github.run_number }}
+          echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=${BUILD_NUMBER}" >> $GITHUB_ENV
+          echo "APK_NAME=klinup-v${VERSION_NAME}-build${BUILD_NUMBER}" >> $GITHUB_ENV
+          
+          echo "Building KLIN UP Mobile v${VERSION_NAME} (Build #${BUILD_NUMBER})"
+          
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('./app.json', 'utf8'));
+            app.expo.android = app.expo.android || {};
+            app.expo.android.versionCode = ${BUILD_NUMBER};
+            fs.writeFileSync('./app.json', JSON.stringify(app, null, 2));
+          "
+
       - name: Install dependencies
         working-directory: mobile-app
         run: npm ci
@@ -43,13 +64,14 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Cache Gradle packages
+      - name: Cache Gradle packages & build cache
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+            mobile-app/android/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
@@ -69,16 +91,16 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x mobile-app/android/gradlew
 
-      - name: Build Release APK
+      - name: Build Release APK with Gradle Caching & Parallel Execution
         working-directory: mobile-app/android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon --build-cache --parallel
         env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m"
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: klinup-mobile-release-apk
+          name: ${{ env.APK_NAME }}
           path: mobile-app/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
