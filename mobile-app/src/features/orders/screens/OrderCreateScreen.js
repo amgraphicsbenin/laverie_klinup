@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Platform, Alert, RefreshControl } from 'react-native';
-import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, ArrowLeft } from 'lucide-react-native';
+import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus } from 'lucide-react-native';
 import { CustomSelect } from '../../../components/CustomSelect';
 import { db } from '../../../services/db';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
@@ -11,6 +11,10 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
   const scrollPaddingBottom = useScrollPaddingBottom();
   const styles = getStyles(isDarkMode);
 
+  // Active sub-page tab: 'commande' | 'client'
+  const [activeMode, setActiveMode] = useState('commande');
+
+  // Mode Commande state
   const [orderClient, setOrderClient] = useState('');
   const [selectedArticles, setSelectedArticles] = useState([]);
   const [orderAvance, setOrderAvance] = useState('0');
@@ -21,6 +25,13 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
 
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
+
+  // Mode Nouveau Client state
+  const [clientNom, setClientNom] = useState('');
+  const [clientPrenom, setClientPrenom] = useState('');
+  const [clientTelephone, setClientTelephone] = useState('');
+  const [clientAdresse, setClientAdresse] = useState('');
+  const [clientPrefPliage, setClientPrefPliage] = useState('Plié');
 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
 
@@ -158,361 +169,512 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
     }
   };
 
+  const handleCreateClient = async () => {
+    if (!clientPrenom.trim() || !clientNom.trim()) {
+      Alert.alert("Champs requis", "Veuillez saisir le prénom et le nom du client.");
+      return;
+    }
+    if (!clientTelephone.trim()) {
+      Alert.alert("Champ requis", "Veuillez saisir le numéro de téléphone.");
+      return;
+    }
+
+    try {
+      const newCustomer = await db.addCustomer({
+        prenom: clientPrenom.trim(),
+        nom: clientNom.trim(),
+        telephone: clientTelephone.trim(),
+        adresse: clientAdresse.trim(),
+        preferences_pliage: clientPrefPliage,
+      });
+
+      // Clear new client form state
+      setClientPrenom('');
+      setClientNom('');
+      setClientTelephone('');
+      setClientAdresse('');
+      setClientPrefPliage('Plié');
+
+      if (onShowSuccess) onShowSuccess(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès !`);
+      
+      // Auto-select the newly created client and switch back to Order Creation form!
+      setOrderClient(newCustomer.id);
+      setActiveMode('commande');
+    } catch (e) {
+      Alert.alert("Erreur", e.message || "Impossible de créer le client.");
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* Header Bar */}
+      {/* Header Bar with Segmented Buttons (Nouvelle Commande / Nouveau Client) */}
       <View style={styles.headerBar}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={styles.headerIconWrap}>
-            <ShoppingBag size={20} color="#002cf7" />
-          </View>
-          <View>
-            <Text style={styles.headerTitle}>Nouvelle Commande</Text>
-            <Text style={styles.headerSub}>Création d'un ticket de dépot</Text>
-          </View>
+        <View style={styles.segmentedContainer}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveMode('commande')}
+            style={[
+              styles.segmentedBtn,
+              activeMode === 'commande' && styles.segmentedBtnActive
+            ]}
+          >
+            <ShoppingBag size={15} color={activeMode === 'commande' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')} style={{ marginRight: 6 }} />
+            <Text style={[
+              styles.segmentedBtnText,
+              activeMode === 'commande' && styles.segmentedBtnTextActive
+            ]}>
+              Nouvelle Commande
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveMode('client')}
+            style={[
+              styles.segmentedBtn,
+              activeMode === 'client' && styles.segmentedBtnActive
+            ]}
+          >
+            <UserPlus size={15} color={activeMode === 'client' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')} style={{ marginRight: 6 }} />
+            <Text style={[
+              styles.segmentedBtnText,
+              activeMode === 'client' && styles.segmentedBtnTextActive
+            ]}>
+              Nouveau Client
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Step 1: Sélection du Client */}
-        <View style={styles.cardSection}>
-          <View style={styles.sectionHeader}>
-            <User size={16} color="#002cf7" />
-            <Text style={styles.sectionTitle}>1. Client & Abonnement</Text>
+      {activeMode === 'client' ? (
+        /* PAGE 2: NOUVEAU CLIENT */
+        <ScrollView 
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.cardSection}>
+            <View style={styles.sectionHeader}>
+              <UserPlus size={16} color="#002cf7" />
+              <Text style={styles.sectionTitle}>Création d'un Nouveau Client</Text>
+            </View>
+
+            <View style={styles.formRowInline}>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Prénom *</Text>
+                <TextInput
+                  value={clientPrenom}
+                  onChangeText={setClientPrenom}
+                  placeholder="Ex: Jean"
+                  placeholderTextColor="#a1a1aa"
+                  style={styles.formInput}
+                />
+              </View>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Nom *</Text>
+                <TextInput
+                  value={clientNom}
+                  onChangeText={setClientNom}
+                  placeholder="Ex: KOFFI"
+                  placeholderTextColor="#a1a1aa"
+                  style={styles.formInput}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.formLabel}>Numéro de Téléphone *</Text>
+            <TextInput
+              keyboardType="phone-pad"
+              value={clientTelephone}
+              onChangeText={setClientTelephone}
+              placeholder="Ex: 97000000"
+              placeholderTextColor="#a1a1aa"
+              style={styles.formInput}
+            />
+
+            <Text style={styles.formLabel}>Adresse / Quartier</Text>
+            <TextInput
+              value={clientAdresse}
+              onChangeText={setClientAdresse}
+              placeholder="Ex: Cotonou, Cadjehoun"
+              placeholderTextColor="#a1a1aa"
+              style={styles.formInput}
+            />
+
+            <Text style={styles.formLabel}>Préférence de pliage</Text>
+            <View style={styles.urgencyRow}>
+              {['Plié', 'Sur Cintre'].map((pref) => {
+                const isActive = clientPrefPliage === pref;
+                return (
+                  <TouchableOpacity
+                    key={pref}
+                    onPress={() => setClientPrefPliage(pref)}
+                    style={[
+                      styles.urgencyBtn,
+                      isActive && { backgroundColor: '#002cf7', borderColor: '#002cf7' }
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.urgencyBtnText, isActive && { color: '#ffffff' }]}>
+                      {pref}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
-          <Text style={styles.formLabel}>Client</Text>
-          <CustomSelect
-            value={orderClient}
-            onChange={setOrderClient}
-            options={customers.map(c => ({ value: c.id, label: `${c.prenom} ${c.nom} (${c.telephone})` }))}
-            placeholder="Sélectionner un client"
-            style={styles.selectMargin}
-          />
+          <TouchableOpacity 
+            activeOpacity={0.85}
+            onPress={handleCreateClient}
+            style={styles.submitBtn}
+          >
+            <Text style={styles.submitBtnText}>Enregistrer le Client</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      ) : (
+        /* PAGE 1: NOUVELLE COMMANDE */
+        <ScrollView 
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Step 1: Sélection du Client */}
+          <View style={styles.cardSection}>
+            <View style={styles.sectionHeader}>
+              <User size={16} color="#002cf7" />
+              <Text style={styles.sectionTitle}>1. Client & Abonnement</Text>
+            </View>
 
-          {/* Subscriptions Info Card */}
-          {activeCustomer && (
-            <View style={styles.subContainer}>
-              {activeCustomer.active_subscription ? (
-                <View style={styles.subCard}>
-                  <View style={styles.subHeaderRow}>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        if (!subscribePlanId) setPayWithSubscription(!payWithSubscription);
-                      }}
-                      disabled={!!subscribePlanId}
-                      style={styles.checkboxRow}
-                    >
-                      <View style={[
-                        styles.checkbox,
-                        payWithSubscription && styles.checkboxChecked,
-                        !!subscribePlanId && styles.checkboxDisabled
-                      ]}>
-                        {payWithSubscription && <Check size={12} color="#ffffff" />}
-                      </View>
-                      <Text style={[styles.checkboxLabel, !!subscribePlanId && { color: '#a1a1aa' }]}>
-                        Déduire du solde abonnement
-                      </Text>
-                    </TouchableOpacity>
-                    <Text style={styles.subTextBold}>
-                      ({activeCustomer.active_subscription.remaining_clothes} vêt. restants)
-                    </Text>
-                  </View>
+            <Text style={styles.formLabel}>Client</Text>
+            <CustomSelect
+              value={orderClient}
+              onChange={setOrderClient}
+              options={customers.map(c => ({ value: c.id, label: `${c.prenom} ${c.nom} (${c.telephone})` }))}
+              placeholder="Sélectionner un client"
+              style={styles.selectMargin}
+            />
 
-                  {payWithSubscription && !subscribePlanId && getTotalClothesCount() > activeCustomer.active_subscription.remaining_clothes && (
-                    <View style={styles.alertRow}>
-                      <AlertTriangle size={14} color="#ef4444" style={{ marginRight: 6 }} />
-                      <Text style={styles.alertText}>
-                        Solde insuffisant ({getTotalClothesCount()} vêt. requis)
+            {/* Subscriptions Info Card */}
+            {activeCustomer && (
+              <View style={styles.subContainer}>
+                {activeCustomer.active_subscription ? (
+                  <View style={styles.subCard}>
+                    <View style={styles.subHeaderRow}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          if (!subscribePlanId) setPayWithSubscription(!payWithSubscription);
+                        }}
+                        disabled={!!subscribePlanId}
+                        style={styles.checkboxRow}
+                      >
+                        <View style={[
+                          styles.checkbox,
+                          payWithSubscription && styles.checkboxChecked,
+                          !!subscribePlanId && styles.checkboxDisabled
+                        ]}>
+                          {payWithSubscription && <Check size={12} color="#ffffff" />}
+                        </View>
+                        <Text style={[styles.checkboxLabel, !!subscribePlanId && { color: '#a1a1aa' }]}>
+                          Déduire du solde abonnement
+                        </Text>
+                      </TouchableOpacity>
+                      <Text style={styles.subTextBold}>
+                        ({activeCustomer.active_subscription.remaining_clothes} vêt. restants)
                       </Text>
                     </View>
-                  )}
-                </View>
-              ) : (
-                <View style={styles.subCard}>
-                  <Text style={styles.subLabelSmallBold}>Souscrire un abonnement immédiat :</Text>
-                  <CustomSelect
-                    value={subscribePlanId}
-                    onChange={(val) => {
-                      setSubscribePlanId(val);
-                      setPayWithSubscription(!!val);
-                    }}
-                    options={[
-                      { label: "-- Pas d'abonnement --", value: "" },
-                      ...catalog.filter(c => c.categorie === 'abonnement').map(p => ({
-                        label: `${p.article} (${p.prix.toLocaleString('fr-FR')} FCFA)`,
-                        value: p.id
-                      }))
-                    ]}
-                    placeholder="Pas d'abonnement"
-                  />
-                </View>
-              )}
-            </View>
-          )}
-        </View>
 
-        {/* Step 2: Vêtements & Prestations */}
-        <View style={styles.cardSection}>
-          <View style={styles.sectionHeader}>
-            <ShoppingBag size={16} color="#002cf7" />
-            <Text style={styles.sectionTitle}>2. Sélection des Vêtements</Text>
+                    {payWithSubscription && !subscribePlanId && getTotalClothesCount() > activeCustomer.active_subscription.remaining_clothes && (
+                      <View style={styles.alertRow}>
+                        <AlertTriangle size={14} color="#ef4444" style={{ marginRight: 6 }} />
+                        <Text style={styles.alertText}>
+                          Solde insuffisant ({getTotalClothesCount()} vêt. requis)
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.subCard}>
+                    <Text style={styles.subLabelSmallBold}>Souscrire un abonnement immédiat :</Text>
+                    <CustomSelect
+                      value={subscribePlanId}
+                      onChange={(val) => {
+                        setSubscribePlanId(val);
+                        setPayWithSubscription(!!val);
+                      }}
+                      options={[
+                        { label: "-- Pas d'abonnement --", value: "" },
+                        ...catalog.filter(c => c.categorie === 'abonnement').map(p => ({
+                          label: `${p.article} (${p.prix.toLocaleString('fr-FR')} FCFA)`,
+                          value: p.id
+                        }))
+                      ]}
+                      placeholder="Pas d'abonnement"
+                    />
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
-          {(() => {
-            const uniqueArticles = [...new Set(catalog
-              .filter(c => c.categorie !== 'system_setting' && c.service !== 'system' && c.categorie !== 'abonnement' && c.service !== 'abonnement')
-              .map(c => c.article)
-            )];
+          {/* Step 2: Vêtements & Prestations */}
+          <View style={styles.cardSection}>
+            <View style={styles.sectionHeader}>
+              <ShoppingBag size={16} color="#002cf7" />
+              <Text style={styles.sectionTitle}>2. Sélection des Vêtements</Text>
+            </View>
 
-            if (uniqueArticles.length === 0) {
-              return <Text style={styles.emptyText}>Aucun article disponible</Text>;
+            {(() => {
+              const uniqueArticles = [...new Set(catalog
+                .filter(c => c.categorie !== 'system_setting' && c.service !== 'system' && c.categorie !== 'abonnement' && c.service !== 'abonnement')
+                .map(c => c.article)
+              )];
+
+              if (uniqueArticles.length === 0) {
+                return <Text style={styles.emptyText}>Aucun article disponible</Text>;
+              }
+
+              return uniqueArticles.map(articleName => {
+                const items = catalog.filter(c => c.article === articleName);
+                const traitementItem = items.find(i => i.service === 'lavage_simple') || items.find(i => i.service.includes('lavage')) || items.find(i => i.service.includes('sec') || i.service.includes('nettoyage'));
+                const repassageItem = items.find(i => i.service === 'repassage');
+                
+                const isExpanded = isArticleExpanded(articleName, items);
+                const getQtyInCart = (itemId) => {
+                  const cartItem = selectedArticles.find(a => a.id === itemId);
+                  return cartItem ? cartItem.quantity : 0;
+                };
+
+                return (
+                  <View key={articleName} style={styles.clothingCard}>
+                    <View style={styles.clothingHeader}>
+                      <Text style={styles.clothingName}>{articleName}</Text>
+                      <TouchableOpacity 
+                        onPress={() => toggleExpandArticle(articleName)}
+                        style={isExpanded ? styles.clothingCloseBtn : styles.clothingAddBtn}
+                      >
+                        <Text style={isExpanded ? styles.clothingCloseBtnText : styles.clothingAddBtnText}>
+                          {isExpanded ? 'Masquer' : 'Ajouter'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {isExpanded && (
+                      <View style={styles.servicesContainer}>
+                        {traitementItem && (
+                          <View style={styles.serviceRow}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.serviceLabel}>Traitement (Lavage)</Text>
+                              <Text style={styles.servicePrice}>{formatPrice(traitementItem.prix)}</Text>
+                            </View>
+                            {getQtyInCart(traitementItem.id) === 0 ? (
+                              <TouchableOpacity 
+                                onPress={() => addArticleToOrder(traitementItem)}
+                                style={styles.serviceAddBtn}
+                              >
+                                <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
+                                <Text style={styles.serviceAddBtnText}>Ajouter</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={styles.serviceQtyRow}>
+                                <TouchableOpacity onPress={() => removeArticleFromOrder(traitementItem.id)} style={styles.serviceQtyBtn}>
+                                  <Text style={styles.serviceQtyBtnText}>-</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.serviceQtyText}>{getQtyInCart(traitementItem.id)}</Text>
+                                <TouchableOpacity onPress={() => addArticleToOrder(traitementItem)} style={styles.serviceQtyBtn}>
+                                  <Text style={styles.serviceQtyBtnText}>+</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        )}
+
+                        {repassageItem && (
+                          <View style={styles.serviceRow}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.serviceLabel}>Repassage</Text>
+                              <Text style={styles.servicePrice}>{formatPrice(repassageItem.prix)}</Text>
+                            </View>
+                            {getQtyInCart(repassageItem.id) === 0 ? (
+                              <TouchableOpacity 
+                                onPress={() => addArticleToOrder(repassageItem)}
+                                style={styles.serviceAddBtn}
+                              >
+                                <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
+                                <Text style={styles.serviceAddBtnText}>Ajouter</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={styles.serviceQtyRow}>
+                                <TouchableOpacity onPress={() => removeArticleFromOrder(repassageItem.id)} style={styles.serviceQtyBtn}>
+                                  <Text style={styles.serviceQtyBtnText}>-</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.serviceQtyText}>{getQtyInCart(repassageItem.id)}</Text>
+                                <TouchableOpacity onPress={() => addArticleToOrder(repassageItem)} style={styles.serviceQtyBtn}>
+                                  <Text style={styles.serviceQtyBtnText}>+</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              });
+            })()}
+          </View>
+
+          {/* Step 3: Options & Paiement */}
+          <View style={styles.cardSection}>
+            <View style={styles.sectionHeader}>
+              <Sparkles size={16} color="#002cf7" />
+              <Text style={styles.sectionTitle}>3. Options & Paiement</Text>
+            </View>
+
+            {/* Niveau d'urgence */}
+            <Text style={styles.formLabel}>Niveau d'Urgence</Text>
+            <View style={styles.urgencyRow}>
+              {['Normal', 'Express'].map((level) => {
+                const isActive = orderUrgency === level;
+                return (
+                  <TouchableOpacity
+                    key={level}
+                    onPress={() => setOrderUrgency(level)}
+                    style={[
+                      styles.urgencyBtn, 
+                      isActive && { backgroundColor: level === 'Express' ? '#e11d48' : '#002cf7', borderColor: level === 'Express' ? '#e11d48' : '#002cf7' }
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.urgencyBtnText, isActive && { color: '#ffffff' }]}>
+                      {level === 'Express' ? '⚡ Express (24h)' : '⏱ Normal (48h)'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Avance & Mode de paiement */}
+            <View style={styles.formRowInline}>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Avance (FCFA)</Text>
+                <TextInput
+                  keyboardType="numeric"
+                  value={orderAvance}
+                  onChangeText={setOrderAvance}
+                  style={styles.formInput}
+                />
+              </View>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Mode Règlement</Text>
+                <CustomSelect
+                  value={orderPaymentMethod}
+                  onChange={setOrderPaymentMethod}
+                  options={[
+                    { value: 'Espèce', label: 'Espèce' },
+                    { value: 'Mobile Money', label: 'Mobile Money' }
+                  ]}
+                  placeholder="Mode"
+                  buttonStyle={styles.formSelectButton}
+                />
+              </View>
+            </View>
+
+            {/* Réduction (%) */}
+            <Text style={styles.formLabel}>Réduction (%)</Text>
+            <TextInput
+              keyboardType="numeric"
+              value={orderDiscount}
+              onChangeText={(val) => {
+                const num = parseInt(val, 10);
+                if (val === '') setOrderDiscount('0');
+                else if (!isNaN(num) && num >= 0 && num <= 100) setOrderDiscount(num.toString());
+              }}
+              style={styles.formInput}
+              placeholder="Ex: 10"
+              placeholderTextColor="#a1a1aa"
+            />
+          </View>
+
+          {/* Facturation & Live Receipt Preview */}
+          {(() => {
+            const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
+            let currentTotal = 0;
+            let isImmediateSub = false;
+            
+            if (subscribePlanId) {
+              const subPlan = catalog.find(c => c.id === subscribePlanId && c.categorie === 'abonnement');
+              currentTotal = subPlan ? subPlan.prix : 0;
+              isImmediateSub = true;
+            } else if (isSubscriptionActive) {
+              currentTotal = 0;
+            } else {
+              currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             }
 
-            return uniqueArticles.map(articleName => {
-              const items = catalog.filter(c => c.article === articleName);
-              const traitementItem = items.find(i => i.service === 'lavage_simple') || items.find(i => i.service.includes('lavage')) || items.find(i => i.service.includes('sec') || i.service.includes('nettoyage'));
-              const repassageItem = items.find(i => i.service === 'repassage');
-              
-              const isExpanded = isArticleExpanded(articleName, items);
-              const getQtyInCart = (itemId) => {
-                const cartItem = selectedArticles.find(a => a.id === itemId);
-                return cartItem ? cartItem.quantity : 0;
-              };
+            if (!isSubscriptionActive && orderUrgency === 'Express') {
+              const expressMarkupItem = catalog.find(c => c.id === 'setting_express_markup');
+              const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+              currentTotal = Math.round(currentTotal * (1 + expressMarkup / 100));
+            }
 
-              return (
-                <View key={articleName} style={styles.clothingCard}>
-                  <View style={styles.clothingHeader}>
-                    <Text style={styles.clothingName}>{articleName}</Text>
-                    <TouchableOpacity 
-                      onPress={() => toggleExpandArticle(articleName)}
-                      style={isExpanded ? styles.clothingCloseBtn : styles.clothingAddBtn}
-                    >
-                      <Text style={isExpanded ? styles.clothingCloseBtnText : styles.clothingAddBtnText}>
-                        {isExpanded ? 'Masquer' : 'Ajouter'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+            const discountPercent = Number(orderDiscount) || 0;
+            const discountAmount = Math.round(currentTotal * (discountPercent / 100));
+            const netTotal = currentTotal - discountAmount;
+            const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
+            const currentReste = netTotal - currentAvance;
 
-                  {isExpanded && (
-                    <View style={styles.servicesContainer}>
-                      {traitementItem && (
-                        <View style={styles.serviceRow}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.serviceLabel}>Traitement (Lavage)</Text>
-                            <Text style={styles.servicePrice}>{formatPrice(traitementItem.prix)}</Text>
-                          </View>
-                          {getQtyInCart(traitementItem.id) === 0 ? (
-                            <TouchableOpacity 
-                              onPress={() => addArticleToOrder(traitementItem)}
-                              style={styles.serviceAddBtn}
-                            >
-                              <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                              <Text style={styles.serviceAddBtnText}>Ajouter</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={styles.serviceQtyRow}>
-                              <TouchableOpacity onPress={() => removeArticleFromOrder(traitementItem.id)} style={styles.serviceQtyBtn}>
-                                <Text style={styles.serviceQtyBtnText}>-</Text>
-                              </TouchableOpacity>
-                              <Text style={styles.serviceQtyText}>{getQtyInCart(traitementItem.id)}</Text>
-                              <TouchableOpacity onPress={() => addArticleToOrder(traitementItem)} style={styles.serviceQtyBtn}>
-                                <Text style={styles.serviceQtyBtnText}>+</Text>
-                              </TouchableOpacity>
-                            </View>
-                          )}
-                        </View>
-                      )}
-
-                      {repassageItem && (
-                        <View style={styles.serviceRow}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.serviceLabel}>Repassage</Text>
-                            <Text style={styles.servicePrice}>{formatPrice(repassageItem.prix)}</Text>
-                          </View>
-                          {getQtyInCart(repassageItem.id) === 0 ? (
-                            <TouchableOpacity 
-                              onPress={() => addArticleToOrder(repassageItem)}
-                              style={styles.serviceAddBtn}
-                            >
-                              <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                              <Text style={styles.serviceAddBtnText}>Ajouter</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={styles.serviceQtyRow}>
-                              <TouchableOpacity onPress={() => removeArticleFromOrder(repassageItem.id)} style={styles.serviceQtyBtn}>
-                                <Text style={styles.serviceQtyBtnText}>-</Text>
-                              </TouchableOpacity>
-                              <Text style={styles.serviceQtyText}>{getQtyInCart(repassageItem.id)}</Text>
-                              <TouchableOpacity onPress={() => addArticleToOrder(repassageItem)} style={styles.serviceQtyBtn}>
-                                <Text style={styles.serviceQtyBtnText}>+</Text>
-                              </TouchableOpacity>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </View>
-              );
-            });
-          })()}
-        </View>
-
-        {/* Step 3: Options & Paiement */}
-        <View style={styles.cardSection}>
-          <View style={styles.sectionHeader}>
-            <Sparkles size={16} color="#002cf7" />
-            <Text style={styles.sectionTitle}>3. Options & Paiement</Text>
-          </View>
-
-          {/* Niveau d'urgence */}
-          <Text style={styles.formLabel}>Niveau d'Urgence</Text>
-          <View style={styles.urgencyRow}>
-            {['Normal', 'Express'].map((level) => {
-              const isActive = orderUrgency === level;
-              return (
-                <TouchableOpacity
-                  key={level}
-                  onPress={() => setOrderUrgency(level)}
-                  style={[
-                    styles.urgencyBtn, 
-                    isActive && { backgroundColor: level === 'Express' ? '#e11d48' : '#002cf7', borderColor: level === 'Express' ? '#e11d48' : '#002cf7' }
-                  ]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.urgencyBtnText, isActive && { color: '#ffffff' }]}>
-                    {level === 'Express' ? '⚡ Express (24h)' : '⏱ Normal (48h)'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Avance & Mode de paiement */}
-          <View style={styles.formRowInline}>
-            <View style={styles.formFieldInline}>
-              <Text style={styles.formLabel}>Avance (FCFA)</Text>
-              <TextInput
-                keyboardType="numeric"
-                value={orderAvance}
-                onChangeText={setOrderAvance}
-                style={styles.formInput}
-              />
-            </View>
-            <View style={styles.formFieldInline}>
-              <Text style={styles.formLabel}>Mode Règlement</Text>
-              <CustomSelect
-                value={orderPaymentMethod}
-                onChange={setOrderPaymentMethod}
-                options={[
-                  { value: 'Espèce', label: 'Espèce' },
-                  { value: 'Mobile Money', label: 'Mobile Money' }
-                ]}
-                placeholder="Mode"
-                buttonStyle={styles.formSelectButton}
-              />
-            </View>
-          </View>
-
-          {/* Réduction (%) */}
-          <Text style={styles.formLabel}>Réduction (%)</Text>
-          <TextInput
-            keyboardType="numeric"
-            value={orderDiscount}
-            onChangeText={(val) => {
-              const num = parseInt(val, 10);
-              if (val === '') setOrderDiscount('0');
-              else if (!isNaN(num) && num >= 0 && num <= 100) setOrderDiscount(num.toString());
-            }}
-            style={styles.formInput}
-            placeholder="Ex: 10"
-            placeholderTextColor="#a1a1aa"
-          />
-        </View>
-
-        {/* Facturation & Live Receipt Preview */}
-        {(() => {
-          const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
-          let currentTotal = 0;
-          let isImmediateSub = false;
-          
-          if (subscribePlanId) {
-            const subPlan = catalog.find(c => c.id === subscribePlanId && c.categorie === 'abonnement');
-            currentTotal = subPlan ? subPlan.prix : 0;
-            isImmediateSub = true;
-          } else if (isSubscriptionActive) {
-            currentTotal = 0;
-          } else {
-            currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-          }
-
-          if (!isSubscriptionActive && orderUrgency === 'Express') {
-            const expressMarkupItem = catalog.find(c => c.id === 'setting_express_markup');
-            const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
-            currentTotal = Math.round(currentTotal * (1 + expressMarkup / 100));
-          }
-
-          const discountPercent = Number(orderDiscount) || 0;
-          const discountAmount = Math.round(currentTotal * (discountPercent / 100));
-          const netTotal = currentTotal - discountAmount;
-          const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
-          const currentReste = netTotal - currentAvance;
-
-          return (
-            <View style={styles.receiptPreviewCard}>
-              <Text style={styles.receiptSectionTitle}>Récapitulatif de la Facture</Text>
-              
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptRowLabel}>Total Brut</Text>
-                <Text style={styles.receiptRowVal}>
-                  {isSubscriptionActive && !isImmediateSub ? 'Forfait Abonnement' : formatPrice(currentTotal)}
-                </Text>
-              </View>
-
-              {discountAmount > 0 && (
+            return (
+              <View style={styles.receiptPreviewCard}>
+                <Text style={styles.receiptSectionTitle}>Récapitulatif de la Facture</Text>
+                
                 <View style={styles.receiptRow}>
-                  <Text style={styles.receiptRowLabel}>Réduction ({discountPercent}%)</Text>
-                  <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
+                  <Text style={styles.receiptRowLabel}>Total Brut</Text>
+                  <Text style={styles.receiptRowVal}>
+                    {isSubscriptionActive && !isImmediateSub ? 'Forfait Abonnement' : formatPrice(currentTotal)}
+                  </Text>
                 </View>
-              )}
 
-              <View style={styles.receiptDivider} />
+                {discountAmount > 0 && (
+                  <View style={styles.receiptRow}>
+                    <Text style={styles.receiptRowLabel}>Réduction ({discountPercent}%)</Text>
+                    <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
+                  </View>
+                )}
 
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptRowLabelBold}>Total Net À Payer</Text>
-                <Text style={[styles.receiptRowValBold, { color: '#002cf7' }]}>{formatPrice(netTotal)}</Text>
+                <View style={styles.receiptDivider} />
+
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptRowLabelBold}>Total Net À Payer</Text>
+                  <Text style={[styles.receiptRowValBold, { color: '#002cf7' }]}>{formatPrice(netTotal)}</Text>
+                </View>
+
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptRowLabel}>Avance versée</Text>
+                  <Text style={[styles.receiptRowVal, { color: '#10b981' }]}>{formatPrice(currentAvance)}</Text>
+                </View>
+
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptRowLabelBold}>Reste à régler</Text>
+                  <Text style={[styles.receiptRowValBold, { color: currentReste > 0 ? '#ef4444' : '#10b981' }]}>
+                    {formatPrice(currentReste)}
+                  </Text>
+                </View>
               </View>
+            );
+          })()}
 
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptRowLabel}>Avance versée</Text>
-                <Text style={[styles.receiptRowVal, { color: '#10b981' }]}>{formatPrice(currentAvance)}</Text>
-              </View>
-
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptRowLabelBold}>Reste à régler</Text>
-                <Text style={[styles.receiptRowValBold, { color: currentReste > 0 ? '#ef4444' : '#10b981' }]}>
-                  {formatPrice(currentReste)}
-                </Text>
-              </View>
-            </View>
-          );
-        })()}
-
-        {/* Action Button */}
-        <TouchableOpacity 
-          activeOpacity={0.85}
-          onPress={handleCreateOrder}
-          style={styles.submitBtn}
-        >
-          <Text style={styles.submitBtnText}>Valider et Créer la Commande</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* Action Button */}
+          <TouchableOpacity 
+            activeOpacity={0.85}
+            onPress={handleCreateOrder}
+            style={styles.submitBtn}
+          >
+            <Text style={styles.submitBtnText}>Valider et Créer la Commande</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -524,31 +686,42 @@ function getStyles(isDarkMode) {
       backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
     },
     headerBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 20,
-      paddingTop: 16,
-      paddingBottom: 16,
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 14,
       borderBottomWidth: 1,
       borderBottomColor: isDarkMode ? '#1e293b' : '#f1f5f9',
     },
-    headerIconWrap: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.2)' : '#eff6ff',
-      justifyContent: 'center',
+    segmentedContainer: {
+      flexDirection: 'row',
+      backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+      borderRadius: 16,
+      padding: 4,
+    },
+    segmentedBtn: {
+      flex: 1,
+      flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      borderRadius: 12,
     },
-    headerTitle: {
-      fontSize: 18,
+    segmentedBtnActive: {
+      backgroundColor: '#002cf7',
+      shadowColor: '#002cf7',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    segmentedBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDarkMode ? '#cbd5e1' : '#475569',
+    },
+    segmentedBtnTextActive: {
+      color: '#ffffff',
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
-    },
-    headerSub: {
-      fontSize: 12,
-      color: isDarkMode ? '#94a3b8' : '#64748b',
     },
     scrollContent: {
       padding: 20,
