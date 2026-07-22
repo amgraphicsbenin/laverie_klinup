@@ -2,32 +2,43 @@ import { useState, useEffect } from 'react';
 import { db } from '../services/db';
 
 export function useDbState() {
-  const [customers, setCustomers] = useState(db.getCustomers());
-  const [orders, setOrders] = useState(db.getOrders());
-  const [catalog, setCatalog] = useState(db.getCatalog());
-  const [currentUser, setCurrentUser] = useState(db.getCurrentUser());
-  const [isRemote, setIsRemote] = useState(db.isRemote());
-  const [isDarkMode, setIsDarkMode] = useState(db.isDarkMode ? db.isDarkMode() : false);
+  const [customers, setCustomers] = useState(() => db.getCustomers() || []);
+  const [orders, setOrders] = useState(() => db.getOrders() || []);
+  const [catalog, setCatalog] = useState(() => db.getCatalog() || []);
+  const [currentUser, setCurrentUser] = useState(() => db.getCurrentUser() || null);
+  const [isRemote, setIsRemote] = useState(() => (typeof db.isRemote === 'function' ? db.isRemote() : false));
+  const [isDarkMode, setIsDarkMode] = useState(() => (typeof db.isDarkMode === 'function' ? db.isDarkMode() : false));
 
   useEffect(() => {
     // Load initial values
-    setCustomers(db.getCustomers());
-    setOrders(db.getOrders());
-    setCatalog(db.getCatalog());
-    setCurrentUser(db.getCurrentUser());
-    setIsRemote(db.isRemote());
-    setIsDarkMode(db.isDarkMode ? db.isDarkMode() : false);
+    setCustomers(db.getCustomers() || []);
+    setOrders(db.getOrders() || []);
+    setCatalog(db.getCatalog() || []);
+    setCurrentUser(db.getCurrentUser() || null);
+    setIsRemote(typeof db.isRemote === 'function' ? db.isRemote() : false);
+    setIsDarkMode(typeof db.isDarkMode === 'function' ? db.isDarkMode() : false);
 
     const unsubscribe = db.subscribe(() => {
-      setCustomers(db.getCustomers());
-      setOrders(db.getOrders());
-      setCatalog(db.getCatalog());
-      setCurrentUser(db.getCurrentUser());
-      setIsRemote(db.isRemote());
-      setIsDarkMode(db.isDarkMode ? db.isDarkMode() : false);
+      setCustomers(db.getCustomers() || []);
+      setOrders(db.getOrders() || []);
+      setCatalog(db.getCatalog() || []);
+      setCurrentUser(db.getCurrentUser() || null);
+      setIsRemote(typeof db.isRemote === 'function' ? db.isRemote() : false);
+      setIsDarkMode(typeof db.isDarkMode === 'function' ? db.isDarkMode() : false);
     });
-    return () => unsubscribe();
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
   }, []);
 
-  return { customers, orders, catalog, currentUser, isRemote, isDarkMode };
+  return { 
+    customers: customers || [], 
+    orders: orders || [], 
+    catalog: catalog || [], 
+    currentUser, 
+    isRemote: !!isRemote, 
+    isDarkMode: !!isDarkMode 
+  };
 }

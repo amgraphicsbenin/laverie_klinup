@@ -20,20 +20,33 @@ import SplashScreen from './src/components/SplashScreen';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
   componentDidCatch(error, info) {
     console.error('App crash:', error, info);
+    this.setState({ errorInfo: info });
   }
   render() {
     if (this.state.hasError) {
       return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#fff' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#ffffff', paddingTop: 60 }}>
           <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ef4444', marginBottom: 12 }}>Erreur détectée</Text>
-          <Text style={{ fontSize: 11, color: '#374151', textAlign: 'center' }}>{String(this.state.error)}</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: '#1f2937', textAlign: 'center', marginBottom: 12 }}>
+            {this.state.error?.message || String(this.state.error)}
+          </Text>
+          <ScrollView style={{ flex: 1, width: '100%', backgroundColor: '#f3f4f6', borderRadius: 8, padding: 12 }}>
+            <Text style={{ fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#dc2626' }}>
+              {this.state.error?.stack || 'Pas de trace d\'empilement disponible'}
+            </Text>
+            {this.state.errorInfo?.componentStack && (
+              <Text style={{ fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#4b5563', marginTop: 10 }}>
+                {this.state.errorInfo.componentStack}
+              </Text>
+            )}
+          </ScrollView>
         </View>
       );
     }

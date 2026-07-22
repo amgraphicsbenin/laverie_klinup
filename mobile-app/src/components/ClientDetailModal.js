@@ -20,7 +20,7 @@ export default function ClientDetailModal({
 
   if (!visible || !client) return null;
 
-  const activeClient = customers.find(c => c.id === client.id) || client;
+  const activeClient = (customers || []).find(c => c && c.id === client.id) || client;
 
   const getDisplayTicketId = (order) => {
     if (!order) return '1001';
@@ -218,8 +218,8 @@ export default function ClientDetailModal({
                         onChange={(val) => setSelectedCrmSubId(val)}
                         options={[
                           { label: "-- Choisir une formule --", value: "" },
-                          ...catalog.filter(item => item.service === 'abonnement').map(sub => ({
-                            label: `${sub.article} (${sub.prix.toLocaleString('fr-FR')} F/m)`,
+                          ...(catalog || []).filter(item => item && item.service === 'abonnement').map(sub => ({
+                            label: `${sub.article} (${(sub.prix || 0).toLocaleString('fr-FR')} F/m)`,
                             value: sub.id
                           }))
                         ]}
@@ -245,7 +245,7 @@ export default function ClientDetailModal({
             {/* Historique Client */}
             <Text style={styles.detailSectionTitle}>Historique des Commandes</Text>
             {(() => {
-              const clientOrders = orders.filter(o => o.customer_id === activeClient.id);
+              const clientOrders = (orders || []).filter(o => o && o.customer_id === activeClient.id);
               return clientOrders.length === 0 ? (
                 <Text style={styles.noResultsText}>Aucune commande pour ce client</Text>
               ) : (
