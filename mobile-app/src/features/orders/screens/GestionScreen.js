@@ -1324,7 +1324,7 @@ export default function GestionScreen({
                               type: 'timing',
                               duration: 150,
                             }}
-                            style={styles.cardNextStatusBlockBtn}
+                            style={[styles.cardNextStatusBlockBtn, { backgroundColor: canTransition ? nextStyle.bg : (isDarkMode ? '#334155' : '#f1f5f9') }]}
                           >
                             <MotiView
                               key={iconName}
