@@ -762,18 +762,70 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               transition={{ type: 'timing', duration: 150 }}
               style={styles.newMainCard}
             >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, zIndex: 50 }}>
                 <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    if (e && e.stopPropagation) e.stopPropagation();
-                    setPeriodPickerVisible(true);
-                  }}
-                  activeOpacity={0.8}
-                  style={styles.filterPill}
-                >
-                  <Text style={styles.filterPillText}>{revenuePeriodData.label} ▾</Text>
-                </TouchableOpacity>
+                <View style={{ position: 'relative', zIndex: 100 }}>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      if (e && e.stopPropagation) e.stopPropagation();
+                      setPeriodPickerVisible(!periodPickerVisible);
+                    }}
+                    activeOpacity={0.8}
+                    style={styles.filterPill}
+                  >
+                    <Text style={styles.filterPillText}>{revenuePeriodData.label} ▾</Text>
+                  </TouchableOpacity>
+
+                  {/* DROPDOWN MENU DIRECTLY BELOW FILTER BUTTON */}
+                  {periodPickerVisible && (
+                    <MotiView
+                      from={{ opacity: 0, translateY: -4, scale: 0.95 }}
+                      animate={{ opacity: 1, translateY: 0, scale: 1 }}
+                      transition={{ type: 'timing', duration: 120 }}
+                      style={[
+                        styles.dropdownMenu,
+                        {
+                          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                          borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+                        }
+                      ]}
+                    >
+                      {[
+                        { key: 'today', label: "Aujourd'hui" },
+                        { key: 'week', label: "Cette Semaine" },
+                        { key: 'month', label: "Ce Mois" },
+                        { key: 'year', label: "Cette Année" },
+                      ].map(opt => {
+                        const isSelected = revenuePeriod === opt.key;
+                        return (
+                          <TouchableOpacity
+                            key={opt.key}
+                            activeOpacity={0.7}
+                            onPress={(e) => {
+                              if (e && e.stopPropagation) e.stopPropagation();
+                              setRevenuePeriod(opt.key);
+                              setPeriodPickerVisible(false);
+                            }}
+                            style={[
+                              styles.dropdownItem,
+                              isSelected && { backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.2)' : '#eff6ff' }
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.dropdownItemText,
+                                { color: isSelected ? '#002cf7' : (isDarkMode ? '#ffffff' : '#0f172a') }
+                              ]}
+                            >
+                              {opt.label}
+                            </Text>
+                            {isSelected && <Check size={14} color="#002cf7" />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </MotiView>
+                  )}
+                </View>
               </View>
 
               <Text style={styles.newMainBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
@@ -1033,80 +1085,11 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         isDarkMode={isDarkMode}
       />
       {periodPickerVisible && (
-        <View style={[StyleSheet.absoluteFill, { zIndex: 99999, justifyContent: 'center', alignItems: 'center' }]}>
-          <TouchableOpacity
-            activeOpacity={1}
-            style={StyleSheet.absoluteFill}
-            onPress={() => setPeriodPickerVisible(false)}
-          >
-            <SafeBlurView intensity={80} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-          </TouchableOpacity>
-
-          <MotiView
-            from={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'timing', duration: 150 }}
-            style={[
-              styles.periodPickerCard,
-              { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }
-            ]}
-          >
-            <View style={[styles.periodPickerHeader, { borderBottomColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Calendar size={18} color="#002cf7" />
-                <Text style={[styles.periodPickerTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>
-                  Période du Chiffre d'Affaires
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setPeriodPickerVisible(false)}>
-                <X size={18} color={isDarkMode ? '#94a3b8' : '#64748b'} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ paddingVertical: 8 }}>
-              {[
-                { key: 'today', label: "Aujourd'hui", sub: "Journée en cours" },
-                { key: 'week', label: "Cette Semaine", sub: "7 derniers jours glissants" },
-                { key: 'month', label: "Ce Mois", sub: "Mois civil en cours" },
-                { key: 'year', label: "Cette Année", sub: "12 mois de l'année en cours" },
-              ].map(opt => {
-                const isSelected = revenuePeriod === opt.key;
-                return (
-                  <TouchableOpacity
-                    key={opt.key}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      setRevenuePeriod(opt.key);
-                      setPeriodPickerVisible(false);
-                    }}
-                    style={[
-                      styles.periodOptionRow,
-                      {
-                        backgroundColor: isSelected
-                          ? (isDarkMode ? 'rgba(0, 44, 247, 0.2)' : '#eff6ff')
-                          : 'transparent',
-                        borderColor: isSelected ? '#002cf7' : 'transparent',
-                      }
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[
-                        styles.periodOptionLabel,
-                        { color: isSelected ? '#002cf7' : (isDarkMode ? '#ffffff' : '#0f172a') }
-                      ]}>
-                        {opt.label}
-                      </Text>
-                      <Text style={[styles.periodOptionSub, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
-                        {opt.sub}
-                      </Text>
-                    </View>
-                    {isSelected && <Check size={18} color="#002cf7" />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </MotiView>
-        </View>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={[StyleSheet.absoluteFill, { zIndex: 90 }]}
+          onPress={() => setPeriodPickerVisible(false)}
+        />
       )}
     </View>
   );
@@ -1702,45 +1685,34 @@ const baseStyles = StyleSheet.create({
     fontWeight: '700',
     color: '#002cf7',
   },
-  periodPickerCard: {
-    width: '85%',
-    maxWidth: 360,
-    borderRadius: 20,
+  dropdownMenu: {
+    position: 'absolute',
+    top: 32,
+    right: 0,
+    width: 145,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+    zIndex: 9999,
   },
-  periodPickerHeader: {
+  dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 12,
-    borderBottomWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginVertical: 1,
   },
-  periodPickerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  periodOptionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginVertical: 3,
-  },
-  periodOptionLabel: {
-    fontSize: 14,
+  dropdownItemText: {
+    fontSize: 12,
     fontWeight: '600',
-  },
-  periodOptionSub: {
-    fontSize: 11,
-    marginTop: 1,
   },
   kpiCard: {
     width: 145,
