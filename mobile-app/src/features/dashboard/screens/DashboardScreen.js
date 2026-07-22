@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl } from 'react-native';
-import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock, User, Bell } from 'lucide-react-native';
+import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { MotiView } from '../../../components/SafeView';
 import Svg, { Rect, Path, Circle } from 'react-native-svg';
@@ -15,6 +15,8 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   const { orders, customers, notifications, currentUser, isDarkMode } = useDbState();
   const [refreshing, setRefreshing] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [revenuePeriod, setRevenuePeriod] = useState('today'); // 'today' | 'week' | 'month' | 'year'
+  const [periodPickerVisible, setPeriodPickerVisible] = useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -114,24 +116,166 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   // Late orders (active orders only)
   const lateOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'livre' && o.statut !== 'annule' && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < new Date())));
 
-  // Last 7 days revenue for bar chart
-  const getLast7DaysRevenue = () => {
-    const revenueData = [];
-    const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayName = days[d.getDay()];
-      
-      const dayOrders = orders.filter(o => o.created_at?.startsWith(dateStr));
-      const revenue = dayOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
-      revenueData.push({ day: dayName, revenue, isToday: i === 0 });
+  // Dynamic Revenue calculation based on selected period
+  const getRevenuePeriodData = () => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    const todayOrders = orders.filter(o => o.created_at?.startsWith(todayStr));
+    const todayRev = todayOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+
+    if (revenuePeriod === 'today') {
+      const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+      const chart = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dStr = d.toISOString().split('T')[0];
+        const dayOrders = orders.filter(o => o.created_at?.startsWith(dStr));
+        const rev = dayOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+        chart.push({ label: days[d.getDay()], revenue: rev, isActive: i === 0 });
+      }
+
+      const yDate = new Date();
+      yDate.setDate(yDate.getDate() - 1);
+      const yStr = yDate.toISOString().split('T')[0];
+      const yOrders = orders.filter(o => o.created_at?.startsWith(yStr));
+      const yRev = yOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+
+      const growth = yRev > 0 ? Math.round(((todayRev - yRev) / yRev) * 100) : (todayRev > 0 ? 100 : 0);
+
+      return {
+        label: "Aujourd'hui",
+        totalRevenue: todayRev,
+        growthText: `${growth >= 0 ? '+' : ''}${growth}% (évolution jour)`,
+        isPositive: growth >= 0,
+        chartData: chart,
+      };
     }
-    return revenueData;
+
+    if (revenuePeriod === 'week') {
+      const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+      const chart = [];
+      let total = 0;
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dStr = d.toISOString().split('T')[0];
+        const dayOrders = orders.filter(o => o.created_at?.startsWith(dStr));
+        const rev = dayOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+        total += rev;
+        chart.push({ label: days[d.getDay()], revenue: rev, isActive: i === 0 });
+      }
+
+      let prevTotal = 0;
+      for (let i = 13; i >= 7; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dStr = d.toISOString().split('T')[0];
+        const dayOrders = orders.filter(o => o.created_at?.startsWith(dStr));
+        prevTotal += dayOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+      }
+      const growth = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : (total > 0 ? 100 : 0);
+
+      return {
+        label: "Cette Semaine",
+        totalRevenue: total,
+        growthText: `${growth >= 0 ? '+' : ''}${growth}% (vs sem. passée)`,
+        isPositive: growth >= 0,
+        chartData: chart,
+      };
+    }
+
+    if (revenuePeriod === 'month') {
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+      const monthOrders = orders.filter(o => {
+        if (!o.created_at) return false;
+        const d = new Date(o.created_at);
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+      });
+      const total = monthOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+
+      const chart = [
+        { label: 'Sem 1', revenue: 0, isActive: false },
+        { label: 'Sem 2', revenue: 0, isActive: false },
+        { label: 'Sem 3', revenue: 0, isActive: false },
+        { label: 'Sem 4', revenue: 0, isActive: false },
+      ];
+
+      monthOrders.forEach(o => {
+        const dateNum = new Date(o.created_at).getDate();
+        const amt = o.prix_total || o.total || 0;
+        if (dateNum <= 7) chart[0].revenue += amt;
+        else if (dateNum <= 14) chart[1].revenue += amt;
+        else if (dateNum <= 21) chart[2].revenue += amt;
+        else chart[3].revenue += amt;
+      });
+
+      const currentDay = today.getDate();
+      if (currentDay <= 7) chart[0].isActive = true;
+      else if (currentDay <= 14) chart[1].isActive = true;
+      else if (currentDay <= 21) chart[2].isActive = true;
+      else chart[3].isActive = true;
+
+      const prevMonthOrders = orders.filter(o => {
+        if (!o.created_at) return false;
+        const d = new Date(o.created_at);
+        const prevM = currentMonth === 0 ? 11 : currentMonth - 1;
+        const prevY = currentMonth === 0 ? currentYear - 1 : currentYear;
+        return d.getFullYear() === prevY && d.getMonth() === prevM;
+      });
+      const prevTotal = prevMonthOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+      const growth = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : (total > 0 ? 100 : 0);
+
+      return {
+        label: "Ce Mois",
+        totalRevenue: total,
+        growthText: `${growth >= 0 ? '+' : ''}${growth}% (vs mois passé)`,
+        isPositive: growth >= 0,
+        chartData: chart,
+      };
+    }
+
+    if (revenuePeriod === 'year') {
+      const currentYear = today.getFullYear();
+      const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+      const chart = months.map((m, idx) => ({ label: m, revenue: 0, isActive: idx === today.getMonth() }));
+
+      let total = 0;
+      orders.forEach(o => {
+        if (!o.created_at) return;
+        const d = new Date(o.created_at);
+        if (d.getFullYear() === currentYear) {
+          const amt = o.prix_total || o.total || 0;
+          chart[d.getMonth()].revenue += amt;
+          total += amt;
+        }
+      });
+
+      let prevTotal = 0;
+      orders.forEach(o => {
+        if (!o.created_at) return;
+        const d = new Date(o.created_at);
+        if (d.getFullYear() === currentYear - 1) {
+          prevTotal += (o.prix_total || o.total || 0);
+        }
+      });
+      const growth = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : (total > 0 ? 100 : 0);
+
+      return {
+        label: "Cette Année",
+        totalRevenue: total,
+        growthText: `${growth >= 0 ? '+' : ''}${growth}% (vs an passé)`,
+        isPositive: growth >= 0,
+        chartData: chart,
+      };
+    }
+
+    return { label: "Aujourd'hui", totalRevenue: 0, growthText: "0%", isPositive: true, chartData: [] };
   };
-  const last7DaysData = getLast7DaysRevenue();
-  const maxRevenue = Math.max(...last7DaysData.map(d => d.revenue), 1000);
+
+  const revenuePeriodData = getRevenuePeriodData();
 
   const getStatusColor = (statut) => {
     switch (statut) {
@@ -606,7 +750,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             </TouchableOpacity>
           </ScrollView>
 
-          {/* CARTE CA DU JOUR (Inspirée de Card 8 "Sales report $17,900") */}
+          {/* CARTE CHIFFRE D'AFFAIRES DYNAMIQUE AVEC FILTRE */}
           <TouchableOpacity 
             activeOpacity={0.9}
             onPress={() => setActiveKpiDetail('ca_jour')}
@@ -620,36 +764,52 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
-                <View style={styles.filterPill}>
-                  <Text style={styles.filterPillText}>Aujourd'hui ▾</Text>
-                </View>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    if (e && e.stopPropagation) e.stopPropagation();
+                    setPeriodPickerVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                  style={styles.filterPill}
+                >
+                  <Text style={styles.filterPillText}>{revenuePeriodData.label} ▾</Text>
+                </TouchableOpacity>
               </View>
 
-              <Text style={styles.newMainBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(todayRevenue)}</Text>
+              <Text style={styles.newMainBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {formatPrice(revenuePeriodData.totalRevenue)}
+              </Text>
               
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <View style={styles.greenPillBadge}>
-                  <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
-                  <Text style={styles.greenPillText}>+80% (évolution jour)</Text>
+                <View style={[styles.greenPillBadge, !revenuePeriodData.isPositive && { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                  {revenuePeriodData.isPositive ? (
+                    <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
+                  ) : (
+                    <TrendingDown size={12} color="#ef4444" style={{ marginRight: 3 }} />
+                  )}
+                  <Text style={[styles.greenPillText, !revenuePeriodData.isPositive && { color: '#ef4444' }]}>
+                    {revenuePeriodData.growthText}
+                  </Text>
                 </View>
               </View>
 
-              {/* Premium Batonnet (Bar Chart) of Last 7 Days */}
+              {/* Dynamic Bar Chart matching selected period */}
               <View style={styles.barChartContainer}>
-                {last7DaysData.map((d) => {
-                  const barHeight = maxRevenue > 0 ? (d.revenue / maxRevenue) * 45 : 3;
-                  const barWidth = 12;
-                  
+                {revenuePeriodData.chartData.map((d, index) => {
+                  const maxVal = Math.max(...revenuePeriodData.chartData.map(c => c.revenue), 1000);
+                  const barHeight = maxVal > 0 ? (d.revenue / maxVal) * 45 : 3;
+                  const barWidth = revenuePeriodData.chartData.length > 7 ? 10 : 12;
+
                   return (
-                    <View key={d.day} style={styles.barColumn}>
+                    <View key={`${d.label}-${index}`} style={styles.barColumn}>
                       <View style={styles.barWrapper}>
-                        <Svg height="55" width="20" style={{ alignSelf: 'center' }}>
+                        <Svg height="55" width={barWidth + 8} style={{ alignSelf: 'center' }}>
                           <Rect
                             x="4"
                             y="5"
                             width={barWidth}
                             height="45"
-                            rx="6"
+                            rx="5"
                             fill={isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(9, 9, 11, 0.04)'}
                           />
                           <Rect
@@ -657,13 +817,13 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                             y={50 - barHeight}
                             width={barWidth}
                             height={barHeight}
-                            rx="6"
-                            fill={d.isToday ? '#002cf7' : (isDarkMode ? 'rgba(56, 189, 248, 0.4)' : 'rgba(0, 44, 247, 0.35)')}
+                            rx="5"
+                            fill={d.isActive ? '#002cf7' : (isDarkMode ? 'rgba(56, 189, 248, 0.4)' : 'rgba(0, 44, 247, 0.35)')}
                           />
                         </Svg>
                       </View>
-                      <Text style={[styles.barDayText, d.isToday && styles.barDayTextActive]}>
-                        {d.day}
+                      <Text style={[styles.barDayText, d.isActive && styles.barDayTextActive]} numberOfLines={1}>
+                        {d.label}
                       </Text>
                     </View>
                   );
@@ -872,6 +1032,82 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         notifications={notifications}
         isDarkMode={isDarkMode}
       />
+      {periodPickerVisible && (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 99999, justifyContent: 'center', alignItems: 'center' }]}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={StyleSheet.absoluteFill}
+            onPress={() => setPeriodPickerVisible(false)}
+          >
+            <SafeBlurView intensity={80} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+          </TouchableOpacity>
+
+          <MotiView
+            from={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'timing', duration: 150 }}
+            style={[
+              styles.periodPickerCard,
+              { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }
+            ]}
+          >
+            <View style={[styles.periodPickerHeader, { borderBottomColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Calendar size={18} color="#002cf7" />
+                <Text style={[styles.periodPickerTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>
+                  Période du Chiffre d'Affaires
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setPeriodPickerVisible(false)}>
+                <X size={18} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingVertical: 8 }}>
+              {[
+                { key: 'today', label: "Aujourd'hui", sub: "Journée en cours" },
+                { key: 'week', label: "Cette Semaine", sub: "7 derniers jours glissants" },
+                { key: 'month', label: "Ce Mois", sub: "Mois civil en cours" },
+                { key: 'year', label: "Cette Année", sub: "12 mois de l'année en cours" },
+              ].map(opt => {
+                const isSelected = revenuePeriod === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setRevenuePeriod(opt.key);
+                      setPeriodPickerVisible(false);
+                    }}
+                    style={[
+                      styles.periodOptionRow,
+                      {
+                        backgroundColor: isSelected
+                          ? (isDarkMode ? 'rgba(0, 44, 247, 0.2)' : '#eff6ff')
+                          : 'transparent',
+                        borderColor: isSelected ? '#002cf7' : 'transparent',
+                      }
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[
+                        styles.periodOptionLabel,
+                        { color: isSelected ? '#002cf7' : (isDarkMode ? '#ffffff' : '#0f172a') }
+                      ]}>
+                        {opt.label}
+                      </Text>
+                      <Text style={[styles.periodOptionSub, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
+                        {opt.sub}
+                      </Text>
+                    </View>
+                    {isSelected && <Check size={18} color="#002cf7" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </MotiView>
+        </View>
+      )}
     </View>
   );
 }
@@ -1454,15 +1690,57 @@ const baseStyles = StyleSheet.create({
     color: '#10b981',
   },
   filterPill: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 44, 247, 0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 44, 247, 0.18)',
   },
   filterPillText: {
-    fontSize: 11,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#002cf7',
+  },
+  periodPickerCard: {
+    width: '85%',
+    maxWidth: 360,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  periodPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
+  periodPickerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  periodOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginVertical: 3,
+  },
+  periodOptionLabel: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+  },
+  periodOptionSub: {
+    fontSize: 11,
+    marginTop: 1,
   },
   kpiCard: {
     width: 145,
