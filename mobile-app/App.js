@@ -18,6 +18,7 @@ import { MotiView } from './src/components/SafeView';
 import { OrderFormModal } from './src/components/OrderFormModal';
 import { registerAlertHandler } from './src/services/alert';
 import SplashScreen from './src/components/SplashScreen';
+import FlaticonIcon from './src/components/FlaticonIcon';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -391,8 +392,9 @@ export default function App() {
           activeOpacity={0.8}
         >
           <View style={styles.tabItemInner}>
-            <MaterialCommunityIcons
-              name={activeTab === 'accueil' ? 'home' : 'home-outline'}
+            <FlaticonIcon
+              name="accueil"
+              active={activeTab === 'accueil'}
               size={22}
               color={activeTab === 'accueil' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
             />
@@ -413,8 +415,9 @@ export default function App() {
             activeOpacity={0.8}
           >
             <View style={styles.tabItemInner}>
-              <MaterialCommunityIcons
-                name={activeTab === 'gestion' ? 'clipboard-list' : 'clipboard-list-outline'}
+              <FlaticonIcon
+                name="gestion"
+                active={activeTab === 'gestion'}
                 size={22}
                 color={activeTab === 'gestion' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
@@ -437,8 +440,9 @@ export default function App() {
             activeOpacity={0.8}
           >
             <View style={styles.tabItemInner}>
-              <MaterialCommunityIcons
-                name={activeTab === 'creer_commande' ? 'plus-circle' : 'plus-circle-outline'}
+              <FlaticonIcon
+                name="ajouter"
+                active={activeTab === 'creer_commande'}
                 size={22}
                 color={activeTab === 'creer_commande' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
@@ -460,8 +464,9 @@ export default function App() {
             activeOpacity={0.8}
           >
             <View style={styles.tabItemInner}>
-              <MaterialCommunityIcons
-                name={activeTab === 'historique' ? 'history' : 'history'}
+              <FlaticonIcon
+                name="historique"
+                active={activeTab === 'historique'}
                 size={22}
                 color={activeTab === 'historique' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
@@ -482,8 +487,9 @@ export default function App() {
           activeOpacity={0.8}
         >
             <View style={styles.tabItemInner}>
-              <MaterialCommunityIcons
-                name={activeTab === 'profile' ? 'account-circle' : 'account-circle-outline'}
+              <FlaticonIcon
+                name="profile"
+                active={activeTab === 'profile'}
                 size={22}
                 color={activeTab === 'profile' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
