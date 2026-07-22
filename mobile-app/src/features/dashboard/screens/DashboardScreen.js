@@ -652,7 +652,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
           >
             {/* KPI 1: CA Mensuel (Inspiré Card 1 & 8) */}
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('ca_mensuel')} style={{ borderRadius: 24, overflow: 'hidden' }}>
+            <View style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -674,10 +674,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                   <Text style={styles.greenPillText}>+12.4% ce mois</Text>
                 </View>
               </MotiView>
-            </TouchableOpacity>
+            </View>
 
             {/* KPI 2: Panier Moyen (Inspiré Card 5 avec mini bâtonnets) */}
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('panier_moyen')} style={{ borderRadius: 24, overflow: 'hidden' }}>
+            <View style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -698,10 +698,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 
                 <Text style={styles.newCardSub}>Par commande</Text>
               </MotiView>
-            </TouchableOpacity>
+            </View>
 
             {/* KPI 3: Recouvrement (Inspiré Card 3 anneau de progression) */}
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('recouvrement')} style={{ borderRadius: 24, overflow: 'hidden' }}>
+            <View style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -739,10 +739,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 
                 <Text style={[styles.newCardSub, { marginTop: 6 }]}>Volume total encaissé</Text>
               </MotiView>
-            </TouchableOpacity>
+            </View>
 
             {/* KPI 4: Part Express (Inspiré Card 7 jauges de progression) */}
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('part_express')} style={{ borderRadius: 24, overflow: 'hidden' }}>
+            <View style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -764,7 +764,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                   </View>
                 </View>
               </MotiView>
-            </TouchableOpacity>
+            </View>
           </ScrollView>
 
           {/* CARTE CHIFFRE D'AFFAIRES DYNAMIQUE AVEC FILTRE */}
@@ -777,9 +777,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             >
               {/* Header Row: Title & Filter Pill Dropdown */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveKpiDetail('ca_jour')}>
-                  <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
-                </TouchableOpacity>
+                <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
 
                 <TouchableOpacity
                   ref={filterPillRef}
@@ -791,12 +789,8 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 </TouchableOpacity>
               </View>
 
-              {/* Clickable Card Body for Detail View */}
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => setActiveKpiDetail('ca_jour')}
-                style={{ width: '100%' }}
-              >
+              {/* Card Body */}
+              <View style={{ width: '100%' }}>
                 <Text style={styles.newMainBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {formatPrice(revenuePeriodData.totalRevenue)}
                 </Text>
@@ -850,7 +844,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                     );
                   })}
                 </View>
-              </TouchableOpacity>
+              </View>
             </MotiView>
           </View>
 
@@ -1041,7 +1035,6 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         )}
       </ScrollView>
 
-      {renderKpiDetails()}
       <ClientDetailModal
         visible={!!selectedClient}
         client={selectedClient}
