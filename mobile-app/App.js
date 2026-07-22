@@ -380,7 +380,12 @@ export default function App() {
             width: pillWidth,
             height: 62,
             borderRadius: 20,
-            backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff',
+            backgroundColor: '#002cf7',
+            shadowColor: '#002cf7',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.35,
+            shadowRadius: 8,
+            elevation: 6,
             transform: [{ translateX: pillTranslateX }],
             zIndex: 0,
           }}
@@ -396,11 +401,11 @@ export default function App() {
               name="accueil"
               active={activeTab === 'accueil'}
               size={22}
-              color={activeTab === 'accueil' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
+              color={activeTab === 'accueil' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
             />
             <Text style={[
               styles.tabLabel, 
-              { color: activeTab === 'accueil' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+              { color: activeTab === 'accueil' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
               activeTab === 'accueil' && styles.tabLabelActive
             ]}>
               Accueil
@@ -419,11 +424,11 @@ export default function App() {
                 name="gestion"
                 active={activeTab === 'gestion'}
                 size={22}
-                color={activeTab === 'gestion' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
+                color={activeTab === 'gestion' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
               <Text style={[
                 styles.tabLabel, 
-                { color: activeTab === 'gestion' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+                { color: activeTab === 'gestion' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
                 activeTab === 'gestion' && styles.tabLabelActive
               ]}>
                 Gestion
@@ -444,11 +449,11 @@ export default function App() {
                 name="ajouter"
                 active={activeTab === 'creer_commande'}
                 size={22}
-                color={activeTab === 'creer_commande' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
+                color={activeTab === 'creer_commande' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
               <Text style={[
                 styles.tabLabel, 
-                { color: activeTab === 'creer_commande' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+                { color: activeTab === 'creer_commande' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
                 activeTab === 'creer_commande' && styles.tabLabelActive
               ]}>
                 Ajouter
@@ -468,11 +473,11 @@ export default function App() {
                 name="historique"
                 active={activeTab === 'historique'}
                 size={22}
-                color={activeTab === 'historique' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
+                color={activeTab === 'historique' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
               <Text style={[
                 styles.tabLabel, 
-                { color: activeTab === 'historique' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+                { color: activeTab === 'historique' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
                 activeTab === 'historique' && styles.tabLabelActive
               ]}>
                 Historique
@@ -491,11 +496,11 @@ export default function App() {
                 name="profile"
                 active={activeTab === 'profile'}
                 size={22}
-                color={activeTab === 'profile' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
+                color={activeTab === 'profile' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
               <Text style={[
                 styles.tabLabel, 
-                { color: activeTab === 'profile' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+                { color: activeTab === 'profile' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
                 activeTab === 'profile' && styles.tabLabelActive
               ]}>
                 Profil
