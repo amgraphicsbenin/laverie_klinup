@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Animated,
+  Easing,
   Platform
 } from 'react-native';
 import {
@@ -29,7 +31,83 @@ import SafeView from './SafeView';
 import { db } from '../services/db';
 
 export function NotificationModal({ visible, onClose, notifications = [], isDarkMode = false }) {
-  if (!visible) return null;
+  const [isRendered, setIsRendered] = useState(visible);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.92)).current;
+  const translateYAnim = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setIsRendered(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: false,
+          easing: Easing.out(Easing.quad),
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 140,
+          useNativeDriver: false,
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: false,
+          easing: Easing.out(Easing.cubic),
+        }),
+      ]).start();
+    } else if (isRendered) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 140,
+          useNativeDriver: false,
+          easing: Easing.in(Easing.quad),
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.94,
+          duration: 140,
+          useNativeDriver: false,
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: 10,
+          duration: 140,
+          useNativeDriver: false,
+        }),
+      ]).start(() => {
+        setIsRendered(false);
+      });
+    }
+  }, [visible]);
+
+  const handleRequestClose = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 140,
+        useNativeDriver: false,
+        easing: Easing.in(Easing.quad),
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.94,
+        duration: 140,
+        useNativeDriver: false,
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: 10,
+        duration: 140,
+        useNativeDriver: false,
+      }),
+    ]).start(() => {
+      setIsRendered(false);
+      if (onClose) onClose();
+    });
+  };
+
+  if (!visible && !isRendered) return null;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -159,11 +237,26 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
         { zIndex: 99999, justifyContent: 'center', alignItems: 'center' }
       ]}
     >
-      <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
-        <SafeBlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+      <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleRequestClose}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
+          <SafeBlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+        </Animated.View>
       </TouchableOpacity>
 
-      <View style={[styles.card, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }]}>
+      <Animated.View
+        style={[
+          styles.card,
+          {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            opacity: fadeAnim,
+            transform: [
+              { scale: scaleAnim },
+              { translateY: translateYAnim }
+            ]
+          }
+        ]}
+      >
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
           <View style={styles.headerLeft}>
@@ -177,7 +270,7 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
               </Text>
             </View>
           </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+          <TouchableOpacity onPress={handleRequestClose} style={styles.closeBtn}>
             <X size={20} color={isDarkMode ? '#94a3b8' : '#64748b'} />
           </TouchableOpacity>
         </View>
@@ -261,7 +354,7 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
             })
           )}
         </ScrollView>
-      </View>
+      </Animated.View>
     </SafeView>
   );
 }
