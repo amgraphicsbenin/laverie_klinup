@@ -13,8 +13,9 @@ import {
   StyleSheet 
 } from 'react-native';
 import { X, Ban } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
-const MotiView = View;
+import SafeBlurView from '../../../components/SafeBlurView';
+const BlurView = SafeBlurView;
+import { MotiView } from '../../../components/SafeView';
 
 /**
  * Composant de modal d'annulation de commande.

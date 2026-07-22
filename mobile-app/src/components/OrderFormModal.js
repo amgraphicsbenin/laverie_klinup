@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Platform, Alert } from 'react-native';
 import { X, Plus } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
-const MotiView = View;
+import SafeBlurView from './SafeBlurView';
+const BlurView = SafeBlurView;
+import { MotiView } from './SafeView';
 import { CustomSelect } from './CustomSelect';
 import { db } from '../services/db';
 import { useTabBarHeight } from '../hooks/useTabBarHeight';

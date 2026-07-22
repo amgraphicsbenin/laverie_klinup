@@ -3,10 +3,11 @@ import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal,
 import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, Download, Award, Ban } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { CustomSelect } from '../../../components/CustomSelect';
-import { BlurView } from 'expo-blur';
+import SafeBlurView from '../../../components/SafeBlurView';
+const BlurView = SafeBlurView;
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-const MotiView = View;
+import { MotiView } from '../../../components/SafeView';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import ClientsScreen from '../../clients/screens/ClientsScreen';

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler, Switch } from 'react-native';
 import { Key, LogOut, X, Printer, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight } from 'lucide-react-native';
 import { db } from '../../../services/db';
-import { BlurView } from 'expo-blur';
-const MotiView = View;
+import SafeBlurView from '../../../components/SafeBlurView';
+const BlurView = SafeBlurView;
+import { MotiView } from '../../../components/SafeView';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
 
