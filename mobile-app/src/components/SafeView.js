@@ -9,7 +9,7 @@ export function SafeView({ animate, from, transition, exit, state, style, childr
 
   let extraStyle = {};
   if (animate && typeof animate === 'object') {
-    const { opacity, backgroundColor, borderColor, borderWidth, borderRadius, width, height } = animate;
+    const { opacity, backgroundColor, borderColor, borderWidth, borderRadius, width, height, translateX, translateY, scale } = animate;
     if (typeof opacity === 'number') extraStyle.opacity = opacity;
     if (backgroundColor) extraStyle.backgroundColor = backgroundColor;
     if (borderColor) extraStyle.borderColor = borderColor;
@@ -17,6 +17,12 @@ export function SafeView({ animate, from, transition, exit, state, style, childr
     if (typeof borderRadius === 'number') extraStyle.borderRadius = borderRadius;
     if (width !== undefined) extraStyle.width = width;
     if (height !== undefined) extraStyle.height = height;
+
+    const transforms = [];
+    if (typeof translateX === 'number') transforms.push({ translateX });
+    if (typeof translateY === 'number') transforms.push({ translateY });
+    if (typeof scale === 'number') transforms.push({ scale });
+    if (transforms.length > 0) extraStyle.transform = transforms;
   }
 
   return (

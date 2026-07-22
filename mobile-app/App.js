@@ -362,9 +362,11 @@ export default function App() {
             position: 'absolute',
             left: 4,
             top: 6,
+            width: pillWidth,
             height: 62,
             borderRadius: 20,
             backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#e8eeff',
+            transform: [{ translateX: pillTranslateX }],
             zIndex: 0,
           }}
         />
