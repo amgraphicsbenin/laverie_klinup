@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl } from 'react-native';
 import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock, User } from 'lucide-react-native';
 import { db } from '../../../services/db';
-import { MotiView } from 'moti';
+const MotiView = View;
 import Svg, { Rect, Path, Circle } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom, useTabBarHeight } from '../../../hooks/useTabBarHeight';

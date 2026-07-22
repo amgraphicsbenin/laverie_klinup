@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, Tex
 import { Key, LogOut, X, Printer, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { BlurView } from 'expo-blur';
-import { MotiView } from 'moti';
+const MotiView = View;
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
 

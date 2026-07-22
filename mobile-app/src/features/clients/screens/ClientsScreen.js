@@ -5,7 +5,7 @@ import {
 } from "react-native";
 import { Search, Plus, MapPin, Phone, ChevronRight, X, Edit3, Trash2, Award, CreditCard, Calendar } from "lucide-react-native";
 import { db } from "../../../services/db";
-import { MotiView } from "moti";
+const MotiView = View;
 import { BlurView } from "expo-blur";
 import { useScrollPaddingBottom } from "../../../hooks/useTabBarHeight";
 import { CustomSelect } from "../../../components/CustomSelect";

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { X, Download, Printer } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
-import { MotiView } from 'moti';
+const MotiView = View;
 
 /**
  * Composant de modal de facture client (Format reçu TPE).

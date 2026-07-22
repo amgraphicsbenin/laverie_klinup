@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { User, Phone, MapPin, Edit3, Trash2, X, Award } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
-import { MotiView } from 'moti';
+const MotiView = View;
 import { db } from '../services/db';
 import { useDbState } from '../hooks/useDbState';
 import { CustomSelect } from './CustomSelect';

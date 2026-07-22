@@ -4,7 +4,7 @@ import { Search, Calendar, X, Receipt, Trash2, User, Ban, ChevronRight, Tag } fr
 import { db } from '../../../services/db';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
-import { MotiView } from 'moti';
+const MotiView = View;
 import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
 

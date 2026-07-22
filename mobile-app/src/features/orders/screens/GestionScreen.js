@@ -6,7 +6,7 @@ import { CustomSelect } from '../../../components/CustomSelect';
 import { BlurView } from 'expo-blur';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { MotiView } from 'moti';
+const MotiView = View;
 import { LinearGradient } from 'expo-linear-gradient';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import ClientsScreen from '../../clients/screens/ClientsScreen';

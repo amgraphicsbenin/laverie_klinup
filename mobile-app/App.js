@@ -12,7 +12,6 @@ import HistoryScreen from './src/features/orders/screens/HistoryScreen';
 import ProfileScreen from './src/features/profile/screens/ProfileScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { MotiView } from 'moti';
 import { OrderFormModal } from './src/components/OrderFormModal';
 import { registerAlertHandler } from './src/services/alert';
 import SplashScreen from './src/components/SplashScreen';
@@ -61,7 +60,7 @@ export default function App() {
   const isDarkMode = dbState.isDarkMode;
 
   const [dbReady, setDbReady] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('accueil');
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -373,13 +372,7 @@ export default function App() {
           style={[styles.tabItem, { zIndex: 1 }]}
           activeOpacity={0.8}
         >
-          <MotiView
-            animate={{ 
-              scale: activeTab === 'accueil' ? 1.04 : 1
-            }}
-            transition={{ type: 'timing', duration: 150 }}
-            style={styles.tabItemInner}
-          >
+          <View style={styles.tabItemInner}>
             <MaterialCommunityIcons
               name={activeTab === 'accueil' ? 'home' : 'home-outline'}
               size={22}
@@ -392,7 +385,7 @@ export default function App() {
             ]}>
               Accueil
             </Text>
-          </MotiView>
+          </View>
         </TouchableOpacity>
 
         {currentUser.role !== 'agent_lavage_repassage' && (
@@ -401,13 +394,7 @@ export default function App() {
             style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
-            <MotiView
-              animate={{ 
-                scale: activeTab === 'gestion' ? 1.04 : 1
-              }}
-              transition={{ type: 'timing', duration: 150 }}
-              style={styles.tabItemInner}
-            >
+            <View style={styles.tabItemInner}>
               <MaterialCommunityIcons
                 name={activeTab === 'gestion' ? 'clipboard-list' : 'clipboard-list-outline'}
                 size={22}
@@ -420,7 +407,7 @@ export default function App() {
               ]}>
                 Gestion
               </Text>
-            </MotiView>
+            </View>
           </TouchableOpacity>
         )}
 
@@ -458,15 +445,9 @@ export default function App() {
             style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
-            <MotiView
-              animate={{ 
-                scale: activeTab === 'historique' ? 1.04 : 1
-              }}
-              transition={{ type: 'timing', duration: 150 }}
-              style={styles.tabItemInner}
-            >
+            <View style={styles.tabItemInner}>
               <MaterialCommunityIcons
-                name="history"
+                name={activeTab === 'historique' ? 'history' : 'history'}
                 size={22}
                 color={activeTab === 'historique' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
               />
@@ -477,7 +458,7 @@ export default function App() {
               ]}>
                 Historique
               </Text>
-            </MotiView>
+            </View>
           </TouchableOpacity>
         )}
 
@@ -486,26 +467,20 @@ export default function App() {
           style={[styles.tabItem, { zIndex: 1 }]}
           activeOpacity={0.8}
         >
-          <MotiView
-            animate={{ 
-              scale: activeTab === 'profile' ? 1.04 : 1
-            }}
-            transition={{ type: 'timing', duration: 150 }}
-            style={styles.tabItemInner}
-          >
-            <MaterialCommunityIcons
-              name={activeTab === 'profile' ? 'account-circle' : 'account-circle-outline'}
-              size={22}
-              color={activeTab === 'profile' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
-            />
-            <Text style={[
-              styles.tabLabel, 
-              { color: activeTab === 'profile' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
-              activeTab === 'profile' && styles.tabLabelActive
-            ]}>
-              Profil
-            </Text>
-          </MotiView>
+            <View style={styles.tabItemInner}>
+              <MaterialCommunityIcons
+                name={activeTab === 'profile' ? 'account-circle' : 'account-circle-outline'}
+                size={22}
+                color={activeTab === 'profile' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b')}
+              />
+              <Text style={[
+                styles.tabLabel, 
+                { color: activeTab === 'profile' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#94a3b8' : '#64748b') },
+                activeTab === 'profile' && styles.tabLabelActive
+              ]}>
+                Profil
+              </Text>
+            </View>
         </TouchableOpacity>
       </View>
       <OrderFormModal key={orderFormKey} visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
@@ -514,19 +489,8 @@ export default function App() {
       )}
       {/* GLOBAL FLOATING SUCCESS TOAST */}
       {successToast.visible && (
-        <MotiView
+        <View
           pointerEvents="auto"
-          animate={{
-            opacity: 1,
-            translateY: Platform.OS === 'ios' ? 50 : 25,
-            scale: 1,
-          }}
-          from={{
-            opacity: 0,
-            translateY: -120,
-            scale: 0.88,
-          }}
-          transition={{ type: 'timing', duration: 150 }}
           style={styles.globalToastContainer}
         >
           <BlurView intensity={Platform.OS === 'ios' ? 45 : 95} tint="light" style={StyleSheet.absoluteFill} />
@@ -539,15 +503,12 @@ export default function App() {
               <Text style={styles.toastMessage}>{successToast.message}</Text>
             </View>
           </View>
-        </MotiView>
+        </View>
       )}
       {/* GLOBAL CUSTOM PREMIUM ALERT MODAL */}
       {customAlertState.visible && (
-        <MotiView
+        <View
           pointerEvents="auto"
-          animate={{ opacity: 1 }}
-          from={{ opacity: 0 }}
-          transition={{ type: 'timing', duration: 100 }}
           style={[StyleSheet.absoluteFill, { zIndex: 100000, elevation: 100000, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.5)' }]}
         >
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => {
@@ -558,10 +519,7 @@ export default function App() {
             <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
           
-          <MotiView
-            animate={{ opacity: 1, scale: 1, translateY: 0 }}
-            from={{ opacity: 0, scale: 0.9, translateY: 15 }}
-            transition={{ type: 'spring', damping: 18, mass: 0.8 }}
+          <View
             style={{
               backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
               borderRadius: 24,
@@ -672,8 +630,8 @@ export default function App() {
                 );
               })}
             </View>
-          </MotiView>
-        </MotiView>
+          </View>
+        </View>
       )}
 
       {/* OPENING ANIMATED SPLASH SCREEN OVERLAY */}
