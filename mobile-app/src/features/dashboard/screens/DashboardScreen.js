@@ -879,7 +879,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
   },
   header: {
     flexDirection: 'row',
@@ -888,7 +888,7 @@ const baseStyles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 16,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
   },
   headerTitle: {
     fontSize: 28,
