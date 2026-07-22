@@ -418,7 +418,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 </View>
                 {item.type_article ? (
                   <Text style={styles.articleSummaryText} numberOfLines={1}>
-                    {item.type_article} {item.type_service ? `• ${item.type_service.replaceAll('_', ' ')}` : ''}
+                    {item.type_article} {item.type_service ? `• ${String(item.type_service).replace(/_/g, ' ')}` : ''}
                   </Text>
                 ) : null}
               </View>
@@ -559,7 +559,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 <View style={styles.detailCard}>
                   {(selectedOrder.items || selectedOrder.articles || []).map((art) => (
                     <View key={`${art.article}-${art.service}`} style={styles.articleRow}>
-                      <Text style={styles.articleText}>{art.article} ({art.service.replaceAll('_', ' ')}) x{art.quantite}</Text>
+                      <Text style={styles.articleText}>{art.article} ({(art.service || '').replace(/_/g, ' ')}) x{art.quantite}</Text>
                       <Text style={styles.articlePrice}>{formatPrice(art.prix * art.quantite)}</Text>
                     </View>
                   ))}

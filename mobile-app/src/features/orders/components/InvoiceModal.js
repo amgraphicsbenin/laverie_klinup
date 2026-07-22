@@ -127,7 +127,7 @@ export default function InvoiceModal({
                   <View key={`${art.article}-${art.service}`} style={styles.tpeItemRow}>
                     <View style={{ flex: 1.8 }}>
                       <Text style={styles.tpeItemName}>{art.article}</Text>
-                      <Text style={styles.tpeItemService}>{art.service.replaceAll('_', ' ')}</Text>
+                      <Text style={styles.tpeItemService}>{(art.service || '').replace(/_/g, ' ')}</Text>
                     </View>
                     <Text style={styles.tpeItemQty}>x{art.quantite || art.quantity}</Text>
                     <Text style={styles.tpeItemPrice}>
