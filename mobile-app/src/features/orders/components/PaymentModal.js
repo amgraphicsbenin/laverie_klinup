@@ -91,14 +91,14 @@ export default function PaymentModal({
         StyleSheet.absoluteFill,
         { 
           zIndex: 9999,
-          bottom: 86
+          bottom: 0
         }
       ]}
     >
       <View style={styles.absoluteModalContainer || { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
         <View style={styles.popupModalOverlay || { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
-            <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+            <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
           <View style={[styles.popupModalView || { width: '90%', maxWidth: 400, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', borderRadius: 12, padding: 20 }, { maxHeight: '80%' }]}>
             

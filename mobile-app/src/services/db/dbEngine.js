@@ -591,6 +591,7 @@ export const db = {
     else if (newStatus === 'lavage_cours') normalizedStatus = 'en_cours_lavage';
     else if (newStatus === 'repassage_cours') normalizedStatus = 'en_cours_repassage';
     else if (newStatus === 'attente') normalizedStatus = 'en_attente';
+    else if (!normalizedStatus) normalizedStatus = 'restitue';
 
     const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
@@ -622,11 +623,14 @@ export const db = {
     if (normalizedStatus === 'restitue' || normalizedStatus === 'a_livrer' || normalizedStatus === 'a_recuperer') {
       order.solde_paid_at = new Date().toISOString();
       if (customer) {
-        const remainingToPay = order.prix_total - order.avance_payee;
+        const totalVal = Number(order.prix_total || order.total || 0);
+        const avanceVal = Number(order.avance_payee || order.avance || 0);
+        const remainingToPay = Math.max(0, totalVal - avanceVal);
         if (remainingToPay > 0) {
-          customer.solde_dette = Math.max(0, Number(customer.solde_dette) - remainingToPay);
+          const currentDette = Number(customer.solde_dette) || 0;
+          customer.solde_dette = Math.max(0, currentDette - remainingToPay);
           const newPoints = Math.floor(remainingToPay / 1000) * 1;
-          customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
+          customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
           db.logAction('PAIEMENT_FINAL', `Règlement du solde restant (${remainingToPay} FCFA) par le client ${customer.prenom} ${customer.nom} lors de la restitution`);
           
           performMutation('update', 'customers', customer.id, {
@@ -637,7 +641,7 @@ export const db = {
       }
     }
 
-    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage} passée de '${oldStatus}' à '${newStatus}'`);
+    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${newStatus}'`);
     persist();
     db.notify();
 
@@ -665,21 +669,31 @@ export const db = {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
-    const normalizedFinalStatus = finalStatus === 'livre' ? 'restitue' : finalStatus;
+    let normalizedFinalStatus = 'restitue';
+    if (finalStatus && typeof finalStatus === 'string' && finalStatus.trim()) {
+      normalizedFinalStatus = finalStatus === 'livre' ? 'restitue' : finalStatus;
+    }
 
     const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
     const originalCustomerState = customer ? { ...customer } : null;
 
     const oldStatus = order.statut;
+
+    const totalVal = Number(order.prix_total || order.total || 0);
+    const avanceVal = Number(order.avance_payee || order.avance || 0);
+    const cleanAmountPaid = isNaN(Number(amountPaid)) ? Math.max(0, totalVal - avanceVal) : Math.max(0, Number(amountPaid));
+
     order.statut = normalizedFinalStatus;
-    order.mode_reglement = paymentMethod;
+    order.mode_reglement = paymentMethod || order.mode_reglement || 'Espèces';
     if (referencePaiement) {
       order.reference_momo = referencePaiement;
       order.reference_paiement = referencePaiement;
     }
     
-    order.avance_payee = Number(order.avance_payee) + Number(amountPaid);
+    order.avance_payee = avanceVal + cleanAmountPaid;
+    order.prix_total = totalVal;
+    order.total = totalVal;
     order.solde_paid_at = new Date().toISOString();
 
     let typeLivraison = order.subscription_details?.type_livraison;
@@ -698,10 +712,11 @@ export const db = {
       };
     }
 
-    if (customer && amountPaid > 0) {
-      customer.solde_dette = Math.max(0, Number(customer.solde_dette) - Number(amountPaid));
-      const newPoints = Math.floor(amountPaid / 1000) * 1;
-      customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
+    if (customer && cleanAmountPaid > 0) {
+      const currentDette = Number(customer.solde_dette) || 0;
+      customer.solde_dette = Math.max(0, currentDette - cleanAmountPaid);
+      const newPoints = Math.floor(cleanAmountPaid / 1000) * 1;
+      customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
       
       performMutation('update', 'customers', customer.id, {
         solde_dette: customer.solde_dette,
@@ -711,9 +726,9 @@ export const db = {
 
     db.logAction(
       'PAIEMENT_FINAL', 
-      `Livraison commande ${order.identifiant_unique_marquage}. Paiement reçu : ${amountPaid} FCFA (Méthode: ${paymentMethod})` + (referencePaiement ? ` (Réf: ${referencePaiement})` : '')
+      `Livraison commande ${order.identifiant_unique_marquage || order.id}. Paiement reçu : ${cleanAmountPaid} FCFA (Méthode: ${paymentMethod})` + (referencePaiement ? ` (Réf: ${referencePaiement})` : '')
     );
-    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage} passée de '${oldStatus}' à '${finalStatus}'`);
+    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${normalizedFinalStatus}'`);
     persist();
     db.notify();
 

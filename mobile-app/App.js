@@ -15,6 +15,7 @@ import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
 import { OrderFormModal } from './src/components/OrderFormModal';
 import { registerAlertHandler } from './src/services/alert';
+import SplashScreen from './src/components/SplashScreen';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -47,6 +48,7 @@ export default function App() {
   const isDarkMode = dbState.isDarkMode;
 
   const [dbReady, setDbReady] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('accueil');
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -124,13 +126,18 @@ export default function App() {
   // Load database on mount
   useEffect(() => {
     async function setup() {
+      const startTime = Date.now();
       try {
         await initializeDatabase();
-        setDbReady(true);
       } catch (err) {
         console.error("DB Initialization error", err);
-        // Fallback set ready so screen shows at least
-        setDbReady(true);
+      } finally {
+        const elapsed = Date.now() - startTime;
+        const minSplashTime = 2200; // Display animated splash screen for at least 2.2s for rich experience
+        const remaining = Math.max(0, minSplashTime - elapsed);
+        setTimeout(() => {
+          setDbReady(true);
+        }, remaining);
       }
     }
     setup();
@@ -201,31 +208,7 @@ export default function App() {
     return () => backHandler.remove();
   }, [currentUser, activeTab, selectedOrder, orderFormVisible]);
 
-  if (!dbReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <LinearGradient
-          colors={['#eff6ff', '#f8fafc', '#ffffff']}
-          style={StyleSheet.absoluteFill}
-        />
-        <MotiView
-          from={{ opacity: 0.4, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1.05 }}
-          transition={{
-            type: 'timing',
-            duration: 1500,
-            loop: true,
-            repeatReverse: true,
-          }}
-          style={{ alignItems: 'center' }}
-        >
-          <ActivityIndicator size="large" color="#2563eb" style={{ marginBottom: 16 }} />
-          <Text style={styles.loadingText}>KLIN UP</Text>
-          <Text style={styles.loadingSubtext}>Initialisation de la base de données...</Text>
-        </MotiView>
-      </View>
-    );
-  }
+
 
   const renderTabScreen = (tabKey) => {
     switch (tabKey) {
@@ -271,6 +254,10 @@ export default function App() {
             setGestionFilter={setGestionFilter}
             onModalStateChange={setLocalModalOpen}
             closeAllModalsTrigger={closeModalsTrigger}
+            onSelectClient={(client) => {
+              switchTab('gestion');
+              setInitSelectedClient(client);
+            }}
             onShowSuccess={triggerSuccess}
           />
         );
@@ -301,8 +288,8 @@ export default function App() {
 
   const appContent = (
     <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
-      <StatusBar style={isDarkMode ? "light" : "dark"} translucent={true} backgroundColor="transparent" />
-      {!currentUser ? (
+      <StatusBar style={showSplash ? "light" : (isDarkMode ? "light" : "dark")} translucent={true} backgroundColor="transparent" />
+      {!dbReady ? null : !currentUser ? (
         <LoginScreen />
       ) : (
         <View style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', paddingTop: insets.top }]}>
@@ -555,7 +542,7 @@ export default function App() {
               setCustomAlertState(prev => ({ ...prev, visible: false }));
             }
           }}>
-            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
           
           <MotiView
@@ -675,6 +662,14 @@ export default function App() {
           </MotiView>
         </MotiView>
       )}
+
+      {/* OPENING ANIMATED SPLASH SCREEN OVERLAY */}
+      {showSplash && (
+        <SplashScreen
+          isReady={dbReady}
+          onAnimationFinish={() => setShowSplash(false)}
+        />
+      )}
     </View>
   );
 
@@ -748,6 +743,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 14,
     right: 14,
+    zIndex: 10000,
     flexDirection: 'row',
     backgroundColor: '#f3f4f8',
     borderRadius: 30,
@@ -766,7 +762,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 18,
-    elevation: 12,
+    elevation: 20,
   },
   tabItem: {
     alignItems: 'center',

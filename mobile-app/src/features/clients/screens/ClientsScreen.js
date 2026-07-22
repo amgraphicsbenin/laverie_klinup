@@ -198,7 +198,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
       >
         <View style={styles.compactModalOverlay}>
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
-            <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+            <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
           <MotiView
             from={{ opacity: 0, scale: 0.88, translateY: 48 }}
@@ -409,7 +409,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
         >
             <View style={styles.compactModalOverlay}>
               <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseFiche}>
-                <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+                <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
               </TouchableOpacity>
               <MotiView
                 from={{ opacity: 0, scale: 0.9, translateY: 40 }}

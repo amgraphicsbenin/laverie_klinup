@@ -87,7 +87,7 @@ export default function CancelModal({
         StyleSheet.absoluteFill,
         { 
           zIndex: 9999,
-          bottom: 86
+          bottom: 0
         }
       ]}
     >
@@ -98,7 +98,7 @@ export default function CancelModal({
             style={StyleSheet.absoluteFill} 
             onPress={onClose}
           >
-            <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+            <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
           
           <MotiView

@@ -108,7 +108,10 @@ export default function useOrderActions({
   const confirmPayment = (method, reference) => {
     if (!paymentOrder) return;
 
-    const soldeRestant = paymentOrder.prix_total - (paymentOrder.avance_payee || 0);
+    const total = Number(paymentOrder.prix_total || paymentOrder.total || 0);
+    const avance = Number(paymentOrder.avance_payee || paymentOrder.avance || 0);
+    const soldeRestant = Math.max(0, total - avance);
+    const targetStatus = paymentNextStatus || 'restitue';
 
     const performUpdate = async () => {
       try {
@@ -116,7 +119,7 @@ export default function useOrderActions({
           paymentOrder.id,
           soldeRestant,
           method,
-          paymentNextStatus,
+          targetStatus,
           reference
         );
         if (onShowSuccess) {
@@ -134,7 +137,7 @@ export default function useOrderActions({
       setSelectedOrder(null);
     }
 
-    triggerFinalStatusAnimation(paymentOrder.id, paymentNextStatus, performUpdate);
+    triggerFinalStatusAnimation(paymentOrder.id, targetStatus, performUpdate);
   };
 
   /**

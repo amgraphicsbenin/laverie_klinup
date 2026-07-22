@@ -6,6 +6,7 @@ import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { MotiView } from 'moti';
 import { useDbState } from '../../../hooks/useDbState';
+import ClientDetailModal from '../../../components/ClientDetailModal';
 
 export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { orders, customers, currentUser, isDarkMode } = useDbState();
@@ -26,6 +27,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, delivered, late
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedClient, setSelectedClient] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const scrollPaddingBottom = useScrollPaddingBottom();
@@ -390,8 +392,8 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
               <View style={styles.cardHeader}>
                 <TouchableOpacity
                   onPress={(e) => {
-                    e.stopPropagation();
-                    if (clientObj && onSelectClient) onSelectClient(clientObj);
+                    if (e && e.stopPropagation) e.stopPropagation();
+                    if (clientObj) setSelectedClient(clientObj);
                   }}
                   activeOpacity={0.8}
                   style={styles.clientPillBtn}
@@ -482,14 +484,14 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           StyleSheet.absoluteFill,
           { 
             zIndex: 9999,
-            bottom: 86
+            bottom: 0
           }
         ]}
       >
         {selectedOrder && (
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedOrder(null)}>
-              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             <View style={[styles.compactModalView, { maxHeight: '90%' }]}>
               <View style={styles.compactModalHeader}>
@@ -508,9 +510,8 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   <TouchableOpacity
                     onPress={() => {
                       const client = customers.find(c => c.id === selectedOrder.customer_id);
-                      if (client && onSelectClient) {
-                        setSelectedOrder(null);
-                        onSelectClient(client);
+                      if (client) {
+                        setSelectedClient(client);
                       }
                     }}
                     activeOpacity={0.8}
@@ -653,7 +654,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           StyleSheet.absoluteFill,
           { 
             zIndex: 9999,
-            bottom: 86
+            bottom: 0
           }
         ]}
       >
@@ -679,7 +680,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             <View style={styles.absoluteModalContainer}>
               <View style={styles.popupModalOverlay}>
                 <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                  <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+                  <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
                 </TouchableOpacity>
                 <View style={styles.popupModalView}>
                   <View style={styles.compactModalHeader}>
@@ -828,14 +829,14 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           StyleSheet.absoluteFill,
           { 
             zIndex: 9999,
-            bottom: 86
+            bottom: 0
           }
         ]}
       >
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setCancelModalVisible(false)}>
-              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             
             <MotiView
@@ -929,6 +930,13 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           </View>
         </View>
       </MotiView>
+      {/* MODAL FICHE CLIENT (POPUP SUR PAGE HISTORIQUE) */}
+      <ClientDetailModal
+        visible={!!selectedClient}
+        client={selectedClient}
+        onClose={() => setSelectedClient(null)}
+        onShowSuccess={onShowSuccess}
+      />
     </View>
   );
 }
@@ -1752,7 +1760,7 @@ const baseStyles = StyleSheet.create({
   absoluteModalContainer: {
     position: 'absolute',
     top: 0,
-    bottom: 86,
+    bottom: 0,
     left: 0,
     right: 0,
     zIndex: 1000,

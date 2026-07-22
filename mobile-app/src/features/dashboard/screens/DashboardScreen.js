@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl } from 'react-native';
-import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock } from 'lucide-react-native';
+import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock, User } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { MotiView } from 'moti';
 import Svg, { Rect, Path, Circle } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import { useScrollPaddingBottom, useTabBarHeight } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
+import ClientDetailModal from '../../../components/ClientDetailModal';
 
-export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger }) {
+export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { orders, customers, currentUser, isDarkMode } = useDbState();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -30,6 +31,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   // State for active KPI details modal
   const [activeKpiDetail, setActiveKpiDetail] = useState(null);
   const [localKpiDetail, setLocalKpiDetail] = useState(null);
+  const [selectedClient, setSelectedClient] = useState(null);
 
   // Close KPI details when trigger increments
   React.useEffect(() => {
@@ -344,7 +346,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             zIndex: 9999,
             justifyContent: 'center',
             alignItems: 'center',
-            bottom: tabBarHeight,
+            bottom: 0,
           }
         ]}
       >
@@ -353,7 +355,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           style={StyleSheet.absoluteFill} 
           onPress={() => setActiveKpiDetail(null)}
         >
-          <BlurView tint={isDarkMode ? "dark" : "light"} intensity={35} style={StyleSheet.absoluteFill} />
+          <BlurView tint={isDarkMode ? "dark" : "light"} intensity={85} style={StyleSheet.absoluteFill} />
         </TouchableOpacity>
 
         <MotiView
@@ -470,7 +472,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
           >
             {/* KPI 1: CA Mensuel (Inspiré Card 1 & 8) */}
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('ca_mensuel')}>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('ca_mensuel')} style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -485,7 +487,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 </View>
                 <Text style={styles.newCardSub}>Mois en cours</Text>
                 
-                <Text style={styles.newCardBigValue}>{formatPrice(monthlyRevenue)}</Text>
+                <Text style={styles.newCardBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(monthlyRevenue)}</Text>
                 
                 <View style={styles.greenPillBadge}>
                   <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
@@ -495,7 +497,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             </TouchableOpacity>
 
             {/* KPI 2: Panier Moyen (Inspiré Card 5 avec mini bâtonnets) */}
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('panier_moyen')}>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('panier_moyen')} style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -505,7 +507,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 <View style={styles.cardHeaderRow}>
                   <Text style={styles.newCardTitle}>Panier Moyen</Text>
                 </View>
-                <Text style={styles.newCardBigValue}>{formatPrice(averageBasket)}</Text>
+                <Text style={styles.newCardBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(averageBasket)}</Text>
 
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 26, marginVertical: 4 }}>
                   <View style={{ flex: 1, height: '40%', backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.18)', borderRadius: 4 }} />
@@ -519,7 +521,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             </TouchableOpacity>
 
             {/* KPI 3: Recouvrement (Inspiré Card 3 anneau de progression) */}
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('recouvrement')}>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('recouvrement')} style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -528,7 +530,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               >
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View>
-                    <Text style={styles.newCardBigValue}>{recoveryRate || 0}%</Text>
+                    <Text style={styles.newCardBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{recoveryRate || 0}%</Text>
                     <Text style={styles.newCardSub}>Recouvrement</Text>
                   </View>
 
@@ -560,7 +562,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             </TouchableOpacity>
 
             {/* KPI 4: Part Express (Inspiré Card 7 jauges de progression) */}
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('part_express')}>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveKpiDetail('part_express')} style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -589,7 +591,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           <TouchableOpacity 
             activeOpacity={0.9}
             onPress={() => setActiveKpiDetail('ca_jour')}
-            style={{ width: '100%' }}
+            style={{ width: '100%', borderRadius: 24, overflow: 'hidden' }}
           >
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
@@ -604,7 +606,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 </View>
               </View>
 
-              <Text style={styles.newMainBigValue}>{formatPrice(todayRevenue)}</Text>
+              <Text style={styles.newMainBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(todayRevenue)}</Text>
               
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                 <View style={styles.greenPillBadge}>
@@ -651,101 +653,125 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             </MotiView>
           </TouchableOpacity>
 
-        {/* 2X2 GRID STATS (DESIGN FIRST MODEL) */}
+        {/* 2X2 GRID STATS (DESIGN FIRST MODEL WITH ICON-MATCHED BACKGROUNDS) */}
         <View style={styles.gridRow}>
-          {/* Card 1: En Cours */}
+          {/* Card 1: En Cours (Fond Bleu) */}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setActiveKpiDetail('en_cours')}
-            style={{ flex: 1 }}
+            style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
           >
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
               transition={{ type: 'timing', duration: 150, delay: 15 }}
-              style={styles.newGridCard}
+              style={[
+                styles.newGridCard,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(2, 132, 199, 0.16)' : '#f0f9ff',
+                  borderColor: isDarkMode ? 'rgba(2, 132, 199, 0.3)' : '#e0f2fe',
+                }
+              ]}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(2, 132, 199, 0.15)' : '#eff6ff' }]}>
+                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(2, 132, 199, 0.3)' : '#ffffff' }]}>
                   <Layers size={15} color="#0284c7" />
                 </View>
-                <Text style={styles.newCardTitle}>En cours</Text>
+                <Text style={[styles.newCardTitle, { color: isDarkMode ? '#7dd3fc' : '#0369a1' }]}>En cours</Text>
               </View>
-              <Text style={styles.newCardBigValue}>{activeOrders.length}</Text>
-              <Text style={styles.newCardSub}>Lavage & Repassage</Text>
+              <Text style={[styles.newCardBigValue, { color: isDarkMode ? '#ffffff' : '#0369a1' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{activeOrders.length}</Text>
+              <Text style={[styles.newCardSub, { color: isDarkMode ? '#38bdf8' : '#0284c7' }]}>Lavage & Repassage</Text>
             </MotiView>
           </TouchableOpacity>
 
-          {/* Card 2: Commandes Prêtes */}
+          {/* Card 2: Commandes Prêtes (Fond Vert) */}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setActiveKpiDetail('pretes')}
-            style={{ flex: 1 }}
+            style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
           >
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
               transition={{ type: 'timing', duration: 150, delay: 30 }}
-              style={styles.newGridCard}
+              style={[
+                styles.newGridCard,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#ecfdf5',
+                  borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#d1fae5',
+                }
+              ]}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5' }]}>
+                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#ffffff' }]}>
                   <CheckCircle2 size={15} color="#10b981" />
                 </View>
-                <Text style={styles.newCardTitle}>Prêtes</Text>
+                <Text style={[styles.newCardTitle, { color: isDarkMode ? '#6ee7b7' : '#047857' }]}>Prêtes</Text>
               </View>
-              <Text style={styles.newCardBigValue}>{readyOrders.length}</Text>
-              <Text style={styles.newCardSub}>À récupérer</Text>
+              <Text style={[styles.newCardBigValue, { color: isDarkMode ? '#ffffff' : '#047857' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{readyOrders.length}</Text>
+              <Text style={[styles.newCardSub, { color: isDarkMode ? '#34d399' : '#10b981' }]}>À récupérer</Text>
             </MotiView>
           </TouchableOpacity>
         </View>
 
         <View style={styles.gridRow}>
-          {/* Card 3: Retards / Urgences */}
+          {/* Card 3: Retards / Urgences (Fond Rouge) */}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setActiveKpiDetail('retards')}
-            style={{ flex: 1 }}
+            style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
           >
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
               transition={{ type: 'timing', duration: 150, delay: 45 }}
-              style={styles.newGridCard}
+              style={[
+                styles.newGridCard,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.16)' : '#fef2f2',
+                  borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#ffe4e6',
+                }
+              ]}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2' }]}>
+                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#ffffff' }]}>
                   <AlertTriangle size={15} color="#ef4444" />
                 </View>
-                <Text style={[styles.newCardTitle, { color: isDarkMode ? '#fca5a5' : '#ef4444' }]}>Retards</Text>
+                <Text style={[styles.newCardTitle, { color: isDarkMode ? '#fca5a5' : '#b91c1c' }]}>Retards</Text>
               </View>
-              <Text style={[styles.newCardBigValue, lateOrders.length > 0 && { color: '#ef4444' }]}>
+              <Text style={[styles.newCardBigValue, { color: isDarkMode ? '#f87171' : '#dc2626' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {lateOrders.length}
               </Text>
-              <Text style={styles.newCardSub}>Livraison alerte</Text>
+              <Text style={[styles.newCardSub, { color: isDarkMode ? '#fca5a5' : '#ef4444' }]}>Livraison alerte</Text>
             </MotiView>
           </TouchableOpacity>
 
-          {/* Card 4: Commandes du Jour */}
+          {/* Card 4: Commandes du Jour (Fond Indigo/Violet) */}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setActiveKpiDetail('volume_jour')}
-            style={{ flex: 1 }}
+            style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
           >
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
               transition={{ type: 'timing', duration: 150, delay: 60 }}
-              style={styles.newGridCard}
+              style={[
+                styles.newGridCard,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(99, 102, 241, 0.16)' : '#eef2ff',
+                  borderColor: isDarkMode ? 'rgba(99, 102, 241, 0.3)' : '#e0e7ff',
+                }
+              ]}
             >
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(99, 102, 241, 0.15)' : '#f1f5f9' }]}>
+                <View style={[styles.newGridIconWrap, { backgroundColor: isDarkMode ? 'rgba(99, 102, 241, 0.3)' : '#ffffff' }]}>
                   <RefreshCw size={15} color="#6366f1" />
                 </View>
-                <Text style={styles.newCardTitle}>Du jour</Text>
+                <Text style={[styles.newCardTitle, { color: isDarkMode ? '#a5b4fc' : '#4338ca' }]}>Du jour</Text>
               </View>
-              <Text style={styles.newCardBigValue}>{todayOrders.length}</Text>
-              <Text style={styles.newCardSub}>Flux quotidien</Text>
+              <Text style={[styles.newCardBigValue, { color: isDarkMode ? '#ffffff' : '#4338ca' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{todayOrders.length}</Text>
+              <Text style={[styles.newCardSub, { color: isDarkMode ? '#818cf8' : '#6366f1' }]}>Flux quotidien</Text>
             </MotiView>
           </TouchableOpacity>
         </View>
@@ -765,6 +791,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         ) : (
           activeOrders.slice(0, 10).map((item, index) => {
             const status = getStatusColor(item.statut);
+            const clientObj = customers.find(c => c.id === item.customer_id);
             return (
               <MotiView
                 key={item.id}
@@ -784,7 +811,17 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 >
                   <View style={styles.orderLeft}>
                     <View style={styles.orderInfo}>
-                      <Text style={styles.orderClientName}>{getCustomerName(item.customer_id)}</Text>
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          if (e && e.stopPropagation) e.stopPropagation();
+                          if (clientObj) setSelectedClient(clientObj);
+                        }}
+                        activeOpacity={0.8}
+                        style={styles.clientPillBtn}
+                      >
+                        <User size={12} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 4 }} />
+                        <Text style={styles.clientPillBtnText}>{getCustomerName(item.customer_id)}</Text>
+                      </TouchableOpacity>
                       <Text style={styles.orderNumber}>Ticket #{getDisplayTicketId(item)}</Text>
                     </View>
                   </View>
@@ -804,6 +841,12 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
       </ScrollView>
 
       {renderKpiDetails()}
+      <ClientDetailModal
+        visible={!!selectedClient}
+        client={selectedClient}
+        onClose={() => setSelectedClient(null)}
+        onShowSuccess={onShowSuccess}
+      />
     </View>
   );
 }
@@ -1038,10 +1081,11 @@ const baseStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.035,
+    shadowRadius: 10,
+    elevation: 2,
+    overflow: 'hidden',
   },
   orderLeft: {
     flex: 1,
@@ -1056,6 +1100,23 @@ const baseStyles = StyleSheet.create({
     fontWeight: '500',
     color: '#09090b',
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+  },
+  clientPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 44, 247, 0.08)',
+    borderRadius: 99,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  clientPillBtnText: {
+    color: '#002cf7',
+    fontSize: 12,
+    fontWeight: '600',
   },
   orderNumber: {
     fontSize: 11,
@@ -1229,7 +1290,7 @@ const baseStyles = StyleSheet.create({
   },
   newKpiCard: {
     width: 175,
-    minHeight: 135,
+    height: 138,
     backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 16,
@@ -1237,10 +1298,11 @@ const baseStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.035,
+    shadowRadius: 10,
+    elevation: 2,
+    overflow: 'hidden',
   },
   newMainCard: {
     backgroundColor: '#ffffff',
@@ -1249,11 +1311,12 @@ const baseStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.035,
+    shadowRadius: 10,
+    elevation: 2,
     marginBottom: 16,
+    overflow: 'hidden',
   },
   newGridCard: {
     flex: 1,
@@ -1263,12 +1326,13 @@ const baseStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.035,
+    shadowRadius: 10,
+    elevation: 2,
     justifyContent: 'space-between',
-    minHeight: 115,
+    height: 118,
+    overflow: 'hidden',
   },
   newGridIconWrap: {
     width: 30,
@@ -1294,16 +1358,16 @@ const baseStyles = StyleSheet.create({
     color: '#94a3b8',
   },
   newCardBigValue: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: '800',
     color: '#0f172a',
-    marginVertical: 4,
+    marginVertical: 2,
   },
   newMainBigValue: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: '#0f172a',
-    marginVertical: 4,
+    marginVertical: 2,
   },
   purpleBadge: {
     backgroundColor: '#e0e7ff',
@@ -1604,6 +1668,8 @@ function getStyles(isDarkMode) {
     sectionTitle: { color: '#94a3b8' },
     viewAllText: { color: '#38bdf8' },
     orderCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    clientPillBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
+    clientPillBtnText: { color: '#38bdf8' },
     orderClientName: { color: '#ffffff' },
     orderNumber: { color: '#cbd5e1' },
     orderPrice: { color: '#ffffff' },

@@ -288,13 +288,13 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
             StyleSheet.absoluteFill,
             { 
               zIndex: 9999,
-              bottom: 86
+              bottom: 0
             }
           ]}
         >
           <View style={styles.modalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setShowPinModal(false)}>
-              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>

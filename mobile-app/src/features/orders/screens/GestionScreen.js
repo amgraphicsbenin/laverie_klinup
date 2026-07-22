@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import ClientsScreen from '../../clients/screens/ClientsScreen';
 import { useDbState } from '../../../hooks/useDbState';
+import ClientDetailModal from '../../../components/ClientDetailModal';
 
 export default function GestionScreen({ 
   selectedOrder, 
@@ -295,6 +296,15 @@ export default function GestionScreen({
     }
   }, [selectedOrder]);
 
+  useEffect(() => {
+    if (initialSelectedClient) {
+      setSelectedClient(initialSelectedClient);
+      if (onClearInitialSelectedClient) {
+        onClearInitialSelectedClient();
+      }
+    }
+  }, [initialSelectedClient]);
+
   // Handle Android back button/gesture to close modals and forms inside GestionScreen
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -409,7 +419,10 @@ export default function GestionScreen({
       return;
     }
 
-    const soldeRestant = paymentOrder.prix_total - (paymentOrder.avance_payee || 0);
+    const total = Number(paymentOrder.prix_total || paymentOrder.total || 0);
+    const avance = Number(paymentOrder.avance_payee || paymentOrder.avance || 0);
+    const soldeRestant = Math.max(0, total - avance);
+    const targetStatus = paymentNextStatus || 'restitue';
 
     const performUpdate = async () => {
       try {
@@ -417,13 +430,14 @@ export default function GestionScreen({
           paymentOrder.id,
           soldeRestant,
           paymentMethod,
-          paymentNextStatus,
+          targetStatus,
           paymentMethod === 'Mobile Money' ? momoRefNumber.trim() : null
         );
         if (onShowSuccess) {
           onShowSuccess("Paiement enregistré et commande finalisée.");
         }
       } catch (e) {
+        console.error("Error validating payment:", e);
         Alert.alert("Erreur", "Impossible de valider le règlement.");
       }
     };
@@ -434,7 +448,7 @@ export default function GestionScreen({
       setSelectedOrder(null);
     }
     
-    triggerFinalStatusAnimation(paymentOrder.id, paymentNextStatus, performUpdate);
+    triggerFinalStatusAnimation(paymentOrder.id, targetStatus, performUpdate);
   };
 
   const handleUpdateStatusDirect = async (order, nextStatus) => {
@@ -1472,7 +1486,7 @@ export default function GestionScreen({
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseOrderDetails}>
-              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             <MotiView
               from={{ opacity: 0, scale: 0.88, translateY: 48 }}
@@ -1849,7 +1863,7 @@ export default function GestionScreen({
           >
             <View style={styles.compactModalOverlay}>
               <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseCustomerModal}>
-                <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+                <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
               </TouchableOpacity>
               <MotiView
                 from={{ opacity: 0, scale: 0.88, translateY: 48 }}
@@ -1938,185 +1952,14 @@ export default function GestionScreen({
         </View>
       )}
 
-      {/* MODAL 4 : DETAIL CLIENT (FICHE CLIENT - BOTTOM SHEET DOCKÉ) */}
-      {selectedClient !== null && selectedClient && (
-        <View style={styles.absoluteModalContainer}>
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedClient(null)}>
-              <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
-            <MotiView
-              from={{ opacity: 0, scale: 0.88, translateY: 48 }}
-              animate={{ opacity: 1, scale: 1, translateY: 0 }}
-              transition={{ type: 'spring', damping: 16, mass: 0.8 }}
-              style={[styles.compactModalView, { maxHeight: '90%' }]}
-            >
-              <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Fiche Client</Text>
-                <TouchableOpacity onPress={() => setSelectedClient(null)}>
-                  <X size={20} color="#71717a" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
-                {(() => {
-                  const activeClient = customers.find(c => c.id === selectedClient.id) || selectedClient;
-                  return (
-                    <>
-                      <View style={styles.detailCard}>
-                        <Text style={styles.clientProfileName}>{activeClient.prenom} {activeClient.nom}</Text>
-                        <Text style={styles.clientProfilePhone}>{activeClient.telephone}</Text>
-                        <Text style={styles.clientProfileAddress}>{activeClient.adresse || 'Aucune adresse renseignée'}</Text>
-                        <Text style={styles.clientProfilePreferences}>Préférence : {activeClient.preferences_pliage || 'Plié'}</Text>
-                        
-                        <View style={styles.clientActionRow}>
-                          <TouchableOpacity
-                            onPress={() => handleEditCustomer(activeClient)}
-                            style={styles.clientEditBtn}
-                          >
-                            <Edit3 size={14} color="#2563eb" />
-                            <Text style={styles.clientEditBtnText}>Modifier</Text>
-                          </TouchableOpacity>
-                          {currentUser && currentUser.role !== 'livreur' && (
-                            <TouchableOpacity
-                              onPress={() => handleDeleteCustomer(activeClient.id)}
-                              style={styles.clientDeleteBtn}
-                            >
-                              <Trash2 size={14} color="#ef4444" />
-                              <Text style={styles.clientDeleteBtnText}>Supprimer</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      </View>
-
-                      {/* SECTION ABONNEMENT CLIENT */}
-                      <Text style={styles.detailSectionTitle}>Forfait d'Abonnement</Text>
-                      <View style={styles.premiumSubscriptionCard}>
-                        <View style={styles.subscriptionHeader}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Award size={16} color="#002cf7" />
-                            <Text style={styles.subscriptionTitle}>Forfait d'Abonnement</Text>
-                          </View>
-                          {activeClient.active_subscription && (
-                            <View style={styles.subActiveBadge}>
-                              <Text style={styles.subActiveBadgeText}>Actif</Text>
-                            </View>
-                          )}
-                        </View>
-
-                        {activeClient.active_subscription ? (
-                          <View style={{ gap: 10 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
-                              <Text style={styles.subPlanBalance}>
-                                Solde : {activeClient.active_subscription.remaining_clothes} / {activeClient.active_subscription.total_clothes} vêt.
-                              </Text>
-                            </View>
-
-                            {/* Barre de progression */}
-                            {(() => {
-                              const remaining = activeClient.active_subscription.remaining_clothes;
-                              const total = activeClient.active_subscription.total_clothes;
-                              const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                              return (
-                                <View style={{ gap: 4 }}>
-                                  <View style={styles.progressBarBg}>
-                                    <View style={[styles.progressBarFill, { width: `${percentUsed}%` }]} />
-                                  </View>
-                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={styles.progressText}>Consommé : {percentUsed}%</Text>
-                                    <Text style={styles.progressText}>Restant : {remaining} vêtements</Text>
-                                  </View>
-                                </View>
-                              );
-                            })()}
-
-                            <View style={styles.subDatesRow}>
-                              <Text style={styles.subDateText}>
-                                Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
-                              </Text>
-                              <Text style={styles.subDateText}>
-                                Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
-                              </Text>
-                            </View>
-
-                            {currentUser && currentUser.role !== 'livreur' && (
-                              <TouchableOpacity
-                                onPress={() => handleUnsubscribeCrm(activeClient.id)}
-                                style={styles.unsubscribeBtn}
-                                activeOpacity={0.8}
-                              >
-                                <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        ) : (
-                          currentUser && currentUser.role !== 'livreur' ? (
-                            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                              <View style={{ flex: 1 }}>
-                                <CustomSelect
-                                  value={selectedCrmSubId}
-                                  onChange={(val) => setSelectedCrmSubId(val)}
-                                  options={[
-                                    { label: "-- Choisir une formule --", value: "" },
-                                    ...catalog.filter(item => item.service === 'abonnement').map(sub => ({
-                                      label: `${sub.article} (${sub.prix.toLocaleString('fr-FR')} F/m)`,
-                                      value: sub.id
-                                    }))
-                                  ]}
-                                  placeholder="Choisir une formule"
-                                />
-                              </View>
-                              <TouchableOpacity
-                                onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
-                                style={styles.subscribeBtn}
-                                activeOpacity={0.8}
-                              >
-                                <Text style={styles.subscribeBtnText}>Souscrire</Text>
-                              </TouchableOpacity>
-                            </View>
-                          ) : (
-                            <Text style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', marginTop: 4 }}>
-                              Souscription réservée aux gérants et agents d'accueil
-                            </Text>
-                          )
-                        )}
-                      </View>
-                    </>
-                  );
-                })()}
-
-                {/* Historique Client */}
-                <Text style={styles.detailSectionTitle}>Historique des Commandes</Text>
-                {(() => {
-                  const clientOrders = orders.filter(o => o.customer_id === selectedClient.id);
-                  return clientOrders.length === 0 ? (
-                    <Text style={styles.noResultsText}>Aucune commande pour ce client</Text>
-                  ) : (
-                    clientOrders.map(item => {
-                      const status = getStatusColor(item.statut);
-                      return (
-                        <View key={item.id} style={styles.orderHistoryItem}>
-                          <View>
-                            <Text style={styles.orderHistoryNo}>Ticket #{getDisplayTicketId(item)}</Text>
-                            <Text style={styles.orderHistoryDate}>{item.created_at.split('T')[0]}</Text>
-                          </View>
-                          <View style={{ alignItems: 'flex-end' }}>
-                            <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, marginBottom: 4, borderWidth: 1 }]}>
-                              <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
-                            </View>
-                            <Text style={styles.orderHistoryTotal}>{formatPrice(item.prix_total || item.total)}</Text>
-                          </View>
-                        </View>
-                      );
-                    })
-                  );
-                })()}
-              </ScrollView>
-            </MotiView>
-          </View>
-        </View>
-      )}
+      {/* MODAL 4 : DETAIL CLIENT (FICHE CLIENT) */}
+      <ClientDetailModal
+        visible={!!selectedClient}
+        client={selectedClient}
+        onClose={() => setSelectedClient(null)}
+        onEditClient={(client) => handleEditCustomer(client)}
+        onShowSuccess={onShowSuccess}
+      />
 
       {/* MODAL 5 : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
       <MotiView
@@ -2129,7 +1972,7 @@ export default function GestionScreen({
           StyleSheet.absoluteFill,
           { 
             zIndex: 9999,
-            bottom: 86
+            bottom: 0
           }
         ]}
       >
@@ -2155,7 +1998,7 @@ export default function GestionScreen({
             <View style={styles.absoluteModalContainer}>
               <View style={styles.popupModalOverlay}>
                 <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                  <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+                  <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
                 </TouchableOpacity>
                 <View style={styles.popupModalView}>
                   <View style={styles.compactModalHeader}>
@@ -2305,14 +2148,14 @@ export default function GestionScreen({
           StyleSheet.absoluteFill,
           { 
             zIndex: 9999,
-            bottom: 86
+            bottom: 0
           }
         ]}
       >
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setCancelModalVisible(false)}>
-              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             
             <MotiView
@@ -2418,14 +2261,14 @@ export default function GestionScreen({
           StyleSheet.absoluteFill,
           { 
             zIndex: 9999,
-            bottom: 86
+            bottom: 0
           }
         ]}
       >
         <View style={styles.absoluteModalContainer}>
           <View style={styles.compactModalOverlay}>
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setPaymentModalVisible(false)}>
-              <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             </TouchableOpacity>
             
             <View style={[styles.popupModalView, { width: '92%', maxWidth: 380, padding: 22 }]}>
@@ -2594,7 +2437,7 @@ const baseStyles = StyleSheet.create({
   absoluteModalContainer: {
     position: 'absolute',
     top: 0,
-    bottom: 86,
+    bottom: 0,
     left: 0,
     right: 0,
     zIndex: 1000,
@@ -2739,6 +2582,7 @@ const baseStyles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 5,
     position: 'relative',
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',

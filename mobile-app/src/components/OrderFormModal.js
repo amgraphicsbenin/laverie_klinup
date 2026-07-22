@@ -189,14 +189,14 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
         StyleSheet.absoluteFill,
         { 
           zIndex: 9999,
-          bottom: tabBarHeight
+          bottom: 0
         }
       ]}
     >
       <View style={styles.absoluteModalContainer}>
         <View style={styles.compactModalOverlay}>
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
-            <BlurView intensity={35} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+            <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
           <MotiView
             animate={{
