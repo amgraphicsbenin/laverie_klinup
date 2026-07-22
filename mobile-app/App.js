@@ -92,7 +92,7 @@ export default function App() {
     }
   };
 
-  const handleMomentumScrollEnd = (e) => {
+  const handleScroll = (e) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     if (containerWidth > 0) {
       const pageIndex = Math.round(offsetX / containerWidth);
@@ -103,6 +103,10 @@ export default function App() {
         }
       }
     }
+  };
+
+  const handleMomentumScrollEnd = (e) => {
+    handleScroll(e);
   };
 
   useEffect(() => {
@@ -324,6 +328,7 @@ export default function App() {
               showsHorizontalScrollIndicator={false}
               bounces={false}
               scrollEventThrottle={16}
+              onScroll={handleScroll}
               onMomentumScrollEnd={handleMomentumScrollEnd}
               style={{ flex: 1 }}
               contentContainerStyle={{ width: containerWidth * availableTabs.length }}
