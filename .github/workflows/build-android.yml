@@ -64,34 +64,20 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Cache Gradle packages & build cache
+      - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            mobile-app/android/.gradle
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}-${{ github.run_id }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-
-      - name: Create Android assets directory
-        run: mkdir -p mobile-app/android/app/src/main/assets
-
-      - name: Bundle JavaScript (standalone — no Metro required)
-        working-directory: mobile-app
-        run: |
-          npx react-native bundle \
-            --platform android \
-            --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
 
       - name: Make Gradle wrapper executable
         run: chmod +x mobile-app/android/gradlew
 
-      - name: Build Release APK with Gradle Caching & Parallel Execution
+      - name: Build Release APK
         working-directory: mobile-app/android
         run: ./gradlew assembleRelease --no-daemon --build-cache --parallel
         env:
