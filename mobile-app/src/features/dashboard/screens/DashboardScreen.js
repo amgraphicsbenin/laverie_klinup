@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl } from 'react-native';
-import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock, User } from 'lucide-react-native';
+import { TrendingUp, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock, User, Bell } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { MotiView } from '../../../components/SafeView';
 import Svg, { Rect, Path, Circle } from 'react-native-svg';
@@ -9,10 +9,12 @@ const BlurView = SafeBlurView;
 import { useScrollPaddingBottom, useTabBarHeight } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
+import NotificationModal from '../../../components/NotificationModal';
 
 export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
-  const { orders, customers, currentUser, isDarkMode } = useDbState();
+  const { orders, customers, notifications, currentUser, isDarkMode } = useDbState();
   const [refreshing, setRefreshing] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -448,6 +450,22 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             {currentUser ? `Salut ${currentUser.prenom}` : 'Salut'}
           </Text>
         </View>
+
+        {/* NOTIFICATION BUTTON */}
+        <TouchableOpacity
+          onPress={() => setNotificationModalVisible(true)}
+          style={[styles.notificationBtn, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }]}
+          activeOpacity={0.8}
+        >
+          <Bell size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+          {(notifications || []).filter(n => !n.read).length > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>
+                {(notifications || []).filter(n => !n.read).length > 9 ? '9+' : (notifications || []).filter(n => !n.read).length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -848,6 +866,12 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         onClose={() => setSelectedClient(null)}
         onShowSuccess={onShowSuccess}
       />
+      <NotificationModal
+        visible={notificationModalVisible}
+        onClose={() => setNotificationModalVisible(false)}
+        notifications={notifications}
+        isDarkMode={isDarkMode}
+      />
     </View>
   );
 }
@@ -872,6 +896,39 @@ const baseStyles = StyleSheet.create({
     color: '#09090b',
     letterSpacing: -0.5,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+  },
+  notificationBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+  },
+  unreadBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
   },
   subHeadline: {
     fontSize: 12,

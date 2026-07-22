@@ -5,6 +5,7 @@ export function useDbState() {
   const [customers, setCustomers] = useState(() => db.getCustomers() || []);
   const [orders, setOrders] = useState(() => db.getOrders() || []);
   const [catalog, setCatalog] = useState(() => db.getCatalog() || []);
+  const [notifications, setNotifications] = useState(() => (typeof db.getNotifications === 'function' ? db.getNotifications() : []));
   const [currentUser, setCurrentUser] = useState(() => db.getCurrentUser() || null);
   const [isRemote, setIsRemote] = useState(() => (typeof db.isRemote === 'function' ? db.isRemote() : false));
   const [isDarkMode, setIsDarkMode] = useState(() => (typeof db.isDarkMode === 'function' ? db.isDarkMode() : false));
@@ -14,6 +15,7 @@ export function useDbState() {
     setCustomers(db.getCustomers() || []);
     setOrders(db.getOrders() || []);
     setCatalog(db.getCatalog() || []);
+    setNotifications(typeof db.getNotifications === 'function' ? db.getNotifications() : []);
     setCurrentUser(db.getCurrentUser() || null);
     setIsRemote(typeof db.isRemote === 'function' ? db.isRemote() : false);
     setIsDarkMode(typeof db.isDarkMode === 'function' ? db.isDarkMode() : false);
@@ -22,6 +24,7 @@ export function useDbState() {
       setCustomers(db.getCustomers() || []);
       setOrders(db.getOrders() || []);
       setCatalog(db.getCatalog() || []);
+      setNotifications(typeof db.getNotifications === 'function' ? db.getNotifications() : []);
       setCurrentUser(db.getCurrentUser() || null);
       setIsRemote(typeof db.isRemote === 'function' ? db.isRemote() : false);
       setIsDarkMode(typeof db.isDarkMode === 'function' ? db.isDarkMode() : false);
@@ -37,6 +40,7 @@ export function useDbState() {
     customers: customers || [], 
     orders: orders || [], 
     catalog: catalog || [], 
+    notifications: notifications || [],
     currentUser, 
     isRemote: !!isRemote, 
     isDarkMode: !!isDarkMode 

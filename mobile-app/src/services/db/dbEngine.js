@@ -21,6 +21,7 @@ export const memoryDb = {
   customers: DEFAULT_CUSTOMERS,
   orders: DEFAULT_ORDERS,
   logs: DEFAULT_LOGS,
+  notifications: [],
   catalog: DEFAULT_CATALOG,
   current_user: null,
   pin_reset_requests: [],
@@ -109,6 +110,48 @@ export const db = {
   getCustomers: () => [...memoryDb.customers],
   getOrders: () => [...memoryDb.orders],
   getLogs: () => [...memoryDb.logs],
+  getNotifications: () => {
+    if (!memoryDb.notifications || memoryDb.notifications.length === 0) {
+      if (memoryDb.logs && memoryDb.logs.length > 0) {
+        memoryDb.notifications = memoryDb.logs.map(log => ({
+          id: 'n_' + log.id,
+          action: log.action,
+          details: log.details,
+          timestamp: log.timestamp,
+          read: false
+        }));
+      } else {
+        memoryDb.notifications = [];
+      }
+    }
+    return [...memoryDb.notifications];
+  },
+  markNotificationRead: (id) => {
+    if (!memoryDb.notifications) return;
+    const item = memoryDb.notifications.find(n => n.id === id);
+    if (item) {
+      item.read = true;
+      persist();
+      db.notify();
+    }
+  },
+  markAllNotificationsRead: () => {
+    if (!memoryDb.notifications) return;
+    memoryDb.notifications.forEach(n => { n.read = true; });
+    persist();
+    db.notify();
+  },
+  deleteNotification: (id) => {
+    if (!memoryDb.notifications) return;
+    memoryDb.notifications = memoryDb.notifications.filter(n => n.id !== id);
+    persist();
+    db.notify();
+  },
+  clearAllNotifications: () => {
+    memoryDb.notifications = [];
+    persist();
+    db.notify();
+  },
   getCatalog: () => [...memoryDb.catalog],
   getCurrentUser: () => memoryDb.current_user ? { ...memoryDb.current_user } : null,
 
@@ -160,6 +203,16 @@ export const db = {
       timestamp: new Date().toISOString()
     };
     memoryDb.logs.unshift(newLog);
+
+    if (!memoryDb.notifications) memoryDb.notifications = [];
+    memoryDb.notifications.unshift({
+      id: 'n_' + newLog.id,
+      action: newLog.action,
+      details: newLog.details,
+      timestamp: newLog.timestamp,
+      read: false
+    });
+
     persist();
     db.notify();
 
