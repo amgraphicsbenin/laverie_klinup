@@ -751,25 +751,22 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           </ScrollView>
 
           {/* CARTE CHIFFRE D'AFFAIRES DYNAMIQUE AVEC FILTRE */}
-          <TouchableOpacity 
-            activeOpacity={0.9}
-            onPress={() => setActiveKpiDetail('ca_jour')}
-            style={{ width: '100%', borderRadius: 24, overflow: 'hidden' }}
-          >
+          <View style={{ width: '100%', borderRadius: 24, zIndex: 500 }}>
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
               transition={{ type: 'timing', duration: 150 }}
-              style={styles.newMainCard}
+              style={[styles.newMainCard, { overflow: 'visible', zIndex: 500 }]}
             >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, zIndex: 50 }}>
-                <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
-                <View style={{ position: 'relative', zIndex: 100 }}>
+              {/* Header Row: Title & Filter Pill Dropdown */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, zIndex: 1000 }}>
+                <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveKpiDetail('ca_jour')}>
+                  <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
+                </TouchableOpacity>
+
+                <View style={{ position: 'relative', zIndex: 1000 }}>
                   <TouchableOpacity
-                    onPress={(e) => {
-                      if (e && e.stopPropagation) e.stopPropagation();
-                      setPeriodPickerVisible(!periodPickerVisible);
-                    }}
+                    onPress={() => setPeriodPickerVisible(!periodPickerVisible)}
                     activeOpacity={0.8}
                     style={styles.filterPill}
                   >
@@ -801,8 +798,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                           <TouchableOpacity
                             key={opt.key}
                             activeOpacity={0.7}
-                            onPress={(e) => {
-                              if (e && e.stopPropagation) e.stopPropagation();
+                            onPress={() => {
                               setRevenuePeriod(opt.key);
                               setPeriodPickerVisible(false);
                             }}
@@ -828,61 +824,68 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                 </View>
               </View>
 
-              <Text style={styles.newMainBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                {formatPrice(revenuePeriodData.totalRevenue)}
-              </Text>
-              
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <View style={[styles.greenPillBadge, !revenuePeriodData.isPositive && { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
-                  {revenuePeriodData.isPositive ? (
-                    <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
-                  ) : (
-                    <TrendingDown size={12} color="#ef4444" style={{ marginRight: 3 }} />
-                  )}
-                  <Text style={[styles.greenPillText, !revenuePeriodData.isPositive && { color: '#ef4444' }]}>
-                    {revenuePeriodData.growthText}
-                  </Text>
+              {/* Clickable Card Body for Detail View */}
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setActiveKpiDetail('ca_jour')}
+                style={{ width: '100%' }}
+              >
+                <Text style={styles.newMainBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  {formatPrice(revenuePeriodData.totalRevenue)}
+                </Text>
+                
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                  <View style={[styles.greenPillBadge, !revenuePeriodData.isPositive && { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                    {revenuePeriodData.isPositive ? (
+                      <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
+                    ) : (
+                      <TrendingDown size={12} color="#ef4444" style={{ marginRight: 3 }} />
+                    )}
+                    <Text style={[styles.greenPillText, !revenuePeriodData.isPositive && { color: '#ef4444' }]}>
+                      {revenuePeriodData.growthText}
+                    </Text>
+                  </View>
                 </View>
-              </View>
 
-              {/* Dynamic Bar Chart matching selected period */}
-              <View style={styles.barChartContainer}>
-                {revenuePeriodData.chartData.map((d, index) => {
-                  const maxVal = Math.max(...revenuePeriodData.chartData.map(c => c.revenue), 1000);
-                  const barHeight = maxVal > 0 ? (d.revenue / maxVal) * 45 : 3;
-                  const barWidth = revenuePeriodData.chartData.length > 7 ? 10 : 12;
+                {/* Dynamic Bar Chart matching selected period */}
+                <View style={styles.barChartContainer}>
+                  {revenuePeriodData.chartData.map((d, index) => {
+                    const maxVal = Math.max(...revenuePeriodData.chartData.map(c => c.revenue), 1000);
+                    const barHeight = maxVal > 0 ? (d.revenue / maxVal) * 45 : 3;
+                    const barWidth = revenuePeriodData.chartData.length > 7 ? 10 : 12;
 
-                  return (
-                    <View key={`${d.label}-${index}`} style={styles.barColumn}>
-                      <View style={styles.barWrapper}>
-                        <Svg height="55" width={barWidth + 8} style={{ alignSelf: 'center' }}>
-                          <Rect
-                            x="4"
-                            y="5"
-                            width={barWidth}
-                            height="45"
-                            rx="5"
-                            fill={isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(9, 9, 11, 0.04)'}
-                          />
-                          <Rect
-                            x="4"
-                            y={50 - barHeight}
-                            width={barWidth}
-                            height={barHeight}
-                            rx="5"
-                            fill={d.isActive ? '#002cf7' : (isDarkMode ? 'rgba(56, 189, 248, 0.4)' : 'rgba(0, 44, 247, 0.35)')}
-                          />
-                        </Svg>
+                    return (
+                      <View key={`${d.label}-${index}`} style={styles.barColumn}>
+                        <View style={styles.barWrapper}>
+                          <Svg height="55" width={barWidth + 8} style={{ alignSelf: 'center' }}>
+                            <Rect
+                              x="4"
+                              y="5"
+                              width={barWidth}
+                              height="45"
+                              rx="5"
+                              fill={isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(9, 9, 11, 0.04)'}
+                            />
+                            <Rect
+                              x="4"
+                              y={50 - barHeight}
+                              width={barWidth}
+                              height={barHeight}
+                              rx="5"
+                              fill={d.isActive ? '#002cf7' : (isDarkMode ? 'rgba(56, 189, 248, 0.4)' : 'rgba(0, 44, 247, 0.35)')}
+                            />
+                          </Svg>
+                        </View>
+                        <Text style={[styles.barDayText, d.isActive && styles.barDayTextActive]} numberOfLines={1}>
+                          {d.label}
+                        </Text>
                       </View>
-                      <Text style={[styles.barDayText, d.isActive && styles.barDayTextActive]} numberOfLines={1}>
-                        {d.label}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
+                    );
+                  })}
+                </View>
+              </TouchableOpacity>
             </MotiView>
-          </TouchableOpacity>
+          </View>
 
         {/* 2X2 GRID STATS (DESIGN FIRST MODEL WITH ICON-MATCHED BACKGROUNDS) */}
         <View style={styles.gridRow}>
