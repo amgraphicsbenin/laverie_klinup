@@ -76,6 +76,8 @@ export default function CancelModal({
     onConfirm(cancelReason.trim());
   };
 
+  if (!visible || !orderToCancel) return null;
+
   const inputBorderColor = cancelReasonError ? '#ef4444' : (isDarkMode ? '#334155' : '#e2e8f0');
   return (
     <MotiView

@@ -79,7 +79,7 @@ export default function PaymentModal({
     onConfirm(paymentMethod, momoRefNumber.trim());
   };
 
-  if (!order) return null;
+  if (!visible || !order) return null;
 
   return (
     <MotiView

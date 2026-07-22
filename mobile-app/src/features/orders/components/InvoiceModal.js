@@ -53,6 +53,8 @@ export default function InvoiceModal({
   const displayRemisePourcent = order.remise_pourcentage || (displayBrut > 0 ? Math.round((displayRemiseMontant / displayBrut) * 100) : 0);
   const hasDiscount = displayRemiseMontant > 0;
 
+  if (!visible || !order) return null;
+
   // Récupération des informations du client associé
   const associatedClient = customers.find(c => c.id === order.customer_id);
   const clientFullName = associatedClient ? `${associatedClient.prenom} ${associatedClient.nom}` : 'Client Inconnu';

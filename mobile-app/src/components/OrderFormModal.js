@@ -179,6 +179,8 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
     }
   };
 
+  if (!visible) return null;
+
   return (
     <MotiView
       pointerEvents={visible ? 'auto' : 'none'}
