@@ -358,7 +358,7 @@ export default function App() {
         {
           bottom: Math.max(18, insets.bottom + 12),
           backgroundColor: isDarkMode ? '#1e293b' : '#f3f4f8',
-          borderColor: isDarkMode ? '#334155' : 'rgba(226, 232, 240, 0.8)',
+          borderColor: isDarkMode ? 'rgba(0, 44, 247, 0.4)' : 'rgba(0, 44, 247, 0.25)',
         }
       ]}>
         {/* Sliding Active Pill Background Indicator */}
@@ -748,8 +748,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 4,
     height: 74,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderWidth: 1.2,
+    borderColor: 'rgba(0, 44, 247, 0.25)',
     // Shadows for floating rounded card look
     shadowColor: '#0f172a',
     shadowOffset: {
