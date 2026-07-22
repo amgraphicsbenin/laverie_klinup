@@ -800,7 +800,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
   },
   tabLabelActive: {
-    color: '#002cf7',
+    color: '#ffffff',
     fontWeight: '700',
   },
   globalToastContainer: {
