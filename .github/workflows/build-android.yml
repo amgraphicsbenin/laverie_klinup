@@ -2,24 +2,29 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
     tags:
       - 'v*'
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Type de build'
+        required: false
+        default: 'release'
+        type: choice
+        options:
+          - release
 
 jobs:
   build:
     name: Build Android Release APK
-    runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -28,7 +33,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: mobile-app/package-lock.json
 
-      - name: Configure Versioning & Build Artifact Name
+      - name: Configure Versioning
         working-directory: mobile-app
         run: |
           VERSION_NAME=$(node -p "require('./app.json').expo.version")
@@ -36,8 +41,7 @@ jobs:
           echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
           echo "BUILD_NUMBER=${BUILD_NUMBER}" >> $GITHUB_ENV
           echo "APK_NAME=klinup-v${VERSION_NAME}-build${BUILD_NUMBER}" >> $GITHUB_ENV
-          
-          echo "Building KLIN UP Mobile v${VERSION_NAME} (Build #${BUILD_NUMBER})"
+          echo "🏗️ Building KLIN UP v${VERSION_NAME} (Build #${BUILD_NUMBER})"
           
           node -e "
             const fs = require('fs');
@@ -49,7 +53,17 @@ jobs:
 
       - name: Install dependencies
         working-directory: mobile-app
-        run: npm ci
+        run: npm ci --prefer-offline
+
+      - name: Cache Expo prebuild
+        uses: actions/cache@v4
+        with:
+          path: |
+            mobile-app/android
+            !mobile-app/android/app/build
+          key: expo-prebuild-${{ hashFiles('mobile-app/package-lock.json', 'mobile-app/app.json') }}
+          restore-keys: |
+            expo-prebuild-
 
       - name: Expo prebuild (generate Android native layer)
         working-directory: mobile-app
@@ -64,24 +78,42 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Cache Gradle packages
+      - name: Cache Gradle dependencies
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: gradle-${{ hashFiles('mobile-app/android/gradle/wrapper/gradle-wrapper.properties', 'mobile-app/android/build.gradle', 'mobile-app/android/app/build.gradle') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            gradle-
+
+      - name: Optimize Gradle configuration
+        working-directory: mobile-app/android
+        run: |
+          cat >> gradle.properties << 'EOF'
+
+          # === KLIN UP Build Optimizations ===
+          # Limit to arm64-v8a only (modern Android devices 99%+)
+          reactNativeArchitectures=arm64-v8a
+          # Parallel & caching
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          org.gradle.configureondemand=true
+          # Memory optimization
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError
+          # Disable unused features
+          android.enableJetifier=false
+          EOF
 
       - name: Make Gradle wrapper executable
         run: chmod +x mobile-app/android/gradlew
 
       - name: Build Release APK
         working-directory: mobile-app/android
-        run: ./gradlew assembleRelease --no-daemon --build-cache --parallel
+        run: ./gradlew assembleRelease --no-daemon --build-cache --parallel -x lint -x test
         env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -90,3 +122,4 @@ jobs:
           path: mobile-app/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
+          compression-level: 0
