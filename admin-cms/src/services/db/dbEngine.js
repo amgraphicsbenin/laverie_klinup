@@ -286,7 +286,9 @@ export const dbEngine = {
       ramassage: Boolean(ramassage),
       nombre_ramassages: nombre_ramassages !== null ? Number(nombre_ramassages) : null,
       ramassage_gratuit: Boolean(ramassage_gratuit),
-      livraison_gratuite: Boolean(livraison_gratuite)
+      livraison_gratuite: Boolean(livraison_gratuite),
+      is_active: true,
+      statut: 'actif'
     };
     memoryDb.catalog.push(newItem);
     dbEngine.logAction('AJOUT_CATALOGUE', `Nouvel article ajouté au catalogue: ${article} (${service}) - SKU: ${sku} - ${prix} FCFA (Urgent: ${prix_urgent})`);
@@ -299,6 +301,40 @@ export const dbEngine = {
       notifyListeners();
     });
     return newItem;
+  },
+
+  toggleCatalogItemActive: (idOrArticleName) => {
+    const itemsToToggle = memoryDb.catalog.filter(i => 
+      i.id === idOrArticleName || 
+      (i.article && i.article.trim().toLowerCase() === String(idOrArticleName).trim().toLowerCase())
+    );
+    if (itemsToToggle.length === 0) return false;
+
+    const isCurrentlyActive = itemsToToggle.some(i => i.is_active !== false && i.statut !== 'inactif');
+    const newActive = !isCurrentlyActive;
+
+    itemsToToggle.forEach(item => {
+      item.is_active = newActive;
+      item.statut = newActive ? 'actif' : 'inactif';
+    });
+
+    const articleLabel = itemsToToggle[0].article;
+    dbEngine.logAction(
+      'MODIFICATION_CATALOGUE', 
+      `Produit "${articleLabel}" ${newActive ? 'ACTIVÉ' : 'DÉSACTIVÉ'} sur le catalogue`
+    );
+
+    persist();
+    notifyListeners();
+
+    itemsToToggle.forEach(item => {
+      performMutation('update', 'catalog', item.id, {
+        is_active: item.is_active,
+        statut: item.statut
+      });
+    });
+
+    return newActive;
   },
 
   deleteCatalogItem: (id) => {

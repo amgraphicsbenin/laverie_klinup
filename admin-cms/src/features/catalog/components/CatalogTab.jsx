@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Plus, Search, Trash2, Edit, AlertCircle } from 'lucide-react';
+import { Sparkles, Plus, Search, Trash2, Edit, AlertCircle, Power, CheckCircle2, XCircle } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 
 export default function CatalogTab({
@@ -22,6 +22,7 @@ export default function CatalogTab({
   getAssetIcon,
   handleStartEditProduct,
   handleDeleteCatalogItem,
+  handleToggleCatalogItemActive,
   setShowAddCatalogModal
 }) {
   const catalogItemsPerPage = 20;
@@ -52,7 +53,7 @@ export default function CatalogTab({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexShrink: 0 }}>
         <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
           <Sparkles size={18} color="var(--primary)" />
-          Grille Tarifaire
+          Grille Tarifaire & Catalogue des Produits
         </h3>
         <button className="btn btn-primary" onClick={() => setShowAddCatalogModal(true)}>
           <Plus size={16} /> Nouveau tarif
@@ -200,13 +201,14 @@ export default function CatalogTab({
                     <th style={{ fontSize: '0.8rem', padding: '0.75rem', color: 'var(--text-secondary)' }}>Article</th>
                     <th style={{ fontSize: '0.8rem', padding: '0.75rem', color: 'var(--text-secondary)' }}>Tarif Traitement</th>
                     <th style={{ fontSize: '0.8rem', padding: '0.75rem', color: 'var(--text-secondary)' }}>Tarif Repassage</th>
+                    <th style={{ fontSize: '0.8rem', padding: '0.75rem', color: 'var(--text-secondary)' }}>Statut Mobile</th>
                     <th style={{ fontSize: '0.8rem', padding: '0.75rem', color: 'var(--text-secondary)', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedCatalog.length === 0 ? (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem 1rem' }}>
+                      <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem 1rem' }}>
                         <AlertCircle size={28} style={{ margin: '0 auto 0.5rem', color: 'var(--text-muted)' }} />
                         Aucun vêtement trouvé.
                       </td>
@@ -214,6 +216,8 @@ export default function CatalogTab({
                   ) : (
                     paginatedCatalog.map((item, index) => {
                       const isSelected = selectedCatalogIds.includes(item.id);
+                      const isActive = item.is_active !== false && item.statut !== 'inactif';
+
                       return (
                         <tr
                           key={item.id}
@@ -221,6 +225,7 @@ export default function CatalogTab({
                           style={{
                             background: isSelected ? 'rgba(var(--primary-rgb), 0.02)' : 'transparent',
                             borderBottom: '1px solid var(--border-color)',
+                            opacity: isActive ? 1 : 0.65,
                             cursor: 'pointer',
                             transition: 'background 0.2s ease'
                           }}
@@ -244,10 +249,10 @@ export default function CatalogTab({
                           </td>
                           <td style={{ padding: '0.75rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: isActive ? 'var(--primary-light)' : 'rgba(100, 116, 139, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                 {getAssetIcon(item.article)}
                               </div>
-                              <strong style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>{item.article}</strong>
+                              <strong style={{ fontSize: '0.88rem', color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>{item.article}</strong>
                             </div>
                           </td>
                           
@@ -283,8 +288,43 @@ export default function CatalogTab({
                             )}
                           </td>
 
+                          {/* Statut Mobile (Actif / Désactivé) */}
+                          <td style={{ padding: '0.75rem' }}>
+                            {isActive ? (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '0.15rem 0.55rem', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <CheckCircle2 size={11} /> Actif
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '0.15rem 0.55rem', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <XCircle size={11} /> Désactivé
+                              </span>
+                            )}
+                          </td>
+
                           <td style={{ padding: '0.75rem', textAlign: 'right' }}>
                             <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'end' }}>
+                              {/* Bouton d'activation / désactivation */}
+                              <button
+                                className="btn btn-outline"
+                                style={{
+                                  padding: '0.35rem 0.6rem',
+                                  borderRadius: '8px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  color: isActive ? '#ef4444' : '#10b981',
+                                  borderColor: isActive ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)',
+                                  background: isActive ? 'rgba(239, 68, 68, 0.05)' : 'rgba(16, 185, 129, 0.05)'
+                                }}
+                                onClick={() => handleToggleCatalogItemActive && handleToggleCatalogItemActive(item)}
+                                title={isActive ? 'Désactiver du catalogue mobile' : 'Activer sur le catalogue mobile'}
+                              >
+                                <Power size={13} />
+                                {isActive ? 'Désactiver' : 'Activer'}
+                              </button>
+
                               <button
                                 className="btn btn-outline"
                                 style={{ padding: '0.35rem', borderRadius: '8px' }}
@@ -293,6 +333,7 @@ export default function CatalogTab({
                               >
                                 <Edit size={13} style={{ color: 'var(--text-secondary)' }} />
                               </button>
+
                               <button
                                 className="btn btn-outline"
                                 style={{ padding: '0.35rem', borderRadius: '8px', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.2)', background: 'transparent' }}
@@ -325,6 +366,8 @@ export default function CatalogTab({
               ) : (
                 paginatedCatalog.map(item => {
                   const isSelected = selectedCatalogIds.includes(item.id);
+                  const isActive = item.is_active !== false && item.statut !== 'inactif';
+
                   return (
                     <div
                       key={item.id}
@@ -339,6 +382,7 @@ export default function CatalogTab({
                         gap: '1rem',
                         boxShadow: isSelected ? '0 12px 30px rgba(0,0,0,0.06)' : '0 8px 25px rgba(0,0,0,0.03)',
                         position: 'relative',
+                        opacity: isActive ? 1 : 0.65,
                         cursor: 'pointer',
                         transition: 'all 0.25s ease-out'
                       }}
@@ -358,7 +402,20 @@ export default function CatalogTab({
                         />
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '1.5rem' }}>
+                      {/* Badge Statut */}
+                      <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem' }}>
+                        {isActive ? (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                            Actif
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                            Désactivé
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
                         <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}>
                           {item.article}
                         </h4>
@@ -379,6 +436,28 @@ export default function CatalogTab({
                       </div>
 
                       <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'end', marginTop: 'auto', paddingTop: '0.5rem' }}>
+                        {/* Toggle Activation Button */}
+                        <button
+                          className="btn btn-outline"
+                          style={{
+                            padding: '0.35rem 0.65rem',
+                            borderRadius: '8px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            color: isActive ? '#ef4444' : '#10b981',
+                            borderColor: isActive ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)',
+                            background: isActive ? 'rgba(239, 68, 68, 0.05)' : 'rgba(16, 185, 129, 0.05)'
+                          }}
+                          onClick={() => handleToggleCatalogItemActive && handleToggleCatalogItemActive(item)}
+                          title={isActive ? 'Désactiver la formule d\'abonnement' : 'Activer la formule d\'abonnement'}
+                        >
+                          <Power size={13} />
+                          {isActive ? 'Désactiver' : 'Activer'}
+                        </button>
+
                         <button
                           className="btn btn-outline"
                           style={{ padding: '0.35rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}

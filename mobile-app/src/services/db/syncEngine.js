@@ -37,7 +37,9 @@ const loadData = async (key, defaultData) => {
     }
     const parsed = JSON.parse(data);
     if (key === STORAGE_KEYS.CATALOG) {
-      const needsMigration = parsed.length < defaultData.length || !parsed[0].hasOwnProperty('categorie');
+      const hasZeroPriceClothes = parsed.some(item => item.categorie === 'individuel' && (!item.prix || Number(item.prix) === 0));
+      const hasMissingActiveKeys = parsed.some(item => item.categorie === 'individuel' && item.is_active === undefined && item.statut === 'inactif');
+      const needsMigration = parsed.length < defaultData.length || !parsed[0].hasOwnProperty('categorie') || hasZeroPriceClothes || hasMissingActiveKeys;
       if (needsMigration) {
         await AsyncStorage.setItem(key, JSON.stringify(defaultData));
         return defaultData;
@@ -69,7 +71,15 @@ export async function loadFromLocalStorage() {
   const loadedOrders = await loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
   memoryDb.orders = (loadedOrders || []).map(hydrateOrder);
   memoryDb.logs = await loadData(STORAGE_KEYS.LOGS, DEFAULT_LOGS);
-  memoryDb.catalog = await loadData(STORAGE_KEYS.CATALOG, DEFAULT_CATALOG);
+  
+  // Purge any stale local storage cache key for catalog to enforce direct DB querying
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.CATALOG);
+  } catch (e) {}
+
+  // Direct in-memory catalog initialization (no local storage caching)
+  memoryDb.catalog = DEFAULT_CATALOG;
+  
   memoryDb.current_user = await loadData(STORAGE_KEYS.CURRENT_USER, null);
   memoryDb.pin_reset_requests = await loadData('klin_up_pin_reset_requests', []);
   memoryDb.sync_queue = await loadData('klin_up_sync_queue', []);
@@ -85,7 +95,7 @@ export async function persist() {
   await saveData(STORAGE_KEYS.CUSTOMERS, memoryDb.customers);
   await saveData(STORAGE_KEYS.ORDERS, memoryDb.orders);
   await saveData(STORAGE_KEYS.LOGS, memoryDb.logs);
-  await saveData(STORAGE_KEYS.CATALOG, memoryDb.catalog);
+  // Catalog is NOT stored locally (direct DB query mode)
   await saveData(STORAGE_KEYS.CURRENT_USER, memoryDb.current_user);
   await saveData('klin_up_pin_reset_requests', memoryDb.pin_reset_requests);
   await saveData('klin_up_sync_queue', memoryDb.sync_queue);

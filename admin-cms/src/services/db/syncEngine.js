@@ -17,7 +17,9 @@ const loadData = (key, defaultData) => {
   try {
     const parsed = JSON.parse(data);
     if (key === STORAGE_KEYS.CATALOG) {
-      const needsMigration = parsed.length < defaultData.length || !parsed[0].hasOwnProperty('categorie');
+      const hasZeroPriceClothes = parsed.some(item => item.categorie === 'individuel' && (!item.prix || Number(item.prix) === 0));
+      const hasMissingActiveKeys = parsed.some(item => item.categorie === 'individuel' && item.is_active === undefined && item.statut === 'inactif');
+      const needsMigration = parsed.length < defaultData.length || !parsed[0].hasOwnProperty('categorie') || hasZeroPriceClothes || hasMissingActiveKeys;
       if (needsMigration) {
         localStorage.setItem(key, JSON.stringify(defaultData));
         return defaultData;
@@ -40,7 +42,15 @@ export function loadFromLocalStorage() {
   const loadedOrders = loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
   memoryDb.orders = (loadedOrders || []).map(hydrateOrder);
   memoryDb.logs = loadData(STORAGE_KEYS.LOGS, DEFAULT_LOGS);
-  memoryDb.catalog = loadData(STORAGE_KEYS.CATALOG, DEFAULT_CATALOG);
+  
+  // Clear any legacy local storage cache key for catalog to enforce direct DB querying
+  try {
+    localStorage.removeItem(STORAGE_KEYS.CATALOG);
+  } catch (e) {}
+
+  // Direct in-memory catalog initialization (no local storage caching)
+  memoryDb.catalog = DEFAULT_CATALOG;
+  
   memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
   memoryDb.pin_reset_requests = loadData('klin_up_pin_reset_requests', []);
   notifyListeners();
@@ -51,7 +61,7 @@ export function persist() {
   saveData(STORAGE_KEYS.CUSTOMERS, memoryDb.customers);
   saveData(STORAGE_KEYS.ORDERS, memoryDb.orders);
   saveData(STORAGE_KEYS.LOGS, memoryDb.logs);
-  saveData(STORAGE_KEYS.CATALOG, memoryDb.catalog);
+  // Catalog is NOT stored locally (direct DB query mode)
   saveData(STORAGE_KEYS.CURRENT_USER, memoryDb.current_user);
   saveData('klin_up_pin_reset_requests', memoryDb.pin_reset_requests);
 }

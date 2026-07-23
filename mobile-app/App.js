@@ -64,7 +64,7 @@ export default function App() {
   const isDarkMode = dbState.isDarkMode;
 
   const [dbReady, setDbReady] = useState(false);
-  const [showSplash, setShowSplash] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('accueil');
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -316,8 +316,14 @@ export default function App() {
 
   const appContent = (
     <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
-      <StatusBar style={showSplash ? "light" : (isDarkMode ? "light" : "dark")} translucent={true} backgroundColor="transparent" />
-      {!dbReady ? null : !currentUser ? (
+      {!dbReady ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
+          <ActivityIndicator size="large" color="#002cf7" />
+          <Text style={{ marginTop: 14, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+            Chargement de KLIN UP...
+          </Text>
+        </View>
+      ) : !currentUser ? (
         <LoginScreen />
       ) : (
         <View style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', paddingTop: insets.top }]}>

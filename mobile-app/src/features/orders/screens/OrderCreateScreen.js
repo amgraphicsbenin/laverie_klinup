@@ -405,7 +405,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                       }}
                       options={[
                         { label: "-- Pas d'abonnement --", value: "" },
-                        ...catalog.filter(c => c.categorie === 'abonnement').map(p => ({
+                        ...catalog.filter(c => c.categorie === 'abonnement' && c.is_active !== false && c.statut !== 'inactif').map(p => ({
                           label: `${p.article} (${p.prix.toLocaleString('fr-FR')} FCFA)`,
                           value: p.id
                         }))
@@ -427,8 +427,16 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
 
             {(() => {
               const uniqueArticles = [...new Set(catalog
-                .filter(c => c.categorie !== 'system_setting' && c.service !== 'system' && c.categorie !== 'abonnement' && c.service !== 'abonnement')
-                .map(c => c.article)
+                .filter(c => 
+                  c.article &&
+                  c.categorie !== 'system_setting' && 
+                  c.service !== 'system' && 
+                  c.categorie !== 'abonnement' && 
+                  c.service !== 'abonnement' &&
+                  !c.id?.startsWith('setting_') &&
+                  c.is_active !== false
+                )
+                .map(c => c.article.trim())
               )];
 
               if (uniqueArticles.length === 0) {
@@ -436,9 +444,16 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
               }
 
               return uniqueArticles.map(articleName => {
-                const items = catalog.filter(c => c.article === articleName);
-                const traitementItem = items.find(i => i.service === 'lavage_simple') || items.find(i => i.service.includes('lavage')) || items.find(i => i.service.includes('sec') || i.service.includes('nettoyage'));
-                const repassageItem = items.find(i => i.service === 'repassage');
+                const items = catalog.filter(c => 
+                  c.article && 
+                  c.article.trim().toLowerCase() === articleName.toLowerCase() &&
+                  c.categorie !== 'system_setting' &&
+                  c.service !== 'system' &&
+                  c.categorie !== 'abonnement' &&
+                  c.service !== 'abonnement' &&
+                  !c.id?.startsWith('setting_') &&
+                  c.is_active !== false
+                );
                 
                 const isExpanded = isArticleExpanded(articleName, items);
                 const getQtyInCart = (itemId) => {
@@ -462,61 +477,44 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
 
                     {isExpanded && (
                       <View style={styles.servicesContainer}>
-                        {traitementItem && (
-                          <View style={styles.serviceRow}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.serviceLabel}>Traitement (Lavage)</Text>
-                              <Text style={styles.servicePrice}>{formatPrice(traitementItem.prix)}</Text>
-                            </View>
-                            {getQtyInCart(traitementItem.id) === 0 ? (
-                              <TouchableOpacity 
-                                onPress={() => addArticleToOrder(traitementItem)}
-                                style={styles.serviceAddBtn}
-                              >
-                                <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                                <Text style={styles.serviceAddBtnText}>Ajouter</Text>
-                              </TouchableOpacity>
-                            ) : (
-                              <View style={styles.serviceQtyRow}>
-                                <TouchableOpacity onPress={() => removeArticleFromOrder(traitementItem.id)} style={styles.serviceQtyBtn}>
-                                  <Text style={styles.serviceQtyBtnText}>-</Text>
-                                </TouchableOpacity>
-                                <Text style={styles.serviceQtyText}>{getQtyInCart(traitementItem.id)}</Text>
-                                <TouchableOpacity onPress={() => addArticleToOrder(traitementItem)} style={styles.serviceQtyBtn}>
-                                  <Text style={styles.serviceQtyBtnText}>+</Text>
-                                </TouchableOpacity>
-                              </View>
-                            )}
-                          </View>
-                        )}
+                        {items.map(item => {
+                          const serviceLabel = 
+                            item.service === 'lavage_simple' ? 'Traitement (Lavage)' :
+                            item.service === 'repassage' ? 'Repassage' :
+                            item.service === 'nettoyage_a_sec' ? 'Nettoyage à Sec' :
+                            item.service === 'lavage_et_repassage' ? 'Lavage & Repassage' :
+                            item.service ? item.service.replace(/_/g, ' ') : 'Service';
 
-                        {repassageItem && (
-                          <View style={styles.serviceRow}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.serviceLabel}>Repassage</Text>
-                              <Text style={styles.servicePrice}>{formatPrice(repassageItem.prix)}</Text>
-                            </View>
-                            {getQtyInCart(repassageItem.id) === 0 ? (
-                              <TouchableOpacity 
-                                onPress={() => addArticleToOrder(repassageItem)}
-                                style={styles.serviceAddBtn}
-                              >
-                                <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                                <Text style={styles.serviceAddBtnText}>Ajouter</Text>
-                              </TouchableOpacity>
-                            ) : (
-                              <View style={styles.serviceQtyRow}>
-                                <TouchableOpacity onPress={() => removeArticleFromOrder(repassageItem.id)} style={styles.serviceQtyBtn}>
-                                  <Text style={styles.serviceQtyBtnText}>-</Text>
-                                </TouchableOpacity>
-                                <Text style={styles.serviceQtyText}>{getQtyInCart(repassageItem.id)}</Text>
-                                <TouchableOpacity onPress={() => addArticleToOrder(repassageItem)} style={styles.serviceQtyBtn}>
-                                  <Text style={styles.serviceQtyBtnText}>+</Text>
-                                </TouchableOpacity>
+                          const qty = getQtyInCart(item.id);
+
+                          return (
+                            <View key={item.id || `${articleName}_${item.service}`} style={styles.serviceRow}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.serviceLabel}>{serviceLabel}</Text>
+                                <Text style={styles.servicePrice}>{formatPrice(item.prix)}</Text>
                               </View>
-                            )}
-                          </View>
-                        )}
+                              {qty === 0 ? (
+                                <TouchableOpacity 
+                                  onPress={() => addArticleToOrder(item)}
+                                  style={styles.serviceAddBtn}
+                                >
+                                  <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
+                                  <Text style={styles.serviceAddBtnText}>Ajouter</Text>
+                                </TouchableOpacity>
+                              ) : (
+                                <View style={styles.serviceQtyRow}>
+                                  <TouchableOpacity onPress={() => removeArticleFromOrder(item.id)} style={styles.serviceQtyBtn}>
+                                    <Text style={styles.serviceQtyBtnText}>-</Text>
+                                  </TouchableOpacity>
+                                  <Text style={styles.serviceQtyText}>{qty}</Text>
+                                  <TouchableOpacity onPress={() => addArticleToOrder(item)} style={styles.serviceQtyBtn}>
+                                    <Text style={styles.serviceQtyBtnText}>+</Text>
+                                  </TouchableOpacity>
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })}
                       </View>
                     )}
                   </View>

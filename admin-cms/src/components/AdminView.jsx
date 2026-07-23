@@ -1043,10 +1043,14 @@ export default function AdminView({ activeTab, onManageStaff }) {
             categorie: 'individuel',
             traitement: null,
             repassage: null,
-            allIds: []
+            allIds: [],
+            is_active: false
           };
         }
         groups[articleKey].allIds.push(item.id);
+        if (item.is_active !== false && item.statut !== 'inactif') {
+          groups[articleKey].is_active = true;
+        }
         if (item.service === 'lavage_simple') {
           groups[articleKey].traitement = {
             id: item.id,
@@ -1382,6 +1386,11 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setEditArtRamassageGratuit(false);
     setEditArtLivraisonGratuite(false);
     setEditArtNameError('');
+    refreshAdminData();
+  };
+
+  const handleToggleCatalogItemActive = (groupedItem) => {
+    db.toggleCatalogItemActive(groupedItem.article || groupedItem.id);
     refreshAdminData();
   };
 
@@ -2013,6 +2022,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           getAssetIcon={getAssetIcon}
           handleStartEditProduct={handleStartEditProduct}
           handleDeleteCatalogItem={handleDeleteCatalogItem}
+          handleToggleCatalogItemActive={handleToggleCatalogItemActive}
           setShowAddCatalogModal={setShowAddCatalogModal}
         />
       )}
