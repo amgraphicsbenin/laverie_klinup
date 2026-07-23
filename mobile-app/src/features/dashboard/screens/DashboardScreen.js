@@ -353,7 +353,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
     pretes: { primary: '#4ade80', bg: isDarkMode ? '#064e3b' : '#dcfce7', text: isDarkMode ? '#dcfce7' : '#064e3b', title: 'Commandes Prêtes' },
     retards: { primary: '#fb7185', bg: isDarkMode ? '#4c0519' : '#ffe4e6', text: isDarkMode ? '#ffe4e6' : '#4c0519', title: 'Retards & Urgences' },
     ca_jour: { primary: '#60a5fa', bg: isDarkMode ? '#1e3a8a' : '#eff6ff', text: isDarkMode ? '#eff6ff' : '#1e3a8a', title: 'CA Journalier' },
-    volume_jour: { primary: '#94a3b8', bg: isDarkMode ? '#1e293b' : '#f1f5f9', text: isDarkMode ? '#f8fafc' : '#0f172a', title: 'Commandes du Jour' },
+    volume_jour: { primary: '#94a3b8', bg: isDarkMode ? '#121212' : '#f1f5f9', text: isDarkMode ? '#f8fafc' : '#09090b', title: 'Commandes du Jour' },
   };
 
   const renderKpiDetails = () => {
@@ -615,10 +615,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         {/* NOTIFICATION BUTTON */}
         <TouchableOpacity
           onPress={() => setNotificationModalVisible(true)}
-          style={[styles.notificationBtn, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', borderColor: isDarkMode ? '#334155' : '#e2e8f0' }]}
+          style={[styles.notificationBtn, { backgroundColor: isDarkMode ? '#121212' : '#ffffff', borderColor: isDarkMode ? '#27272a' : '#e2e8f0' }]}
           activeOpacity={0.8}
         >
-          <Bell size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+          <Bell size={20} color={isDarkMode ? '#ffffff' : '#09090b'} />
           {(notifications || []).filter(n => !n.read).length > 0 && (
             <View style={styles.unreadBadge}>
               <Text style={styles.unreadBadgeText}>
@@ -720,7 +720,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                       cy="18"
                       r="15.9155"
                       fill="none"
-                      stroke={isDarkMode ? '#334155' : '#f1f5f9'}
+                      stroke={isDarkMode ? '#27272a' : '#f1f5f9'}
                       strokeWidth="3.8"
                     />
                     <Circle
@@ -756,10 +756,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 
                 <View style={{ marginVertical: 6, gap: 5 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#475569' }}>Express</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#475569' }}>Express</Text>
                     <Text style={{ fontSize: 11, fontWeight: '700', color: '#002cf7' }}>{expressRate}%</Text>
                   </View>
-                  <View style={{ height: 6, backgroundColor: isDarkMode ? '#334155' : '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{ height: 6, backgroundColor: isDarkMode ? '#27272a' : '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
                     <View style={{ width: `${Math.min(100, expressRate)}%`, height: '100%', backgroundColor: '#002cf7', borderRadius: 3 }} />
                   </View>
                 </View>
@@ -1063,8 +1063,8 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               {
                 top: dropdownPos.top || 275,
                 right: dropdownPos.right || 24,
-                backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-                borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+                backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+                borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
               }
             ]}
           >
@@ -1091,7 +1091,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                   <Text
                     style={[
                       styles.dropdownItemText,
-                      { color: isSelected ? '#002cf7' : (isDarkMode ? '#ffffff' : '#0f172a') }
+                      { color: isSelected ? '#002cf7' : (isDarkMode ? '#ffffff' : '#09090b') }
                     ]}
                   >
                     {opt.label}
@@ -1216,7 +1216,7 @@ const baseStyles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
@@ -1369,7 +1369,7 @@ const baseStyles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.035,
     shadowRadius: 10,
@@ -1454,7 +1454,7 @@ const baseStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     maxHeight: '85%',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.15,
     shadowRadius: 24,
@@ -1586,7 +1586,7 @@ const baseStyles = StyleSheet.create({
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.035,
     shadowRadius: 10,
@@ -1599,7 +1599,7 @@ const baseStyles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.035,
     shadowRadius: 10,
@@ -1614,7 +1614,7 @@ const baseStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.035,
     shadowRadius: 10,
@@ -1649,13 +1649,13 @@ const baseStyles = StyleSheet.create({
   newCardBigValue: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#09090b',
     marginVertical: 2,
   },
   newMainBigValue: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#09090b',
     marginVertical: 2,
   },
   purpleBadge: {
@@ -1731,11 +1731,11 @@ const baseStyles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   kpiHeader: {
     flexDirection: 'row',
@@ -1848,7 +1848,7 @@ const baseStyles = StyleSheet.create({
     width: '92%',
     maxWidth: 385,
     maxHeight: '82%',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.18,
     shadowRadius: 30,
@@ -1870,7 +1870,7 @@ const baseStyles = StyleSheet.create({
   premiumModalTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#09090b',
     letterSpacing: -0.3,
   },
   premiumCloseBtn: {
@@ -1953,66 +1953,66 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
-    container: { backgroundColor: '#0f172a' },
-    header: { backgroundColor: '#0f172a' },
+    container: { backgroundColor: '#000000' },
+    header: { backgroundColor: '#000000' },
     headerTitle: { color: '#ffffff' },
-    subHeadline: { color: '#94a3b8' },
+    subHeadline: { color: '#a1a1aa' },
     boldText: { color: '#ffffff' },
-    circleButtonBlack: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
-    kpiCard: { borderColor: '#334155', shadowColor: '#000000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 5 },
-    newKpiCard: { backgroundColor: '#1e293b', borderColor: '#334155', shadowOpacity: 0.2 },
-    newMainCard: { backgroundColor: '#1e293b', borderColor: '#334155', shadowOpacity: 0.2 },
-    newGridCard: { backgroundColor: '#1e293b', borderColor: '#334155', shadowOpacity: 0.2 },
-    newCardTitle: { color: '#cbd5e1' },
-    newCardSub: { color: '#64748b' },
+    circleButtonBlack: { backgroundColor: '#18181b', borderColor: '#27272a', borderWidth: 1 },
+    kpiCard: { borderColor: '#27272a', shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
+    newKpiCard: { backgroundColor: '#121212', borderColor: '#27272a', shadowOpacity: 0, elevation: 0 },
+    newMainCard: { backgroundColor: '#121212', borderColor: '#27272a', shadowOpacity: 0, elevation: 0 },
+    newGridCard: { backgroundColor: '#121212', borderColor: '#27272a', shadowOpacity: 0, elevation: 0 },
+    newCardTitle: { color: '#d4d4d8' },
+    newCardSub: { color: '#a1a1aa' },
     newCardBigValue: { color: '#ffffff' },
     newMainBigValue: { color: '#ffffff' },
     purpleBadge: { backgroundColor: 'rgba(99, 102, 241, 0.2)' },
     purpleBadgeText: { color: '#818cf8' },
     greenPillBadge: { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
-    filterPill: { backgroundColor: '#334155' },
-    filterPillText: { color: '#cbd5e1' },
-    kpiLabel: { color: '#cbd5e1' },
+    filterPill: { backgroundColor: '#27272a' },
+    filterPillText: { color: '#d4d4d8' },
+    kpiLabel: { color: '#d4d4d8' },
     kpiValue: { color: '#ffffff' },
-    kpiSub: { color: '#94a3b8' },
-    mainSpendCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    spendLabel: { color: '#94a3b8' },
+    kpiSub: { color: '#a1a1aa' },
+    mainSpendCard: { backgroundColor: '#121212', borderColor: '#27272a' },
+    spendLabel: { color: '#a1a1aa' },
     spendValue: { color: '#ffffff' },
-    chartLabel: { color: '#94a3b8' },
-    barInactive: { backgroundColor: '#334155' },
-    kpiSubCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    chartLabel: { color: '#a1a1aa' },
+    barInactive: { backgroundColor: '#27272a' },
+    kpiSubCard: { backgroundColor: '#121212', borderColor: '#27272a' },
     kpiSubVal: { color: '#ffffff' },
-    kpiSubLbl: { color: '#94a3b8' },
-    sectionTitle: { color: '#94a3b8' },
+    kpiSubLbl: { color: '#a1a1aa' },
+    sectionTitle: { color: '#a1a1aa' },
     viewAllText: { color: '#38bdf8' },
-    orderCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    orderCard: { backgroundColor: '#121212', borderColor: '#27272a' },
     clientPillBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
     clientPillBtnText: { color: '#38bdf8' },
     orderClientName: { color: '#ffffff' },
-    orderNumber: { color: '#cbd5e1' },
+    orderNumber: { color: '#d4d4d8' },
     orderPrice: { color: '#ffffff' },
-    divider: { backgroundColor: '#334155' },
-    tabTitle: { color: '#94a3b8' },
+    divider: { backgroundColor: '#27272a' },
+    tabTitle: { color: '#a1a1aa' },
     tabTitleActive: { color: '#ffffff' },
-    searchContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    searchContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
     searchInput: { color: '#ffffff' },
-    modalContent: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    modalContent: { backgroundColor: '#121212', borderColor: '#27272a' },
     modalTitle: { color: '#ffffff' },
-    modalSubtitle: { color: '#94a3b8' },
-    modalLabel: { color: '#e2e8f0' },
-    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
-    infoRow: { borderBottomColor: '#334155' },
-    infoLabel: { color: '#94a3b8' },
+    modalSubtitle: { color: '#a1a1aa' },
+    modalLabel: { color: '#d4d4d8' },
+    modalInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
+    infoRow: { borderBottomColor: '#27272a' },
+    infoLabel: { color: '#a1a1aa' },
     infoValue: { color: '#ffffff' },
-    detailsListContainer: { backgroundColor: 'rgba(15, 23, 42, 0.5)', borderColor: '#334155' },
-    premiumDetailsOrderRowClickable: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    premiumKpiHeroCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    premiumKpiHeroLabel: { color: '#cbd5e1' },
-    premiumKpiSubBox: { backgroundColor: '#0f172a', borderColor: '#334155' },
-    premiumKpiSubBoxLbl: { color: '#94a3b8' },
+    detailsListContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
+    premiumDetailsOrderRowClickable: { backgroundColor: '#121212', borderColor: '#27272a' },
+    premiumKpiHeroCard: { backgroundColor: '#121212', borderColor: '#27272a' },
+    premiumKpiHeroLabel: { color: '#d4d4d8' },
+    premiumKpiSubBox: { backgroundColor: '#09090b', borderColor: '#27272a' },
+    premiumKpiSubBoxLbl: { color: '#a1a1aa' },
     premiumModalTitle: { color: '#ffffff' },
-    emptyStateContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    emptyStateText: { color: '#94a3b8' },
+    emptyStateContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
+    emptyStateText: { color: '#a1a1aa' },
   };
 
   const merged = {};

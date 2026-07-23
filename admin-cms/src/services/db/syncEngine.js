@@ -249,12 +249,33 @@ export async function initDb(forceSync = false) {
     const { data: catData } = await supabase.from('catalog').select('*');
     if (catData && catData.length > 0) {
       const merged = DEFAULT_CATALOG.map(defItem => {
-        const remote = catData.find(r => r.id === defItem.id || (r.article === defItem.article && r.service === defItem.service));
-        return remote ? { ...defItem, ...remote } : defItem;
+        const remote = catData.find(r => 
+          r.id === defItem.id || 
+          (r.article && defItem.article && r.article.trim().toLowerCase() === defItem.article.trim().toLowerCase() && r.service === defItem.service)
+        );
+        if (remote) {
+          const prix = (remote.prix && Number(remote.prix) > 0) ? Number(remote.prix) : defItem.prix;
+          const isActive = remote.is_active === false || remote.statut === 'inactif' ? false : true;
+          return {
+            ...defItem,
+            ...remote,
+            prix,
+            is_active: isActive,
+            statut: isActive ? 'actif' : 'inactif'
+          };
+        }
+        return defItem;
       });
       catData.forEach(remoteItem => {
         const exists = merged.some(m => m.id === remoteItem.id);
-        if (!exists) merged.push(remoteItem);
+        if (!exists) {
+          const isActive = remoteItem.is_active === false || remoteItem.statut === 'inactif' ? false : true;
+          merged.push({
+            ...remoteItem,
+            is_active: isActive,
+            statut: isActive ? 'actif' : 'inactif'
+          });
+        }
       });
       memoryDb.catalog = merged;
     }

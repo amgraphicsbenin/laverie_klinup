@@ -340,7 +340,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
           keyboardShouldPersistTaps="handled"
         >
           {/* Step 1: Sélection du Client */}
-          <View style={styles.cardSection}>
+          <View style={[styles.cardSection, { zIndex: 30, elevation: 30 }]}>
             <View style={styles.sectionHeader}>
               <User size={16} color="#002cf7" />
               <Text style={styles.sectionTitle}>1. Client & Abonnement</Text>
@@ -419,112 +419,121 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
           </View>
 
           {/* Step 2: Vêtements & Prestations */}
-          <View style={styles.cardSection}>
+          <View style={[styles.cardSection, { zIndex: 20, elevation: 20 }]}>
             <View style={styles.sectionHeader}>
               <ShoppingBag size={16} color="#002cf7" />
               <Text style={styles.sectionTitle}>2. Sélection des Vêtements</Text>
             </View>
 
-            {(() => {
-              const uniqueArticles = [...new Set(catalog
-                .filter(c => 
-                  c.article &&
-                  c.categorie !== 'system_setting' && 
-                  c.service !== 'system' && 
-                  c.categorie !== 'abonnement' && 
-                  c.service !== 'abonnement' &&
-                  !c.id?.startsWith('setting_') &&
-                  c.is_active !== false
-                )
-                .map(c => c.article.trim())
-              )];
+            <View style={styles.fixedArticleContainer}>
+              <ScrollView 
+                nestedScrollEnabled={true} 
+                showsVerticalScrollIndicator={true}
+                style={styles.fixedArticleScrollView}
+                contentContainerStyle={{ paddingRight: 4, paddingBottom: 4 }}
+              >
+                {(() => {
+                  const uniqueArticles = [...new Set(catalog
+                    .filter(c => 
+                      c.article &&
+                      c.categorie !== 'system_setting' && 
+                      c.service !== 'system' && 
+                      c.categorie !== 'abonnement' && 
+                      c.service !== 'abonnement' &&
+                      !c.id?.startsWith('setting_') &&
+                      c.is_active !== false &&
+                      (c.service === 'lavage_simple' || c.service === 'repassage' || c.service === 'traitement')
+                    )
+                    .map(c => c.article.trim())
+                  )];
 
-              if (uniqueArticles.length === 0) {
-                return <Text style={styles.emptyText}>Aucun article disponible</Text>;
-              }
+                  if (uniqueArticles.length === 0) {
+                    return <Text style={styles.emptyText}>Aucun article disponible</Text>;
+                  }
 
-              return uniqueArticles.map(articleName => {
-                const items = catalog.filter(c => 
-                  c.article && 
-                  c.article.trim().toLowerCase() === articleName.toLowerCase() &&
-                  c.categorie !== 'system_setting' &&
-                  c.service !== 'system' &&
-                  c.categorie !== 'abonnement' &&
-                  c.service !== 'abonnement' &&
-                  !c.id?.startsWith('setting_') &&
-                  c.is_active !== false
-                );
-                
-                const isExpanded = isArticleExpanded(articleName, items);
-                const getQtyInCart = (itemId) => {
-                  const cartItem = selectedArticles.find(a => a.id === itemId);
-                  return cartItem ? cartItem.quantity : 0;
-                };
+                  return uniqueArticles.map(articleName => {
+                    const items = catalog.filter(c => 
+                      c.article && 
+                      c.article.trim().toLowerCase() === articleName.toLowerCase() &&
+                      c.categorie !== 'system_setting' &&
+                      c.service !== 'system' &&
+                      c.categorie !== 'abonnement' &&
+                      c.service !== 'abonnement' &&
+                      !c.id?.startsWith('setting_') &&
+                      c.is_active !== false &&
+                      (c.service === 'lavage_simple' || c.service === 'repassage' || c.service === 'traitement')
+                    );
+                    
+                    const isExpanded = isArticleExpanded(articleName, items);
+                    const getQtyInCart = (itemId) => {
+                      const cartItem = selectedArticles.find(a => a.id === itemId);
+                      return cartItem ? cartItem.quantity : 0;
+                    };
 
-                return (
-                  <View key={articleName} style={styles.clothingCard}>
-                    <View style={styles.clothingHeader}>
-                      <Text style={styles.clothingName}>{articleName}</Text>
-                      <TouchableOpacity 
-                        onPress={() => toggleExpandArticle(articleName)}
-                        style={isExpanded ? styles.clothingCloseBtn : styles.clothingAddBtn}
-                      >
-                        <Text style={isExpanded ? styles.clothingCloseBtnText : styles.clothingAddBtnText}>
-                          {isExpanded ? 'Masquer' : 'Ajouter'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                    return (
+                      <View key={articleName} style={styles.clothingCard}>
+                        <View style={styles.clothingHeader}>
+                          <Text style={styles.clothingName}>{articleName}</Text>
+                          <TouchableOpacity 
+                            onPress={() => toggleExpandArticle(articleName)}
+                            style={isExpanded ? styles.clothingCloseBtn : styles.clothingAddBtn}
+                          >
+                            <Text style={isExpanded ? styles.clothingCloseBtnText : styles.clothingAddBtnText}>
+                              {isExpanded ? 'Masquer' : 'Ajouter'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
 
-                    {isExpanded && (
-                      <View style={styles.servicesContainer}>
-                        {items.map(item => {
-                          const serviceLabel = 
-                            item.service === 'lavage_simple' ? 'Traitement (Lavage)' :
-                            item.service === 'repassage' ? 'Repassage' :
-                            item.service === 'nettoyage_a_sec' ? 'Nettoyage à Sec' :
-                            item.service === 'lavage_et_repassage' ? 'Lavage & Repassage' :
-                            item.service ? item.service.replace(/_/g, ' ') : 'Service';
+                        {isExpanded && (
+                          <View style={styles.servicesContainer}>
+                            {items.map(item => {
+                              const serviceLabel = 
+                                (item.service === 'lavage_simple' || item.service === 'traitement') ? 'Traitement' :
+                                item.service === 'repassage' ? 'Repassage' :
+                                item.service ? item.service.replace(/_/g, ' ') : 'Service';
 
-                          const qty = getQtyInCart(item.id);
+                              const qty = getQtyInCart(item.id);
 
-                          return (
-                            <View key={item.id || `${articleName}_${item.service}`} style={styles.serviceRow}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={styles.serviceLabel}>{serviceLabel}</Text>
-                                <Text style={styles.servicePrice}>{formatPrice(item.prix)}</Text>
-                              </View>
-                              {qty === 0 ? (
-                                <TouchableOpacity 
-                                  onPress={() => addArticleToOrder(item)}
-                                  style={styles.serviceAddBtn}
-                                >
-                                  <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                                  <Text style={styles.serviceAddBtnText}>Ajouter</Text>
-                                </TouchableOpacity>
-                              ) : (
-                                <View style={styles.serviceQtyRow}>
-                                  <TouchableOpacity onPress={() => removeArticleFromOrder(item.id)} style={styles.serviceQtyBtn}>
-                                    <Text style={styles.serviceQtyBtnText}>-</Text>
-                                  </TouchableOpacity>
-                                  <Text style={styles.serviceQtyText}>{qty}</Text>
-                                  <TouchableOpacity onPress={() => addArticleToOrder(item)} style={styles.serviceQtyBtn}>
-                                    <Text style={styles.serviceQtyBtnText}>+</Text>
-                                  </TouchableOpacity>
+                              return (
+                                <View key={item.id || `${articleName}_${item.service}`} style={styles.serviceRow}>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.serviceLabel}>{serviceLabel}</Text>
+                                    <Text style={styles.servicePrice}>{formatPrice(item.prix)}</Text>
+                                  </View>
+                                  {qty === 0 ? (
+                                    <TouchableOpacity 
+                                      onPress={() => addArticleToOrder(item)}
+                                      style={styles.serviceAddBtn}
+                                    >
+                                      <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
+                                      <Text style={styles.serviceAddBtnText}>Ajouter</Text>
+                                    </TouchableOpacity>
+                                  ) : (
+                                    <View style={styles.serviceQtyRow}>
+                                      <TouchableOpacity onPress={() => removeArticleFromOrder(item.id)} style={styles.serviceQtyBtn}>
+                                        <Text style={styles.serviceQtyBtnText}>-</Text>
+                                      </TouchableOpacity>
+                                      <Text style={styles.serviceQtyText}>{qty}</Text>
+                                      <TouchableOpacity onPress={() => addArticleToOrder(item)} style={styles.serviceQtyBtn}>
+                                        <Text style={styles.serviceQtyBtnText}>+</Text>
+                                      </TouchableOpacity>
+                                    </View>
+                                  )}
                                 </View>
-                              )}
-                            </View>
-                          );
-                        })}
+                              );
+                            })}
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                );
-              });
-            })()}
+                    );
+                  });
+                })()}
+              </ScrollView>
+            </View>
           </View>
 
           {/* Step 3: Options & Paiement */}
-          <View style={styles.cardSection}>
+          <View style={[styles.cardSection, { zIndex: 10, elevation: 10 }]}>
             <View style={styles.sectionHeader}>
               <Sparkles size={16} color="#002cf7" />
               <Text style={styles.sectionTitle}>3. Options & Paiement</Text>
@@ -554,7 +563,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             </View>
 
             {/* Avance & Mode de paiement */}
-            <View style={styles.formRowInline}>
+            <View style={[styles.formRowInline, { zIndex: 20, elevation: 20 }]}>
               <View style={styles.formFieldInline}>
                 <Text style={styles.formLabel}>Avance (FCFA)</Text>
                 <TextInput
@@ -564,7 +573,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                   style={styles.formInput}
                 />
               </View>
-              <View style={styles.formFieldInline}>
+              <View style={[styles.formFieldInline, { zIndex: 20, elevation: 20 }]}>
                 <Text style={styles.formLabel}>Mode Règlement</Text>
                 <CustomSelect
                   value={orderPaymentMethod}
@@ -681,18 +690,18 @@ function getStyles(isDarkMode) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+      backgroundColor: isDarkMode ? '#000000' : '#ffffff',
     },
     headerBar: {
       paddingHorizontal: 16,
       paddingTop: 14,
       paddingBottom: 14,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+      borderBottomColor: isDarkMode ? '#27272a' : '#f1f5f9',
     },
     segmentedContainer: {
       flexDirection: 'row',
-      backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+      backgroundColor: isDarkMode ? '#121212' : '#f1f5f9',
       borderRadius: 16,
       padding: 4,
     },
@@ -706,16 +715,16 @@ function getStyles(isDarkMode) {
     },
     segmentedBtnActive: {
       backgroundColor: '#002cf7',
-      shadowColor: '#002cf7',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 6,
-      elevation: 3,
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
     },
     segmentedBtnText: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#cbd5e1' : '#475569',
+      color: isDarkMode ? '#d4d4d8' : '#475569',
     },
     segmentedBtnTextActive: {
       color: '#ffffff',
@@ -726,11 +735,11 @@ function getStyles(isDarkMode) {
       gap: 16,
     },
     cardSection: {
-      backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+      backgroundColor: isDarkMode ? '#121212' : '#f8fafc',
       borderRadius: 20,
       padding: 16,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
     },
     sectionHeader: {
       flexDirection: 'row',
@@ -741,12 +750,12 @@ function getStyles(isDarkMode) {
     sectionTitle: {
       fontSize: 15,
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
     },
     formLabel: {
       fontSize: 12,
       fontWeight: '600',
-      color: isDarkMode ? '#cbd5e1' : '#475569',
+      color: isDarkMode ? '#d4d4d8' : '#475569',
       marginBottom: 6,
       marginTop: 8,
     },
@@ -757,11 +766,11 @@ function getStyles(isDarkMode) {
       marginTop: 8,
     },
     subCard: {
-      backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#eff6ff',
+      backgroundColor: isDarkMode ? '#18181b' : '#eff6ff',
       borderRadius: 12,
       padding: 12,
       borderWidth: 1,
-      borderColor: isDarkMode ? 'rgba(0, 44, 247, 0.3)' : '#dbeafe',
+      borderColor: isDarkMode ? '#27272a' : '#dbeafe',
     },
     subHeaderRow: {
       flexDirection: 'row',
@@ -791,7 +800,7 @@ function getStyles(isDarkMode) {
     checkboxLabel: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
     },
     subTextBold: {
       fontSize: 12,
@@ -801,7 +810,7 @@ function getStyles(isDarkMode) {
     subLabelSmallBold: {
       fontSize: 12,
       fontWeight: '600',
-      color: isDarkMode ? '#cbd5e1' : '#334155',
+      color: isDarkMode ? '#d4d4d8' : '#334155',
       marginBottom: 6,
     },
     alertRow: {
@@ -815,12 +824,12 @@ function getStyles(isDarkMode) {
       fontWeight: '600',
     },
     clothingCard: {
-      backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+      backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
       borderRadius: 12,
       padding: 12,
       marginVertical: 4,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
     },
     clothingHeader: {
       flexDirection: 'row',
@@ -830,7 +839,7 @@ function getStyles(isDarkMode) {
     clothingName: {
       fontSize: 14,
       fontWeight: '600',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
     },
     clothingAddBtn: {
       paddingVertical: 4,
@@ -846,19 +855,19 @@ function getStyles(isDarkMode) {
     clothingCloseBtn: {
       paddingVertical: 4,
       paddingHorizontal: 10,
-      backgroundColor: isDarkMode ? '#334155' : '#f1f5f9',
+      backgroundColor: isDarkMode ? '#27272a' : '#f1f5f9',
       borderRadius: 8,
     },
     clothingCloseBtnText: {
       fontSize: 12,
       fontWeight: '600',
-      color: isDarkMode ? '#cbd5e1' : '#64748b',
+      color: isDarkMode ? '#d4d4d8' : '#64748b',
     },
     servicesContainer: {
       marginTop: 10,
       gap: 8,
       borderTopWidth: 1,
-      borderTopColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+      borderTopColor: isDarkMode ? '#27272a' : '#f1f5f9',
       paddingTop: 8,
     },
     serviceRow: {
@@ -869,11 +878,11 @@ function getStyles(isDarkMode) {
     serviceLabel: {
       fontSize: 13,
       fontWeight: '500',
-      color: isDarkMode ? '#cbd5e1' : '#334155',
+      color: isDarkMode ? '#d4d4d8' : '#334155',
     },
     servicePrice: {
       fontSize: 11,
-      color: isDarkMode ? '#94a3b8' : '#64748b',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
     },
     serviceAddBtn: {
       flexDirection: 'row',
@@ -910,7 +919,7 @@ function getStyles(isDarkMode) {
     serviceQtyText: {
       fontSize: 14,
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
       minWidth: 16,
       textAlign: 'center',
     },
@@ -925,14 +934,14 @@ function getStyles(isDarkMode) {
       paddingVertical: 10,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       alignItems: 'center',
-      backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+      backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
     },
     urgencyBtnText: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#cbd5e1' : '#475569',
+      color: isDarkMode ? '#d4d4d8' : '#475569',
     },
     formRowInline: {
       flexDirection: 'row',
@@ -942,29 +951,29 @@ function getStyles(isDarkMode) {
       flex: 1,
     },
     formInput: {
-      backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+      backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       paddingHorizontal: 12,
       paddingVertical: 10,
       fontSize: 14,
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
     },
     formSelectButton: {
       height: 42,
     },
     receiptPreviewCard: {
-      backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+      backgroundColor: isDarkMode ? '#121212' : '#f8fafc',
       borderRadius: 20,
       padding: 16,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
     },
     receiptSectionTitle: {
       fontSize: 14,
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
       marginBottom: 10,
     },
     receiptRow: {
@@ -975,17 +984,17 @@ function getStyles(isDarkMode) {
     },
     receiptRowLabel: {
       fontSize: 13,
-      color: isDarkMode ? '#94a3b8' : '#64748b',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
     },
     receiptRowVal: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
     },
     receiptRowLabelBold: {
       fontSize: 14,
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
     },
     receiptRowValBold: {
       fontSize: 14,
@@ -993,7 +1002,7 @@ function getStyles(isDarkMode) {
     },
     receiptDivider: {
       height: 1,
-      backgroundColor: isDarkMode ? '#334155' : '#e2e8f0',
+      backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0',
       marginVertical: 8,
     },
     submitBtn: {
@@ -1002,11 +1011,11 @@ function getStyles(isDarkMode) {
       paddingVertical: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: '#002cf7',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
-      elevation: 6,
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
       marginTop: 8,
     },
     submitBtnText: {
@@ -1019,6 +1028,16 @@ function getStyles(isDarkMode) {
       color: isDarkMode ? '#94a3b8' : '#64748b',
       textAlign: 'center',
       paddingVertical: 10,
+    },
+    fixedArticleContainer: {
+      height: 280,
+      maxHeight: 280,
+      borderRadius: 14,
+      overflow: 'hidden',
+      marginTop: 8,
+    },
+    fixedArticleScrollView: {
+      flex: 1,
     },
   });
 }

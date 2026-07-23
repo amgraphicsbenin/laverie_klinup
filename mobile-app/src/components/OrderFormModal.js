@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Platform, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Platform, Alert, Modal } from 'react-native';
 import { X, Plus } from 'lucide-react-native';
 import SafeBlurView from './SafeBlurView';
 const BlurView = SafeBlurView;
@@ -182,20 +182,19 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
   if (!visible) return null;
 
   return (
-    <MotiView
-      pointerEvents={visible ? 'auto' : 'none'}
-      animate={{
-        opacity: visible ? 1 : 0
-      }}
-      transition={{ type: 'timing', duration: 120 }}
-      style={[
-        StyleSheet.absoluteFill,
-        { 
-          zIndex: 9999,
-          bottom: 0
-        }
-      ]}
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="none"
+      onRequestClose={onClose}
     >
+      <MotiView
+        animate={{
+          opacity: visible ? 1 : 0
+        }}
+        transition={{ type: 'timing', duration: 120 }}
+        style={StyleSheet.absoluteFill}
+      >
       <View style={styles.absoluteModalContainer}>
         <View style={styles.compactModalOverlay}>
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
@@ -223,14 +222,16 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
               showsVerticalScrollIndicator={false}
             >
               {/* Sélection du client */}
-              <Text style={styles.formLabel}>Client</Text>
-              <CustomSelect
-                value={orderClient}
-                onChange={setOrderClient}
-                options={customers.map(c => ({ value: c.id, label: `${c.prenom} ${c.nom} (${c.telephone})` }))}
-                placeholder="Sélectionner le client"
-                style={styles.selectMargin}
-              />
+              <View style={{ zIndex: 30, elevation: 30, position: 'relative' }}>
+                <Text style={styles.formLabel}>Client</Text>
+                <CustomSelect
+                  value={orderClient}
+                  onChange={setOrderClient}
+                  options={customers.map(c => ({ value: c.id, label: `${c.prenom} ${c.nom} (${c.telephone})` }))}
+                  placeholder="Sélectionner le client"
+                  style={styles.selectMargin}
+                />
+              </View>
 
               {/* Zone d'abonnement dynamique */}
               {activeCustomer && (
@@ -327,7 +328,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
               {/* Choisir les vêtements */}
               <Text style={styles.formLabel}>Choisir les vêtements</Text>
               <View style={styles.fixedArticleContainer}>
-                <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>
+                <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={true} style={{ flex: 1 }} contentContainerStyle={{ paddingRight: 4, paddingBottom: 4 }}>
                   {(() => {
                     const uniqueArticles = [...new Set(catalog
                       .filter(c => 
@@ -337,7 +338,8 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                         c.categorie !== 'abonnement' && 
                         c.service !== 'abonnement' &&
                         !c.id?.startsWith('setting_') &&
-                        c.is_active !== false
+                        c.is_active !== false &&
+                        (c.service === 'lavage_simple' || c.service === 'repassage' || c.service === 'traitement')
                       )
                       .map(c => c.article.trim())
                     )];
@@ -355,7 +357,8 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                         c.categorie !== 'abonnement' &&
                         c.service !== 'abonnement' &&
                         !c.id?.startsWith('setting_') &&
-                        c.is_active !== false
+                        c.is_active !== false &&
+                        (c.service === 'lavage_simple' || c.service === 'repassage' || c.service === 'traitement')
                       );
 
                       const isExpanded = isArticleExpanded(articleName, items);
@@ -383,10 +386,8 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                             <View style={styles.servicesContainer}>
                               {items.map(item => {
                                 const serviceLabel = 
-                                  item.service === 'lavage_simple' ? 'Traitement (Lavage)' :
+                                  (item.service === 'lavage_simple' || item.service === 'traitement') ? 'Traitement' :
                                   item.service === 'repassage' ? 'Repassage' :
-                                  item.service === 'nettoyage_a_sec' ? 'Nettoyage à Sec' :
-                                  item.service === 'lavage_et_repassage' ? 'Lavage & Repassage' :
                                   item.service ? item.service.replace(/_/g, ' ') : 'Service';
 
                                 const qty = getQtyInCart(item.id);
@@ -452,7 +453,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
               </View>
 
               {/* Avance et Mode de règlement (same line) */}
-              <View style={styles.formRowInline}>
+              <View style={[styles.formRowInline, { zIndex: 20, elevation: 20 }]}>
                 <View style={styles.formFieldInline}>
                   <Text style={styles.formLabel}>Avance (FCFA)</Text>
                   <TextInput
@@ -462,7 +463,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                     style={styles.formInput}
                   />
                 </View>
-                <View style={styles.formFieldInline}>
+                <View style={[styles.formFieldInline, { zIndex: 20, elevation: 20 }]}>
                   <Text style={styles.formLabel}>Mode Règlement</Text>
                   <CustomSelect
                     value={orderPaymentMethod}
@@ -621,6 +622,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
         </View>
       </View>
     </MotiView>
+    </Modal>
   );
 }
 
@@ -645,7 +647,7 @@ const baseStyles = StyleSheet.create({
     padding: 20,
     width: '100%',
     maxWidth: 380,
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.15,
     shadowRadius: 24,
@@ -663,7 +665,7 @@ const baseStyles = StyleSheet.create({
   compactModalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   compactModalScroll: {
     paddingBottom: 24,
@@ -686,7 +688,7 @@ const baseStyles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 16,
     fontSize: 14,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '500',
     marginBottom: 14,
   },
@@ -728,7 +730,7 @@ const baseStyles = StyleSheet.create({
   },
   receiptRowLabelBold: {
     fontSize: 13,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   receiptRowVal: {
@@ -738,7 +740,7 @@ const baseStyles = StyleSheet.create({
   },
   receiptRowValBold: {
     fontSize: 13,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   receiptRowValTotal: {
@@ -801,7 +803,7 @@ const baseStyles = StyleSheet.create({
   },
   receiptRowValMuted: {
     fontSize: 11,
-    color: '#334155',
+    color: '#475569',
     fontWeight: '600',
   },
   fixedArticleContainer: {
@@ -812,6 +814,14 @@ const baseStyles = StyleSheet.create({
     borderColor: '#e2e8f0',
     padding: 10,
     marginVertical: 12,
+  },
+  fixedArticleContainer: {
+    height: 280,
+    maxHeight: 280,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 6,
+    marginBottom: 12,
   },
   clothingCard: {
     backgroundColor: '#ffffff',
@@ -834,7 +844,7 @@ const baseStyles = StyleSheet.create({
   clothingName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   clothingAddBtn: {
     backgroundColor: 'rgba(0, 44, 247, 0.06)',
@@ -919,7 +929,7 @@ const baseStyles = StyleSheet.create({
   serviceQtyText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     minWidth: 16,
     textAlign: 'center',
   },
@@ -985,7 +995,7 @@ const baseStyles = StyleSheet.create({
   subTextBold: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#09090b',
   },
   alertRow: {
     marginTop: 6,
@@ -1019,46 +1029,46 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
-    compactModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    compactModalView: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
     compactModalTitle: { color: '#ffffff' },
-    modalLabel: { color: '#cbd5e1' },
-    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
-    articleRow: { borderBottomColor: '#334155' },
+    modalLabel: { color: '#d4d4d8' },
+    modalInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
+    articleRow: { borderBottomColor: '#27272a' },
     articleName: { color: '#ffffff' },
-    articlePrice: { color: '#94a3b8' },
-    articleQtyInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
-    totalLabel: { color: '#94a3b8' },
+    articlePrice: { color: '#a1a1aa' },
+    articleQtyInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
+    totalLabel: { color: '#a1a1aa' },
     totalValue: { color: '#ffffff' },
-    summarySection: { backgroundColor: '#0f172a', borderColor: '#334155' },
-    summaryLabel: { color: '#cbd5e1' },
+    summarySection: { backgroundColor: '#09090b', borderColor: '#27272a' },
+    summaryLabel: { color: '#d4d4d8' },
     summaryValue: { color: '#ffffff' },
-    prefSelector: { backgroundColor: '#0f172a' },
-    prefOptActive: { backgroundColor: '#1e293b' },
-    prefOptText: { color: '#cbd5e1' },
+    prefSelector: { backgroundColor: '#09090b' },
+    prefOptActive: { backgroundColor: '#18181b' },
+    prefOptText: { color: '#d4d4d8' },
     prefOptTextActive: { color: '#ffffff' },
-    subLabelSmall: { color: '#94a3b8' },
-    subLabelSmallBold: { color: '#cbd5e1' },
+    subLabelSmall: { color: '#a1a1aa' },
+    subLabelSmallBold: { color: '#d4d4d8' },
     
     // Additional form labels, input and layout overrides
-    formLabel: { color: '#cbd5e1' },
-    fixedArticleContainer: { backgroundColor: '#0f172a', borderColor: '#334155' },
-    clothingCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    formLabel: { color: '#d4d4d8' },
+    fixedArticleContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
+    clothingCard: { backgroundColor: '#18181b', borderColor: '#27272a' },
     clothingName: { color: '#ffffff' },
-    clothingCloseBtn: { backgroundColor: '#334155' },
-    clothingCloseBtnText: { color: '#cbd5e1' },
+    clothingCloseBtn: { backgroundColor: '#27272a' },
+    clothingCloseBtnText: { color: '#d4d4d8' },
     clothingAddBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
     clothingAddBtnText: { color: '#38bdf8' },
-    formInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
-    urgencyBtn: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    urgencyBtnText: { color: '#cbd5e1' },
-    formSelectButton: { backgroundColor: '#0f172a', borderColor: '#334155' },
-    serviceLabel: { color: '#cbd5e1' },
+    formInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
+    urgencyBtn: { backgroundColor: '#18181b', borderColor: '#27272a' },
+    urgencyBtnText: { color: '#d4d4d8' },
+    formSelectButton: { backgroundColor: '#09090b', borderColor: '#27272a' },
+    serviceLabel: { color: '#d4d4d8' },
     servicePrice: { color: '#38bdf8' },
     serviceQtyText: { color: '#ffffff' },
     subCard: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
     subTextBold: { color: '#ffffff' },
-    checkbox: { backgroundColor: '#0f172a', borderColor: '#002cf7' },
+    checkbox: { backgroundColor: '#09090b', borderColor: '#002cf7' },
     checkboxLabel: { color: '#38bdf8' },
     alertRow: { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444' },
     alertText: { color: '#f87171' },
@@ -1066,13 +1076,13 @@ function getStyles(isDarkMode) {
     // Receipt/Facturation card overrides
     receiptPreviewCard: { backgroundColor: 'rgba(0, 44, 247, 0.12)', borderColor: 'rgba(56, 189, 248, 0.2)' },
     receiptSectionTitle: { color: '#ffffff' },
-    receiptRowLabel: { color: '#cbd5e1' },
-    receiptRowVal: { color: '#cbd5e1' },
+    receiptRowLabel: { color: '#d4d4d8' },
+    receiptRowVal: { color: '#d4d4d8' },
     receiptRowLabelBold: { color: '#ffffff' },
     receiptRowValBold: { color: '#ffffff' },
     receiptRowValTotal: { color: '#ffffff' },
-    receiptRowLabelMuted: { color: '#cbd5e1' },
-    receiptRowValMuted: { color: '#cbd5e1' },
+    receiptRowLabelMuted: { color: '#d4d4d8' },
+    receiptRowValMuted: { color: '#d4d4d8' },
     receiptDivider: { backgroundColor: 'rgba(56, 189, 248, 0.15)' },
   };
 

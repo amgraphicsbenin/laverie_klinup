@@ -43,10 +43,10 @@ export default function PaymentModal({
   const [paymentMethod, setPaymentMethod] = useState('Espèces');
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
-  const baseBorderColor = isDarkMode ? '#334155' : '#cbd5e1';
+  const baseBorderColor = isDarkMode ? '#27272a' : '#cbd5e1';
   const baseBg = 'transparent';
   const activeBg = isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff';
-  const baseTextColor = isDarkMode ? '#94a3b8' : '#64748b';
+  const baseTextColor = isDarkMode ? '#a1a1aa' : '#64748b';
   const activeColor = '#002cf7';
 
   const cashBorder = paymentMethod === 'Espèces' ? activeColor : baseBorderColor;
@@ -101,11 +101,11 @@ export default function PaymentModal({
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
             <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           </TouchableOpacity>
-          <View style={[styles.popupModalView || { width: '90%', maxWidth: 400, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', borderRadius: 12, padding: 20 }, { maxHeight: '80%' }]}>
+          <View style={[styles.popupModalView || { width: '90%', maxWidth: 400, backgroundColor: isDarkMode ? '#121212' : '#ffffff', borderRadius: 12, padding: 20 }, { maxHeight: '80%' }]}>
             
             {/* En-tête de la modale */}
             <View style={styles.compactModalHeader || { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-              <Text style={styles.compactModalTitle || { fontSize: 16, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#0f172a' }}>
+              <Text style={styles.compactModalTitle || { fontSize: 16, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>
                 Enregistrer le Règlement
               </Text>
               <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
@@ -115,10 +115,10 @@ export default function PaymentModal({
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Résumé financier */}
-              <View style={{ marginBottom: 15, padding: 12, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', borderRadius: 8 }}>
+              <View style={{ marginBottom: 15, padding: 12, backgroundColor: isDarkMode ? '#09090b' : '#f8fafc', borderRadius: 8 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                   <Text style={{ fontSize: 12, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Total Commande:</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#334155' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155' }}>
                     {formatPrice(order.prix_total || order.total || 0)}
                   </Text>
                 </View>
@@ -128,9 +128,9 @@ export default function PaymentModal({
                     {formatPrice(order.avance_payee || order.avance || 0)}
                   </Text>
                 </View>
-                <View style={{ height: 1, backgroundColor: isDarkMode ? '#334155' : '#e2e8f0', marginVertical: 6 }} />
+                <View style={{ height: 1, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0', marginVertical: 6 }} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#0f172a' }}>Reste à payer:</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>Reste à payer:</Text>
                   <Text style={{ fontSize: 14, fontWeight: '800', color: '#ef4444' }}>
                     {formatPrice(order.reste || 0)}
                   </Text>
@@ -138,7 +138,7 @@ export default function PaymentModal({
               </View>
 
               {/* Sélection du mode de règlement */}
-              <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#334155', marginBottom: 10 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 10 }}>
                 Sélectionner le mode de règlement :
               </Text>
               
@@ -189,7 +189,7 @@ export default function PaymentModal({
               {/* Champ optionnel Référence Mobile Money */}
               {paymentMethod === 'Mobile Money' && (
                 <View style={{ marginBottom: 18 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#334155', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
                     Numéro de Référence <Text style={{ color: '#ef4444' }}>*</Text>
                   </Text>
                   <TextInput
@@ -207,8 +207,8 @@ export default function PaymentModal({
                       paddingHorizontal: 12,
                       paddingVertical: 10,
                       fontSize: 13,
-                      color: isDarkMode ? '#f8fafc' : '#0f172a',
-                      backgroundColor: isDarkMode ? '#0f172a' : '#ffffff'
+                      color: isDarkMode ? '#f8fafc' : '#09090b',
+                      backgroundColor: isDarkMode ? '#09090b' : '#ffffff'
                     }}
                   />
                   {momoRefError ? (
@@ -227,12 +227,12 @@ export default function PaymentModal({
                     paddingVertical: 12,
                     borderRadius: 8,
                     borderWidth: 1.5,
-                    borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+                    borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#64748b' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#64748b' }}>
                     Annuler
                   </Text>
                 </TouchableOpacity>

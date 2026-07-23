@@ -78,7 +78,7 @@ export default function CancelModal({
 
   if (!visible || !orderToCancel) return null;
 
-  const inputBorderColor = cancelReasonError ? '#ef4444' : (isDarkMode ? '#334155' : '#e2e8f0');
+  const inputBorderColor = cancelReasonError ? '#ef4444' : (isDarkMode ? '#27272a' : '#e2e8f0');
   return (
     <MotiView
       pointerEvents={visible ? 'auto' : 'none'}
@@ -131,7 +131,7 @@ export default function CancelModal({
               </View>
               <Text style={{ 
                 fontSize: 13, 
-                color: isDarkMode ? '#cbd5e1' : '#64748b', 
+                color: isDarkMode ? '#d4d4d8' : '#64748b', 
                 textAlign: 'center', 
                 paddingHorizontal: 10 
               }}>
@@ -150,7 +150,7 @@ export default function CancelModal({
                     borderColor: inputBorderColor,
                     borderRadius: 12,
                     borderWidth: 1,
-                    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                    backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
                     color: isDarkMode ? '#ffffff' : '#09090b',
                   }
                 ]}
@@ -176,14 +176,14 @@ export default function CancelModal({
                 onPress={onClose}
                 style={{
                   flex: 1,
-                  backgroundColor: isDarkMode ? '#334155' : '#f4f4f5',
+                  backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5',
                   borderRadius: 12,
                   paddingVertical: 12,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Text style={{ color: isDarkMode ? '#e2e8f0' : '#27272a', fontWeight: '700', fontSize: 13 }}>
+                <Text style={{ color: isDarkMode ? '#d4d4d8' : '#27272a', fontWeight: '700', fontSize: 13 }}>
                   Retour
                 </Text>
               </TouchableOpacity>

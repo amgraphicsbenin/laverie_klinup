@@ -1246,8 +1246,8 @@ export default function GestionScreen({
                               style={{ flex: 1 }}
                             >
                               <MotiView
-                                animate={{ backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#334155' : '#f1f5f9') }}
-                                style={[styles.cardNextStatusBlockBtn, { minHeight: 38, marginTop: 8 }]}
+                                animate={{ backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
+                                style={[styles.cardNextStatusBlockBtn, { minHeight: 38, marginTop: 8, backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
                               >
                                 <Truck size={12} color={canLivrer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 4 }} />
                                 <Text style={[styles.cardNextStatusBlockBtnText, { fontSize: 11, color: canLivrer ? '#ffffff' : '#94a3b8' }]}>
@@ -1266,8 +1266,8 @@ export default function GestionScreen({
                               style={{ flex: 1 }}
                             >
                               <MotiView
-                                animate={{ backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#334155' : '#f1f5f9') }}
-                                style={[styles.cardNextStatusBlockBtn, { minHeight: 38, marginTop: 8 }]}
+                                animate={{ backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
+                                style={[styles.cardNextStatusBlockBtn, { minHeight: 38, marginTop: 8, backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
                               >
                                 <User size={12} color={canRecuperer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 4 }} />
                                 <Text style={[styles.cardNextStatusBlockBtnText, { fontSize: 11, color: canRecuperer ? '#ffffff' : '#94a3b8' }]}>
@@ -1318,13 +1318,13 @@ export default function GestionScreen({
                         >
                           <MotiView
                             animate={{
-                              backgroundColor: canTransition ? nextStyle.bg : (isDarkMode ? '#334155' : '#f1f5f9'),
+                              backgroundColor: canTransition ? nextStyle.bg : (isDarkMode ? '#27272a' : '#f1f5f9'),
                             }}
                             transition={{
                               type: 'timing',
                               duration: 150,
                             }}
-                            style={[styles.cardNextStatusBlockBtn, { backgroundColor: canTransition ? nextStyle.bg : (isDarkMode ? '#334155' : '#f1f5f9') }]}
+                            style={[styles.cardNextStatusBlockBtn, { backgroundColor: canTransition ? nextStyle.bg : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
                           >
                             <MotiView
                               key={iconName}
@@ -1624,15 +1624,7 @@ export default function GestionScreen({
                       style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
                     >
                       <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteOrder(selectedOrder)}
-                      activeOpacity={0.8}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef44441a', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 10, paddingVertical: 10 }}
-                    >
-                      <Trash2 size={14} color="#ef4444" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Supprimer</Text>
+                      <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler la commande</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1656,8 +1648,8 @@ export default function GestionScreen({
                            style={{ flex: 1 }}
                          >
                            <MotiView
-                             animate={{ backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#334155' : '#f1f5f9') }}
-                             style={styles.statusChangeBtnSide}
+                             animate={{ backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
+                             style={[styles.statusChangeBtnSide, { backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
                            >
                              <Truck size={16} color={canLivrer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 6 }} />
                              <Text style={[styles.statusChangeBtnText, { color: canLivrer ? '#ffffff' : '#94a3b8' }]}>À livrer</Text>
@@ -1671,8 +1663,8 @@ export default function GestionScreen({
                            style={{ flex: 1 }}
                          >
                            <MotiView
-                             animate={{ backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#334155' : '#f1f5f9') }}
-                             style={styles.statusChangeBtnSide}
+                             animate={{ backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
+                             style={[styles.statusChangeBtnSide, { backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
                            >
                              <User size={16} color={canRecuperer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 6 }} />
                              <Text style={[styles.statusChangeBtnText, { color: canRecuperer ? '#ffffff' : '#94a3b8' }]}>À récupérer</Text>
@@ -1804,13 +1796,13 @@ export default function GestionScreen({
                      >
                        <MotiView
                          animate={{
-                           backgroundColor: canTransition ? btn.color : (isDarkMode ? '#334155' : '#ffffff')
+                           backgroundColor: canTransition ? btn.color : (isDarkMode ? '#27272a' : '#ffffff')
                          }}
                          transition={{
                            type: 'timing',
                            duration: 150
                          }}
-                         style={styles.statusChangeBtn}
+                         style={[styles.statusChangeBtn, { backgroundColor: canTransition ? btn.color : (isDarkMode ? '#27272a' : '#ffffff') }]}
                        >
                          <MotiView
                            key={btn.icon}
@@ -2176,7 +2168,7 @@ export default function GestionScreen({
                 <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
                   <Ban size={22} color="#ef4444" />
                 </View>
-                <Text style={{ fontSize: 13, color: isDarkMode ? '#cbd5e1' : '#64748b', textAlign: 'center', paddingHorizontal: 10 }}>
+                <Text style={{ fontSize: 13, color: isDarkMode ? '#d4d4d8' : '#64748b', textAlign: 'center', paddingHorizontal: 10 }}>
                   Veuillez spécifier le motif d'annulation de la commande #{orderToCancel ? (orderToCancel.ticket_numero || orderToCancel.id) : ''}.
                 </Text>
               </View>
@@ -2189,10 +2181,10 @@ export default function GestionScreen({
                       height: 80,
                       textAlignVertical: 'top',
                       padding: 12,
-                      borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                      borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#27272a' : '#e2e8f0'),
                       borderRadius: 12,
                       borderWidth: 1,
-                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
                       color: isDarkMode ? '#ffffff' : '#09090b',
                     }
                   ]}
@@ -2218,7 +2210,7 @@ export default function GestionScreen({
                   onPress={() => setCancelModalVisible(false)}
                   style={{
                     flex: 1,
-                    backgroundColor: isDarkMode ? '#334155' : '#f4f4f5',
+                    backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5',
                     borderRadius: 12,
                     paddingVertical: 12,
                     alignItems: 'center',
@@ -2276,7 +2268,7 @@ export default function GestionScreen({
               <View style={styles.compactModalHeader}>
                 <Text style={styles.compactModalTitle}>Confirmation du Règlement</Text>
                 <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
-                  <X size={20} color={isDarkMode ? '#cbd5e1' : '#64748b'} />
+                  <X size={20} color={isDarkMode ? '#d4d4d8' : '#64748b'} />
                 </TouchableOpacity>
               </View>
 
@@ -2288,24 +2280,24 @@ export default function GestionScreen({
                 return (
                   <ScrollView contentContainerStyle={{ paddingVertical: 10 }} bounces={false} showsVerticalScrollIndicator={false}>
                     {/* Financial Summary */}
-                    <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 14, borderRadius: 10, marginBottom: 18, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
+                    <View style={{ backgroundColor: isDarkMode ? '#121212' : '#f8fafc', padding: 14, borderRadius: 10, marginBottom: 18, borderWidth: 1, borderColor: isDarkMode ? '#27272a' : '#e2e8f0' }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                         <Text style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Total Commande</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#ffffff' : '#0f172a' }}>{formatPrice(total)}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#ffffff' : '#09090b' }}>{formatPrice(total)}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                         <Text style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Acompte déjà payé</Text>
                         <Text style={{ fontSize: 13, fontWeight: '600', color: '#16a34a' }}>{formatPrice(avance)}</Text>
                       </View>
-                      <View style={{ height: 1, backgroundColor: isDarkMode ? '#334155' : '#e2e8f0', marginVertical: 8 }} />
+                      <View style={{ height: 1, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0', marginVertical: 8 }} />
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#0f172a' }}>Solde restant à régler</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>Solde restant à régler</Text>
                         <Text style={{ fontSize: 14, fontWeight: '700', color: '#ef4444' }}>{formatPrice(solde)}</Text>
                       </View>
                     </View>
 
                     {/* Payment Method Selector */}
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#334155', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
                       Mode de règlement du solde
                     </Text>
                     <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
@@ -2323,7 +2315,7 @@ export default function GestionScreen({
                           paddingVertical: 12,
                           borderRadius: 8,
                           borderWidth: 1.5,
-                          borderColor: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#334155' : '#cbd5e1'),
+                          borderColor: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
                           backgroundColor: paymentMethod === 'Espèces' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent'
                         }}
                       >
@@ -2342,7 +2334,7 @@ export default function GestionScreen({
                           paddingVertical: 12,
                           borderRadius: 8,
                           borderWidth: 1.5,
-                          borderColor: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#334155' : '#cbd5e1'),
+                          borderColor: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
                           backgroundColor: paymentMethod === 'Mobile Money' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent'
                         }}
                       >
@@ -2355,7 +2347,7 @@ export default function GestionScreen({
                     {/* Reference Input for Mobile Money */}
                     {paymentMethod === 'Mobile Money' && (
                       <View style={{ marginBottom: 18 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#334155', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
                           Numéro de Référence <Text style={{ color: '#ef4444' }}>*</Text>
                         </Text>
                         <TextInput
@@ -2368,13 +2360,13 @@ export default function GestionScreen({
                           placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
                           style={{
                             borderWidth: 1,
-                            borderColor: momoRefError ? '#ef4444' : (isDarkMode ? '#334155' : '#cbd5e1'),
+                            borderColor: momoRefError ? '#ef4444' : (isDarkMode ? '#27272a' : '#d4d4d8'),
                             borderRadius: 8,
                             paddingHorizontal: 12,
                             paddingVertical: 10,
                             fontSize: 13,
-                            color: isDarkMode ? '#f8fafc' : '#0f172a',
-                            backgroundColor: isDarkMode ? '#0f172a' : '#ffffff'
+                            color: isDarkMode ? '#f8fafc' : '#09090b',
+                            backgroundColor: isDarkMode ? '#09090b' : '#ffffff'
                           }}
                         />
                         {momoRefError ? (
@@ -2393,12 +2385,12 @@ export default function GestionScreen({
                           paddingVertical: 12,
                           borderRadius: 8,
                           borderWidth: 1.5,
-                          borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+                          borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}
                       >
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#64748b' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#64748b' }}>
                           Annuler
                         </Text>
                       </TouchableOpacity>
@@ -2553,11 +2545,11 @@ const baseStyles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -2577,11 +2569,11 @@ const baseStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 5,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -2594,7 +2586,7 @@ const baseStyles = StyleSheet.create({
   cardClientName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   statusTag: {
     flexDirection: 'row',
@@ -2621,7 +2613,7 @@ const baseStyles = StyleSheet.create({
   },
   cardTicketNo: {
     fontSize: 14,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '700',
   },
   cardPrice: {
@@ -2651,7 +2643,7 @@ const baseStyles = StyleSheet.create({
   clientName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   clientPhone: {
     fontSize: 12,
@@ -2669,7 +2661,7 @@ const baseStyles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.03,
     shadowRadius: 16,
@@ -2678,7 +2670,7 @@ const baseStyles = StyleSheet.create({
   catalogArticle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   catalogService: {
     fontSize: 11,
@@ -2689,7 +2681,7 @@ const baseStyles = StyleSheet.create({
   catalogPrice: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   modalView: {
     flex: 1,
@@ -2709,7 +2701,7 @@ const baseStyles = StyleSheet.create({
   modalTitleLarge: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#09090b',
   },
   modalScroll: {
     padding: 20,
@@ -2731,7 +2723,7 @@ const baseStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.03,
     shadowRadius: 16,
@@ -2739,7 +2731,7 @@ const baseStyles = StyleSheet.create({
   detailTextLarge: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   detailArticleRow: {
     flexDirection: 'row',
@@ -2754,7 +2746,7 @@ const baseStyles = StyleSheet.create({
   detailArticlePrice: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#09090b',
   },
   detailDivider: {
     height: 1,
@@ -2764,7 +2756,7 @@ const baseStyles = StyleSheet.create({
   detailLabelBold: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   detailPriceBold: {
     fontSize: 15,
@@ -2778,12 +2770,12 @@ const baseStyles = StyleSheet.create({
   },
   detailTextMuted: {
     fontSize: 12,
-    color: '#334155',
+    color: '#475569',
     fontWeight: '600',
   },
   logisticsText: {
     fontSize: 13,
-    color: '#334155',
+    color: '#475569',
     paddingVertical: 3,
     fontWeight: '500',
   },
@@ -2841,7 +2833,7 @@ const baseStyles = StyleSheet.create({
     paddingVertical: 10,
     marginRight: 8,
     alignItems: 'center',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.02,
     shadowRadius: 8,
@@ -2849,7 +2841,7 @@ const baseStyles = StyleSheet.create({
   catalogBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   catalogBadgeService: {
     fontSize: 9,
@@ -2870,7 +2862,7 @@ const baseStyles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.03,
     shadowRadius: 16,
@@ -2893,7 +2885,7 @@ const baseStyles = StyleSheet.create({
   selectedRowName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   selectedRowService: {
     fontSize: 10,
@@ -2916,12 +2908,12 @@ const baseStyles = StyleSheet.create({
   qtyBtnText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   qtyText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   formInput: {
     backgroundColor: '#ffffff',
@@ -2931,7 +2923,7 @@ const baseStyles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 16,
     fontSize: 14,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '500',
     marginBottom: 14,
   },
@@ -2975,11 +2967,11 @@ const baseStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     maxHeight: '85%',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 10,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     overflow: 'hidden',
@@ -2993,7 +2985,7 @@ const baseStyles = StyleSheet.create({
   compactModalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   compactModalScroll: {
     paddingBottom: 24,
@@ -3016,7 +3008,7 @@ const baseStyles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 14,
     fontSize: 13,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '500',
     marginBottom: 12,
   },
@@ -3035,7 +3027,7 @@ const baseStyles = StyleSheet.create({
   },
   prefOptionActive: {
     backgroundColor: '#ffffff',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -3071,7 +3063,7 @@ const baseStyles = StyleSheet.create({
   clientProfileName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   clientProfilePhone: {
     fontSize: 13,
@@ -3141,7 +3133,7 @@ const baseStyles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.02,
     shadowRadius: 8,
@@ -3149,7 +3141,7 @@ const baseStyles = StyleSheet.create({
   orderHistoryNo: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   orderHistoryDate: {
     fontSize: 11,
@@ -3160,7 +3152,7 @@ const baseStyles = StyleSheet.create({
   orderHistoryTotal: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   categoryTabsRow: {
     flexDirection: 'row',
@@ -3201,7 +3193,7 @@ const baseStyles = StyleSheet.create({
   formArticleName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   formArticleMeta: {
     flexDirection: 'row',
@@ -3225,7 +3217,7 @@ const baseStyles = StyleSheet.create({
   formArticlePrice: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   formArticleAddBtn: {
     flexDirection: 'row',
@@ -3263,7 +3255,7 @@ const baseStyles = StyleSheet.create({
   formQtyText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   paymentMethodRow: {
     flexDirection: 'row',
@@ -3342,7 +3334,7 @@ const baseStyles = StyleSheet.create({
   },
   receiptRowLabelBold: {
     fontSize: 13,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   receiptRowVal: {
@@ -3352,7 +3344,7 @@ const baseStyles = StyleSheet.create({
   },
   receiptRowValBold: {
     fontSize: 13,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   receiptRowValTotal: {
@@ -3493,7 +3485,7 @@ const baseStyles = StyleSheet.create({
   },
   receiptRowValMuted: {
     fontSize: 11,
-    color: '#334155',
+    color: '#475569',
     fontWeight: '600',
   },
   cardExtraInfoRow: {
@@ -3509,7 +3501,7 @@ const baseStyles = StyleSheet.create({
   },
   cardExtraInfoText: {
     fontSize: 11,
-    color: '#334155',
+    color: '#475569',
     fontWeight: '600',
     flex: 1,
   },
@@ -3808,12 +3800,12 @@ const baseStyles = StyleSheet.create({
   },
   invoiceInfoVal: {
     fontSize: 12,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   invoiceInfoValBold: {
     fontSize: 12,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '700',
   },
   invoiceDivider: {
@@ -3829,7 +3821,7 @@ const baseStyles = StyleSheet.create({
   },
   invoiceItemName: {
     fontSize: 12,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   invoiceItemService: {
@@ -3845,7 +3837,7 @@ const baseStyles = StyleSheet.create({
   },
   invoiceItemPrice: {
     fontSize: 12,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   invoiceTotalRow: {
@@ -3860,7 +3852,7 @@ const baseStyles = StyleSheet.create({
   },
   invoiceTotalLabelBold: {
     fontSize: 13,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   invoiceTotalLabelMuted: {
@@ -3875,7 +3867,7 @@ const baseStyles = StyleSheet.create({
   },
   invoiceTotalValBold: {
     fontSize: 13,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   invoiceTotalValMuted: {
@@ -3891,7 +3883,7 @@ const baseStyles = StyleSheet.create({
   invoiceFooterText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   invoiceFooterSubtext: {
     fontSize: 9,
@@ -3942,7 +3934,7 @@ const baseStyles = StyleSheet.create({
   clothingName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
   },
   clothingAddBtn: {
     backgroundColor: 'rgba(0, 44, 247, 0.06)',
@@ -4027,7 +4019,7 @@ const baseStyles = StyleSheet.create({
   serviceQtyText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     minWidth: 16,
     textAlign: 'center',
   },
@@ -4072,7 +4064,7 @@ const baseStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.03,
     shadowRadius: 16,
@@ -4092,7 +4084,7 @@ const baseStyles = StyleSheet.create({
   subscriptionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#09090b',
   },
   subActiveBadge: {
     backgroundColor: '#dcfce7',
@@ -4222,133 +4214,133 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
-    compactModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    popupModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    container: { backgroundColor: '#0f172a' },
-    header: { backgroundColor: '#0f172a' },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    container: { backgroundColor: '#000000' },
+    header: { backgroundColor: '#000000' },
     headerTitle: { color: '#ffffff' },
-    tabHeader: { backgroundColor: '#0f172a' },
-    topActionsRow: { backgroundColor: '#0f172a' },
-    topActionBtnWhite: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    tabHeader: { backgroundColor: '#000000' },
+    topActionsRow: { backgroundColor: '#000000' },
+    topActionBtnWhite: { backgroundColor: '#121212', borderColor: '#27272a' },
     topActionBtnTextWhite: { color: '#ffffff' },
-    statusFilterRow: { backgroundColor: '#0f172a' },
-    statusFilterBtn: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    statusFilterText: { color: '#cbd5e1' },
-    searchSection: { backgroundColor: '#0f172a' },
-    searchContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    statusFilterRow: { backgroundColor: '#000000' },
+    statusFilterBtn: { backgroundColor: '#121212', borderColor: '#27272a' },
+    statusFilterText: { color: '#d4d4d8' },
+    searchSection: { backgroundColor: '#000000' },
+    searchContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
     searchInput: { color: '#ffffff' },
-    filterPillSection: { backgroundColor: '#0f172a' },
+    filterPillSection: { backgroundColor: '#000000' },
     filterPill: { backgroundColor: 'rgba(56, 189, 248, 0.1)' },
     filterPillText: { color: '#38bdf8' },
-    orderCard: { backgroundColor: '#1e293b', borderColor: '#334155', shadowColor: '#000000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 5 },
+    orderCard: { backgroundColor: '#121212', borderColor: '#27272a', shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
     cardClientName: { color: '#ffffff' },
-    cardTicketNo: { color: '#cbd5e1' },
+    cardTicketNo: { color: '#d4d4d8' },
     cardPrice: { color: '#ffffff' },
-    cardExtraInfoText: { color: '#cbd5e1' },
-    cardExtraInfoRow: { backgroundColor: '#0f172a', borderColor: '#334155' },
-    metaBadge: { backgroundColor: '#334155', borderColor: '#475569' },
-    metaBadgeText: { color: '#cbd5e1' },
-    cardDivider: { backgroundColor: '#334155' },
-    divider: { backgroundColor: '#334155' },
+    cardExtraInfoText: { color: '#d4d4d8' },
+    cardExtraInfoRow: { backgroundColor: '#09090b', borderColor: '#27272a' },
+    metaBadge: { backgroundColor: '#27272a', borderColor: '#3f3f46' },
+    metaBadgeText: { color: '#d4d4d8' },
+    cardDivider: { backgroundColor: '#27272a' },
+    divider: { backgroundColor: '#27272a' },
     factureBtn: { backgroundColor: 'rgba(0, 44, 247, 0.1)', borderColor: '#002cf7' },
     factureBtnText: { color: '#38bdf8' },
-    cardProgressContainer: { backgroundColor: 'rgba(15, 23, 42, 0.5)', borderColor: '#334155' },
-    cardProgressLabel: { color: '#cbd5e1' },
+    cardProgressContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
+    cardProgressLabel: { color: '#d4d4d8' },
     cardProgressValue: { color: '#38bdf8' },
-    cardProgressBarBg: { backgroundColor: '#334155' },
+    cardProgressBarBg: { backgroundColor: '#27272a' },
     tabSelector: { backgroundColor: 'rgba(255, 255, 255, 0.05)' },
-    tabButtonActive: { backgroundColor: '#1e293b' },
+    tabButtonActive: { backgroundColor: '#18181b' },
     tabButtonTextActive: { color: '#ffffff' },
-    tabButtonTextInactive: { color: '#64748b' },
-    card: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    tabButtonTextInactive: { color: '#71717a' },
+    card: { backgroundColor: '#121212', borderColor: '#27272a' },
     cardTitle: { color: '#ffffff' },
-    cardSubtitle: { color: '#94a3b8' },
-    cardFooter: { borderTopColor: '#334155' },
+    cardSubtitle: { color: '#a1a1aa' },
+    cardFooter: { borderTopColor: '#27272a' },
     totalAmount: { color: '#ffffff' },
-    sectionTitle: { color: '#94a3b8' },
-    actionButton: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    sectionTitle: { color: '#a1a1aa' },
+    actionButton: { backgroundColor: '#121212', borderColor: '#27272a' },
     actionText: { color: '#ffffff' },
-    modalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    modalContent: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    modalContent: { backgroundColor: '#121212', borderColor: '#27272a' },
     modalTitle: { color: '#ffffff' },
-    modalLabel: { color: '#e2e8f0' },
-    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
-    infoRow: { borderBottomColor: '#334155' },
-    infoLabel: { color: '#94a3b8' },
+    modalLabel: { color: '#d4d4d8' },
+    modalInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
+    infoRow: { borderBottomColor: '#27272a' },
+    infoLabel: { color: '#a1a1aa' },
     infoValue: { color: '#ffffff' },
     clientPillBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
     clientPillBtnText: { color: '#38bdf8' },
-    emptyStateContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    emptyStateText: { color: '#94a3b8' },
+    emptyStateContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
+    emptyStateText: { color: '#a1a1aa' },
     
     // Clients tab list overrides
-    clientCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    clientCard: { backgroundColor: '#121212', borderColor: '#27272a' },
     clientName: { color: '#ffffff' },
-    clientTel: { color: '#cbd5e1' },
-    clientFooter: { borderTopColor: '#334155' },
-    clientMetaText: { color: '#94a3b8' },
+    clientTel: { color: '#d4d4d8' },
+    clientFooter: { borderTopColor: '#27272a' },
+    clientMetaText: { color: '#a1a1aa' },
     
     // Catalog overrides
-    serviceCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    serviceCard: { backgroundColor: '#121212', borderColor: '#27272a' },
     serviceName: { color: '#ffffff' },
-    serviceDesc: { color: '#cbd5e1' },
+    serviceDesc: { color: '#d4d4d8' },
     servicePrice: { color: '#ffffff' },
-    catalogHeader: { backgroundColor: '#0f172a' },
+    catalogHeader: { backgroundColor: '#000000' },
     
     // Bottom Sheet Order modal list row overrides
-    premiumDetailsOrderRowClickable: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    detailsListContainer: { backgroundColor: 'rgba(15, 23, 42, 0.5)', borderColor: '#334155' },
+    premiumDetailsOrderRowClickable: { backgroundColor: '#121212', borderColor: '#27272a' },
+    detailsListContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
 
     // Modal popup views overrides (New client form, invoice details, order details)
-    compactModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    compactModalView: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
     compactModalTitle: { color: '#ffffff' },
-    compactLabel: { color: '#cbd5e1' },
-    compactInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
-    prefSelector: { backgroundColor: '#0f172a' },
-    prefOptionActive: { backgroundColor: '#1e293b' },
-    prefText: { color: '#cbd5e1' },
+    compactLabel: { color: '#d4d4d8' },
+    compactInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
+    prefSelector: { backgroundColor: '#09090b' },
+    prefOptionActive: { backgroundColor: '#18181b' },
+    prefText: { color: '#d4d4d8' },
     prefTextActive: { color: '#ffffff' },
     
-    popupModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    popupModalView: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    popupModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
     
-    detailSectionTitle: { color: '#cbd5e1' },
-    detailCard: { backgroundColor: '#0f172a', borderColor: '#334155', borderWidth: 1 },
-    detailTextMuted: { color: '#cbd5e1' },
-    detailArticleText: { color: '#cbd5e1' },
+    detailSectionTitle: { color: '#d4d4d8' },
+    detailCard: { backgroundColor: '#09090b', borderColor: '#27272a', borderWidth: 1 },
+    detailTextMuted: { color: '#d4d4d8' },
+    detailArticleText: { color: '#d4d4d8' },
     detailArticlePrice: { color: '#ffffff' },
     detailLabelBold: { color: '#ffffff' },
-    detailLabelMuted: { color: '#94a3b8' },
+    detailLabelMuted: { color: '#a1a1aa' },
     detailPriceBold: { color: '#38bdf8' },
-    logisticsText: { color: '#cbd5e1' },
-    detailDivider: { backgroundColor: '#334155' },
+    logisticsText: { color: '#d4d4d8' },
+    detailDivider: { backgroundColor: '#27272a' },
 
     // Client detailed profile fiche inside popup
     clientProfileName: { color: '#ffffff' },
-    clientProfilePhone: { color: '#cbd5e1' },
-    clientProfileAddress: { color: '#94a3b8' },
+    clientProfilePhone: { color: '#d4d4d8' },
+    clientProfileAddress: { color: '#a1a1aa' },
     clientProfilePreferences: { color: '#38bdf8' },
     clientEditBtn: { backgroundColor: 'rgba(56, 189, 248, 0.1)', borderColor: '#38bdf8' },
     clientEditBtnText: { color: '#38bdf8' },
     clientDeleteBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#f43f5e' },
     clientDeleteBtnText: { color: '#f87171' },
-    premiumSubscriptionCard: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    premiumSubscriptionCard: { backgroundColor: '#09090b', borderColor: '#27272a' },
     subscriptionTitle: { color: '#ffffff' },
     subActiveBadge: { backgroundColor: 'rgba(74, 222, 128, 0.1)' },
     subActiveBadgeText: { color: '#4ade80' },
     subPlanName: { color: '#38bdf8' },
-    subPlanBalance: { color: '#cbd5e1' },
-    progressBarBg: { backgroundColor: '#334155' },
-    progressText: { color: '#cbd5e1' },
-    subDateText: { color: '#94a3b8' },
+    subPlanBalance: { color: '#d4d4d8' },
+    progressBarBg: { backgroundColor: '#27272a' },
+    progressText: { color: '#d4d4d8' },
+    subDateText: { color: '#a1a1aa' },
     unsubscribeBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444' },
     unsubscribeBtnText: { color: '#f87171' },
     
     // Client detailed profile order history cards overrides
-    orderHistoryItem: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    orderHistoryItem: { backgroundColor: '#09090b', borderColor: '#27272a' },
     orderHistoryNo: { color: '#ffffff' },
-    orderHistoryDate: { color: '#cbd5e1' },
+    orderHistoryDate: { color: '#d4d4d8' },
     orderHistoryTotal: { color: '#ffffff' },
   };
 

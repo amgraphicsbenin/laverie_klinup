@@ -6,7 +6,7 @@ import {
   AlertTriangle,
   Search,
   Plus,
-  Trash2,
+  Ban,
   ChevronUp,
   ChevronDown,
   Copy,
@@ -592,7 +592,7 @@ export default function OrdersTab({
                         title="Annuler la commande"
                         onClick={() => handleCancelOrder(order.id)}
                       >
-                        <Trash2 size={15} />
+                        <Ban size={15} />
                       </button>
                     </div>
                   </div>

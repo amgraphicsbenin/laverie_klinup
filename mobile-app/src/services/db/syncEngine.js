@@ -310,7 +310,39 @@ export async function initDb(isRetry = false) {
         memoryDb.logs = logsRes.value.data || [];
       }
       if (catalogRes.status === 'fulfilled' && !catalogRes.value?.error && catalogRes.value?.data?.length > 0) {
-        memoryDb.catalog = catalogRes.value.data;
+        const remoteCat = catalogRes.value.data;
+        const merged = DEFAULT_CATALOG.map(defItem => {
+          const remote = remoteCat.find(r => 
+            r.id === defItem.id || 
+            (r.article && defItem.article && r.article.trim().toLowerCase() === defItem.article.trim().toLowerCase() && r.service === defItem.service)
+          );
+          if (remote) {
+            const prix = (remote.prix && Number(remote.prix) > 0) ? Number(remote.prix) : defItem.prix;
+            const isActive = remote.is_active === false || remote.statut === 'inactif' ? false : true;
+            return {
+              ...defItem,
+              ...remote,
+              prix,
+              is_active: isActive,
+              statut: isActive ? 'actif' : 'inactif'
+            };
+          }
+          return defItem;
+        });
+
+        remoteCat.forEach(remoteItem => {
+          const exists = merged.some(m => m.id === remoteItem.id);
+          if (!exists) {
+            const isActive = remoteItem.is_active === false || remoteItem.statut === 'inactif' ? false : true;
+            merged.push({
+              ...remoteItem,
+              is_active: isActive,
+              statut: isActive ? 'actif' : 'inactif'
+            });
+          }
+        });
+
+        memoryDb.catalog = merged;
       }
       if (reqsRes.status === 'fulfilled' && !reqsRes.value?.error) {
         memoryDb.pin_reset_requests = reqsRes.value.data || [];

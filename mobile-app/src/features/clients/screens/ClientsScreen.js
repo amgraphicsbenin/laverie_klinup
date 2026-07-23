@@ -179,24 +179,23 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
   const formatPrice = (price) => (price || 0).toLocaleString("fr-FR") + " FCFA";
 
   const renderForm = (isEditing, onClose, visible) => (
-    <MotiView
-      pointerEvents={visible ? 'auto' : 'none'}
-      animate={{
-        opacity: visible ? 1 : 0
-      }}
-      transition={{ type: 'timing', duration: 120 }}
-      style={[
-        StyleSheet.absoluteFill,
-        { 
-          zIndex: 9999,
-          bottom: scrollPaddingBottom
-        }
-      ]}
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="none"
+      onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+      <MotiView
+        animate={{
+          opacity: visible ? 1 : 0
+        }}
+        transition={{ type: 'timing', duration: 120 }}
+        style={StyleSheet.absoluteFill}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
         <View style={styles.compactModalOverlay}>
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
             <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
@@ -283,9 +282,10 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
               </TouchableOpacity>
             </ScrollView>
           </MotiView>
-        </View>
-      </KeyboardAvoidingView>
-    </MotiView>
+          </View>
+        </KeyboardAvoidingView>
+      </MotiView>
+    </Modal>
   );
 
   return (
@@ -293,7 +293,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
-            <X size={18} color="#64748b" />
+            <X size={18} color={isDarkMode ? '#ffffff' : '#64748b'} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Clients</Text>
           <TouchableOpacity onPress={handleOpenAddCustomer} style={styles.addBtn} activeOpacity={0.8}>
@@ -305,17 +305,17 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
 
       <View style={styles.filterHeader}>
         <View style={styles.searchContainer}>
-          <Search size={16} color="#71717a" style={styles.searchIcon} />
+          <Search size={16} color={isDarkMode ? '#a1a1aa' : '#71717a'} style={styles.searchIcon} />
           <TextInput
             placeholder="Rechercher par nom ou telephone..."
-            placeholderTextColor="#a1a1aa"
+            placeholderTextColor={isDarkMode ? '#71717a' : '#a1a1aa'}
             value={searchQuery}
             onChangeText={setSearchQuery}
             style={styles.searchInput}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <X size={14} color="#71717a" />
+              <X size={14} color={isDarkMode ? '#a1a1aa' : '#71717a'} />
             </TouchableOpacity>
           )}
         </View>
@@ -357,12 +357,12 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                         {hasActiveSub && <View style={styles.subBadge}><Text style={styles.subBadgeText}>Abonne</Text></View>}
                       </View>
                       <View style={styles.clientPhoneRow}>
-                        <Phone size={11} color="#71717a" style={{ marginRight: 4 }} />
+                        <Phone size={11} color={isDarkMode ? '#a1a1aa' : '#71717a'} style={{ marginRight: 4 }} />
                         <Text style={styles.clientPhone}>{client.telephone}</Text>
                       </View>
                       {client.adresse ? (
                         <View style={styles.clientPhoneRow}>
-                          <MapPin size={11} color="#71717a" style={{ marginRight: 4 }} />
+                          <MapPin size={11} color={isDarkMode ? '#a1a1aa' : '#71717a'} style={{ marginRight: 4 }} />
                           <Text style={styles.clientAddress} numberOfLines={1}>{client.adresse}</Text>
                         </View>
                       ) : null}
@@ -370,7 +370,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                     <View style={styles.clientMeta}>
                       <Text style={styles.clientOrderCount}>{clientOrders.length}</Text>
                       <Text style={styles.clientOrderLabel}>cmde{clientOrders.length > 1 ? "s" : ""}</Text>
-                      <ChevronRight size={14} color="#a1a1aa" style={{ marginTop: 4 }} />
+                      <ChevronRight size={14} color={isDarkMode ? '#71717a' : '#a1a1aa'} style={{ marginTop: 4 }} />
                     </View>
                   </View>
                   {hasActiveSub && (
@@ -396,18 +396,18 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
       </ScrollView>
 
       {selectedClient && (
-        <MotiView
-          pointerEvents={selectedClient ? 'auto' : 'none'}
-          animate={{ opacity: isFicheVisible ? 1 : 0 }}
-          transition={{ type: 'timing', duration: 120 }}
-          style={[
-            StyleSheet.absoluteFill,
-            { 
-              zIndex: 9999,
-              bottom: scrollPaddingBottom
-            }
-          ]}
+        <Modal
+          visible={!!selectedClient}
+          transparent={true}
+          animationType="none"
+          onRequestClose={handleCloseFiche}
         >
+          <MotiView
+            pointerEvents={selectedClient ? 'auto' : 'none'}
+            animate={{ opacity: isFicheVisible ? 1 : 0 }}
+            transition={{ type: 'timing', duration: 120 }}
+            style={StyleSheet.absoluteFill}
+          >
             <View style={styles.compactModalOverlay}>
               <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseFiche}>
                 <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
@@ -577,7 +577,8 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                 </View>
               </MotiView>
             </View>
-        </MotiView>
+          </MotiView>
+        </Modal>
       )}
 
       {renderForm(false, handleCloseCustomerModal, showCustomerModal)}
@@ -592,12 +593,12 @@ const baseStyles = StyleSheet.create({
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#ffffff", borderWidth: 1.5, borderColor: "#e2e8f0", justifyContent: "center", alignItems: "center" },
   headerTitle: { fontSize: 28, fontWeight: "700", color: "#09090b", letterSpacing: -0.5 },
-  addBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#002cf7", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, shadowColor: "#002cf7", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 4 },
+  addBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#002cf7", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, shadowColor: "transparent", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
   addBtnText: { color: "#ffffff", fontSize: 13, fontWeight: "700" },
   filterHeader: { backgroundColor: "#f8fafc", paddingVertical: 14, borderBottomWidth: 1, borderColor: "rgba(0, 0, 0, 0.03)" },
   searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#ffffff", borderRadius: 16, borderWidth: 1.5, borderColor: "#e2e8f0", marginHorizontal: 16, paddingHorizontal: 12, height: 44, marginBottom: 12 },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 13, color: "#0f172a", fontWeight: "500", height: "100%" },
+  searchInput: { flex: 1, fontSize: 13, color: "#09090b", fontWeight: "500", height: "100%" },
   chipRow: { flexDirection: "row", paddingHorizontal: 16 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: "#e2e8f0", marginRight: 8 },
   chipActive: { backgroundColor: "#2563eb" },
@@ -612,24 +613,24 @@ const baseStyles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 5
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0
   },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   clientAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#dbeafe", justifyContent: "center", alignItems: "center", flexShrink: 0 },
   clientAvatarText: { fontSize: 15, fontWeight: "800", color: "#002cf7" },
   clientNameRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
-  clientName: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  clientName: { fontSize: 14, fontWeight: "700", color: "#09090b" },
   subBadge: { backgroundColor: "#dcfce7", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
   subBadgeText: { fontSize: 9, fontWeight: "700", color: "#16a34a" },
   clientPhoneRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
   clientPhone: { fontSize: 12, color: "#64748b", fontWeight: "500" },
   clientAddress: { fontSize: 11, color: "#94a3b8" },
   clientMeta: { alignItems: "center", marginLeft: "auto" },
-  clientOrderCount: { fontSize: 16, fontWeight: "800", color: "#0f172a", textAlign: "center" },
+  clientOrderCount: { fontSize: 16, fontWeight: "800", color: "#09090b", textAlign: "center" },
   clientOrderLabel: { fontSize: 9, color: "#94a3b8", fontWeight: "600", textAlign: "center" },
   cardSubscriptionGaugeContainer: { marginTop: 10, backgroundColor: "rgba(0, 44, 247, 0.03)", padding: 8, borderRadius: 10, borderWidth: 1, borderColor: "rgba(0, 44, 247, 0.08)" },
   cardSubText: { fontSize: 10, color: "#475569", fontWeight: "500" },
@@ -637,25 +638,25 @@ const baseStyles = StyleSheet.create({
   cardProgressBarBg: { height: 6, backgroundColor: "#e2e8f0", borderRadius: 3, overflow: "hidden" },
   cardProgressBarFill: { height: "100%", backgroundColor: "#002cf7", borderRadius: 3 },
   compactModalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(241, 245, 249, 0.55)", padding: 16 },
-  compactModalView: { backgroundColor: "#ffffff", borderRadius: 24, padding: 20, width: "100%", maxWidth: 380, maxHeight: "85%", shadowColor: "#0f172a", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10, borderWidth: 1, borderColor: "#e2e8f0", overflow: "hidden" },
+  compactModalView: { backgroundColor: "#ffffff", borderRadius: 24, padding: 20, width: "100%", maxWidth: 380, maxHeight: "85%", shadowColor: "transparent", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0, borderWidth: 1, borderColor: "#e2e8f0", overflow: "hidden" },
   compactModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   ficheAvatarRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   ficheAvatarLarge: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#dbeafe", justifyContent: "center", alignItems: "center" },
   ficheAvatarTextLarge: { fontSize: 18, fontWeight: "800", color: "#002cf7" },
-  compactModalTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
+  compactModalTitle: { fontSize: 16, fontWeight: "700", color: "#09090b" },
   ficheSubtitle: { fontSize: 12, color: "#64748b", marginTop: 2, fontWeight: "500" },
   compactModalScroll: { paddingBottom: 16 },
-  detailCard: { backgroundColor: "#ffffff", borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.04)", shadowColor: "#0f172a", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8 },
+  detailCard: { backgroundColor: "#ffffff", borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.04)", shadowColor: "transparent", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0 },
   ficheInfoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   ficheInfoLabel: { fontSize: 13, color: "#64748b", fontWeight: "500" },
-  ficheInfoValue: { fontSize: 13, color: "#0f172a", fontWeight: "600" },
+  ficheInfoValue: { fontSize: 13, color: "#09090b", fontWeight: "600" },
   ficheInfoText: { fontSize: 13, color: "#64748b" },
   sectionTitle: { fontSize: 12, fontWeight: "600", color: "#64748b", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
   articleRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
   articleText: { fontSize: 12, color: "#475569", fontWeight: "500" },
-  articlePrice: { fontSize: 12, fontWeight: "600", color: "#0f172a" },
+  articlePrice: { fontSize: 12, fontWeight: "600", color: "#09090b" },
   subscriptionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#f1f5f9", paddingBottom: 8, marginBottom: 10 },
-  subscriptionTitle: { fontSize: 13, fontWeight: "700", color: "#0f172a" },
+  subscriptionTitle: { fontSize: 13, fontWeight: "700", color: "#09090b" },
   subActiveBadge: { backgroundColor: "#dcfce7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   subActiveBadgeText: { fontSize: 9, color: "#15803d", fontWeight: "700" },
   subPlanName: { fontSize: 14, fontWeight: "700", color: "#002cf7" },
@@ -685,7 +686,7 @@ const baseStyles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 14,
     fontSize: 13,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '500',
     marginBottom: 12,
     width: '100%',
@@ -705,11 +706,11 @@ const baseStyles = StyleSheet.create({
   },
   prefOptionActive: {
     backgroundColor: '#ffffff',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   prefText: {
     fontSize: 12,
@@ -726,10 +727,10 @@ const baseStyles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 10,
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
     width: '100%',
   },
   compactSubmitBtnText: {
@@ -770,72 +771,81 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
-    container: { backgroundColor: '#0f172a' },
-    header: { backgroundColor: '#0f172a' },
+    container: { backgroundColor: '#000000' },
+    header: { backgroundColor: '#000000' },
     headerTitle: { color: '#ffffff' },
-    backBtn: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    filterHeader: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
-    searchContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    backBtn: { backgroundColor: '#121212', borderColor: '#27272a' },
+    filterHeader: { backgroundColor: '#000000', borderBottomColor: '#27272a' },
+    searchContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
     searchInput: { color: '#ffffff' },
-    chip: { backgroundColor: '#334155' },
+    chip: { backgroundColor: '#18181b' },
     chipActive: { backgroundColor: '#002cf7' },
-    chipText: { color: '#cbd5e1' },
+    chipText: { color: '#d4d4d8' },
     chipTextActive: { color: '#ffffff' },
-    clientCard: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    clientAvatar: { backgroundColor: 'rgba(56, 189, 248, 0.1)' },
+    clientCard: { backgroundColor: '#121212', borderColor: '#27272a' },
+    clientAvatar: { backgroundColor: 'rgba(56, 189, 248, 0.15)' },
     clientAvatarText: { color: '#38bdf8' },
     clientName: { color: '#ffffff' },
-    clientPhone: { color: '#cbd5e1' },
-    clientFooter: { borderTopColor: '#334155' },
-    clientMetaText: { color: '#cbd5e1' },
-    emptyStateContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    emptyStateText: { color: '#94a3b8' },
+    clientPhone: { color: '#d4d4d8' },
+    clientAddress: { color: '#a1a1aa' },
+    clientOrderCount: { color: '#ffffff' },
+    clientOrderLabel: { color: '#a1a1aa' },
+    cardSubscriptionGaugeContainer: { backgroundColor: 'rgba(56, 189, 248, 0.08)', borderColor: 'rgba(56, 189, 248, 0.2)' },
+    cardSubText: { color: '#d4d4d8' },
+    cardSubTextBold: { color: '#38bdf8' },
+    cardProgressBarBg: { backgroundColor: '#27272a' },
+    cardProgressBarFill: { backgroundColor: '#38bdf8' },
+    clientFooter: { borderTopColor: '#27272a' },
+    clientMetaText: { color: '#d4d4d8' },
+    emptyStateContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
+    emptyStateText: { color: '#a1a1aa' },
+    noResultsText: { color: '#a1a1aa' },
     
     // Modal & Form overrides
-    modalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    modalContent: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    modalContent: { backgroundColor: '#121212', borderColor: '#27272a' },
     modalTitle: { color: '#ffffff' },
-    modalLabel: { color: '#e2e8f0' },
-    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    modalLabel: { color: '#d4d4d8' },
+    modalInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
     
     // Compact Modal & Form overrides
-    compactModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    compactModalView: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
     compactModalTitle: { color: '#ffffff' },
-    compactLabel: { color: '#cbd5e1' },
-    compactInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
+    compactLabel: { color: '#d4d4d8' },
+    compactInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
     
     // Fiche client details card overrides
-    detailCard: { backgroundColor: '#0f172a', borderColor: '#334155', borderWidth: 1 },
+    detailCard: { backgroundColor: '#09090b', borderColor: '#27272a', borderWidth: 1 },
     ficheAvatarLarge: { backgroundColor: 'rgba(56, 189, 248, 0.1)' },
     ficheAvatarTextLarge: { color: '#38bdf8' },
-    ficheSubtitle: { color: '#cbd5e1' },
-    ficheInfoLabel: { color: '#cbd5e1' },
+    ficheSubtitle: { color: '#d4d4d8' },
+    ficheInfoLabel: { color: '#d4d4d8' },
     ficheInfoText: { color: '#ffffff' },
     ficheInfoValue: { color: '#ffffff' },
-    sectionTitle: { color: '#cbd5e1' },
+    sectionTitle: { color: '#d4d4d8' },
     subscriptionTitle: { color: '#ffffff' },
     subPlanName: { color: '#38bdf8' },
-    subPlanBalance: { color: '#cbd5e1' },
-    progressBarBg: { backgroundColor: '#334155' },
+    subPlanBalance: { color: '#d4d4d8' },
+    progressBarBg: { backgroundColor: '#27272a' },
     unsubscribeBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444' },
     unsubscribeBtnText: { color: '#f87171' },
     ficheDeleteBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444' },
     ficheDeleteBtnText: { color: '#f87171' },
     
     // Segmented controller overrides
-    prefSelector: { backgroundColor: '#0f172a' },
-    prefOptActive: { backgroundColor: '#1e293b' },
-    prefOptText: { color: '#cbd5e1' },
+    prefSelector: { backgroundColor: '#09090b' },
+    prefOptActive: { backgroundColor: '#18181b' },
+    prefOptText: { color: '#d4d4d8' },
     prefOptTextActive: { color: '#ffffff' },
     
     // Subscriptions overrides
-    subContainer: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    subContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
     subActiveTitle: { color: '#ffffff' },
-    subMetaRow: { borderTopColor: '#334155' },
-    subMetaLabel: { color: '#94a3b8' },
+    subMetaRow: { borderTopColor: '#27272a' },
+    subMetaLabel: { color: '#a1a1aa' },
     subMetaValue: { color: '#ffffff' },
-    subProgressTrack: { backgroundColor: '#334155' },
+    subProgressTrack: { backgroundColor: '#27272a' },
   };
 
   const merged = {};

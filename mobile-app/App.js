@@ -315,9 +315,9 @@ export default function App() {
   const pillTranslateX = (activeSlotIndex * slotWidth) + (slotWidth - pillWidth) / 2;
 
   const appContent = (
-    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
+    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000000' : '#ffffff' }}>
       {!dbReady ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#000000' : '#ffffff' }}>
           <ActivityIndicator size="large" color="#002cf7" />
           <Text style={{ marginTop: 14, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
             Chargement de KLIN UP...
@@ -326,7 +326,7 @@ export default function App() {
       ) : !currentUser ? (
         <LoginScreen />
       ) : (
-        <View style={[styles.container, { backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', paddingTop: insets.top }]}>
+        <View style={[styles.container, { backgroundColor: isDarkMode ? '#000000' : '#ffffff', paddingTop: insets.top }]}>
           <View 
             style={styles.content}
             onLayout={(e) => {
@@ -363,8 +363,8 @@ export default function App() {
         styles.tabBar,
         {
           bottom: Math.max(18, insets.bottom + 12),
-          backgroundColor: isDarkMode ? '#1e293b' : '#f3f4f8',
-          borderColor: isDarkMode ? 'rgba(0, 44, 247, 0.4)' : 'rgba(0, 44, 247, 0.25)',
+          backgroundColor: isDarkMode ? '#121212' : '#f3f4f8',
+          borderColor: isDarkMode ? '#27272a' : 'rgba(0, 44, 247, 0.25)',
         }
       ]}>
         {/* Sliding Active Pill Background Indicator */}
@@ -385,13 +385,13 @@ export default function App() {
             top: 6,
             width: pillWidth,
             height: 62,
-            borderRadius: 26,
-            backgroundColor: '#002cf7',
-            shadowColor: '#002cf7',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.35,
-            shadowRadius: 8,
-            elevation: 6,
+            borderRadius: 14,
+            backgroundColor: isDarkMode ? '#1d4ed8' : '#2563eb',
+            shadowColor: 'transparent',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0,
+            shadowRadius: 0,
+            elevation: 0,
             transform: [{ translateX: pillTranslateX }],
             zIndex: 0,
           }}
@@ -540,7 +540,7 @@ export default function App() {
       {customAlertState.visible && (
         <View
           pointerEvents="auto"
-          style={[StyleSheet.absoluteFill, { zIndex: 100000, elevation: 100000, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.5)' }]}
+          style={[StyleSheet.absoluteFill, { zIndex: 100000, elevation: 100000, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
         >
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => {
             if (customAlertState.buttons.length <= 1) {
@@ -552,16 +552,15 @@ export default function App() {
           
           <View
             style={{
-              backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+              backgroundColor: isDarkMode ? '#121212' : '#ffffff',
               borderRadius: 24,
               borderWidth: 1,
-              borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+              borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
               padding: 24,
               width: '90%',
               maxWidth: 340,
               alignItems: 'center',
               shadowColor: '#000',
-              shadowOffset: { width: 0, height: 12 },
               shadowOpacity: isDarkMode ? 0.4 : 0.15,
               shadowRadius: 24,
               elevation: 20,
@@ -589,7 +588,7 @@ export default function App() {
             <Text style={{
               fontSize: 16,
               fontWeight: '700',
-              color: isDarkMode ? '#ffffff' : '#0f172a',
+              color: isDarkMode ? '#ffffff' : '#09090b',
               textAlign: 'center',
               marginBottom: 10,
             }}>
@@ -599,7 +598,7 @@ export default function App() {
             {/* Message */}
             <Text style={{
               fontSize: 13,
-              color: isDarkMode ? '#cbd5e1' : '#475569',
+              color: isDarkMode ? '#d4d4d8' : '#475569',
               textAlign: 'center',
               lineHeight: 18,
               marginBottom: 24,
@@ -627,9 +626,9 @@ export default function App() {
                   btnBg = '#ef4444';
                 } else if (isCancel) {
                   btnBg = 'transparent';
-                  textColor = isDarkMode ? '#cbd5e1' : '#475569';
+                  textColor = isDarkMode ? '#d4d4d8' : '#475569';
                   borderW = 1.5;
-                  borderC = isDarkMode ? '#334155' : '#e2e8f0';
+                  borderC = isDarkMode ? '#27272a' : '#e2e8f0';
                 }
                 
                 return (
@@ -680,7 +679,7 @@ export default function App() {
     return (
       <ErrorBoundary>
         <View style={styles.webOuter}>
-          <View style={[styles.webPhone, { backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }]}>
+          <View style={[styles.webPhone, { backgroundColor: isDarkMode ? '#000000' : '#f8fafc' }]}>
             {appContent}
           </View>
         </View>
@@ -698,13 +697,19 @@ const styles = StyleSheet.create({
   // ── Web-only phone frame wrapper ──
   webOuter: {
     flex: 1,
+    height: '100vh',
+    width: '100vw',
+    minHeight: '100vh',
     backgroundColor: '#0c0c10',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   webPhone: {
     width: PHONE_W,
     height: PHONE_H,
+    maxHeight: '100vh',
+    maxWidth: '100vw',
     borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: '#ffffff',
@@ -748,7 +753,7 @@ const styles = StyleSheet.create({
     zIndex: 10000,
     flexDirection: 'row',
     backgroundColor: '#f3f4f8',
-    borderRadius: 30,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 4,
@@ -757,14 +762,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: 'rgba(0, 44, 247, 0.25)',
     // Shadows for floating rounded card look
-    shadowColor: '#0f172a',
+    shadowColor: 'transparent',
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: 0,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 20,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   tabItem: {
     alignItems: 'center',
@@ -819,7 +824,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(34, 197, 94, 0.3)',
     padding: 14,
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.1,
     shadowRadius: 24,

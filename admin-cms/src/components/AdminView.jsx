@@ -3764,23 +3764,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   ↓ Télécharger
                 </button>
               </div>
-              {currentUser && currentUser.role === 'super_admin' && (
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  style={{ width: '100%', color: 'var(--danger)', borderColor: 'var(--danger)', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px', marginBottom: '0.4rem', background: 'transparent' }}
-                  onClick={async () => {
-                    if (await confirm(`Voulez-vous vraiment supprimer définitivement la commande ${createdOrder.identifiant_unique_marquage} ? Cette action est irréversible.`)) {
-                      db.deleteOrder(createdOrder.id);
-                      refreshAdminData();
-                      setCreatedOrder(null);
-                      alert("Commande supprimée avec succès.");
-                    }
-                  }}
-                >
-                  Supprimer la commande
-                </button>
-              )}
+
               <button
                 type="button"
                 className="btn btn-primary"

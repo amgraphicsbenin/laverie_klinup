@@ -290,22 +290,22 @@ function getStyles(isDarkMode) {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : 'rgba(241, 245, 249, 0.55)',
+      backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(241, 245, 249, 0.55)',
       padding: 16,
     },
     compactModalView: {
-      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
       borderRadius: 24,
       padding: 20,
       width: '100%',
       maxWidth: 380,
-      borderColor: isDarkMode ? '#334155' : 'transparent',
+      borderColor: isDarkMode ? '#27272a' : 'transparent',
       borderWidth: isDarkMode ? 1 : 0,
-      shadowColor: '#0f172a',
-      shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: 0.15,
-      shadowRadius: 24,
-      elevation: 12,
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
     },
     compactModalHeader: {
       flexDirection: 'row',
@@ -316,23 +316,23 @@ function getStyles(isDarkMode) {
     compactModalTitle: {
       fontSize: 18,
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
     },
     compactModalScroll: {
       paddingBottom: 10,
     },
     detailCard: {
-      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
       borderRadius: 16,
       padding: 16,
       marginBottom: 16,
-      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       borderWidth: 1,
     },
     clientProfileName: {
       fontSize: 18,
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
       marginBottom: 4,
     },
     clientProfilePhone: {
@@ -343,12 +343,12 @@ function getStyles(isDarkMode) {
     },
     clientProfileAddress: {
       fontSize: 13,
-      color: isDarkMode ? '#cbd5e1' : '#64748b',
+      color: isDarkMode ? '#d4d4d8' : '#64748b',
       marginBottom: 4,
     },
     clientProfilePreferences: {
       fontSize: 12,
-      color: isDarkMode ? '#94a3b8' : '#475569',
+      color: isDarkMode ? '#a1a1aa' : '#475569',
       fontWeight: '500',
       marginBottom: 12,
     },
@@ -392,16 +392,16 @@ function getStyles(isDarkMode) {
     detailSectionTitle: {
       fontSize: 14,
       fontWeight: '700',
-      color: isDarkMode ? '#cbd5e1' : '#334155',
+      color: isDarkMode ? '#d4d4d8' : '#334155',
       marginBottom: 8,
       marginTop: 6,
     },
     premiumSubscriptionCard: {
-      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
       borderRadius: 16,
       padding: 14,
       marginBottom: 16,
-      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       borderWidth: 1,
     },
     subscriptionHeader: {
@@ -413,7 +413,7 @@ function getStyles(isDarkMode) {
     subscriptionTitle: {
       fontSize: 14,
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
     },
     subActiveBadge: {
       backgroundColor: 'rgba(34, 197, 94, 0.15)',
@@ -436,11 +436,11 @@ function getStyles(isDarkMode) {
     subPlanBalance: {
       fontSize: 12,
       fontWeight: '600',
-      color: isDarkMode ? '#cbd5e1' : '#475569',
+      color: isDarkMode ? '#d4d4d8' : '#475569',
     },
     progressBarBg: {
       height: 8,
-      backgroundColor: isDarkMode ? '#334155' : '#e2e8f0',
+      backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0',
       borderRadius: 99,
       overflow: 'hidden',
     },
@@ -451,7 +451,7 @@ function getStyles(isDarkMode) {
     },
     progressText: {
       fontSize: 11,
-      color: isDarkMode ? '#94a3b8' : '#64748b',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
     },
     subDatesRow: {
       flexDirection: 'row',
@@ -460,7 +460,7 @@ function getStyles(isDarkMode) {
     },
     subDateText: {
       fontSize: 11,
-      color: isDarkMode ? '#94a3b8' : '#64748b',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
     },
     unsubscribeBtn: {
       backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
@@ -493,21 +493,21 @@ function getStyles(isDarkMode) {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
       padding: 12,
       borderRadius: 12,
       marginBottom: 8,
-      borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       borderWidth: 1,
     },
     orderHistoryNo: {
       fontSize: 13,
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
+      color: isDarkMode ? '#ffffff' : '#09090b',
     },
     orderHistoryDate: {
       fontSize: 11,
-      color: isDarkMode ? '#94a3b8' : '#64748b',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
     },
     orderHistoryTotal: {
       fontSize: 13,
@@ -525,7 +525,7 @@ function getStyles(isDarkMode) {
     },
     noResultsText: {
       textAlign: 'center',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
       fontSize: 13,
       marginVertical: 12,
     },

@@ -213,7 +213,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 32,
     padding: 28,
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.05,
     shadowRadius: 30,
@@ -242,7 +242,7 @@ const baseStyles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -278,7 +278,7 @@ const baseStyles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 14,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '500',
     height: '100%',
   },
@@ -319,7 +319,7 @@ const baseStyles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 16,
@@ -332,7 +332,7 @@ const baseStyles = StyleSheet.create({
   userName: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     textAlign: 'center',
   },
   userRole: {
@@ -346,7 +346,7 @@ const baseStyles = StyleSheet.create({
   pinTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -414,30 +414,30 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
-    container: { backgroundColor: '#0f172a' },
-    card: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    container: { backgroundColor: '#000000' },
+    card: { backgroundColor: '#121212', borderColor: '#27272a' },
     title: { color: '#ffffff' },
-    subtitle: { color: '#cbd5e1' },
-    label: { color: '#e2e8f0' },
-    inputContainer: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    subtitle: { color: '#d4d4d8' },
+    label: { color: '#d4d4d8' },
+    inputContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
     input: { color: '#ffffff' },
     
     // User card overrides (user selection list)
-    userCard: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    userCard: { backgroundColor: '#09090b', borderColor: '#27272a' },
     userName: { color: '#ffffff' },
-    userRole: { color: '#94a3b8' },
+    userRole: { color: '#a1a1aa' },
     
     // Keypad and PIN entry overrides
-    pinDot: { backgroundColor: '#0f172a', borderColor: '#334155' },
-    pinDotFilled: { borderColor: '#002cf7', backgroundColor: 'rgba(0, 44, 247, 0.05)' },
+    pinDot: { backgroundColor: '#09090b', borderColor: '#27272a' },
+    pinDotFilled: { borderColor: '#002cf7', backgroundColor: 'rgba(0, 44, 247, 0.1)' },
     dotText: { color: '#ffffff' },
-    keypadContainer: { borderTopColor: '#334155' },
-    keypadButton: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    keypadContainer: { borderTopColor: '#27272a' },
+    keypadButton: { backgroundColor: '#09090b', borderColor: '#27272a' },
     keypadButtonText: { color: '#ffffff' },
-    backspaceButton: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    backspaceButton: { backgroundColor: '#09090b', borderColor: '#27272a' },
     
     // Header back button
-    backBtn: { backgroundColor: '#0f172a', borderColor: '#334155' },
+    backBtn: { backgroundColor: '#09090b', borderColor: '#27272a' },
   };
 
   const merged = {};

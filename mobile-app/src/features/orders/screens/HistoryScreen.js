@@ -38,7 +38,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   const [cancelReason, setCancelReason] = useState('');
   const [cancelReasonError, setCancelReasonError] = useState('');
 
-  let cancelBorderColor = isDarkMode ? '#334155' : '#e2e8f0';
+  let cancelBorderColor = isDarkMode ? '#27272a' : '#e2e8f0';
   if (cancelReasonError) {
     cancelBorderColor = '#ef4444';
   }
@@ -301,10 +301,10 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       {/* Search and Filters */}
       <View style={styles.filterHeader}>
         <View style={styles.searchContainer}>
-          <Search size={16} color="#71717a" style={styles.searchIcon} />
+          <Search size={16} color={isDarkMode ? '#a1a1aa' : '#71717a'} style={styles.searchIcon} />
           <TextInput
             placeholder="Rechercher par ticket ou client..."
-            placeholderTextColor="#a1a1aa"
+            placeholderTextColor={isDarkMode ? '#71717a' : '#a1a1aa'}
             value={searchQuery}
             onChangeText={setSearchQuery}
             style={styles.searchInput}
@@ -475,25 +475,25 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       />
 
       {/* Detailed Order Modal (BOTTOM SHEET) */}
-      <MotiView
-        pointerEvents={selectedOrder !== null ? 'auto' : 'none'}
-        animate={{
-          opacity: selectedOrder !== null ? 1 : 0
-        }}
-        transition={{ type: 'timing', duration: 120 }}
-        style={[
-          StyleSheet.absoluteFill,
-          { 
-            zIndex: 9999,
-            bottom: 0
-          }
-        ]}
+      <Modal
+        visible={selectedOrder !== null}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setSelectedOrder(null)}
       >
-        {selectedOrder && (
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedOrder(null)}>
-              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
+        <MotiView
+          pointerEvents={selectedOrder !== null ? 'auto' : 'none'}
+          animate={{
+            opacity: selectedOrder !== null ? 1 : 0
+          }}
+          transition={{ type: 'timing', duration: 120 }}
+          style={StyleSheet.absoluteFill}
+        >
+          {selectedOrder && (
+            <View style={styles.compactModalOverlay}>
+              <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedOrder(null)}>
+                <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+              </TouchableOpacity>
             <View style={[styles.compactModalView, { maxHeight: '90%' }]}>
               <View style={styles.compactModalHeader}>
                 <Text style={styles.compactModalTitle}>Commande #{getDisplayTicketId(selectedOrder)}</Text>
@@ -626,23 +626,16 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                       style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
                     >
                       <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteOrder(selectedOrder)}
-                      activeOpacity={0.8}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef44441a', borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 10, paddingVertical: 10 }}
-                    >
-                      <Trash2 size={14} color="#ef4444" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Supprimer</Text>
+                      <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler la commande</Text>
                     </TouchableOpacity>
                   </View>
                 )}
-              </ScrollView>
+                </ScrollView>
+              </View>
             </View>
-          </View>
-        )}
-      </MotiView>
+          )}
+        </MotiView>
+      </Modal>
 
       {/* MODAL : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
       <MotiView
@@ -857,7 +850,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
                   <Ban size={22} color="#ef4444" />
                 </View>
-                <Text style={{ fontSize: 13, color: isDarkMode ? '#cbd5e1' : '#64748b', textAlign: 'center', paddingHorizontal: 10 }}>
+                <Text style={{ fontSize: 13, color: isDarkMode ? '#d4d4d8' : '#64748b', textAlign: 'center', paddingHorizontal: 10 }}>
                   Veuillez spécifier le motif d'annulation de la commande #{orderToCancel ? (orderToCancel.ticket_numero || orderToCancel.id) : ''}.
                 </Text>
               </View>
@@ -870,15 +863,15 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                       height: 80,
                       textAlignVertical: 'top',
                       padding: 12,
-                      borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                      borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#27272a' : '#e2e8f0'),
                       borderRadius: 12,
                       borderWidth: 1,
-                      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
                       color: isDarkMode ? '#ffffff' : '#09090b',
                     }
                   ]}
                   placeholder="Ex: Erreur de saisie, client absent..."
-                  placeholderTextColor={isDarkMode ? '#64748b' : '#a1a1aa'}
+                  placeholderTextColor={isDarkMode ? '#a1a1aa' : '#a1a1aa'}
                   multiline={true}
                   numberOfLines={3}
                   value={cancelReason}
@@ -899,14 +892,14 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   onPress={() => setCancelModalVisible(false)}
                   style={{
                     flex: 1,
-                    backgroundColor: isDarkMode ? '#334155' : '#f4f4f5',
+                    backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5',
                     borderRadius: 12,
                     paddingVertical: 12,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ color: isDarkMode ? '#e2e8f0' : '#27272a', fontWeight: '700', fontSize: 13 }}>
+                  <Text style={{ color: isDarkMode ? '#d4d4d8' : '#27272a', fontWeight: '700', fontSize: 13 }}>
                     Retour
                   </Text>
                 </TouchableOpacity>
@@ -986,7 +979,7 @@ const baseStyles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 13,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '500',
     height: '100%',
     fontFamily: FONT_FAMILY,
@@ -1035,11 +1028,11 @@ const baseStyles = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 5,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1050,7 +1043,7 @@ const baseStyles = StyleSheet.create({
   clientName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     fontFamily: FONT_FAMILY,
   },
   ticketNo: {
@@ -1096,7 +1089,7 @@ const baseStyles = StyleSheet.create({
   ticketNoText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#334155',
+    color: '#475569',
     fontFamily: FONT_FAMILY,
   },
   articleSummaryText: {
@@ -1181,7 +1174,7 @@ const baseStyles = StyleSheet.create({
   modalTitleLarge: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     fontFamily: FONT_FAMILY,
   },
   modalScroll: {
@@ -1194,7 +1187,7 @@ const baseStyles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 14,
@@ -1203,7 +1196,7 @@ const baseStyles = StyleSheet.create({
   detailClientName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     fontFamily: FONT_FAMILY,
   },
   detailDate: {
@@ -1236,7 +1229,7 @@ const baseStyles = StyleSheet.create({
   articlePrice: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     fontFamily: FONT_FAMILY,
   },
   divider: {
@@ -1247,7 +1240,7 @@ const baseStyles = StyleSheet.create({
   totalLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     fontFamily: FONT_FAMILY,
   },
   totalValue: {
@@ -1264,13 +1257,13 @@ const baseStyles = StyleSheet.create({
   },
   subValue: {
     fontSize: 11,
-    color: '#334155',
+    color: '#475569',
     fontWeight: '600',
     fontFamily: FONT_FAMILY,
   },
   logisticsText: {
     fontSize: 12,
-    color: '#334155',
+    color: '#475569',
     fontWeight: '500',
     fontFamily: FONT_FAMILY,
   },
@@ -1288,11 +1281,11 @@ const baseStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     maxHeight: '85%',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 10,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     overflow: 'hidden',
@@ -1306,7 +1299,7 @@ const baseStyles = StyleSheet.create({
   compactModalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     fontFamily: FONT_FAMILY,
   },
   compactModalScroll: {
@@ -1382,7 +1375,7 @@ const baseStyles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     textAlign: 'center',
-    color: '#0f172a',
+    color: '#09090b',
     letterSpacing: 1,
   },
   tpeBrandSub: {
@@ -1409,7 +1402,7 @@ const baseStyles = StyleSheet.create({
   },
   tpeDashedDivider: {
     fontSize: 10,
-    color: '#cbd5e1',
+    color: '#d4d4d8',
     textAlign: 'center',
     marginVertical: 8,
     letterSpacing: 2,
@@ -1426,13 +1419,13 @@ const baseStyles = StyleSheet.create({
   },
   tpeMetaVal: {
     fontSize: 11,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   tpeSectionTitle: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#09090b',
     marginBottom: 8,
     textAlign: 'center',
     letterSpacing: 0.5,
@@ -1444,7 +1437,7 @@ const baseStyles = StyleSheet.create({
   },
   tpeItemName: {
     fontSize: 12,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   tpeItemService: {
@@ -1456,14 +1449,14 @@ const baseStyles = StyleSheet.create({
   },
   tpeItemQty: {
     fontSize: 11,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
     width: 30,
     textAlign: 'center',
   },
   tpeItemPrice: {
     fontSize: 11,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '700',
     width: 90,
     textAlign: 'right',
@@ -1480,12 +1473,12 @@ const baseStyles = StyleSheet.create({
   },
   tpeTotalVal: {
     fontSize: 11,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '600',
   },
   tpeTotalLabelBold: {
     fontSize: 12,
-    color: '#0f172a',
+    color: '#09090b',
     fontWeight: '700',
   },
   tpeTotalValBold: {
@@ -1496,7 +1489,7 @@ const baseStyles = StyleSheet.create({
   tpeFooterMessage: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#09090b',
     textAlign: 'center',
     marginVertical: 12,
   },
@@ -1513,7 +1506,7 @@ const baseStyles = StyleSheet.create({
   barcodeText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#09090b',
     letterSpacing: 2,
   },
   invoiceCloseBtn: {
@@ -1595,7 +1588,7 @@ const baseStyles = StyleSheet.create({
   clientProfileName: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#09090b',
     marginBottom: 4,
   },
   clientProfilePhone: {
@@ -1629,7 +1622,7 @@ const baseStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#0f172a',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.03,
     shadowRadius: 16,
@@ -1649,7 +1642,7 @@ const baseStyles = StyleSheet.create({
   subscriptionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#09090b',
   },
   subActiveBadge: {
     backgroundColor: '#dcfce7',
@@ -1772,42 +1765,55 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
-    compactModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    popupModalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    container: { backgroundColor: '#0f172a' },
-    header: { backgroundColor: '#0f172a' },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
+    compactModalTitle: { color: '#ffffff' },
+    detailCard: { backgroundColor: '#09090b', borderColor: '#27272a', borderWidth: 1 },
+    detailDate: { color: '#d4d4d8' },
+    sectionTitle: { color: '#38bdf8' },
+    articleText: { color: '#d4d4d8' },
+    articlePrice: { color: '#ffffff' },
+    divider: { backgroundColor: '#27272a' },
+    subLabel: { color: '#a1a1aa' },
+    subValue: { color: '#ffffff' },
+    totalLabel: { color: '#ffffff' },
+    totalValue: { color: '#38bdf8' },
+    logisticsText: { color: '#d4d4d8' },
+    container: { backgroundColor: '#000000' },
+    header: { backgroundColor: '#000000' },
     headerTitle: { color: '#ffffff' },
-    filterHeader: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
-    searchContainer: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    filterHeader: { backgroundColor: '#000000', borderBottomColor: '#27272a' },
+    searchContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
     searchInput: { color: '#ffffff' },
-    chip: { backgroundColor: '#334155' },
+    chip: { backgroundColor: '#18181b' },
     chipActive: { backgroundColor: '#002cf7' },
-    chipText: { color: '#cbd5e1' },
+    chipText: { color: '#d4d4d8' },
     chipTextActive: { color: '#ffffff' },
-    historyCard: { backgroundColor: '#1e293b', borderColor: '#334155', shadowColor: '#000000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 5 },
+    historyCard: { backgroundColor: '#121212', borderColor: '#27272a', shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
     clientName: { color: '#ffffff' },
-    ticketNo: { color: '#cbd5e1' },
-    cardFooter: { borderTopColor: '#334155' },
-    dateText: { color: '#94a3b8' },
+    ticketNo: { color: '#d4d4d8' },
+    cardFooter: { borderTopColor: '#27272a' },
+    dateText: { color: '#a1a1aa' },
     totalAmount: { color: '#38bdf8' },
-    ticketBadge: { backgroundColor: '#0f172a' },
-    ticketNoText: { color: '#cbd5e1' },
-    articleSummaryText: { color: '#94a3b8' },
+    ticketBadge: { backgroundColor: '#09090b' },
+    ticketNoText: { color: '#d4d4d8' },
+    articleSummaryText: { color: '#a1a1aa' },
     cardActionRow: { borderTopColor: 'rgba(255, 255, 255, 0.08)' },
     factureBtn: { backgroundColor: 'rgba(56, 189, 248, 0.12)', borderColor: 'rgba(56, 189, 248, 0.3)' },
     factureBtnText: { color: '#38bdf8' },
     detailsLinkText: { color: '#38bdf8' },
-    modalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-    modalContent: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    modalContent: { backgroundColor: '#121212', borderColor: '#27272a' },
     modalTitle: { color: '#ffffff' },
-    modalLabel: { color: '#e2e8f0' },
-    modalInput: { backgroundColor: '#0f172a', borderColor: '#334155', color: '#ffffff' },
-    invoiceSectionTitle: { color: '#ffffff', borderBottomColor: '#334155' },
-    invoiceItemRow: { borderBottomColor: '#334155' },
+    modalLabel: { color: '#d4d4d8' },
+    modalInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
+    invoiceSectionTitle: { color: '#ffffff', borderBottomColor: '#27272a' },
+    invoiceItemRow: { borderBottomColor: '#27272a' },
     invoiceItemName: { color: '#ffffff' },
-    invoiceItemQty: { color: '#cbd5e1' },
+    invoiceItemQty: { color: '#d4d4d8' },
     invoiceItemTotal: { color: '#ffffff' },
-    invoiceSummaryRow: { borderTopColor: '#334155' },
+    invoiceSummaryRow: { borderTopColor: '#27272a' },
     invoiceTotalValue: { color: '#ffffff' },
     clientPillBtn: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.3)' },
     clientPillBtnText: { color: '#38bdf8' },

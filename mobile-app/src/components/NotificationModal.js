@@ -109,7 +109,10 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
 
   if (!visible && !isRendered) return null;
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const filteredNotifications = notifications.filter(
+    n => n.action !== 'CONNEXION' && n.action !== 'DECONNEXION'
+  );
+  const unreadCount = filteredNotifications.filter(n => !n.read).length;
 
   const formatRelativeTime = (timestamp) => {
     if (!timestamp) return '';
@@ -247,8 +250,8 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
         style={[
           styles.card,
           {
-            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-            borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+            backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+            borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
             opacity: fadeAnim,
             transform: [
               { scale: scaleAnim },
@@ -258,26 +261,26 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
         ]}
       >
         {/* Header */}
-        <View style={[styles.header, { borderBottomColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
+        <View style={[styles.header, { borderBottomColor: isDarkMode ? '#27272a' : '#f1f5f9' }]}>
           <View style={styles.headerLeft}>
             <View style={[styles.bellCircle, { backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#eff6ff' }]}>
               <Bell size={20} color="#2563eb" />
             </View>
             <View>
-              <Text style={[styles.title, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>Notifications</Text>
-              <Text style={[styles.subtitle, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.title, { color: isDarkMode ? '#ffffff' : '#09090b' }]}>Notifications</Text>
+              <Text style={[styles.subtitle, { color: isDarkMode ? '#a1a1aa' : '#64748b' }]}>
                 {unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : 'Toutes lues'}
               </Text>
             </View>
           </View>
           <TouchableOpacity onPress={handleRequestClose} style={styles.closeBtn}>
-            <X size={20} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+            <X size={20} color={isDarkMode ? '#a1a1aa' : '#64748b'} />
           </TouchableOpacity>
         </View>
 
         {/* Action bar */}
         {notifications.length > 0 && (
-          <View style={[styles.actionBar, { borderBottomColor: isDarkMode ? '#334155' : '#f1f5f9' }]}>
+          <View style={[styles.actionBar, { borderBottomColor: isDarkMode ? '#27272a' : '#f1f5f9' }]}>
             {unreadCount > 0 && (
               <TouchableOpacity onPress={handleMarkAllRead} style={styles.actionBtn}>
                 <CheckCheck size={14} color="#2563eb" />
@@ -297,18 +300,18 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {notifications.length === 0 ? (
+          {filteredNotifications.length === 0 ? (
             <View style={styles.emptyState}>
-              <View style={[styles.emptyIconCircle, { backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc' }]}>
-                <BellOff size={32} color={isDarkMode ? '#475569' : '#94a3b8'} />
+              <View style={[styles.emptyIconCircle, { backgroundColor: isDarkMode ? '#09090b' : '#f8fafc' }]}>
+                <BellOff size={32} color={isDarkMode ? '#71717a' : '#94a3b8'} />
               </View>
-              <Text style={[styles.emptyTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>Aucune notification</Text>
-              <Text style={[styles.emptySub, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.emptyTitle, { color: isDarkMode ? '#ffffff' : '#09090b' }]}>Aucune notification</Text>
+              <Text style={[styles.emptySub, { color: isDarkMode ? '#a1a1aa' : '#64748b' }]}>
                 Les notifications d'activité de vos commandes et clients apparaîtront ici.
               </Text>
             </View>
           ) : (
-            notifications.map((item) => {
+            filteredNotifications.map((item) => {
               const config = getActionConfig(item.action);
               const IconComp = config.icon;
 
@@ -321,10 +324,10 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
                     styles.itemCard,
                     {
                       backgroundColor: item.read 
-                        ? (isDarkMode ? '#0f172a' : '#f8fafc') 
-                        : (isDarkMode ? 'rgba(37, 99, 235, 0.08)' : '#ffffff'),
+                        ? (isDarkMode ? '#09090b' : '#f8fafc') 
+                        : (isDarkMode ? 'rgba(37, 99, 235, 0.12)' : '#ffffff'),
                       borderColor: item.read 
-                        ? (isDarkMode ? '#1e293b' : '#f1f5f9') 
+                        ? (isDarkMode ? '#27272a' : '#f1f5f9') 
                         : (isDarkMode ? '#3b82f6' : '#bfdbfe'),
                     }
                   ]}
@@ -335,10 +338,10 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
                   </View>
                   <View style={styles.itemContent}>
                     <View style={styles.itemHeader}>
-                      <Text style={[styles.itemTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>{config.title}</Text>
-                      <Text style={[styles.itemTime, { color: isDarkMode ? '#94a3b8' : '#94a3b8' }]}>{formatRelativeTime(item.timestamp)}</Text>
+                      <Text style={[styles.itemTitle, { color: isDarkMode ? '#ffffff' : '#09090b' }]}>{config.title}</Text>
+                      <Text style={[styles.itemTime, { color: isDarkMode ? '#a1a1aa' : '#94a3b8' }]}>{formatRelativeTime(item.timestamp)}</Text>
                     </View>
-                    <Text style={[styles.itemDetails, { color: isDarkMode ? '#cbd5e1' : '#475569' }]} numberOfLines={2}>
+                    <Text style={[styles.itemDetails, { color: isDarkMode ? '#d4d4d8' : '#475569' }]} numberOfLines={2}>
                       {item.details}
                     </Text>
                   </View>
@@ -347,7 +350,7 @@ export function NotificationModal({ visible, onClose, notifications = [], isDark
                     style={styles.deleteSingleBtn}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <X size={14} color={isDarkMode ? '#64748b' : '#94a3b8'} />
+                    <X size={14} color={isDarkMode ? '#71717a' : '#94a3b8'} />
                   </TouchableOpacity>
                 </TouchableOpacity>
               );

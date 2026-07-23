@@ -136,6 +136,8 @@ export function MotiView({ animate, from, transition, exit, style, children, ...
 
   const animatedStyle = {
     opacity: opacityAnim,
+    ...(animate?.backgroundColor !== undefined ? { backgroundColor: animate.backgroundColor } : {}),
+    ...(animate?.borderColor !== undefined ? { borderColor: animate.borderColor } : {}),
     ...(transform.length > 0 ? { transform } : {}),
   };
 

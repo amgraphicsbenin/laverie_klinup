@@ -1,25 +1,65 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, FlatList } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, FlatList, Modal, Dimensions } from 'react-native';
 import { ChevronDown, Check } from 'lucide-react-native';
 import { db } from '../services/db';
 
-export const CustomSelect = ({ value, onChange, options, placeholder, disabled, style, buttonStyle }) => {
+export const CustomSelect = ({ value, onChange, options = [], placeholder, disabled, style, buttonStyle }) => {
   const isDarkMode = db.isDarkMode ? db.isDarkMode() : false;
   const styles = getStyles(isDarkMode);
   const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = options.find(o => String(o.value) === String(value));
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 200 });
+  const buttonRef = useRef(null);
+
+  const safeOptions = Array.isArray(options) ? options : [];
+  const selectedOption = safeOptions.find(o => String(o.value) === String(value));
 
   const handleSelect = (val) => {
     onChange(val);
     setIsOpen(false);
   };
 
+  const toggleDropdown = () => {
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+
+    const windowH = Dimensions.get('window').height;
+    const windowW = Dimensions.get('window').width;
+
+    const computeAndOpen = (x, y, w, h) => {
+      const menuMaxH = 200;
+      let top = y + h + 4;
+      if (top + menuMaxH > windowH && y - menuMaxH > 0) {
+        top = Math.max(10, y - menuMaxH - 4);
+      }
+      let left = Math.max(8, Math.min(x, windowW - w - 8));
+      setDropdownPos({ top, left, width: Math.max(w, 140) });
+      setIsOpen(true);
+    };
+
+    if (buttonRef.current) {
+      if (typeof buttonRef.current.getBoundingClientRect === 'function') {
+        const rect = buttonRef.current.getBoundingClientRect();
+        computeAndOpen(rect.left, rect.top, rect.width, rect.height);
+      } else if (typeof buttonRef.current.measureInWindow === 'function') {
+        buttonRef.current.measureInWindow((x, y, w, h) => {
+          computeAndOpen(x, y, w, h);
+        });
+      } else {
+        setIsOpen(true);
+      }
+    } else {
+      setIsOpen(true);
+    }
+  };
+
   return (
-    <View style={[styles.container, style, { zIndex: isOpen ? 9999 : 1 }]}>
+    <View ref={buttonRef} style={[styles.container, style]}>
       <TouchableOpacity
         activeOpacity={0.7}
         disabled={disabled}
-        onPress={() => setIsOpen(!isOpen)}
+        onPress={toggleDropdown}
         style={[styles.button, disabled && styles.disabledButton, buttonStyle]}
       >
         <Text style={[styles.buttonText, !selectedOption && styles.placeholderText]} numberOfLines={1}>
@@ -28,40 +68,58 @@ export const CustomSelect = ({ value, onChange, options, placeholder, disabled, 
         <ChevronDown size={16} color="#71717a" />
       </TouchableOpacity>
 
-      {isOpen && (
-        <>
-          {/* Transparent Backdrop to close dropdown on clicking outside */}
-          <TouchableOpacity 
-            activeOpacity={1} 
-            style={styles.backdrop} 
-            onPress={() => setIsOpen(false)} 
-          />
-          
-          <View style={styles.dropdownMenu}>
-            <FlatList
-              data={options}
-              keyExtractor={(item) => String(item.value)}
-              nestedScrollEnabled={true}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => {
-                const isSelected = String(item.value) === String(value);
-                return (
-                  <TouchableOpacity
-                    style={[styles.optionItem, isSelected && styles.selectedOptionItem]}
-                    onPress={() => handleSelect(item.value)}
-                  >
-                    <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
-                      {item.label}
-                    </Text>
-                    {isSelected && <Check size={14} color="#002cf7" />}
-                  </TouchableOpacity>
-                );
-              }}
-              style={styles.optionsList}
-            />
+      <Modal
+        visible={isOpen}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.modalOverlay}
+          onPress={() => setIsOpen(false)}
+        >
+          <View
+            style={[
+              styles.dropdownMenuModal,
+              {
+                top: dropdownPos.top,
+                left: dropdownPos.left,
+                width: dropdownPos.width,
+              }
+            ]}
+          >
+            {safeOptions.length > 0 ? (
+              <FlatList
+                data={safeOptions}
+                keyExtractor={(item) => String(item.value)}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                removeClippedSubviews={false}
+                renderItem={({ item }) => {
+                  const isSelected = String(item.value) === String(value);
+                  return (
+                    <TouchableOpacity
+                      style={[styles.optionItem, isSelected && styles.selectedOptionItem]}
+                      onPress={() => handleSelect(item.value)}
+                    >
+                      <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
+                        {item.label}
+                      </Text>
+                      {isSelected && <Check size={14} color="#002cf7" />}
+                    </TouchableOpacity>
+                  );
+                }}
+                style={styles.optionsList}
+              />
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Aucun choix disponible</Text>
+              </View>
+            )}
           </View>
-        </>
-      )}
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -69,7 +127,6 @@ export const CustomSelect = ({ value, onChange, options, placeholder, disabled, 
 const baseStyles = StyleSheet.create({
   container: {
     width: '100%',
-    position: 'relative',
   },
   button: {
     width: '100%',
@@ -94,35 +151,27 @@ const baseStyles = StyleSheet.create({
   placeholderText: {
     color: '#a1a1aa',
   },
-  backdrop: {
-    position: 'absolute',
-    top: -1000,
-    bottom: -1000,
-    left: -1000,
-    right: -1000,
-    backgroundColor: 'transparent',
-    zIndex: 9998,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
   },
-  dropdownMenu: {
+  dropdownMenuModal: {
     position: 'absolute',
-    top: 44,
-    left: 0,
-    right: 0,
     backgroundColor: '#ffffff',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e4e4e7',
-    maxHeight: 180,
-    zIndex: 9999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 5,
+    maxHeight: 200,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 1000,
     overflow: 'hidden',
   },
   optionsList: {
     padding: 6,
+    flexGrow: 0,
   },
   optionItem: {
     flexDirection: 'row',
@@ -143,20 +192,29 @@ const baseStyles = StyleSheet.create({
     color: '#002cf7',
     fontWeight: '600',
   },
+  emptyContainer: {
+    padding: 12,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#71717a',
+  },
 });
 
 function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
-  
+
   const overrides = {
-    button: { backgroundColor: '#0f172a', borderColor: '#334155' },
-    disabledButton: { backgroundColor: '#1e293b' },
+    button: { backgroundColor: '#09090b', borderColor: '#27272a' },
+    disabledButton: { backgroundColor: '#18181b' },
     buttonText: { color: '#ffffff' },
-    placeholderText: { color: '#64748b' },
-    dropdownMenu: { backgroundColor: '#1e293b', borderColor: '#334155' },
-    optionText: { color: '#cbd5e1' },
+    placeholderText: { color: '#a1a1aa' },
+    dropdownMenuModal: { backgroundColor: '#121212', borderColor: '#27272a' },
+    optionText: { color: '#d4d4d8' },
     selectedOptionItem: { backgroundColor: 'rgba(0, 44, 247, 0.15)' },
     selectedOptionText: { color: '#38bdf8' },
+    emptyText: { color: '#a1a1aa' },
   };
 
   const merged = {};
@@ -168,4 +226,4 @@ function getStyles(isDarkMode) {
     }
   });
   return merged;
-};
+}

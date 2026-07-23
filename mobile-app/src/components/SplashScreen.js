@@ -15,7 +15,7 @@ export default function SplashScreen({ onAnimationFinish }) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#040a17', '#0a1d3f', '#1d4ed8', '#1e40af']}
+        colors={['#000000', '#050510', '#002cf7', '#0020c2']}
         locations={[0, 0.35, 0.75, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     zIndex: 99999,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a1d3f',
+    backgroundColor: '#000000',
   },
   centerContent: {
     alignItems: 'center',

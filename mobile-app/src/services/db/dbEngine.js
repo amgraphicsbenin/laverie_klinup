@@ -14,6 +14,7 @@ import {
 } from './seeds';
 import { performMutation, initDb, persist } from './syncEngine';
 import { supabase } from '../supabaseClient';
+import { playNotificationSound } from '../soundService';
 
 // Base de données locale en mémoire
 export const memoryDb = {
@@ -115,19 +116,21 @@ export const db = {
       memoryDb.notifications_initialized = true;
       if (!memoryDb.notifications || memoryDb.notifications.length === 0) {
         if (memoryDb.logs && memoryDb.logs.length > 0) {
-          memoryDb.notifications = memoryDb.logs.map(log => ({
-            id: 'n_' + log.id,
-            action: log.action,
-            details: log.details,
-            timestamp: log.timestamp,
-            read: false
-          }));
+          memoryDb.notifications = memoryDb.logs
+            .filter(log => log.action !== 'CONNEXION' && log.action !== 'DECONNEXION')
+            .map(log => ({
+              id: 'n_' + log.id,
+              action: log.action,
+              details: log.details,
+              timestamp: log.timestamp,
+              read: false
+            }));
         } else {
           memoryDb.notifications = [];
         }
       }
     }
-    return [...(memoryDb.notifications || [])];
+    return [...(memoryDb.notifications || []).filter(n => n.action !== 'CONNEXION' && n.action !== 'DECONNEXION')];
   },
   markNotificationRead: (id) => {
     if (!memoryDb.notifications) return;
@@ -208,15 +211,18 @@ export const db = {
     };
     memoryDb.logs.unshift(newLog);
 
-    if (!memoryDb.notifications) memoryDb.notifications = [];
-    memoryDb.notifications.unshift({
-      id: 'n_' + newLog.id,
-      action: newLog.action,
-      details: newLog.details,
-      timestamp: newLog.timestamp,
-      read: false
-    });
+    if (action !== 'CONNEXION' && action !== 'DECONNEXION') {
+      if (!memoryDb.notifications) memoryDb.notifications = [];
+      memoryDb.notifications.unshift({
+        id: 'n_' + newLog.id,
+        action: newLog.action,
+        details: newLog.details,
+        timestamp: newLog.timestamp,
+        read: false
+      });
 
+      playNotificationSound();
+    }
     persist();
     db.notify();
 
