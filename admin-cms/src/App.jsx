@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from './services/db';
 import AdminView from './components/AdminView';
 import logoDark from './assets/logo_dark.png';
@@ -26,7 +26,6 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [adminMenu, setAdminMenu] = useState('dashboard'); // dashboard, catalog, logs
   const [staffList, setStaffList] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Authentication states
   const [selectedLoginUser, setSelectedLoginUser] = useState(null);
@@ -52,8 +51,16 @@ function App() {
     }
   });
 
+  const [clearedNotifIds, setClearedNotifIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('klin_up_cleared_notif_ids')) || [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   // Unified notifications stream
-  const notifications = (() => {
+  const allNotifications = (() => {
     const list = [];
     
     // 1. PIN reset requests
@@ -97,7 +104,61 @@ function App() {
     return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 25);
   })();
 
+  const notifications = allNotifications.filter(n => !clearedNotifIds.includes(n.id));
   const unreadCount = notifications.filter(n => !readNotifIds.includes(n.id)).length;
+
+  // Bip sonore pour toute nouvelle notification reçue
+  const playNotificationBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+      osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.08); // G5
+
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.22);
+    } catch (e) {
+      // Ignorer si bloqué par auto-play
+    }
+  };
+
+  const prevLatestNotifIdRef = useRef(null);
+  const isInitialLoadRef = useRef(true);
+
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const latestId = notifications[0].id;
+      if (isInitialLoadRef.current) {
+        prevLatestNotifIdRef.current = latestId;
+        isInitialLoadRef.current = false;
+      } else if (prevLatestNotifIdRef.current && prevLatestNotifIdRef.current !== latestId) {
+        prevLatestNotifIdRef.current = latestId;
+        playNotificationBeep();
+      } else {
+        prevLatestNotifIdRef.current = latestId;
+      }
+    }
+  }, [notifications]);
+
+  const handleClearAllNotifications = (e) => {
+    e.stopPropagation();
+    const idsToClear = notifications.map(n => n.id);
+    const updatedCleared = Array.from(new Set([...clearedNotifIds, ...idsToClear]));
+    setClearedNotifIds(updatedCleared);
+    localStorage.setItem('klin_up_cleared_notif_ids', JSON.stringify(updatedCleared));
+  };
 
   const handleToggleNotifDropdown = () => {
     const nextShow = !showNotifDropdown;
@@ -548,14 +609,14 @@ function App() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.6)',
+            backgroundColor: 'rgba(15, 23, 42, 0.12)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
             animation: 'fadeIn 0.2s ease-out'
           }}>
-            <div className="card" style={{ width: '360px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', color: 'var(--text-primary)' }}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '360px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>Réinitialiser le PIN</h3>
                 <button type="button" onClick={() => setShowResetPinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
@@ -722,17 +783,6 @@ function App() {
 
           {hasAdminAccess && (
             <div className="topbar-actions">
-              {/* Recherche pill avec badge raccourci */}
-              <div className="search-pill-wrapper">
-                <input 
-                  type="text" 
-                  placeholder="Rechercher..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <MIcon name="search" size={18} className="search-pill-icon" />
-              </div>
-
               {/* Raccourcis Icônes */}
               <div style={{ position: 'relative' }}>
                 <div 
@@ -767,28 +817,56 @@ function App() {
                 {showNotifDropdown && (
                   <>
                     <div 
-                      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1099 }} 
+                      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, cursor: 'default' }} 
                       onClick={() => setShowNotifDropdown(false)}
                     />
-                    <div style={{ 
-                      position: 'absolute', 
-                      top: '45px', 
-                      right: 0, 
-                      width: '340px', 
-                      background: 'var(--bg-card)', 
-                      border: '1px solid var(--border-color)', 
-                      borderRadius: '12px', 
-                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', 
-                      zIndex: 1100, 
-                      display: 'flex', 
-                      flexDirection: 'column',
-                      overflow: 'hidden'
-                    }}>
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ 
+                        position: 'absolute', 
+                        top: '48px', 
+                        right: 0, 
+                        width: '360px', 
+                        background: 'var(--bg-card)', 
+                        border: '1px solid rgba(0, 0, 0, 0.08)', 
+                        borderRadius: '16px', 
+                        boxShadow: '0 20px 50px -10px rgba(15, 23, 42, 0.25), 0 10px 20px -5px rgba(15, 23, 42, 0.12)', 
+                        zIndex: 9999, 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                      }}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-app)' }}>
                         <span style={{ fontWeight: 800, fontSize: '0.85rem', fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Notifications</span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                          {notifications.length} au total
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {notifications.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleClearAllNotifications}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.08)',
+                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                                color: 'var(--danger)',
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                transition: 'all 0.15s ease'
+                              }}
+                              title="Effacer toutes les notifications"
+                            >
+                              <MIcon name="delete_sweep" size={15} /> Effacer tout
+                            </button>
+                          )}
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                            {notifications.length} au total
+                          </span>
+                        </div>
                       </div>
 
                       <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -942,7 +1020,10 @@ function App() {
             </div>
           </div>
         ) : (
-          <AdminView activeTab={adminMenu} searchQuery={searchQuery} />
+          <AdminView
+            activeTab={adminMenu}
+            onManageStaff={() => setAdminMenu('staff_management')}
+          />
         )}
 
       </main>
@@ -954,14 +1035,14 @@ function App() {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
+          backgroundColor: 'rgba(15, 23, 42, 0.12)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
           animation: 'fadeIn 0.2s ease-out'
         }}>
-          <div className="card" style={{ width: '360px', padding: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', color: 'var(--text-primary)' }}>
+          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '360px', padding: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)' }}>
             <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.25rem', fontWeight: 700 }}>Confirmer la déconnexion</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Êtes-vous sûr de vouloir vous déconnecter de la plateforme Admin CMS ?</p>
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
@@ -982,8 +1063,7 @@ function App() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.4)',
-          backdropFilter: 'blur(4px)',
+          background: 'rgba(15, 23, 42, 0.12)',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
@@ -991,7 +1071,7 @@ function App() {
           padding: '1.5rem',
           animation: 'fadeIn 0.2s ease-out'
         }}>
-          <div className="card" style={{
+          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{
             width: '100%',
             maxWidth: '380px',
             background: 'var(--bg-card)',
@@ -999,8 +1079,9 @@ function App() {
             display: 'flex',
             flexDirection: 'column',
             gap: '1rem',
-            boxShadow: 'var(--shadow-lg)',
+            boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)',
             borderRadius: 'var(--radius-card)',
+            border: '1px solid rgba(0,0,0,0.08)',
             animation: 'scaleIn 0.2s ease-out',
             color: 'var(--text-primary)',
             transform: 'none'

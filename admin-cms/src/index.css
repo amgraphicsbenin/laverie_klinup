@@ -407,6 +407,8 @@ button, input, select, textarea {
   align-items: center;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 1.25rem;
+  position: relative;
+  z-index: 1050;
 }
 
 .page-title h1 {
@@ -427,53 +429,6 @@ button, input, select, textarea {
   align-items: center;
   gap: 1.25rem;
 }
-
-/* Champ de recherche Premium Interaction */
-.search-pill-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 260px;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.search-pill-wrapper:focus-within {
-  width: 320px;
-}
-
-.search-pill-wrapper input {
-  width: 100%;
-  padding: 0.6rem 2.8rem 0.6rem 2.4rem;
-  border-radius: 14px;
-  background: var(--bg-card);
-  border: 1.5px solid var(--border-color);
-  font-size: 0.82rem;
-  color: var(--text-primary);
-  outline: none;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.search-pill-wrapper input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08), 0 0 0 3px rgba(59, 130, 246, 0.05);
-  background: #ffffff;
-}
-
-.search-pill-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  transition: color 0.3s ease;
-  pointer-events: none;
-}
-
-.search-pill-wrapper input:focus + .search-pill-icon {
-  color: var(--primary);
-}
-
 
 /* Raccourcis Icônes Donezo */
 .topbar-icon-btn {
@@ -557,20 +512,62 @@ button, input, select, textarea {
   box-shadow: var(--shadow-card);
   border-radius: var(--radius-card);
   padding: 1.5rem;
-  transition: transform 0.5s var(--ease-elastic),
-              box-shadow 0.4s var(--ease-spring-soft),
+  cursor: default;
+  transition: box-shadow 0.3s ease,
+              background 0.3s ease,
+              border-color 0.3s ease;
+}
+
+/* Actif uniquement sur les cartes explicitement cliquables / interactives */
+.card-clickable,
+.card.interactive,
+.card[role="button"] {
+  cursor: pointer;
+  transition: transform 0.3s var(--ease-elastic),
+              box-shadow 0.3s var(--ease-spring-soft),
               background 0.3s ease,
               border-color 0.3s ease;
   will-change: transform;
 }
 
-.card:hover {
+.card-clickable:hover,
+.card.interactive:hover,
+.card[role="button"]:hover {
   box-shadow: var(--shadow-lg);
 }
 
-.card:active {
+.card-clickable:active,
+.card.interactive:active,
+.card[role="button"]:active {
   transform: scale(0.985);
   transition: transform 150ms var(--ease-spring-back);
+}
+
+/* Modales & Fenêtres Flottantes Premium (Sans Flou Sombre) */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.12); /* Voile très doux sans flou sombre */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  cursor: default;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-dialog-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10) !important;
+  border-radius: 20px;
+  cursor: default;
+  animation: scaleInCenter 0.25s var(--ease-emphasized-decelerate);
 }
 
 /* KPI Cards Donezo Style */
@@ -1452,7 +1449,3 @@ tr:hover td {
   color: var(--primary);
   font-weight: 600;
 }
-
-
-
-

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Video } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 
 export default function DashboardTab({
@@ -24,7 +24,8 @@ export default function DashboardTab({
   serviceLabels,
   getOrderStatusLabel,
   setActiveDetailsCard,
-  setShowOrderRegistrationModal
+  setShowOrderRegistrationModal,
+  onManageStaff
 }) {
   const renderArrowBtn = () => (
     <span style={{ fontSize: '1rem', color: 'currentColor', opacity: 0.8 }}>→</span>
@@ -204,23 +205,6 @@ export default function DashboardTab({
             })}
           </div>
         </div>
-
-        {/* Rappels & Maintenance */}
-        <div className="card reminder-card">
-          <div>
-            <span className="reminder-title">Rappels & Maintenance</span>
-            <h4 className="reminder-text">Maintenance Tambour - Machine N°2</h4>
-            <p className="reminder-time">Horaire: 14h00 - 16h00 (Aujourd'hui)</p>
-          </div>
-          <button
-            className="btn btn-primary"
-            style={{ display: 'flex', gap: '0.5rem' }}
-            onClick={() => alert('Cycle de maintenance démarré sur la Machine N°2.')}
-          >
-            <Video size={16} />
-            Lancer la Maintenance
-          </button>
-        </div>
       </div>
 
       <div className="grid-2">
@@ -231,7 +215,7 @@ export default function DashboardTab({
             <button
               className="btn btn-outline"
               style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '10px' }}
-              onClick={() => alert('Le personnel est géré via la base de données principale.')}
+              onClick={onManageStaff}
             >
               Gérer
             </button>
