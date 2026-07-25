@@ -41,14 +41,17 @@ export default function useOrderActions({
    * @param {Function} callback - Action finale (mutation BD).
    */
   const triggerFinalStatusAnimation = (orderId, nextStatus, callback) => {
-    setAnimatingOrderIds(prev => ({ ...prev, [orderId]: nextStatus }));
-    setTimeout(async () => {
-      await callback();
-      setAnimatingOrderIds(prev => {
-        const next = { ...prev };
-        delete next[orderId];
-        return next;
-      });
+    setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'enter' } }));
+    setTimeout(() => {
+      setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'exit' } }));
+      setTimeout(async () => {
+        await callback();
+        setAnimatingOrderIds(prev => {
+          const next = { ...prev };
+          delete next[orderId];
+          return next;
+        });
+      }, 300);
     }, 850);
   };
 

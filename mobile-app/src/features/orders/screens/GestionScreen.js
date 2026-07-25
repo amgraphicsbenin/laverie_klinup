@@ -67,14 +67,17 @@ export default function GestionScreen({
   const [animatingOrderIds, setAnimatingOrderIds] = useState({});
 
   const triggerFinalStatusAnimation = (orderId, nextStatus, callback) => {
-    setAnimatingOrderIds(prev => ({ ...prev, [orderId]: nextStatus }));
-    setTimeout(async () => {
-      await callback();
-      setAnimatingOrderIds(prev => {
-        const next = { ...prev };
-        delete next[orderId];
-        return next;
-      });
+    setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'enter' } }));
+    setTimeout(() => {
+      setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'exit' } }));
+      setTimeout(async () => {
+        await callback();
+        setAnimatingOrderIds(prev => {
+          const next = { ...prev };
+          delete next[orderId];
+          return next;
+        });
+      }, 300);
     }, 850);
   };
 
@@ -985,12 +988,15 @@ export default function GestionScreen({
         {/* BOUTONS SUPÉRIEURS D'ACTION */}
         <View style={styles.topActionsRow}>
           <TouchableOpacity 
-            onPress={() => { if (onOpenOrderForm) onOpenOrderForm(); else setShowOrderForm(true); }}
+            onPress={() => {
+              setShowClientsPage(false);
+              setSubTab('orders');
+            }}
             style={styles.topActionBtnBlue}
             activeOpacity={0.8}
           >
-            <Plus size={14} color="#ffffff" style={{ marginRight: 6 }} />
-            <Text style={styles.topActionBtnTextBlue}>Ajouter une commande</Text>
+            <ShoppingBag size={14} color="#ffffff" style={{ marginRight: 6 }} />
+            <Text style={styles.topActionBtnTextBlue}>Commandes</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setShowClientsPage(true)}
@@ -1117,19 +1123,21 @@ export default function GestionScreen({
             filteredOrders.map((item) => {
               const status = getStatusColor(item.statut);
               const client = customers.find(c => c.id === item.customer_id);
-              const isFinished = animatingOrderIds[item.id] !== undefined;
-              const finishedStatus = animatingOrderIds[item.id];
+              const animInfo = animatingOrderIds[item.id];
+              const isFinished = animInfo !== undefined;
+              const finishedStatus = typeof animInfo === 'object' ? animInfo.status : animInfo;
+              const animPhase = typeof animInfo === 'object' ? animInfo.phase : (isFinished ? 'exit' : 'idle');
               return (
                 <MotiView
                   key={item.id}
                   animate={{
-                    opacity: isFinished ? 0 : 1,
-                    scale: isFinished ? 0 : 1,
+                    opacity: animPhase === 'exit' ? 0 : 1,
+                    scale: animPhase === 'exit' ? 0.85 : 1,
+                    translateY: animPhase === 'exit' ? -12 : 0,
                   }}
                   transition={{
                     type: 'timing',
-                    duration: 120,
-                    delay: isFinished ? 100 : 0,
+                    duration: animPhase === 'exit' ? 250 : 150,
                   }}
                   style={{ marginBottom: 16 }}
                 >
@@ -1405,11 +1413,11 @@ export default function GestionScreen({
                           backgroundColor: '#ffffff',
                           justifyContent: 'center',
                           alignItems: 'center',
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.1,
-                          shadowRadius: 10,
-                          elevation: 3,
+                          shadowColor: 'transparent',
+                          shadowOffset: { width: 0, height: 0 },
+                          shadowOpacity: 0,
+                          shadowRadius: 0,
+                          elevation: 0,
                         }}
                       >
                         <Check 
@@ -2476,11 +2484,11 @@ const baseStyles = StyleSheet.create({
   },
   tabButtonActive: {
     backgroundColor: '#ffffff',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   tabButtonText: {
     fontSize: 12,
@@ -2652,11 +2660,11 @@ const baseStyles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.75)',
-    shadowColor: '#002cf7',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.03,
-    shadowRadius: 20,
-    elevation: 3,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   clientInfo: {
     flex: 1,
@@ -2682,11 +2690,11 @@ const baseStyles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   catalogArticle: {
     fontSize: 14,
@@ -2744,10 +2752,11 @@ const baseStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.03,
-    shadowRadius: 16,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   detailTextLarge: {
     fontSize: 16,
@@ -2808,11 +2817,11 @@ const baseStyles = StyleSheet.create({
     paddingVertical: 14,
     marginTop: 24,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   statusChangeBtnSide: {
     flexDirection: 'row',
@@ -2820,11 +2829,11 @@ const baseStyles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 16,
     paddingVertical: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   statusChangeBtnText: {
     color: '#ffffff',
@@ -2854,10 +2863,10 @@ const baseStyles = StyleSheet.create({
     paddingVertical: 10,
     marginRight: 8,
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   catalogBadgeText: {
     fontSize: 12,
@@ -2883,10 +2892,10 @@ const baseStyles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.03,
-    shadowRadius: 16,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   selectedTitle: {
     fontSize: 12,
@@ -2955,10 +2964,10 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     marginBottom: 30,
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   submitOrderBtnText: {
     color: '#ffffff',
@@ -3048,11 +3057,11 @@ const baseStyles = StyleSheet.create({
   },
   prefOptionActive: {
     backgroundColor: '#ffffff',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   prefText: {
     fontSize: 12,
@@ -3069,10 +3078,10 @@ const baseStyles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 10,
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   compactSubmitBtnText: {
     color: '#ffffff',
@@ -3154,10 +3163,10 @@ const baseStyles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   orderHistoryNo: {
     fontSize: 13,
@@ -3408,11 +3417,11 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#002cf7',
     borderRadius: 14,
     height: 40,
-    shadowColor: '#002cf7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   topActionBtnTextBlue: {
     color: '#ffffff',
@@ -3611,11 +3620,11 @@ const baseStyles = StyleSheet.create({
     width: '95%',
     maxWidth: 370,
     maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    elevation: 10,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     overflow: 'hidden',
@@ -3631,11 +3640,11 @@ const baseStyles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 14,
     marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   cardNextStatusBlockBtnText: {
     fontSize: 13,
@@ -3941,11 +3950,11 @@ const baseStyles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.75)',
-    shadowColor: '#002cf7',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.02,
-    shadowRadius: 12,
-    elevation: 2,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   clothingHeader: {
     flexDirection: 'row',
@@ -4068,11 +4077,11 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#002cf7',
     borderRadius: 12,
     paddingVertical: 12,
-    shadowColor: '#002cf7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   invoicePrintBtnText: {
     color: '#ffffff',
@@ -4085,11 +4094,11 @@ const baseStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     marginBottom: 16,
     zIndex: 10,
   },

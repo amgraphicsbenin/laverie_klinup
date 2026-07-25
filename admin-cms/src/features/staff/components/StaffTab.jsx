@@ -78,8 +78,11 @@ const ROLE_CONFIG = {
 };
 
 const PERMISSIONS_CONFIG = [
+  // --- PLATAFORME ADMIN CMS ---
   {
     key: 'can_view_dashboard',
+    category: 'admin',
+    categoryLabel: '🖥️ Habilitations Admin CMS',
     title: 'Tableau de Bord & KPIs',
     description: 'Visionner les métriques de vente, chiffre d\'affaires et statistiques',
     icon: LayoutDashboard,
@@ -87,13 +90,17 @@ const PERMISSIONS_CONFIG = [
   },
   {
     key: 'can_manage_orders',
-    title: 'Gestion Caisse & Commandes',
+    category: 'admin',
+    categoryLabel: '🖥️ Habilitations Admin CMS',
+    title: 'Gestion Caisse & Commandes CMS',
     description: 'Enregistrer, modifier, valider et encaisser les commandes de pressing',
     icon: ShoppingBag,
     color: '#16a34a'
   },
   {
     key: 'can_manage_crm',
+    category: 'admin',
+    categoryLabel: '🖥️ Habilitations Admin CMS',
     title: 'Répertoire & CRM Clients',
     description: 'Accéder aux fiches clients, solder les dettes et gérer les abonnements',
     icon: Users,
@@ -101,14 +108,27 @@ const PERMISSIONS_CONFIG = [
   },
   {
     key: 'can_edit_catalog',
+    category: 'admin',
+    categoryLabel: '🖥️ Habilitations Admin CMS',
     title: 'Catalogue & Tarifications',
     description: 'Ajuster les prix des prestations et créer des forfaits d\'abonnement',
     icon: Tag,
     color: '#d97706'
   },
   {
+    key: 'can_manage_stores',
+    category: 'admin',
+    categoryLabel: '🖥️ Habilitations Admin CMS',
+    title: 'Points de Laverie (Multi-Boutiques)',
+    description: 'Créer, gérer et basculer entre les différents points de laverie',
+    icon: Shield,
+    color: '#6366f1'
+  },
+  {
     key: 'can_view_logs',
-    title: 'Journal d\'Audit & Sécurité',
+    category: 'admin',
+    categoryLabel: '🖥️ Habilitations Admin CMS',
+    title: 'Journal d\'Audit & Traçabilité',
     description: 'Traçabilité complète des actions effectuées sur le système (Super Admin)',
     icon: ShieldAlert,
     color: '#dc2626',
@@ -116,11 +136,51 @@ const PERMISSIONS_CONFIG = [
   },
   {
     key: 'can_manage_staff',
+    category: 'admin',
+    categoryLabel: '🖥️ Habilitations Admin CMS',
     title: 'Gestion du Personnel & Droits',
     description: 'Créer des profils, configurer les accès et réinitialiser les codes PIN',
     icon: UserCheck,
     color: '#8b5cf6',
     requiresSuperAdmin: true
+  },
+
+  // --- APPLICATION MOBILE TERRAIN ---
+  {
+    key: 'can_access_mobile',
+    category: 'mobile',
+    categoryLabel: '📱 Habilitations Application Mobile Terrain',
+    title: 'Connexion & Accès App Mobile',
+    description: 'Autoriser l\'authentification sur l\'application mobile terrain',
+    icon: Key,
+    color: '#10b981'
+  },
+  {
+    key: 'can_create_orders_mobile',
+    category: 'mobile',
+    categoryLabel: '📱 Habilitations Application Mobile Terrain',
+    title: 'Enregistrement Caisse Mobile',
+    description: 'Créer des commandes et imprimer des tickets sur l\'app mobile',
+    icon: ShoppingBag,
+    color: '#002cf7'
+  },
+  {
+    key: 'can_manage_delivery_mobile',
+    category: 'mobile',
+    categoryLabel: '📱 Habilitations Application Mobile Terrain',
+    title: 'Tournées Livreur & Collecte',
+    description: 'Accès au module de livraison, ramassage et encaissement à domicile',
+    icon: User,
+    color: '#f59e0b'
+  },
+  {
+    key: 'can_manage_workshop_mobile',
+    category: 'mobile',
+    categoryLabel: '📱 Habilitations Application Mobile Terrain',
+    title: 'Traitement Atelier (Lavage/Repassage)',
+    description: 'Mise à jour des étapes de traitement textile en atelier',
+    icon: Sliders,
+    color: '#8b5cf6'
   }
 ];
 
@@ -145,6 +205,8 @@ export default function StaffTab({
   handleRoleChangeInForm,
   editStaffStatut,
   setEditStaffStatut,
+  editStaffStoreId,
+  setEditStaffStoreId,
   editStaffPermissions,
   setEditStaffPermissions
 }) {
@@ -443,6 +505,18 @@ export default function StaffTab({
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {s.email || `${prenom.toLowerCase()}.${nom.toLowerCase()}@klinup.com`}
                             </span>
+
+                            {/* Store badge */}
+                            {(() => {
+                              const stores = db.getStores();
+                              const sStore = stores.find(st => st.id === s.store_id);
+                              const storeLabel = sStore ? sStore.code : (s.role === 'super_admin' ? 'Global' : 'Central');
+                              return (
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(0, 44, 247, 0.08)', color: 'var(--primary)', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                                  📍 {storeLabel}
+                                </span>
+                              );
+                            })()}
                             
                             {isSuspended ? (
                               <span style={{ fontSize: '0.65rem', color: 'var(--danger)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
@@ -679,13 +753,13 @@ export default function StaffTab({
                 </div>
               </div>
 
-              {/* SECTION 2 : RÔLE SYSTÈME & STATUT D'ACCÈS */}
+              {/* SECTION 2 : RÔLE SYSTÈME & STATUT D'ACCÈS & BOUTIQUE */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <h5 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  2. Rôle & Statut de Connexion
+                  2. Rôle, Statut & Point de Laverie
                 </h5>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.85rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.85rem' }}>
                   <div className="form-group">
                     <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Rôle Fonctionnel</label>
                     <CustomSelect
@@ -698,6 +772,22 @@ export default function StaffTab({
                       <option value="agent_accueil">Agent d'accueil (Mobile App)</option>
                       <option value="livreur">Livreur (Mobile App)</option>
                       <option value="agent_lavage_repassage">Agent Atelier / Lavage (Mobile App)</option>
+                    </CustomSelect>
+                  </div>
+
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Point de Laverie d'affectation</label>
+                    <CustomSelect
+                      className="input-control"
+                      value={editStaffStoreId || 'store_central'}
+                      onChange={(e) => setEditStaffStoreId(e.target.value)}
+                    >
+                      <option value="all">Tous les points (Accès Global)</option>
+                      {db.getStores().map(st => (
+                        <option key={st.id} value={st.id}>
+                          {st.nom} ({st.code})
+                        </option>
+                      ))}
                     </CustomSelect>
                   </div>
 
@@ -784,60 +874,112 @@ export default function StaffTab({
               </div>
 
               {/* SECTION 4 : MATRICE GRANULAIRE DE PERMISSIONS */}
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h5 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Sliders size={15} color="var(--primary)" />
-                    4. Matrice de Permissions Granulaires
+                    4. Matrice de Habilitations Bi-Plateforme
                   </h5>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    Cocher pour accorder le droit d'accès
+                    Cocher/décocher pour accorder ou révoquer les accès
                   </span>
                 </div>
 
-                {/* Grille de cartes de permissions */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  {PERMISSIONS_CONFIG.map(perm => {
-                    const isChecked = !!editStaffPermissions[perm.key];
-                    const isDisabled = perm.requiresSuperAdmin && editStaffRole !== 'super_admin';
-                    const IconComp = perm.icon;
+                {/* Habilitations Admin CMS */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--primary)', background: 'rgba(0, 44, 247, 0.06)', padding: '0.35rem 0.75rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    🖥️ Habilitations Admin CMS (Web)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    {PERMISSIONS_CONFIG.filter(p => p.category === 'admin').map(perm => {
+                      const isChecked = !!editStaffPermissions[perm.key];
+                      const isDisabled = perm.requiresSuperAdmin && editStaffRole !== 'super_admin';
+                      const IconComp = perm.icon;
 
-                    return (
-                      <label
-                        key={perm.key}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'start',
-                          gap: '0.75rem',
-                          padding: '0.85rem',
-                          borderRadius: '12px',
-                          border: isChecked ? `1px solid ${perm.color}` : '1px solid var(--border-color)',
-                          background: isChecked ? `${perm.color}0d` : 'var(--bg-app)',
-                          cursor: isDisabled ? 'not-allowed' : 'pointer',
-                          opacity: isDisabled ? 0.55 : 1,
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          disabled={isDisabled}
-                          checked={isChecked}
-                          onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, [perm.key]: e.target.checked }))}
-                          style={{ marginTop: '0.2rem', accentColor: perm.color, width: '16px', height: '16px', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
-                        />
+                      return (
+                        <label
+                          key={perm.key}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'start',
+                            gap: '0.75rem',
+                            padding: '0.85rem',
+                            borderRadius: '12px',
+                            border: isChecked ? `1px solid ${perm.color}` : '1px solid var(--border-color)',
+                            background: isChecked ? `${perm.color}0d` : 'var(--bg-app)',
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            opacity: isDisabled ? 0.55 : 1,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={isDisabled}
+                            checked={isChecked}
+                            onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, [perm.key]: e.target.checked }))}
+                            style={{ marginTop: '0.2rem', accentColor: perm.color, width: '16px', height: '16px', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+                          />
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <IconComp size={15} color={perm.color} />
-                            {perm.title}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <IconComp size={15} color={perm.color} />
+                              {perm.title}
+                            </div>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
+                              {perm.description}
+                            </p>
                           </div>
-                          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
-                            {perm.description}
-                          </p>
-                        </div>
-                      </label>
-                    );
-                  })}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Habilitations App Mobile */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.08)', padding: '0.35rem 0.75rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    📱 Habilitations Application Mobile Terrain
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    {PERMISSIONS_CONFIG.filter(p => p.category === 'mobile').map(perm => {
+                      const isChecked = !!editStaffPermissions[perm.key];
+                      const IconComp = perm.icon;
+
+                      return (
+                        <label
+                          key={perm.key}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'start',
+                            gap: '0.75rem',
+                            padding: '0.85rem',
+                            borderRadius: '12px',
+                            border: isChecked ? `1px solid ${perm.color}` : '1px solid var(--border-color)',
+                            background: isChecked ? `${perm.color}0d` : 'var(--bg-app)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => setEditStaffPermissions(prev => ({ ...prev, [perm.key]: e.target.checked }))}
+                            style={{ marginTop: '0.2rem', accentColor: perm.color, width: '16px', height: '16px', cursor: 'pointer' }}
+                          />
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <IconComp size={15} color={perm.color} />
+                              {perm.title}
+                            </div>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
+                              {perm.description}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

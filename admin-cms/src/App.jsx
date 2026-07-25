@@ -710,6 +710,13 @@ function App() {
                 <MIcon name="price_change" size={20} />
                 Catalogue Tarifs
               </li>
+              <li 
+                className={`menu-item ${adminMenu === 'laundry_points' ? 'active' : ''}`}
+                onClick={() => setAdminMenu('laundry_points')}
+              >
+                <MIcon name="store" size={20} />
+                Points de Laverie
+              </li>
               {isSuperAdmin && (
                 <>
                   <li 
@@ -765,6 +772,7 @@ function App() {
               {hasAdminAccess && adminMenu === 'orders_management' && "Gestion des Commandes"}
               {hasAdminAccess && adminMenu === 'crm_management' && "Clients CRM"}
               {hasAdminAccess && adminMenu === 'catalog' && "Catalogue Tarifs"}
+              {hasAdminAccess && adminMenu === 'laundry_points' && "Points de Laverie"}
               {hasAdminAccess && adminMenu === 'staff_management' && "Gestion des Accès"}
               {hasAdminAccess && adminMenu === 'logs' && "Journal d'Audit"}
               {hasAdminAccess && adminMenu === 'settings' && "Paramètres Système"}
@@ -775,6 +783,7 @@ function App() {
               {hasAdminAccess && adminMenu === 'orders_management' && "Enregistrement, suivi d'atelier et facturation des commandes."}
               {hasAdminAccess && adminMenu === 'crm_management' && "Fiches clients, encours financiers et fidélité."}
               {hasAdminAccess && adminMenu === 'catalog' && "Gestion de la grille de prix de traitement de laverie B2B."}
+              {hasAdminAccess && adminMenu === 'laundry_points' && "Gestion des différents points de vente, boutiques et ateliers de laverie."}
               {hasAdminAccess && adminMenu === 'staff_management' && "Habilitations du personnel, gestion des rôles et autorisations d'accès."}
               {hasAdminAccess && adminMenu === 'logs' && "Traçabilité des actions et sécurité des transactions."}
               {hasAdminAccess && adminMenu === 'settings' && "Configuration globale des délais et majorations d'urgence de la laverie."}
@@ -783,6 +792,30 @@ function App() {
 
           {hasAdminAccess && (
             <div className="topbar-actions">
+              {/* Sélecteur de Point de Laverie (Store Switcher) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.35rem 0.65rem', borderRadius: '10px' }}>
+                <MIcon name="storefront" size={18} style={{ color: 'var(--primary)' }} />
+                <select
+                  value={db.getSelectedStoreId()}
+                  onChange={(e) => db.setSelectedStoreId(e.target.value)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-primary)',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="all">Tous les points (Vue Globale)</option>
+                  {db.getStores().map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.nom} ({s.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
               {/* Raccourcis Icônes */}
               <div style={{ position: 'relative' }}>
                 <div 

@@ -66,21 +66,39 @@ const saveData = async (key, data) => {
  * Charge l'ensemble des données locales persistées en mémoire vive.
  */
 export async function loadFromLocalStorage() {
-  memoryDb.staff = await loadData(STORAGE_KEYS.STAFF, DEFAULT_STAFF);
+  const rawStaff = await loadData(STORAGE_KEYS.STAFF, DEFAULT_STAFF);
+  // Keep only super admin or custom staff
+  memoryDb.staff = (rawStaff || []).filter(s => s.email === 'andre.koutomi98@gmail.com' || (s.id && !['u1','u2','u3','u5','u6'].includes(s.id)));
+  if (memoryDb.staff.length === 0) memoryDb.staff = DEFAULT_STAFF;
+
   memoryDb.customers = await loadData(STORAGE_KEYS.CUSTOMERS, DEFAULT_CUSTOMERS);
+  
   const loadedOrders = await loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
-  memoryDb.orders = (loadedOrders || []).map(hydrateOrder);
+  // Filter out stale demo orders (o1 through o10) from old sessions
+  const demoOrderIds = ['o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'o8', 'o9', 'o10'];
+  const cleanedOrders = (loadedOrders || []).filter(o => !demoOrderIds.includes(o.id));
+  memoryDb.orders = cleanedOrders.map(hydrateOrder);
+  
+  // If demo orders were purged, save the clean list immediately to AsyncStorage
+  if (cleanedOrders.length !== (loadedOrders || []).length) {
+    await saveData(STORAGE_KEYS.ORDERS, cleanedOrders);
+  }
+
   memoryDb.logs = await loadData(STORAGE_KEYS.LOGS, DEFAULT_LOGS);
   
-  // Purge any stale local storage cache key for catalog to enforce direct DB querying
   try {
     await AsyncStorage.removeItem(STORAGE_KEYS.CATALOG);
   } catch (e) {}
 
-  // Direct in-memory catalog initialization (no local storage caching)
   memoryDb.catalog = DEFAULT_CATALOG;
   
-  memoryDb.current_user = await loadData(STORAGE_KEYS.CURRENT_USER, null);
+  const currentUser = await loadData(STORAGE_KEYS.CURRENT_USER, null);
+  if (!currentUser || (currentUser.email !== 'andre.koutomi98@gmail.com' && !memoryDb.staff.some(s => s.id === currentUser.id))) {
+    memoryDb.current_user = DEFAULT_STAFF[0];
+  } else {
+    memoryDb.current_user = currentUser;
+  }
+
   memoryDb.pin_reset_requests = await loadData('klin_up_pin_reset_requests', []);
   memoryDb.sync_queue = await loadData('klin_up_sync_queue', []);
   memoryDb.dark_mode = await loadData('klin_up_dark_mode', false);
@@ -401,18 +419,18 @@ export function startAutoReconnect() {
   }, 30000);
 }
 
-// Sync périodique toutes les 60s
+// Sync périodique continue haute fréquence (toutes les 3s)
 let syncInterval = null;
 export async function startPeriodicSync() {
   if (syncInterval) return;
   syncInterval = setInterval(async () => {
-    if (!supabase || !isUsingRemote) return;
+    if (!supabase) return;
     try {
       const [custRes, orderRes, logsRes, reqsRes] = await Promise.allSettled([
-        withTimeout(supabase.from('customers').select('*'), 10000, 'sync-customers'),
-        withTimeout(supabase.from('orders').select('*'), 10000, 'sync-orders'),
-        withTimeout(supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }), 10000, 'sync-logs'),
-        withTimeout(supabase.from('pin_reset_requests').select('*'), 10000, 'sync-reqs'),
+        withTimeout(supabase.from('customers').select('*'), 5000, 'sync-customers'),
+        withTimeout(supabase.from('orders').select('*'), 5000, 'sync-orders'),
+        withTimeout(supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }), 5000, 'sync-logs'),
+        withTimeout(supabase.from('pin_reset_requests').select('*'), 5000, 'sync-reqs'),
       ]);
       let changed = false;
       if (custRes.status === 'fulfilled' && !custRes.value?.error) { memoryDb.customers = custRes.value.data || []; changed = true; }
@@ -437,7 +455,7 @@ export async function startPeriodicSync() {
     } catch (e) {
       // Sync silencieuse
     }
-  }, 60000);
+  }, 3000);
 }
 
 // Abonnements en temps réel

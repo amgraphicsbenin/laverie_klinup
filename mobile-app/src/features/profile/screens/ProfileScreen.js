@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler, Switch } from 'react-native';
-import { Key, LogOut, X, Printer, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight } from 'lucide-react-native';
+import { Key, LogOut, X, Printer, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
@@ -51,7 +51,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
       setShowPinModal(false);
       setCurrentPin('');
       setNewPin('');
-      return true; // prevent default behavior
+      return true;
     };
 
     const backHandler = BackHandler.addEventListener(
@@ -152,52 +152,91 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
     );
   };
 
+  const userInitials = currentUser 
+    ? `${(currentUser.prenom || 'K')[0].toUpperCase()}${(currentUser.nom || 'U')[0].toUpperCase()}`
+    : 'KU';
+
   return (
-    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000000' : '#ffffff' }}>
+    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000000' : '#f8fafc' }}>
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profil</Text>
+        <Text style={styles.headerTitle}>Mon Profil</Text>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: scrollPaddingBottom }]} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={[styles.container, { paddingBottom: scrollPaddingBottom }]} 
+        showsVerticalScrollIndicator={false}
+      >
         
-        {/* Section 1: Profil Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {currentUser ? `${currentUser.prenom[0].toUpperCase()}${currentUser.nom[0].toUpperCase()}` : 'KU'}
+        {/* HERO PROFILE CARD */}
+        <MotiView 
+          from={{ opacity: 0, translateY: 15 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'timing', duration: 200 }}
+          style={styles.heroProfileCard}
+        >
+          {/* Avatar with Status Badge */}
+          <View style={styles.avatarWrapper}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{userInitials}</Text>
+            </View>
+            <View style={styles.onlineBadge} />
+          </View>
+
+          {/* Name & Role Badge */}
+          <Text style={styles.profileName}>
+            {currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Utilisateur'}
+          </Text>
+          
+          <View style={styles.roleBadge}>
+            <Shield size={12} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 5 }} />
+            <Text style={styles.roleBadgeText}>
+              {currentUser ? getRoleLabel(currentUser.role) : 'Invité'}
             </Text>
           </View>
-          <Text style={styles.profileName}>{currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Utilisateur'}</Text>
-          <Text style={styles.profileRole}>{currentUser ? getRoleLabel(currentUser.role) : 'Invite'}</Text>
 
+          {/* Email Info Bar */}
           <View style={styles.emailContainer}>
-            <Text style={styles.emailLabel}>Adresse email :</Text>
-            <Text style={styles.emailText}>{currentUser ? currentUser.email : 'non configuré'}</Text>
+            <Mail size={14} color={isDarkMode ? '#a1a1aa' : '#64748b'} style={{ marginRight: 8 }} />
+            <Text style={styles.emailText}>
+              {currentUser?.email || 'non configuré'}
+            </Text>
           </View>
-        </View>
+        </MotiView>
 
-        {/* Section 2: Shift Activity Stats */}
+        {/* SHIFT ACTIVITY STATS */}
         <Text style={styles.sectionTitle}>Activité de la Session (Aujourd'hui)</Text>
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <TrendingUp size={16} color={isDarkMode ? "#38bdf8" : "#002cf7"} />
-            <Text style={styles.statValue}>{todayOrdersCount}</Text>
-            <Text style={styles.statLabel}>Commandes Créées</Text>
+            <View style={[styles.statIconBadge, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)' }]}>
+              <TrendingUp size={18} color={isDarkMode ? "#38bdf8" : "#002cf7"} />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={styles.statValue}>{todayOrdersCount}</Text>
+              <Text style={styles.statLabel}>Commandes créées</Text>
+            </View>
           </View>
+          
           <View style={styles.statCard}>
-            <Sparkles size={16} color="#16a34a" />
-            <Text style={[styles.statValue, { color: '#16a34a' }]}>{formatPrice(todayRevenueSum)}</Text>
-            <Text style={styles.statLabel}>Volume Encaissé</Text>
+            <View style={[styles.statIconBadge, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
+              <Sparkles size={18} color="#16a34a" />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={[styles.statValue, { color: '#16a34a' }]}>{formatPrice(todayRevenueSum)}</Text>
+              <Text style={styles.statLabel}>Volume encaissé</Text>
+            </View>
           </View>
         </View>
 
-        {/* Section 3: App Preferences */}
+        {/* APP PREFERENCES GROUP */}
         <Text style={styles.sectionTitle}>Préférences Caisse</Text>
-        <View style={styles.infoCard}>
+        <View style={styles.groupedCard}>
+          {/* Dark Mode */}
           <View style={styles.settingsRow}>
             <View style={styles.settingsLeft}>
-              <Moon size={16} color={isDarkMode ? "#94a3b8" : "#71717a"} style={{ marginRight: 6 }} />
+              <View style={[styles.settingIconBox, { backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.15)' : '#f1f5f9' }]}>
+                <Moon size={16} color={isDarkMode ? "#38bdf8" : "#475569"} />
+              </View>
               <Text style={styles.settingsLabel}>Mode Sombre</Text>
             </View>
             <Switch
@@ -210,9 +249,12 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
           
           <View style={styles.divider} />
 
+          {/* Notifications */}
           <View style={styles.settingsRow}>
             <View style={styles.settingsLeft}>
-              <Bell size={16} color={isDarkMode ? "#94a3b8" : "#71717a"} style={{ marginRight: 6 }} />
+              <View style={[styles.settingIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+                <Bell size={16} color="#f59e0b" />
+              </View>
               <Text style={styles.settingsLabel}>Notifications en temps réel</Text>
             </View>
             <Switch
@@ -225,9 +267,12 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 
           <View style={styles.divider} />
 
+          {/* Auto Print */}
           <View style={styles.settingsRow}>
             <View style={styles.settingsLeft}>
-              <Printer size={16} color={isDarkMode ? "#94a3b8" : "#71717a"} style={{ marginRight: 6 }} />
+              <View style={[styles.settingIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                <Printer size={16} color="#10b981" />
+              </View>
               <Text style={styles.settingsLabel}>Impression ticket automatique</Text>
             </View>
             <Switch
@@ -240,40 +285,62 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 
           <View style={styles.divider} />
 
+          {/* Language Selector */}
           <TouchableOpacity style={styles.settingsRow} onPress={handleLanguageToggle} activeOpacity={0.7}>
             <View style={styles.settingsLeft}>
-              <Globe size={16} color={isDarkMode ? "#94a3b8" : "#71717a"} style={{ marginRight: 6 }} />
+              <View style={[styles.settingIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
+                <Globe size={16} color="#6366f1" />
+              </View>
               <Text style={styles.settingsLabel}>Langue de l'interface</Text>
             </View>
             <View style={styles.settingsRight}>
               <Text style={styles.settingsValueText}>{appLanguage}</Text>
-              <ChevronRight size={14} color={isDarkMode ? "#94a3b8" : "#64748b"} />
+              <ChevronRight size={16} color={isDarkMode ? "#94a3b8" : "#94a3b8"} />
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Section 4: Security & Account Actions */}
-        <Text style={styles.sectionTitle}>Paramètres de sécurité</Text>
-        <TouchableOpacity 
-          onPress={() => setShowPinModal(true)}
-          style={styles.actionButton}
-        >
-          <Key size={16} color={isDarkMode ? "#38bdf8" : "#002cf7"} style={styles.actionIcon} />
-          <Text style={styles.actionText}>Modifier mon code PIN</Text>
-        </TouchableOpacity>
+        {/* SECURITY & ACCOUNT ACTIONS */}
+        <Text style={styles.sectionTitle}>Sécurité & Compte</Text>
+        <View style={styles.groupedCard}>
+          {/* Modify PIN */}
+          <TouchableOpacity 
+            onPress={() => setShowPinModal(true)}
+            style={styles.settingsRow}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingIconBox, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)' }]}>
+                <Key size={16} color={isDarkMode ? "#38bdf8" : "#002cf7"} />
+              </View>
+              <Text style={styles.settingsLabel}>Modifier mon code PIN</Text>
+            </View>
+            <ChevronRight size={16} color={isDarkMode ? "#94a3b8" : "#94a3b8"} />
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          onPress={handleLogout}
-          style={[styles.actionButton, { marginTop: 12, borderColor: '#fecaca' }]}
-        >
-          <LogOut size={16} color="#ef4444" style={styles.actionIcon} />
-          <Text style={[styles.actionText, { color: '#ef4444' }]}>Se déconnecter</Text>
-        </TouchableOpacity>
+          <View style={styles.divider} />
 
-        {/* Footer info & support */}
+          {/* Logout */}
+          <TouchableOpacity 
+            onPress={handleLogout}
+            style={styles.settingsRow}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+                <LogOut size={16} color="#ef4444" />
+              </View>
+              <Text style={[styles.settingsLabel, { color: '#ef4444', fontWeight: '600' }]}>Se déconnecter</Text>
+            </View>
+            <ChevronRight size={16} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
+
+        {/* FOOTER INFO & SUPPORT */}
         <View style={styles.supportFooter}>
-          <Text style={styles.versionText}>KLIN UP Mobile v1.5.0 — Boutique</Text>
+          <Text style={styles.versionText}>KLIN UP Mobile v1.5.0 — Caisse & Gestion</Text>
           <TouchableOpacity onPress={handleSupportPress} style={styles.supportBtn} activeOpacity={0.8}>
+            <HelpCircle size={13} color={isDarkMode ? "#a1a1aa" : "#64748b"} style={{ marginRight: 6 }} />
             <Text style={styles.supportBtnText}>Support Technique Administrateur</Text>
           </TouchableOpacity>
         </View>
@@ -284,7 +351,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
           animate={{
             opacity: showPinModal ? 1 : 0
           }}
-          transition={{ type: 'timing', duration: 120 }}
+          transition={{ type: 'timing', duration: 150 }}
           style={[
             StyleSheet.absoluteFill,
             { 
@@ -299,9 +366,14 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
             </TouchableOpacity>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Modifier mon PIN</Text>
-                <TouchableOpacity onPress={() => setShowPinModal(false)}>
-                  <X size={20} color={isDarkMode ? "#94a3b8" : "#71717a"} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[styles.settingIconBox, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)' }]}>
+                    <Key size={16} color={isDarkMode ? "#38bdf8" : "#002cf7"} />
+                  </View>
+                  <Text style={styles.modalTitle}>Modifier mon code PIN</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowPinModal(false)} style={{ padding: 4 }}>
+                  <X size={18} color={isDarkMode ? "#94a3b8" : "#71717a"} />
                 </TouchableOpacity>
               </View>
 
@@ -313,6 +385,8 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
                   secureTextEntry
                   value={currentPin}
                   onChangeText={setCurrentPin}
+                  placeholder="******"
+                  placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
                   style={styles.modalInput}
                 />
 
@@ -323,12 +397,15 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
                   secureTextEntry
                   value={newPin}
                   onChangeText={setNewPin}
+                  placeholder="******"
+                  placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
                   style={styles.modalInput}
                 />
 
                 <TouchableOpacity
                   onPress={handleChangePin}
                   style={styles.modalSubmitBtn}
+                  activeOpacity={0.8}
                 >
                   <Text style={styles.modalSubmitBtnText}>Confirmer le changement</Text>
                 </TouchableOpacity>
@@ -345,207 +422,216 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 function getStyles(isDarkMode) {
   return StyleSheet.create({
     container: {
-      padding: 20,
-      backgroundColor: isDarkMode ? '#000000' : '#ffffff',
+      paddingHorizontal: 18,
+      paddingTop: 12,
+      backgroundColor: isDarkMode ? '#000000' : '#f8fafc',
       paddingBottom: 110,
     },
     header: {
-      paddingHorizontal: 24,
-      paddingTop: 24,
-      paddingBottom: 8,
-      backgroundColor: isDarkMode ? '#000000' : '#ffffff',
+      paddingHorizontal: 20,
+      paddingTop: Platform.OS === 'android' ? 24 : 16,
+      paddingBottom: 12,
+      backgroundColor: isDarkMode ? '#000000' : '#f8fafc',
     },
     headerTitle: {
-      fontSize: 28,
-      fontWeight: '700',
+      fontSize: 26,
+      fontWeight: '800',
       color: isDarkMode ? '#ffffff' : '#09090b',
       letterSpacing: -0.5,
     },
-    profileCard: {
+    heroProfileCard: {
       backgroundColor: isDarkMode ? '#121212' : '#ffffff',
       borderRadius: 24,
       padding: 24,
       alignItems: 'center',
-      borderWidth: 1.5,
-      borderColor: isDarkMode ? '#27272a' : '#ffffff',
-      shadowColor: 'transparent',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0,
-      shadowRadius: 0,
-      elevation: 0,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       marginBottom: 20,
     },
+    avatarWrapper: {
+      position: 'relative',
+      marginBottom: 14,
+    },
     avatar: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: 'rgba(0, 44, 247, 0.1)',
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0, 44, 247, 0.08)',
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: 12,
+      borderWidth: 2,
+      borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.3)' : 'rgba(0, 44, 247, 0.15)',
     },
     avatarText: {
-      fontSize: 32,
-      fontWeight: '700',
-      color: '#002cf7',
+      fontSize: 28,
+      fontWeight: '800',
+      color: isDarkMode ? '#38bdf8' : '#002cf7',
+    },
+    onlineBadge: {
+      position: 'absolute',
+      bottom: 2,
+      right: 2,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: '#22c55e',
+      borderWidth: 2,
+      borderColor: isDarkMode ? '#121212' : '#ffffff',
     },
     profileName: {
-      fontSize: 18,
-      fontWeight: '700',
+      fontSize: 20,
+      fontWeight: '800',
       color: isDarkMode ? '#ffffff' : '#09090b',
-      marginBottom: 4,
+      marginBottom: 6,
+      textAlign: 'center',
     },
-    profileRole: {
-      fontSize: 13,
-      color: isDarkMode ? '#a1a1aa' : '#64748b',
-      fontWeight: '500',
+    roleBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.06)',
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.12)',
+      marginBottom: 14,
+    },
+    roleBadgeText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDarkMode ? '#38bdf8' : '#002cf7',
     },
     emailContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
       width: '100%',
-      marginTop: 16,
       paddingTop: 14,
       borderTopWidth: 1,
       borderTopColor: isDarkMode ? '#27272a' : '#f1f5f9',
-      alignItems: 'flex-start',
-    },
-    emailLabel: {
-      fontSize: 11,
-      color: isDarkMode ? '#a1a1aa' : '#64748b',
-      fontWeight: '600',
     },
     emailText: {
-      fontSize: 13,
-      color: isDarkMode ? '#ffffff' : '#09090b',
-      marginTop: 3,
+      fontSize: 12.5,
+      color: isDarkMode ? '#d4d4d8' : '#475569',
       fontWeight: '500',
     },
     sectionTitle: {
-      fontSize: 12,
-      fontWeight: '700',
+      fontSize: 11,
+      fontWeight: '800',
       color: isDarkMode ? '#a1a1aa' : '#64748b',
-      marginBottom: 8,
-      marginTop: 14,
+      marginBottom: 10,
+      marginTop: 6,
       marginLeft: 4,
       textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    infoCard: {
-      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-      borderRadius: 20,
-      padding: 16,
-      borderWidth: 1.5,
-      borderColor: isDarkMode ? '#27272a' : '#ffffff',
-      shadowColor: 'transparent',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0,
-      shadowRadius: 0,
-      elevation: 0,
-      marginBottom: 20,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: isDarkMode ? '#27272a' : '#f1f5f9',
-      marginVertical: 12,
+      letterSpacing: 0.8,
     },
     statsRow: {
       flexDirection: 'row',
       gap: 12,
-      marginBottom: 20,
+      marginBottom: 22,
     },
     statCard: {
       flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
       backgroundColor: isDarkMode ? '#121212' : '#ffffff',
       borderRadius: 20,
-      padding: 16,
-      borderWidth: 1.5,
-      borderColor: isDarkMode ? '#27272a' : '#ffffff',
-      shadowColor: 'transparent',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0,
-      shadowRadius: 0,
-      elevation: 0,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      gap: 12,
+    },
+    statIconBadge: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      justifyContent: 'center',
       alignItems: 'center',
+    },
+    statInfo: {
+      flex: 1,
     },
     statValue: {
       fontSize: 16,
-      fontWeight: '700',
+      fontWeight: '800',
       color: isDarkMode ? '#38bdf8' : '#002cf7',
-      marginTop: 8,
     },
     statLabel: {
-      fontSize: 10,
+      fontSize: 10.5,
       color: isDarkMode ? '#a1a1aa' : '#64748b',
       fontWeight: '600',
-      marginTop: 3,
+      marginTop: 2,
+    },
+    groupedCard: {
+      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+      borderRadius: 22,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      marginBottom: 22,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: isDarkMode ? '#27272a' : '#f1f5f9',
+      marginVertical: 4,
     },
     settingsRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: 4,
+      paddingVertical: 10,
     },
     settingsLeft: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 12,
+    },
+    settingIconBox: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     settingsLabel: {
-      fontSize: 12,
-      color: isDarkMode ? '#d4d4d8' : '#475569',
-      fontWeight: '500',
+      fontSize: 13,
+      color: isDarkMode ? '#f4f4f5' : '#18181b',
+      fontWeight: '600',
     },
     settingsRight: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 4,
     },
     settingsValueText: {
-      fontSize: 12,
+      fontSize: 12.5,
       fontWeight: '600',
-      color: isDarkMode ? '#ffffff' : '#09090b',
-      marginRight: 4,
-    },
-    actionButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-      borderRadius: 16,
-      padding: 16,
-      height: 52,
-      borderWidth: 1.5,
-      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
-      shadowColor: 'transparent',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0,
-      shadowRadius: 0,
-    },
-    actionIcon: {
-      marginRight: 10,
-    },
-    actionText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: isDarkMode ? '#ffffff' : '#09090b',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
     },
     supportFooter: {
       alignItems: 'center',
-      marginTop: 24,
-      gap: 8,
-      paddingBottom: 20,
+      marginTop: 10,
+      gap: 10,
+      paddingBottom: 30,
     },
     supportBtn: {
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 10,
-      borderWidth: 1.5,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+      borderWidth: 1,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       backgroundColor: isDarkMode ? '#121212' : '#ffffff',
     },
     supportBtnText: {
-      fontSize: 10,
+      fontSize: 11,
       color: isDarkMode ? '#a1a1aa' : '#64748b',
       fontWeight: '600',
     },
     versionText: {
-      fontSize: 9,
+      fontSize: 10,
       color: isDarkMode ? '#71717a' : '#94a3b8',
       fontWeight: '500',
     },
@@ -553,21 +639,15 @@ function getStyles(isDarkMode) {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      padding: 16,
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      padding: 18,
     },
     modalContent: {
       backgroundColor: isDarkMode ? '#121212' : '#ffffff',
       borderRadius: 24,
-      padding: 24,
+      padding: 22,
       width: '100%',
       maxWidth: 380,
-      maxHeight: '85%',
-      shadowColor: 'transparent',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0,
-      shadowRadius: 0,
-      elevation: 0,
       borderWidth: 1,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       overflow: 'hidden',
@@ -576,23 +656,24 @@ function getStyles(isDarkMode) {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 24,
+      marginBottom: 20,
     },
     modalTitle: {
-      fontSize: 16,
-      fontWeight: '600',
+      fontSize: 15,
+      fontWeight: '700',
       color: isDarkMode ? '#ffffff' : '#09090b',
     },
     modalBody: {
-      gap: 14,
+      gap: 12,
     },
     modalLabel: {
       fontSize: 12,
       fontWeight: '600',
       color: isDarkMode ? '#d4d4d8' : '#475569',
+      marginTop: 4,
     },
     modalInput: {
-      backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
+      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
       borderWidth: 1.5,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       borderRadius: 14,
@@ -603,20 +684,16 @@ function getStyles(isDarkMode) {
       fontWeight: '500',
     },
     modalSubmitBtn: {
-      backgroundColor: isDarkMode ? '#38bdf8' : '#002cf7',
-      borderRadius: 16,
-      paddingVertical: 14,
+      backgroundColor: '#002cf7',
+      borderRadius: 14,
+      paddingVertical: 13,
       alignItems: 'center',
-      marginTop: 12,
-      shadowColor: 'transparent',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0,
-      shadowRadius: 0,
+      marginTop: 10,
     },
     modalSubmitBtnText: {
-      color: isDarkMode ? '#09090b' : '#ffffff',
+      color: '#ffffff',
       fontSize: 14,
-      fontWeight: '600',
+      fontWeight: '700',
     },
   });
 }

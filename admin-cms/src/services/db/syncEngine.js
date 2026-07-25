@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { STORAGE_KEYS, DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG } from './seeds';
+import { STORAGE_KEYS, DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG, DEFAULT_STORES } from './seeds';
 import { memoryDb, notifyListeners, hydrateOrder, startOrderStateCron } from './dbEngine';
 
 let isUsingRemote = false;
@@ -37,7 +37,17 @@ const saveData = (key, data) => {
 };
 
 export function loadFromLocalStorage() {
-  memoryDb.staff = loadData(STORAGE_KEYS.STAFF, DEFAULT_STAFF);
+  memoryDb.stores = loadData(STORAGE_KEYS.STORES, DEFAULT_STORES);
+  memoryDb.selected_store_id = loadData(STORAGE_KEYS.SELECTED_STORE, 'all');
+  
+  const rawStaff = loadData(STORAGE_KEYS.STAFF, DEFAULT_STAFF);
+  // Filter staff to ensure ONLY super admin (andre.koutomi98@gmail.com) or newly created custom staff members remain
+  const cleanedStaff = (rawStaff || []).filter(s => s.email === 'andre.koutomi98@gmail.com' || (s.id && !['u1','u2','u3','u5','u6'].includes(s.id)));
+  if (cleanedStaff.length === 0) {
+    cleanedStaff.push(DEFAULT_STAFF[0]);
+  }
+  memoryDb.staff = cleanedStaff;
+
   memoryDb.customers = loadData(STORAGE_KEYS.CUSTOMERS, DEFAULT_CUSTOMERS);
   const loadedOrders = loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
   memoryDb.orders = (loadedOrders || []).map(hydrateOrder);
@@ -51,13 +61,22 @@ export function loadFromLocalStorage() {
   // Direct in-memory catalog initialization (no local storage caching)
   memoryDb.catalog = DEFAULT_CATALOG;
   
-  memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
+  const currentUser = loadData(STORAGE_KEYS.CURRENT_USER, null);
+  // Ensure current user is valid, otherwise default to super admin Koutomi André
+  if (!currentUser || (currentUser.email !== 'andre.koutomi98@gmail.com' && !cleanedStaff.some(s => s.id === currentUser.id))) {
+    memoryDb.current_user = DEFAULT_STAFF[0];
+  } else {
+    memoryDb.current_user = currentUser;
+  }
+  
   memoryDb.pin_reset_requests = loadData('klin_up_pin_reset_requests', []);
   startOrderStateCron();
   notifyListeners();
 }
 
 export function persist() {
+  saveData(STORAGE_KEYS.STORES, memoryDb.stores);
+  saveData(STORAGE_KEYS.SELECTED_STORE, memoryDb.selected_store_id);
   saveData(STORAGE_KEYS.STAFF, memoryDb.staff);
   saveData(STORAGE_KEYS.CUSTOMERS, memoryDb.customers);
   saveData(STORAGE_KEYS.ORDERS, memoryDb.orders);

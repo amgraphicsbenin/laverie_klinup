@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView, StatusBar as RNStatusBar } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView, StatusBar as RNStatusBar, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { initializeDatabase } from './src/services/db';
+import { initializeDatabase, db } from './src/services/db';
 import { useDbState } from './src/hooks/useDbState';
 import LoginScreen from './src/features/auth/screens/LoginScreen';
 import DashboardScreen from './src/features/dashboard/screens/DashboardScreen';
@@ -127,6 +127,18 @@ export default function App() {
         buttons: buttons && buttons.length > 0 ? buttons : [{ text: 'OK' }]
       });
     });
+  }, []);
+
+  // Listen for AppState changes to refresh data when app returns to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        db.refreshData().catch(err => console.warn('Foreground refresh error:', err));
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   const triggerSuccess = (message) => {
@@ -576,10 +588,11 @@ export default function App() {
               width: '90%',
               maxWidth: 340,
               alignItems: 'center',
-              shadowColor: '#000',
-              shadowOpacity: isDarkMode ? 0.4 : 0.15,
-              shadowRadius: 24,
-              elevation: 20,
+              shadowColor: 'transparent',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0,
+              shadowRadius: 0,
+              elevation: 0,
             }}
           >
             {/* Alert Icon */}
@@ -729,11 +742,11 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 40 },
-    shadowOpacity: 0.5,
-    shadowRadius: 50,
-    elevation: 25,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   container: {
     flex: 1,
@@ -813,11 +826,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#002cf7',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#002cf7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   tabLabel: {
     fontSize: 9.5,
@@ -839,11 +852,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(34, 197, 94, 0.35)',
     padding: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 99999,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     zIndex: 99999,
     overflow: 'hidden',
   },

@@ -1,7 +1,9 @@
-import { DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG } from './seeds';
+import { DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG, DEFAULT_STORES } from './seeds';
 import { performMutation, persist } from './syncEngine';
 
 export const memoryDb = {
+  stores: DEFAULT_STORES,
+  selected_store_id: 'all',
   staff: DEFAULT_STAFF,
   customers: DEFAULT_CUSTOMERS,
   orders: DEFAULT_ORDERS,
@@ -127,10 +129,90 @@ export function startOrderStateCron() {
 }
 
 export const dbEngine = {
-  getStaff: () => [...memoryDb.staff],
-  getCustomers: () => [...memoryDb.customers],
-  getOrders: () => [...memoryDb.orders],
-  getLogs: () => [...memoryDb.logs],
+  getStores: () => memoryDb.stores ? [...memoryDb.stores] : [],
+  getSelectedStoreId: () => memoryDb.selected_store_id || 'all',
+  setSelectedStoreId: (storeId) => {
+    memoryDb.selected_store_id = storeId;
+    const store = memoryDb.stores?.find(s => s.id === storeId);
+    const storeName = store ? store.nom : 'Tous les points (Global)';
+    dbEngine.logAction('CHANGEMENT_POINT_LAVERIE', `Changement du point de laverie actif vers : ${storeName}`);
+    persist();
+    notifyListeners();
+  },
+  addStore: (storeData) => {
+    const newStore = {
+      id: 'store_' + Math.random().toString(36).substr(2, 9),
+      nom: storeData.nom || 'Nouveau Point',
+      code: storeData.code || ('KLP-' + Math.floor(100 + Math.random() * 900)),
+      adresse: storeData.adresse || '',
+      ville: storeData.ville || 'Cotonou',
+      telephone: storeData.telephone || '',
+      responsable_id: storeData.responsable_id || null,
+      responsable_nom: storeData.responsable_nom || '',
+      statut: storeData.statut || 'actif',
+      created_at: new Date().toISOString()
+    };
+    if (!memoryDb.stores) memoryDb.stores = [];
+    memoryDb.stores.unshift(newStore);
+    dbEngine.logAction('CREATION_POINT_LAVERIE', `Création du point de laverie ${newStore.nom} (${newStore.code})`);
+    persist();
+    notifyListeners();
+    return newStore;
+  },
+  updateStore: (id, storeData) => {
+    if (!memoryDb.stores) return null;
+    const idx = memoryDb.stores.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      memoryDb.stores[idx] = { ...memoryDb.stores[idx], ...storeData };
+      dbEngine.logAction('MODIFICATION_POINT_LAVERIE', `Modification du point de laverie ${memoryDb.stores[idx].nom}`);
+      persist();
+      notifyListeners();
+      return memoryDb.stores[idx];
+    }
+    return null;
+  },
+  deleteStore: (id) => {
+    if (!memoryDb.stores) return false;
+    const store = memoryDb.stores.find(s => s.id === id);
+    if (store) {
+      memoryDb.stores = memoryDb.stores.filter(s => s.id !== id);
+      if (memoryDb.selected_store_id === id) {
+        memoryDb.selected_store_id = 'all';
+      }
+      dbEngine.logAction('SUPPRESSION_POINT_LAVERIE', `Suppression du point de laverie ${store.nom}`);
+      persist();
+      notifyListeners();
+      return true;
+    }
+    return false;
+  },
+  getAllStaff: () => [...memoryDb.staff],
+  getStaff: () => {
+    const currentStoreId = memoryDb.selected_store_id || 'all';
+    if (currentStoreId === 'all') return [...memoryDb.staff];
+    return memoryDb.staff.filter(s => s.role === 'super_admin' || s.store_id === currentStoreId || (!s.store_id && currentStoreId === 'store_central'));
+  },
+
+  getAllCustomers: () => [...memoryDb.customers],
+  getCustomers: () => {
+    const currentStoreId = memoryDb.selected_store_id || 'all';
+    if (currentStoreId === 'all') return [...memoryDb.customers];
+    return memoryDb.customers.filter(c => c.store_id === currentStoreId || (!c.store_id && currentStoreId === 'store_central'));
+  },
+
+  getAllOrders: () => [...memoryDb.orders],
+  getOrders: () => {
+    const currentStoreId = memoryDb.selected_store_id || 'all';
+    if (currentStoreId === 'all') return [...memoryDb.orders];
+    return memoryDb.orders.filter(o => o.store_id === currentStoreId || (!o.store_id && currentStoreId === 'store_central'));
+  },
+
+  getAllLogs: () => [...memoryDb.logs],
+  getLogs: () => {
+    const currentStoreId = memoryDb.selected_store_id || 'all';
+    if (currentStoreId === 'all') return [...memoryDb.logs];
+    return memoryDb.logs.filter(l => l.store_id === currentStoreId || (!l.store_id && currentStoreId === 'store_central'));
+  },
   getCatalog: () => [...memoryDb.catalog],
   getCurrentUser: () => memoryDb.current_user ? { ...memoryDb.current_user } : null,
 
@@ -150,6 +232,7 @@ export const dbEngine = {
     const newLog = {
       id: 'l_' + Math.random().toString(36).substr(2, 9),
       user_id: currentUser ? currentUser.id : null,
+      store_id: memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central',
       action,
       details,
       timestamp: new Date().toISOString()
@@ -178,6 +261,7 @@ export const dbEngine = {
       preferences_pliage: customer.preferences_pliage || 'Plié',
       points_fidelite: 0,
       solde_dette: 0.00,
+      store_id: customer.store_id || (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central'),
       created_at: new Date().toISOString()
     };
     memoryDb.customers.push(newCustomer);
@@ -562,6 +646,7 @@ export const dbEngine = {
     const newOrder = {
       id: 'o_' + Math.random().toString(36).substr(2, 9),
       customer_id: orderData.customer_id,
+      store_id: orderData.store_id || (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central'),
       statut: 'en_attente',
       type_article: orderData.type_article,
       type_service: orderData.type_service,
@@ -847,6 +932,7 @@ export const dbEngine = {
       email: member.email || `${member.prenom.toLowerCase()}.${member.nom.toLowerCase()}@klinup.com`,
       telephone: member.telephone || '',
       statut: member.statut || 'actif',
+      store_id: member.store_id || (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central'),
       permissions: member.permissions || {
         can_view_dashboard: member.role === 'super_admin' || member.role === 'manager',
         can_manage_orders: true,

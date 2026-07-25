@@ -4,16 +4,52 @@ export const STORAGE_KEYS = {
   ORDERS: 'klin_up_orders',
   LOGS: 'klin_up_activity_logs',
   CATALOG: 'klin_up_catalog',
-  CURRENT_USER: 'klin_up_current_user'
+  CURRENT_USER: 'klin_up_current_user',
+  STORES: 'klin_up_stores',
+  SELECTED_STORE: 'klin_up_selected_store'
 };
 
+export const DEFAULT_STORES = [
+  {
+    id: 'store_central',
+    nom: 'Point Central - Haie Vive',
+    code: 'KLP-HV',
+    adresse: 'Avenue Jean-Paul II, Haie Vive',
+    ville: 'Cotonou',
+    telephone: '+229 97 01 01 01',
+    responsable_id: 'u4',
+    responsable_nom: 'Koutomi André',
+    statut: 'actif',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'store_akpakpa',
+    nom: 'Point Akpakpa - Saint Jean',
+    code: 'KLP-AKP',
+    adresse: 'Carrefour Saint-Jean, Akpakpa',
+    ville: 'Cotonou',
+    telephone: '+229 97 02 02 02',
+    responsable_id: 'u4',
+    responsable_nom: 'Koutomi André',
+    statut: 'actif',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'store_calavi',
+    nom: 'Point Calavi - Université',
+    code: 'KLP-CAL',
+    adresse: 'Carrefour Kpota, Face Université',
+    ville: 'Abomey-Calavi',
+    telephone: '+229 97 03 03 03',
+    responsable_id: 'u4',
+    responsable_nom: 'Koutomi André',
+    statut: 'actif',
+    created_at: new Date().toISOString()
+  }
+];
+
 export const DEFAULT_STAFF = [
-  { id: 'u1', nom: 'Gomez', prenom: 'Jean-Luc', role: 'super_admin', email: 'jean-luc.gomez@klinup.com', code_pin: '111111', created_at: new Date().toISOString() },
-  { id: 'u2', nom: 'Koffi', prenom: 'Marie-Antoinette', role: 'manager', email: 'marie.koffi@klinup.com', code_pin: '222222', created_at: new Date().toISOString() },
-  { id: 'u3', nom: 'Diallo', prenom: 'Pierre', role: 'agent_accueil', email: 'pierre.diallo@klinup.com', code_pin: '333333', created_at: new Date().toISOString() },
-  { id: 'u4', nom: 'Koutomi', prenom: 'André', role: 'super_admin', email: 'andre.koutomi98@gmail.com', code_pin: '000000', created_at: new Date().toISOString() },
-  { id: 'u5', nom: 'Sosso', prenom: 'Paul', role: 'livreur', email: 'paul.sosso@klinup.com', code_pin: '444444', created_at: new Date().toISOString() },
-  { id: 'u6', nom: 'Kole', prenom: 'Moussa', role: 'agent_lavage_repassage', email: 'moussa.kole@klinup.com', code_pin: '555555', created_at: new Date().toISOString() }
+  { id: 'u4', nom: 'Koutomi', prenom: 'André', role: 'super_admin', email: 'andre.koutomi98@gmail.com', code_pin: '000000', created_at: new Date().toISOString() }
 ];
 
 export const DEFAULT_CUSTOMERS = [];
