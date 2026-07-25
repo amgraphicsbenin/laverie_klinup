@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler, Switch } from 'react-native';
-import { Key, LogOut, X, Printer, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle } from 'lucide-react-native';
+import { Key, LogOut, X, Printer, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle, ArrowLeft } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
@@ -345,62 +345,54 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
           </TouchableOpacity>
         </View>
 
-        {/* MODAL : MODIFIER PIN */}
-        <MotiView
-          pointerEvents={showPinModal ? 'auto' : 'none'}
-          animate={{
-            opacity: showPinModal ? 1 : 0
-          }}
-          transition={{ type: 'timing', duration: 150 }}
-          style={[
-            StyleSheet.absoluteFill,
-            { 
-              zIndex: 9999,
-              bottom: 0
-            }
-          ]}
+        {/* MODAL : MODIFIER PIN (FULL SCREEN PAGE) */}
+        <Modal
+          visible={showPinModal}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setShowPinModal(false)}
         >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setShowPinModal(false)}>
-              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={[styles.settingIconBox, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)' }]}>
-                    <Key size={16} color={isDarkMode ? "#38bdf8" : "#002cf7"} />
-                  </View>
-                  <Text style={styles.modalTitle}>Modifier mon code PIN</Text>
+          <View style={styles.fullPageContainer}>
+            {/* HEADER BACK BUTTON */}
+            <View style={styles.fullPageHeader}>
+              <TouchableOpacity onPress={() => setShowPinModal(false)} style={styles.backBtnHeader} activeOpacity={0.7}>
+                <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+                <Text style={styles.backBtnText}>Retour</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.fullPageTitle} numberOfLines={1}>Modifier mon code PIN</Text>
+              <View style={{ width: 70 }} />
+            </View>
+
+            <ScrollView contentContainerStyle={styles.fullPageScroll} bounces={false}>
+              <View style={{ gap: 16 }}>
+                <View>
+                  <Text style={styles.modalLabel}>Code PIN actuel</Text>
+                  <TextInput
+                    keyboardType="numeric"
+                    maxLength={6}
+                    secureTextEntry
+                    value={currentPin}
+                    onChangeText={setCurrentPin}
+                    placeholder="******"
+                    placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
+                    style={styles.modalInput}
+                  />
                 </View>
-                <TouchableOpacity onPress={() => setShowPinModal(false)} style={{ padding: 4 }}>
-                  <X size={18} color={isDarkMode ? "#94a3b8" : "#71717a"} />
-                </TouchableOpacity>
-              </View>
 
-              <View style={styles.modalBody}>
-                <Text style={styles.modalLabel}>Code PIN actuel</Text>
-                <TextInput
-                  keyboardType="numeric"
-                  maxLength={6}
-                  secureTextEntry
-                  value={currentPin}
-                  onChangeText={setCurrentPin}
-                  placeholder="******"
-                  placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
-                  style={styles.modalInput}
-                />
-
-                <Text style={styles.modalLabel}>Nouveau code PIN (6 chiffres)</Text>
-                <TextInput
-                  keyboardType="numeric"
-                  maxLength={6}
-                  secureTextEntry
-                  value={newPin}
-                  onChangeText={setNewPin}
-                  placeholder="******"
-                  placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
-                  style={styles.modalInput}
-                />
+                <View>
+                  <Text style={styles.modalLabel}>Nouveau code PIN (6 chiffres)</Text>
+                  <TextInput
+                    keyboardType="numeric"
+                    maxLength={6}
+                    secureTextEntry
+                    value={newPin}
+                    onChangeText={setNewPin}
+                    placeholder="******"
+                    placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
+                    style={styles.modalInput}
+                  />
+                </View>
 
                 <TouchableOpacity
                   onPress={handleChangePin}
@@ -410,9 +402,9 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
                   <Text style={styles.modalSubmitBtnText}>Confirmer le changement</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
-        </MotiView>
+        </Modal>
 
       </ScrollView>
     </View>
@@ -634,6 +626,44 @@ function getStyles(isDarkMode) {
       fontSize: 10,
       color: isDarkMode ? '#71717a' : '#94a3b8',
       fontWeight: '500',
+    },
+    fullPageContainer: {
+      flex: 1,
+      backgroundColor: isDarkMode ? '#000000' : '#ffffff',
+      paddingTop: Platform.OS === 'ios' ? 48 : 24,
+    },
+    fullPageHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#1f2937' : '#e2e8f0',
+      backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
+    },
+    backBtnHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 4,
+      paddingRight: 10,
+    },
+    backBtnText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
+    },
+    fullPageTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
+      textAlign: 'center',
+      flex: 1,
+    },
+    fullPageScroll: {
+      padding: 16,
+      paddingBottom: 40,
     },
     modalOverlay: {
       flex: 1,

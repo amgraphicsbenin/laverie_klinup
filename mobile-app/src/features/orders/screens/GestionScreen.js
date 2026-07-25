@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform, BackHandler, RefreshControl } from 'react-native';
-import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, Download, Award, Ban } from 'lucide-react-native';
+import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, Download, Award, Ban, ArrowLeft } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { CustomSelect } from '../../../components/CustomSelect';
 import SafeBlurView from '../../../components/SafeBlurView';
@@ -1510,469 +1510,304 @@ export default function GestionScreen({
         </MotiView>
       )}
 
-      {/* MODAL 1 : DETAIL COMMANDE (BOTTOM SHEET) */}
-      {showOrderDetails && selectedOrder && (
-        <View style={styles.absoluteModalContainer}>
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseOrderDetails}>
-              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+      {/* MODAL 1 : DETAIL COMMANDE (FULL SCREEN PAGE) */}
+      <MotiView
+        pointerEvents={showOrderDetails && selectedOrder !== null ? 'auto' : 'none'}
+        animate={{ opacity: showOrderDetails && selectedOrder !== null ? 1 : 0 }}
+        transition={{ type: 'timing', duration: 180 }}
+        style={[
+          StyleSheet.absoluteFill,
+          { zIndex: 9000, backgroundColor: isDarkMode ? '#000000' : '#ffffff' }
+        ]}
+      >
+        <View style={[styles.fullPageContainer, { paddingTop: 0 }]}>
+          {/* HEADER BACK BUTTON */}
+          <View style={styles.fullPageHeader}>
+            <TouchableOpacity onPress={handleCloseOrderDetails} style={styles.backBtn} activeOpacity={0.7}>
+              <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+              <Text style={styles.backBtnText}>Retour</Text>
             </TouchableOpacity>
-            <MotiView
-              from={{ opacity: 0, scale: 0.88, translateY: 48 }}
-              animate={{ opacity: 1, scale: 1, translateY: 0 }}
-              transition={{ type: 'spring', damping: 16, mass: 0.8 }}
-              style={[styles.compactModalView, { maxHeight: '90%' }]}>
-              <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Commande #{getDisplayTicketId(selectedOrder)}</Text>
-                <TouchableOpacity onPress={handleCloseOrderDetails}>
-                  <X size={20} color="#71717a" />
-                </TouchableOpacity>
-              </View>
+
+            <Text style={styles.fullPageTitle} numberOfLines={1}>
+              {selectedOrder ? `Commande #${getDisplayTicketId(selectedOrder)}` : ''}
+            </Text>
+            <View style={{ width: 70 }} />
+          </View>
+
+          {selectedOrder && (
+            <ScrollView
+              contentContainerStyle={styles.fullPageScroll}
+              showsVerticalScrollIndicator={false}
+            >
               {/* Infos Client */}
-              <ScrollView
-                style={{ flexGrow: 0 }}
-                contentContainerStyle={styles.compactModalScroll}
-                showsVerticalScrollIndicator={false}
-              >
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailSectionTitle}>Client & Statut</Text>
-                  <View style={styles.detailCard}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        const client = customers.find(c => c.id === selectedOrder.customer_id);
-                        if (client) {
-                          setShowOrderDetails(false);
-                          setSelectedClient(client);
-                        }
-                      }}
-                      activeOpacity={0.8}
-                      style={[styles.clientPillBtn, { marginBottom: 8 }]}
-                    >
-                      <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
-                      <Text style={styles.clientPillBtnText}>
-                        {customers.find(c => c.id === selectedOrder.customer_id) ? 
-                          `${customers.find(c => c.id === selectedOrder.customer_id).prenom} ${customers.find(c => c.id === selectedOrder.customer_id).nom}` : 
-                          'Client inconnu'}
-                      </Text>
-                    </TouchableOpacity>
-                    <Text style={styles.detailTextMuted}>Téléphone : {customers.find(c => c.id === selectedOrder.customer_id)?.telephone || 'N/A'}</Text>
-                    
-                    <View style={[styles.statusTag, { backgroundColor: getStatusColor(selectedOrder.statut).bg, borderColor: getStatusColor(selectedOrder.statut).border, alignSelf: 'flex-start', marginTop: 8, borderWidth: 1 }]}>
-                      <Text style={[styles.statusTagText, { color: getStatusColor(selectedOrder.statut).text }]}>
-                        {getStatusColor(selectedOrder.statut).label}
-                      </Text>
-                    </View>
-
-                    {(() => {
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Client & Statut</Text>
+                <View style={styles.detailCard}>
+                  <TouchableOpacity
+                    onPress={() => {
                       const client = customers.find(c => c.id === selectedOrder.customer_id);
-                      if (client && client.active_subscription) {
-                        const remaining = client.active_subscription.remaining_clothes;
-                        const total = client.active_subscription.total_clothes;
-                        const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                        return (
-                          <View style={[styles.cardSubscriptionGaugeContainer, { marginTop: 12 }]}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                              <Text style={styles.cardSubText}>Abonnement : {client.active_subscription.name}</Text>
-                              <Text style={styles.cardSubTextBold}>{remaining} / {total} vêt.</Text>
-                            </View>
-                            <View style={styles.cardProgressBarBg}>
-                              <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
-                            </View>
-                          </View>
-                        );
+                      if (client) {
+                        setShowOrderDetails(false);
+                        setSelectedClient(client);
                       }
-                      return null;
-                    })()}
-                  </View>
-                </View>
-                {/* Articles */}
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailSectionTitle}>Détail des Articles</Text>
-                  <View style={styles.detailCard}>
-                    {(selectedOrder.items || selectedOrder.articles || []).map((art, idx) => (
-                      <View key={idx} style={styles.detailArticleRow}>
-                        <Text style={styles.detailArticleText}>{art.article} ({art.service.replace(/_/g, ' ')}) x{art.quantite}</Text>
-                        <Text style={styles.detailArticlePrice}>{formatPrice(art.prix * art.quantite)}</Text>
-                      </View>
-                    ))}
-                    <View style={styles.detailDivider} />
-                    {(selectedOrder.remise_pourcentage > 0 || selectedOrder.remise_montant > 0) && (
-                      <>
-                        <View style={styles.detailArticleRow}>
-                          <Text style={styles.detailLabelMuted}>Sous-total</Text>
-                          <Text style={styles.detailTextMuted}>
-                            {formatPrice(selectedOrder.prix_base_avant_remise || (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0))}
-                          </Text>
-                        </View>
-                        <View style={styles.detailArticleRow}>
-                          <Text style={[styles.detailLabelMuted, { color: '#ef4444' }]}>
-                            Réduction ({selectedOrder.remise_pourcentage || Math.round(((selectedOrder.remise_montant || 0) / (selectedOrder.prix_base_avant_remise || (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) || 1)) * 100)}%)
-                          </Text>
-                          <Text style={[styles.detailTextMuted, { color: '#ef4444', fontWeight: '600' }]}>
-                            -{formatPrice(selectedOrder.remise_montant || ((selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) - (selectedOrder.prix_total || selectedOrder.total)))}
-                          </Text>
-                        </View>
-                      </>
-                    )}
-                    <View style={styles.detailArticleRow}>
-                      <Text style={styles.detailLabelBold}>Total</Text>
-                      <Text style={styles.detailPriceBold}>{formatPrice(selectedOrder.prix_total || selectedOrder.total)}</Text>
-                    </View>
-                    <View style={styles.detailArticleRow}>
-                      <Text style={styles.detailLabelMuted}>Payé (Avance)</Text>
-                      <Text style={styles.detailTextMuted}>{formatPrice(selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : selectedOrder.avance)}</Text>
-                    </View>
-                    <View style={styles.detailArticleRow}>
-                      <Text style={styles.detailLabelMuted}>Reste à payer</Text>
-                      <Text style={styles.detailTextMuted}>
-                        {formatPrice((selectedOrder.prix_total || selectedOrder.total) - (selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : (selectedOrder.avance || 0)))}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Dates & Paiement */}
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailSectionTitle}>Détails Logistiques</Text>
-                  <View style={styles.detailCard}>
-                    <Text style={styles.logisticsText}>
-                      Date retrait prévue : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
+                    }}
+                    activeOpacity={0.8}
+                    style={[styles.clientPillBtn, { marginBottom: 8 }]}
+                  >
+                    <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                    <Text style={styles.clientPillBtnText}>
+                      {customers.find(c => c.id === selectedOrder.customer_id) ? 
+                        `${customers.find(c => c.id === selectedOrder.customer_id).prenom} ${customers.find(c => c.id === selectedOrder.customer_id).nom}` : 
+                        'Client inconnu'}
                     </Text>
-                    <Text style={styles.logisticsText}>Mode de paiement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement}</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.detailTextMuted}>Téléphone : {customers.find(c => c.id === selectedOrder.customer_id)?.telephone || 'N/A'}</Text>
+                  
+                  <View style={[styles.statusTag, { backgroundColor: getStatusColor(selectedOrder.statut).bg, borderColor: getStatusColor(selectedOrder.statut).border, alignSelf: 'flex-start', marginTop: 8, borderWidth: 1 }]}>
+                    <Text style={[styles.statusTagText, { color: getStatusColor(selectedOrder.statut).text }]}>
+                      {getStatusColor(selectedOrder.statut).label}
+                    </Text>
+                  </View>
+
+                  {(() => {
+                    const client = customers.find(c => c.id === selectedOrder.customer_id);
+                    if (client && client.active_subscription) {
+                      const remaining = client.active_subscription.remaining_clothes;
+                      const total = client.active_subscription.total_clothes;
+                      const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                      return (
+                        <View style={[styles.cardSubscriptionGaugeContainer, { marginTop: 12 }]}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <Text style={styles.cardSubText}>Abonnement : {client.active_subscription.name}</Text>
+                            <Text style={styles.cardSubTextBold}>{remaining} / {total} vêt.</Text>
+                          </View>
+                          <View style={styles.cardProgressBarBg}>
+                            <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
+                          </View>
+                        </View>
+                      );
+                    }
+                    return null;
+                  })()}
+                </View>
+              </View>
+              {/* Articles */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Détail des Articles</Text>
+                <View style={styles.detailCard}>
+                  {(selectedOrder.items || selectedOrder.articles || []).map((art, idx) => (
+                    <View key={idx} style={styles.detailArticleRow}>
+                      <Text style={styles.detailArticleText}>{art.article} ({art.service.replace(/_/g, ' ')}) x{art.quantite}</Text>
+                      <Text style={styles.detailArticlePrice}>{formatPrice(art.prix * art.quantite)}</Text>
+                    </View>
+                  ))}
+                  <View style={styles.detailDivider} />
+                  {(selectedOrder.remise_pourcentage > 0 || selectedOrder.remise_montant > 0) && (
+                    <>
+                      <View style={styles.detailArticleRow}>
+                        <Text style={styles.detailLabelMuted}>Sous-total</Text>
+                        <Text style={styles.detailTextMuted}>
+                          {formatPrice(selectedOrder.prix_base_avant_remise || (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0))}
+                        </Text>
+                      </View>
+                      <View style={styles.detailArticleRow}>
+                        <Text style={[styles.detailLabelMuted, { color: '#ef4444' }]}>
+                          Réduction ({selectedOrder.remise_pourcentage || Math.round(((selectedOrder.remise_montant || 0) / (selectedOrder.prix_base_avant_remise || (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) || 1)) * 100)}%)
+                        </Text>
+                        <Text style={[styles.detailTextMuted, { color: '#ef4444', fontWeight: '600' }]}>
+                          -{formatPrice(selectedOrder.remise_montant || ((selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) - (selectedOrder.prix_total || selectedOrder.total)))}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                  <View style={styles.detailArticleRow}>
+                    <Text style={styles.detailLabelBold}>Total</Text>
+                    <Text style={styles.detailPriceBold}>{formatPrice(selectedOrder.prix_total || selectedOrder.total)}</Text>
+                  </View>
+                  <View style={styles.detailArticleRow}>
+                    <Text style={styles.detailLabelMuted}>Payé (Avance)</Text>
+                    <Text style={styles.detailTextMuted}>{formatPrice(selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : selectedOrder.avance)}</Text>
+                  </View>
+                  <View style={styles.detailArticleRow}>
+                    <Text style={styles.detailLabelMuted}>Reste à payer</Text>
+                    <Text style={styles.detailTextMuted}>
+                      {formatPrice((selectedOrder.prix_total || selectedOrder.total) - (selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : (selectedOrder.avance || 0)))}
+                    </Text>
                   </View>
                 </View>
+              </View>
 
-                {/* Cancel & Delete Buttons */}
-                {selectedOrder.statut !== 'annule' && selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && 
-                 currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage' && (
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 4, paddingHorizontal: 2 }}>
-                    <TouchableOpacity
-                      onPress={() => handleCancelOrder(selectedOrder)}
-                      activeOpacity={0.8}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
-                    >
-                      <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler la commande</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+              {/* Dates & Paiement */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Détails Logistiques</Text>
+                <View style={styles.detailCard}>
+                  <Text style={styles.logisticsText}>
+                    Date retrait prévue : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
+                  </Text>
+                  <Text style={styles.logisticsText}>Mode de paiement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement}</Text>
+                </View>
+              </View>
 
-                 {/* Action Button for changing status */}
-                 <View style={{ paddingHorizontal: 2 }}>
-                 {selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && selectedOrder.statut !== 'annule' && (() => {
-                   const status = selectedOrder.statut;
+              {/* Cancel & Delete Buttons */}
+              {selectedOrder.statut !== 'annule' && selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && 
+               currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage' && (
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 4, paddingHorizontal: 2 }}>
+                  <TouchableOpacity
+                    onPress={() => handleCancelOrder(selectedOrder)}
+                    activeOpacity={0.8}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
+                  >
+                    <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
+                    <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler la commande</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+               {/* Action Button for changing status */}
+               <View style={{ paddingHorizontal: 2 }}>
+               {selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && selectedOrder.statut !== 'annule' && (() => {
+                 const status = selectedOrder.statut;
+                 
+                 // If status is 'pret', render two buttons side by side
+                 if (status === 'pret') {
+                   const canLivrer = isTransitionAllowed('pret', 'a_livrer');
+                   const canRecuperer = isTransitionAllowed('pret', 'a_recuperer');
                    
-                   // If status is 'pret', render two buttons side by side
-                   if (status === 'pret') {
-                     const canLivrer = isTransitionAllowed('pret', 'a_livrer');
-                     const canRecuperer = isTransitionAllowed('pret', 'a_recuperer');
-                     
-                     return (
-                       <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 20 }}>
-                         <TouchableOpacity
-                           onPress={canLivrer ? () => handleUpdateStatusDirect(selectedOrder, 'a_livrer') : null}
-                           disabled={!canLivrer}
-                           activeOpacity={canLivrer ? 0.88 : 1}
-                           style={{ flex: 1 }}
-                         >
-                           <MotiView
-                             animate={{ backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
-                             style={[styles.statusChangeBtnSide, { backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
-                           >
-                             <Truck size={16} color={canLivrer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 6 }} />
-                             <Text style={[styles.statusChangeBtnText, { color: canLivrer ? '#ffffff' : '#94a3b8' }]}>À livrer</Text>
-                           </MotiView>
-                         </TouchableOpacity>
-                         
-                         <TouchableOpacity
-                           onPress={canRecuperer ? () => handleUpdateStatusDirect(selectedOrder, 'a_recuperer') : null}
-                           disabled={!canRecuperer}
-                           activeOpacity={canRecuperer ? 0.88 : 1}
-                           style={{ flex: 1 }}
-                         >
-                           <MotiView
-                             animate={{ backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
-                             style={[styles.statusChangeBtnSide, { backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
-                           >
-                             <User size={16} color={canRecuperer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 6 }} />
-                             <Text style={[styles.statusChangeBtnText, { color: canRecuperer ? '#ffffff' : '#94a3b8' }]}>À récupérer</Text>
-                           </MotiView>
-                         </TouchableOpacity>
-                       </View>
-                     );
-                   }
-                   
-                   // For all other statuses, render a single button
-                   const getSingleStatusDetails = () => {
-                      let targetStatus = null;
-                      if (status === 'attente' || status === 'en_attente') targetStatus = 'traitement';
-                      else if (status === 'traitement') targetStatus = 'en_cours_lavage';
-                      else if (status === 'lavage_cours' || status === 'en_cours_lavage') targetStatus = 'en_cours_repassage';
-                      else if (status === 'repassage_cours' || status === 'en_cours_repassage') targetStatus = 'pret';
-                      else if (status === 'a_livrer') targetStatus = 'en_cours_livraison';
-                      else if (status === 'en_cours_livraison') targetStatus = 'livre';
-                      else if (status === 'a_recuperer') targetStatus = 'restitue';
-                      else if (status === 'retard' || status === 'en_retard') targetStatus = 'traitement';
-
-                      if (!targetStatus) return null;
-
-                      if (status === 'attente' || status === 'en_attente' || status === 'retard' || status === 'en_retard') {
-                       return {
-                         label: 'Passer au traitement',
-                         icon: 'Sparkles',
-                         color: '#7c3aed', // Purple for processing
-                         iconColor: '#ffffff',
-                         nextStatus: 'traitement',
-                         animation: {
-                           from: { rotate: '0deg', scale: 0.95 },
-                           animate: { rotate: '15deg', scale: [1, 1.1, 1] },
-                           transition: { loop: true, type: 'timing', duration: 1500 }
-                         }
-                       };
-                     } else if (status === 'traitement') {
-                       return {
-                         label: 'Lancer le lavage',
-                         icon: 'Wind',
-                         color: '#002cf7', // Blue for laundry
-                         iconColor: '#ffffff',
-                         nextStatus: 'en_cours_lavage',
-                         animation: {
-                           from: { rotate: '0deg' },
-                           animate: { rotate: '360deg' },
-                           transition: { loop: true, type: 'timing', duration: 2500, ease: 'linear' }
-                         }
-                       };
-                     } else if (status === 'lavage_cours' || status === 'en_cours_lavage') {
-                       return {
-                         label: 'Passer au repassage',
-                         icon: 'Shirt',
-                         color: '#0d9488', // Teal for ironing
-                         iconColor: '#ffffff',
-                         nextStatus: 'en_cours_repassage',
-                         animation: {
-                           from: { translateY: 0 },
-                           animate: { translateY: [-2, 2, -2] },
-                           transition: { loop: true, type: 'timing', duration: 1000 }
-                         }
-                       };
-                     } else if (status === 'repassage_cours' || status === 'en_cours_repassage') {
-                       return {
-                         label: 'Marquer comme prêt',
-                         icon: 'Check',
-                         color: '#059669', // Green for ready
-                         iconColor: '#ffffff',
-                         nextStatus: 'pret',
-                         animation: {
-                           from: { scale: 0.8 },
-                           animate: { scale: [1, 1.2, 1] },
-                           transition: { loop: true, type: 'spring', damping: 10, stiffness: 100 }
-                         }
-                       };
-                     } else if (status === 'a_livrer') {
-                       return {
-                         label: 'Démarrer la livraison',
-                         icon: 'Truck',
-                         color: '#4f46e5', // Indigo for delivery start
-                         iconColor: '#ffffff',
-                         nextStatus: 'en_cours_livraison',
-                         animation: {
-                           from: { translateX: -3 },
-                           animate: { translateX: [0, 3, 0] },
-                           transition: { loop: true, type: 'timing', duration: 1000 }
-                         }
-                       };
-                     } else if (status === 'en_cours_livraison') {
-                       return {
-                         label: 'Terminer la livraison',
-                         icon: 'ShoppingBag',
-                         color: '#09090b', // Dark for delivery end
-                         iconColor: '#ffffff',
-                         nextStatus: 'livre',
-                         animation: {
-                           from: { scale: 0.9 },
-                           animate: { scale: [1, 1.1, 1] },
-                           transition: { loop: true, type: 'timing', duration: 1500 }
-                         }
-                       };
-                     } else if (status === 'a_recuperer') {
-                       return {
-                         label: 'Marquer comme récupéré',
-                         icon: 'CheckCircle',
-                         color: '#d97706', // Orange for pickup
-                         iconColor: '#ffffff',
-                         nextStatus: 'restitue',
-                         animation: {
-                           from: { scale: 0.8 },
-                           animate: { scale: [1, 1.15, 1] },
-                           transition: { loop: true, type: 'spring', damping: 10 }
-                         }
-                       };
-                     }
-                     return null;
-                   };
-
-                   const btn = getSingleStatusDetails();
-                   if (!btn) return null;
-
-                   const canTransition = isTransitionAllowed(status, btn.nextStatus);
-
                    return (
-                     <TouchableOpacity
-                       onPress={canTransition ? () => handleNextStatus(selectedOrder, true) : null}
-                       disabled={!canTransition}
-                       activeOpacity={canTransition ? 0.88 : 1}
-                       style={{ width: '100%' }}
-                     >
-                       <MotiView
-                         animate={{
-                           backgroundColor: canTransition ? btn.color : (isDarkMode ? '#27272a' : '#ffffff')
-                         }}
-                         transition={{
-                           type: 'timing',
-                           duration: 150
-                         }}
-                         style={[styles.statusChangeBtn, { backgroundColor: canTransition ? btn.color : (isDarkMode ? '#27272a' : '#ffffff') }]}
+                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 20 }}>
+                       <TouchableOpacity
+                         onPress={canLivrer ? () => handleUpdateStatusDirect(selectedOrder, 'a_livrer') : null}
+                         disabled={!canLivrer}
+                         activeOpacity={canLivrer ? 0.88 : 1}
+                         style={{ flex: 1 }}
                        >
                          <MotiView
-                           key={btn.icon}
-                           from={{ opacity: 0, scale: 0.3, rotate: '-45deg' }}
-                           animate={{ 
-                             opacity: 1, 
-                             scale: 1, 
-                             rotate: '0deg',
-                             ...(canTransition && btn.animation ? btn.animation.animate : {})
-                           }}
-                           transition={canTransition && btn.animation ? btn.animation.transition : { type: 'timing', duration: 120 }}
-                           style={{ marginRight: 8 }}
+                           animate={{ backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
+                           style={[styles.statusChangeBtnSide, { backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
                          >
-                            {btn.icon === 'Sparkles' && <Sparkles size={16} color={canTransition ? btn.iconColor : '#94a3b8'} />}
-                            {btn.icon === 'Wind' && <Wind size={16} color={canTransition ? btn.iconColor : '#94a3b8'} />}
-                            {btn.icon === 'Shirt' && <Shirt size={16} color={canTransition ? btn.iconColor : '#94a3b8'} />}
-                            {btn.icon === 'Check' && <Check size={16} color={canTransition ? btn.iconColor : '#94a3b8'} />}
-                            {btn.icon === 'Truck' && <Truck size={16} color={canTransition ? btn.iconColor : '#94a3b8'} />}
-                            {btn.icon === 'ShoppingBag' && <ShoppingBag size={16} color={canTransition ? btn.iconColor : '#94a3b8'} />}
-                            {btn.icon === 'CheckCircle' && <CheckCircle size={16} color={canTransition ? btn.iconColor : '#94a3b8'} />}
+                           <Truck size={16} color={canLivrer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 6 }} />
+                           <Text style={[styles.statusChangeBtnText, { color: canLivrer ? '#ffffff' : '#94a3b8' }]}>À livrer</Text>
                          </MotiView>
-                         
+                       </TouchableOpacity>
+                       
+                       <TouchableOpacity
+                         onPress={canRecuperer ? () => handleUpdateStatusDirect(selectedOrder, 'a_recuperer') : null}
+                         disabled={!canRecuperer}
+                         activeOpacity={canRecuperer ? 0.88 : 1}
+                         style={{ flex: 1 }}
+                       >
                          <MotiView
-                           key={btn.label}
-                           from={{ opacity: 0, translateY: 10 }}
-                           animate={{ opacity: 1, translateY: 0 }}
-                           transition={{ type: 'timing', duration: 150 }}
+                           animate={{ backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
+                           style={[styles.statusChangeBtnSide, { backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
                          >
-                           <Text style={[styles.statusChangeBtnText, { color: canTransition ? '#ffffff' : '#94a3b8' }]}>
-                              {btn.label}
-                            </Text>
+                           <User size={16} color={canRecuperer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 6 }} />
+                           <Text style={[styles.statusChangeBtnText, { color: canRecuperer ? '#ffffff' : '#94a3b8' }]}>À récupérer</Text>
                          </MotiView>
-                       </MotiView>
-                     </TouchableOpacity>
+                       </TouchableOpacity>
+                     </View>
                    );
-                 })()}
-                  </View>
+                 }
+                 return null;
+               })()}
+               </View>
+            </ScrollView>
+          )}
+        </View>
+      </MotiView>
 
-              </ScrollView>
-            </MotiView>
+      {/* MODAL 3 : CRÉATION / MODIFICATION CLIENT (FULL SCREEN PAGE) */}
+      <Modal
+        visible={showCustomerModal}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={handleCloseCustomerModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.fullPageContainer}
+        >
+          {/* HEADER BACK BUTTON */}
+          <View style={styles.fullPageHeader}>
+            <TouchableOpacity onPress={handleCloseCustomerModal} style={styles.backBtn} activeOpacity={0.7}>
+              <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+              <Text style={styles.backBtnText}>Retour</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.fullPageTitle} numberOfLines={1}>
+              {editingCustomer ? "Modifier le Profil Client" : "Nouveau Profil Client"}
+            </Text>
+            <View style={{ width: 70 }} />
           </View>
-        </View>
-      )}
 
-      {/* MODAL 3 : CRÉATION / MODIFICATION CLIENT */}
-      {showCustomerModal && (
-        <View style={styles.absoluteModalContainer}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1 }}
-          >
-            <View style={styles.compactModalOverlay}>
-              <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseCustomerModal}>
-                <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
-              </TouchableOpacity>
-              <MotiView
-                from={{ opacity: 0, scale: 0.88, translateY: 48 }}
-                animate={{ opacity: 1, scale: 1, translateY: 0 }}
-                transition={{ type: 'spring', damping: 16, mass: 0.8 }}
-                style={styles.compactModalView}>
-                <View style={styles.compactModalHeader}>
-                  <Text style={styles.compactModalTitle}>
-                    {editingCustomer ? "Modifier le Profil Client" : "Nouveau Profil Client"}
-                  </Text>
-                  <TouchableOpacity onPress={handleCloseCustomerModal}>
-                    <X size={20} color="#71717a" />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView contentContainerStyle={styles.compactModalScroll} bounces={false}>
-                  <View style={styles.compactInputRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.compactLabel}>Prénom</Text>
-                      <TextInput
-                        placeholder="Prénom"
-                        placeholderTextColor="#a1a1aa"
-                        value={custPrenom}
-                        onChangeText={setCustPrenom}
-                        style={styles.compactInput}
-                      />
-                    </View>
-                    <View style={{ width: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.compactLabel}>Nom</Text>
-                      <TextInput
-                        placeholder="Nom"
-                        placeholderTextColor="#a1a1aa"
-                        value={custNom}
-                        onChangeText={setCustNom}
-                        style={styles.compactInput}
-                      />
-                    </View>
-                  </View>
-
-                  <Text style={styles.compactLabel}>Téléphone</Text>
-                  <TextInput
-                    placeholder="Ex: +229 97 00 00 00"
-                    placeholderTextColor="#a1a1aa"
-                    keyboardType="phone-pad"
-                    value={custTelephone}
-                    onChangeText={setCustTelephone}
-                    style={styles.compactInput}
-                  />
-
-                  <Text style={styles.compactLabel}>Adresse</Text>
-                  <TextInput
-                    placeholder="Ex: Cotonou, Haie Vive"
-                    placeholderTextColor="#a1a1aa"
-                    value={custAdresse}
-                    onChangeText={setCustAdresse}
-                    style={styles.compactInput}
-                  />
-
-                  <Text style={styles.compactLabel}>Préférence de pliage</Text>
-                  <View style={styles.prefSelector}>
-                    <TouchableOpacity 
-                      onPress={() => setCustPreferences('Plié')}
-                      style={[styles.prefOption, custPreferences === 'Plié' && styles.prefOptionActive]}
-                    >
-                      <Text style={[styles.prefText, custPreferences === 'Plié' && styles.prefTextActive]}>Plié</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      onPress={() => setCustPreferences('Cintre')}
-                      style={[styles.prefOption, custPreferences === 'Cintre' && styles.prefOptionActive]}
-                    >
-                      <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={handleSaveCustomer}
-                    style={styles.compactSubmitBtn}
-                  >
-                    <Text style={styles.compactSubmitBtnText}>Enregistrer le client</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </MotiView>
+          <ScrollView contentContainerStyle={styles.fullPageScroll} bounces={false}>
+            <View style={styles.compactInputRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.compactLabel}>Prénom</Text>
+                <TextInput
+                  placeholder="Prénom"
+                  placeholderTextColor="#a1a1aa"
+                  value={custPrenom}
+                  onChangeText={setCustPrenom}
+                  style={styles.compactInput}
+                />
+              </View>
+              <View style={{ width: 12 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.compactLabel}>Nom</Text>
+                <TextInput
+                  placeholder="Nom"
+                  placeholderTextColor="#a1a1aa"
+                  value={custNom}
+                  onChangeText={setCustNom}
+                  style={styles.compactInput}
+                />
+              </View>
             </View>
-          </KeyboardAvoidingView>
-        </View>
-      )}
+
+            <Text style={styles.compactLabel}>Téléphone</Text>
+            <TextInput
+              placeholder="Ex: +229 97 00 00 00"
+              placeholderTextColor="#a1a1aa"
+              keyboardType="phone-pad"
+              value={custTelephone}
+              onChangeText={setCustTelephone}
+              style={styles.compactInput}
+            />
+
+            <Text style={styles.compactLabel}>Adresse</Text>
+            <TextInput
+              placeholder="Ex: Cotonou, Haie Vive"
+              placeholderTextColor="#a1a1aa"
+              value={custAdresse}
+              onChangeText={setCustAdresse}
+              style={styles.compactInput}
+            />
+
+            <Text style={styles.compactLabel}>Préférence de pliage</Text>
+            <View style={styles.prefSelector}>
+              <TouchableOpacity 
+                onPress={() => setCustPreferences('Plié')}
+                style={[styles.prefOption, custPreferences === 'Plié' && styles.prefOptionActive]}
+              >
+                <Text style={[styles.prefText, custPreferences === 'Plié' && styles.prefTextActive]}>Plié</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => setCustPreferences('Cintre')}
+                style={[styles.prefOption, custPreferences === 'Cintre' && styles.prefOptionActive]}
+              >
+                <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleSaveCustomer}
+              style={styles.compactSubmitBtn}
+            >
+              <Text style={styles.compactSubmitBtnText}>Enregistrer le client</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* MODAL 4 : DETAIL CLIENT (FICHE CLIENT) */}
       <ClientDetailModal
@@ -4088,6 +3923,44 @@ const baseStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  fullPageContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    paddingTop: Platform.OS === 'ios' ? 48 : 24,
+  },
+  fullPageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingRight: 10,
+  },
+  backBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  fullPageTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'center',
+    flex: 1,
+  },
+  fullPageScroll: {
+    padding: 16,
+    paddingBottom: 40,
+  },
   premiumSubscriptionCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
@@ -4244,6 +4117,10 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
+    fullPageContainer: { backgroundColor: '#000000' },
+    fullPageHeader: { backgroundColor: '#09090b', borderBottomColor: '#1f2937' },
+    backBtnText: { color: '#ffffff' },
+    fullPageTitle: { color: '#ffffff' },
     compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
     popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
     container: { backgroundColor: '#000000' },

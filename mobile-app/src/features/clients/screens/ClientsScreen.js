@@ -3,7 +3,7 @@ import {
   StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity,
   Alert, BackHandler, Platform, KeyboardAvoidingView, Modal
 } from "react-native";
-import { Search, Plus, MapPin, Phone, ChevronRight, X, Edit3, Trash2, Award, CreditCard, Calendar } from "lucide-react-native";
+import { Search, Plus, MapPin, Phone, ChevronRight, X, Edit3, Trash2, Award, CreditCard, Calendar, ArrowLeft } from "lucide-react-native";
 import { db } from "../../../services/db";
 import { MotiView } from "../../../components/SafeView";
 import SafeBlurView from "../../../components/SafeBlurView";
@@ -174,117 +174,107 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
     ]);
   };
 
-  const getClientOrders = (clientId) => db.getOrders().filter(o => o.customer_id === clientId);
-
   const formatPrice = (price) => (price || 0).toLocaleString("fr-FR") + " FCFA";
+
+  const getClientOrders = (customerId) => {
+    try {
+      return (db.getOrders() || []).filter(o => o && o.customer_id === customerId);
+    } catch (e) {
+      return [];
+    }
+  };
 
   const renderForm = (isEditing, onClose, visible) => (
     <Modal
       visible={visible}
-      transparent={true}
-      animationType="none"
+      animationType="slide"
+      presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <MotiView
-        animate={{
-          opacity: visible ? 1 : 0
-        }}
-        transition={{ type: 'timing', duration: 120 }}
-        style={StyleSheet.absoluteFill}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.fullPageContainer}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-        <View style={styles.compactModalOverlay}>
-          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
-            <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+        {/* HEADER BACK BUTTON */}
+        <View style={styles.fullPageHeader}>
+          <TouchableOpacity onPress={onClose} style={styles.backBtnHeader} activeOpacity={0.7}>
+            <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+            <Text style={styles.backBtnText}>Retour</Text>
           </TouchableOpacity>
-          <MotiView
-            from={{ opacity: 0, scale: 0.88, translateY: 48 }}
-            animate={{ opacity: 1, scale: 1, translateY: 0 }}
-            transition={{ type: 'spring', damping: 16, mass: 0.8 }}
-            style={styles.compactModalView}
-          >
-            <View style={styles.compactModalHeader}>
-              <Text style={styles.compactModalTitle}>
-                {isEditing ? "Modifier le Profil Client" : "Nouveau Profil Client"}
-              </Text>
-              <TouchableOpacity onPress={onClose}>
-                <X size={20} color="#71717a" />
-              </TouchableOpacity>
+
+          <Text style={styles.fullPageTitle} numberOfLines={1}>
+            {isEditing ? "Modifier le Profil Client" : "Nouveau Profil Client"}
+          </Text>
+          <View style={{ width: 70 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.fullPageScroll} bounces={false} showsVerticalScrollIndicator={false}>
+          <View style={styles.compactInputRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.compactLabel}>Prénom</Text>
+              <TextInput
+                placeholder="Prénom"
+                placeholderTextColor="#a1a1aa"
+                value={custPrenom}
+                onChangeText={setCustPrenom}
+                style={styles.compactInput}
+              />
             </View>
-
-            <ScrollView contentContainerStyle={styles.compactModalScroll} bounces={false} showsVerticalScrollIndicator={false}>
-              <View style={styles.compactInputRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.compactLabel}>Prénom</Text>
-                  <TextInput
-                    placeholder="Prénom"
-                    placeholderTextColor="#a1a1aa"
-                    value={custPrenom}
-                    onChangeText={setCustPrenom}
-                    style={styles.compactInput}
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.compactLabel}>Nom</Text>
-                  <TextInput
-                    placeholder="Nom"
-                    placeholderTextColor="#a1a1aa"
-                    value={custNom}
-                    onChangeText={setCustNom}
-                    style={styles.compactInput}
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.compactLabel}>Téléphone</Text>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.compactLabel}>Nom</Text>
               <TextInput
-                placeholder="Ex: 97000000"
+                placeholder="Nom"
                 placeholderTextColor="#a1a1aa"
-                keyboardType="phone-pad"
-                value={custTelephone}
-                onChangeText={setCustTelephone}
+                value={custNom}
+                onChangeText={setCustNom}
                 style={styles.compactInput}
               />
-
-              <Text style={styles.compactLabel}>Adresse</Text>
-              <TextInput
-                placeholder="Quartier, Rue..."
-                placeholderTextColor="#a1a1aa"
-                value={custAdresse}
-                onChangeText={setCustAdresse}
-                style={styles.compactInput}
-              />
-
-              <Text style={styles.compactLabel}>Préférence de pliage</Text>
-              <View style={styles.prefSelector}>
-                <TouchableOpacity 
-                  onPress={() => setCustPreferences('Plié')}
-                  style={[styles.prefOption, custPreferences === 'Plié' && styles.prefOptionActive]}
-                >
-                  <Text style={[styles.prefText, custPreferences === 'Plié' && styles.prefTextActive]}>Plié</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={() => setCustPreferences('Cintre')}
-                  style={[styles.prefOption, custPreferences === 'Cintre' && styles.prefOptionActive]}
-                >
-                  <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                onPress={handleSaveCustomer}
-                style={styles.compactSubmitBtn}
-              >
-                <Text style={styles.compactSubmitBtnText}>Enregistrer le client</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </MotiView>
+            </View>
           </View>
-        </KeyboardAvoidingView>
-      </MotiView>
+
+          <Text style={styles.compactLabel}>Téléphone</Text>
+          <TextInput
+            placeholder="Ex: 97000000"
+            placeholderTextColor="#a1a1aa"
+            keyboardType="phone-pad"
+            value={custTelephone}
+            onChangeText={setCustTelephone}
+            style={styles.compactInput}
+          />
+
+          <Text style={styles.compactLabel}>Adresse</Text>
+          <TextInput
+            placeholder="Quartier, Rue..."
+            placeholderTextColor="#a1a1aa"
+            value={custAdresse}
+            onChangeText={setCustAdresse}
+            style={styles.compactInput}
+          />
+
+          <Text style={styles.compactLabel}>Préférence de pliage</Text>
+          <View style={styles.prefSelector}>
+            <TouchableOpacity 
+              onPress={() => setCustPreferences('Plié')}
+              style={[styles.prefOption, custPreferences === 'Plié' && styles.prefOptionActive]}
+            >
+              <Text style={[styles.prefText, custPreferences === 'Plié' && styles.prefTextActive]}>Plié</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setCustPreferences('Cintre')}
+              style={[styles.prefOption, custPreferences === 'Cintre' && styles.prefOptionActive]}
+            >
+              <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={handleSaveCustomer}
+            style={styles.compactSubmitBtn}
+          >
+            <Text style={styles.compactSubmitBtnText}>Enregistrer le client</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 
@@ -398,186 +388,168 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
       {selectedClient && (
         <Modal
           visible={!!selectedClient}
-          transparent={true}
-          animationType="none"
+          animationType="slide"
+          presentationStyle="fullScreen"
           onRequestClose={handleCloseFiche}
         >
-          <MotiView
-            pointerEvents={selectedClient ? 'auto' : 'none'}
-            animate={{ opacity: isFicheVisible ? 1 : 0 }}
-            transition={{ type: 'timing', duration: 120 }}
-            style={StyleSheet.absoluteFill}
-          >
-            <View style={styles.compactModalOverlay}>
-              <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleCloseFiche}>
-                <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+          <View style={styles.fullPageContainer}>
+            {/* HEADER BACK BUTTON */}
+            <View style={styles.fullPageHeader}>
+              <TouchableOpacity onPress={handleCloseFiche} style={styles.backBtnHeader} activeOpacity={0.7}>
+                <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+                <Text style={styles.backBtnText}>Retour</Text>
               </TouchableOpacity>
-              <MotiView
-                from={{ opacity: 0, scale: 0.9, translateY: 40 }}
-                animate={{
-                  opacity: isFicheVisible ? 1 : 0,
-                  scale: isFicheVisible ? 1 : 0.9,
-                  translateY: isFicheVisible ? 0 : 40
-                }}
-                transition={{ type: 'spring', damping: 15, mass: 0.8 }}
-                style={styles.compactModalView}
-              >
-                <View style={styles.compactModalHeader}>
-                  <View style={styles.ficheAvatarRow}>
-                    <View style={styles.ficheAvatarLarge}>
-                      <Text style={styles.ficheAvatarTextLarge}>{(selectedClient.prenom?.[0] || "") + (selectedClient.nom?.[0] || "")}</Text>
-                    </View>
-                    <View>
-                      <Text style={styles.compactModalTitle}>{selectedClient.prenom} {selectedClient.nom}</Text>
-                      <Text style={styles.ficheSubtitle}>{selectedClient.telephone}</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity onPress={handleCloseFiche}>
-                    <X size={20} color="#71717a" />
-                  </TouchableOpacity>
-                </View>
-                <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
-                  {(() => {
-                    const activeClient = customers.find(c => c.id === selectedClient.id) || selectedClient;
-                    return (
-                      <>
-                        <View style={styles.detailCard}>
-                          {activeClient.adresse ? (
-                            <View style={styles.ficheInfoRow}><MapPin size={13} color="#71717a" /><Text style={styles.ficheInfoText}>{activeClient.adresse}</Text></View>
-                          ) : null}
-                          <View style={styles.ficheInfoRow}>
-                            <Text style={styles.ficheInfoLabel}>Preferences :</Text>
-                            <Text style={styles.ficheInfoValue}>
-                              {activeClient.preferences_pliage === 'Cintre' ? 'Sur Cintre' : (activeClient.preferences_pliage || 'Plié')}
-                            </Text>
-                          </View>
-                        </View>
 
-                        {/* Fidélité & Dette */}
-                        <View style={styles.detailCard}>
-                          <View style={styles.ficheInfoRow}>
-                            <Award size={13} color="#71717a" style={{ marginRight: 6 }} />
-                            <Text style={styles.ficheInfoLabel}>Points Fidélité :</Text>
-                            <Text style={[styles.ficheInfoValue, { color: '#059669', fontWeight: '700' }]}>
-                              {activeClient.points_fidelite || 0} pts
-                            </Text>
-                          </View>
-                          <View style={styles.ficheInfoRow}>
-                            <CreditCard size={13} color="#71717a" style={{ marginRight: 6 }} />
-                            <Text style={styles.ficheInfoLabel}>Solde Dette :</Text>
-                            <Text style={[styles.ficheInfoValue, { color: (activeClient.solde_dette || 0) > 0 ? '#ef4444' : '#64748b', fontWeight: '700' }]}>
-                              {formatPrice(activeClient.solde_dette || 0)}
-                            </Text>
-                          </View>
-                          <View style={styles.ficheInfoRow}>
-                            <Calendar size={13} color="#71717a" style={{ marginRight: 6 }} />
-                            <Text style={styles.ficheInfoLabel}>Membre depuis :</Text>
-                            <Text style={styles.ficheInfoValue}>
-                              {activeClient.created_at ? new Date(activeClient.created_at).toLocaleDateString('fr-FR') : 'N/A'}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* Abonnement Card */}
-                        {(() => {
-                          const canSubscribe = currentUser?.role !== 'livreur';
-                          let subscriptionForm = null;
-
-                          if (activeClient.active_subscription) {
-                            const rem = activeClient.active_subscription.remaining_clothes;
-                            const tot = activeClient.active_subscription.total_clothes;
-                            const pct = Math.max(0, Math.min(100, Math.round(((tot - rem) / tot) * 100)));
-                            
-                            subscriptionForm = (
-                              <View style={{ gap: 8 }}>
-                                <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
-                                <Text style={styles.subPlanBalance}>{activeClient.active_subscription.remaining_clothes} vet. restants / {activeClient.active_subscription.total_clothes} vet.</Text>
-                                <View style={[styles.progressBarBg, { marginTop: 4 }]}>
-                                  <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
-                                </View>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                                  <Text style={{ fontSize: 10, color: '#64748b' }}>
-                                    Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
-                                  </Text>
-                                  <Text style={{ fontSize: 10, color: '#64748b' }}>
-                                    Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
-                                  </Text>
-                                </View>
-                                {canSubscribe && (
-                                  <TouchableOpacity onPress={() => handleUnsubscribeCrm(activeClient.id)} style={styles.unsubscribeBtn} activeOpacity={0.8}>
-                                    <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-                            );
-                          } else if (canSubscribe) {
-                            subscriptionForm = (
-                              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                                <View style={{ flex: 1 }}>
-                                  <CustomSelect
-                                    value={selectedCrmSubId}
-                                    onChange={(val) => setSelectedCrmSubId(val)}
-                                    options={[
-                                      { label: "-- Choisir une formule --", value: "" },
-                                      ...catalog.filter(item => item.service === 'abonnement').map(sub => ({
-                                        label: `${sub.article} (${sub.prix.toLocaleString('fr-FR')} F/m)`,
-                                        value: sub.id
-                                      }))
-                                    ]}
-                                    placeholder="Choisir une formule"
-                                  />
-                                </View>
-                                <TouchableOpacity
-                                  onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
-                                  style={styles.subscribeBtn}
-                                  activeOpacity={0.8}
-                                >
-                                  <Text style={styles.subscribeBtnText}>Souscrire</Text>
-                                </TouchableOpacity>
-                              </View>
-                            );
-                          } else {
-                            subscriptionForm = (
-                              <Text style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', marginTop: 4 }}>
-                                Souscription réservée aux gérants et agents d'accueil
-                              </Text>
-                            );
-                          }
-
-                          return (
-                            <>
-                              <Text style={styles.sectionTitle}>Forfait d'Abonnement</Text>
-                              <View style={styles.detailCard}>
-                                <View style={styles.subscriptionHeader}>
-                                  <Text style={styles.subscriptionTitle}>Abonnement</Text>
-                                  {activeClient.active_subscription && (
-                                    <View style={styles.subActiveBadge}><Text style={styles.subActiveBadgeText}>ACTIF</Text></View>
-                                  )}
-                                </View>
-                                {subscriptionForm}
-                              </View>
-                            </>
-                          );
-                        })()}
-                      </>
-                    );
-                  })()}
-                </ScrollView>
-                <View style={styles.ficheActions}>
-                  {currentUser && currentUser.role !== 'livreur' && (
-                    <TouchableOpacity onPress={() => handleDeleteCustomer(selectedClient.id)} style={styles.ficheDeleteBtn}>
-                      <Trash2 size={14} color="#ef4444" style={{ marginRight: 4 }} />
-                      <Text style={styles.ficheDeleteBtnText}>Supprimer</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity onPress={() => handleEditCustomer(selectedClient)} style={styles.ficheEditBtn}>
-                    <Edit3 size={14} color="#ffffff" style={{ marginRight: 4 }} />
-                    <Text style={styles.ficheEditBtnText}>Modifier</Text>
-                  </TouchableOpacity>
-                </View>
-              </MotiView>
+              <Text style={styles.fullPageTitle} numberOfLines={1}>Fiche Client</Text>
+              <View style={{ width: 70 }} />
             </View>
-          </MotiView>
+
+            <ScrollView contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
+              <View style={styles.compactModalHeader}>
+                <View style={styles.ficheAvatarRow}>
+                  <View style={styles.ficheAvatarLarge}>
+                    <Text style={styles.ficheAvatarTextLarge}>{(selectedClient.prenom?.[0] || "") + (selectedClient.nom?.[0] || "")}</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.compactModalTitle}>{selectedClient.prenom} {selectedClient.nom}</Text>
+                    <Text style={styles.ficheSubtitle}>{selectedClient.telephone}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {(() => {
+                const activeClient = customers.find(c => c.id === selectedClient.id) || selectedClient;
+                return (
+                  <>
+                    <View style={styles.detailCard}>
+                      {activeClient.adresse ? (
+                        <View style={styles.ficheInfoRow}><MapPin size={13} color="#71717a" /><Text style={styles.ficheInfoText}>{activeClient.adresse}</Text></View>
+                      ) : null}
+                      <View style={styles.ficheInfoRow}>
+                        <Text style={styles.ficheInfoLabel}>Preferences :</Text>
+                        <Text style={styles.ficheInfoValue}>
+                          {activeClient.preferences_pliage === 'Cintre' ? 'Sur Cintre' : (activeClient.preferences_pliage || 'Plié')}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Fidélité & Dette */}
+                    <View style={styles.detailCard}>
+                      <View style={styles.ficheInfoRow}>
+                        <Award size={13} color="#71717a" style={{ marginRight: 6 }} />
+                        <Text style={styles.ficheInfoLabel}>Points Fidélité :</Text>
+                        <Text style={[styles.ficheInfoValue, { color: '#059669', fontWeight: '700' }]}>
+                          {activeClient.points_fidelite || 0} pts
+                        </Text>
+                      </View>
+                      <View style={styles.ficheInfoRow}>
+                        <CreditCard size={13} color="#71717a" style={{ marginRight: 6 }} />
+                        <Text style={styles.ficheInfoLabel}>Solde Dette :</Text>
+                        <Text style={[styles.ficheInfoValue, { color: (activeClient.solde_dette || 0) > 0 ? '#ef4444' : '#64748b', fontWeight: '700' }]}>
+                          {formatPrice(activeClient.solde_dette || 0)}
+                        </Text>
+                      </View>
+                      <View style={styles.ficheInfoRow}>
+                        <Calendar size={13} color="#71717a" style={{ marginRight: 6 }} />
+                        <Text style={styles.ficheInfoLabel}>Membre depuis :</Text>
+                        <Text style={styles.ficheInfoValue}>
+                          {activeClient.created_at ? new Date(activeClient.created_at).toLocaleDateString('fr-FR') : 'N/A'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Abonnement Card */}
+                    {(() => {
+                      const canSubscribe = currentUser?.role !== 'livreur';
+                      let subscriptionForm = null;
+
+                      if (activeClient.active_subscription) {
+                        const rem = activeClient.active_subscription.remaining_clothes;
+                        const tot = activeClient.active_subscription.total_clothes;
+                        const pct = Math.max(0, Math.min(100, Math.round(((tot - rem) / tot) * 100)));
+                        
+                        subscriptionForm = (
+                          <View style={{ gap: 8 }}>
+                            <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
+                            <Text style={styles.subPlanBalance}>{activeClient.active_subscription.remaining_clothes} vet. restants / {activeClient.active_subscription.total_clothes} vet.</Text>
+                            <View style={[styles.progressBarBg, { marginTop: 4 }]}>
+                              <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                              <Text style={{ fontSize: 10, color: '#64748b' }}>
+                                Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
+                              </Text>
+                              <Text style={{ fontSize: 10, color: '#64748b' }}>
+                                Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
+                              </Text>
+                            </View>
+                            {canSubscribe && (
+                              <TouchableOpacity onPress={() => handleUnsubscribeCrm(activeClient.id)} style={styles.unsubscribeBtn} activeOpacity={0.8}>
+                                <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        );
+                      } else if (canSubscribe) {
+                        subscriptionForm = (
+                          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                            <View style={{ flex: 1 }}>
+                              <CustomSelect
+                                value={selectedCrmSubId}
+                                onChange={(val) => setSelectedCrmSubId(val)}
+                                options={[
+                                  { label: "-- Choisir une formule --", value: "" },
+                                  ...(db.getCatalog() || []).filter(item => item && item.service === 'abonnement').map(sub => ({
+                                    label: `${sub.article} (${(sub.prix || 0).toLocaleString('fr-FR')} F/m)`,
+                                    value: sub.id
+                                  }))
+                                ]}
+                                placeholder="Choisir une formule"
+                              />
+                            </View>
+                            <TouchableOpacity
+                              onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
+                              style={styles.subscribeBtn}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.subscribeBtnText}>Souscrire</Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      }
+
+                      return (
+                        <>
+                          <View style={styles.detailCard}>
+                            <View style={styles.subscriptionHeader}>
+                              <Text style={styles.subscriptionTitle}>Abonnement</Text>
+                              {activeClient.active_subscription && (
+                                <View style={styles.subActiveBadge}><Text style={styles.subActiveBadgeText}>ACTIF</Text></View>
+                              )}
+                            </View>
+                            {subscriptionForm}
+                          </View>
+                        </>
+                      );
+                    })()}
+                  </>
+                );
+              })()}
+
+              <View style={styles.ficheActions}>
+                {currentUser && currentUser.role !== 'livreur' && (
+                  <TouchableOpacity onPress={() => handleDeleteCustomer(selectedClient.id)} style={styles.ficheDeleteBtn}>
+                    <Trash2 size={14} color="#ef4444" style={{ marginRight: 4 }} />
+                    <Text style={styles.ficheDeleteBtnText}>Supprimer</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => handleEditCustomer(selectedClient)} style={styles.ficheEditBtn}>
+                  <Edit3 size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                  <Text style={styles.ficheEditBtnText}>Modifier</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
         </Modal>
       )}
 
@@ -637,6 +609,44 @@ const baseStyles = StyleSheet.create({
   cardSubTextBold: { fontSize: 10, color: "#002cf7", fontWeight: "700" },
   cardProgressBarBg: { height: 6, backgroundColor: "#e2e8f0", borderRadius: 3, overflow: "hidden" },
   cardProgressBarFill: { height: "100%", backgroundColor: "#002cf7", borderRadius: 3 },
+  fullPageContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    paddingTop: Platform.OS === 'ios' ? 48 : 24,
+  },
+  fullPageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+  },
+  backBtnHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingRight: 10,
+  },
+  backBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  fullPageTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'center',
+    flex: 1,
+  },
+  fullPageScroll: {
+    padding: 16,
+    paddingBottom: 40,
+  },
   compactModalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(241, 245, 249, 0.55)", padding: 16 },
   compactModalView: { backgroundColor: "#ffffff", borderRadius: 24, padding: 20, width: "100%", maxWidth: 380, maxHeight: "85%", shadowColor: "transparent", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0, borderWidth: 1, borderColor: "#e2e8f0", overflow: "hidden" },
   compactModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
@@ -802,6 +812,10 @@ function getStyles(isDarkMode) {
     noResultsText: { color: '#a1a1aa' },
     
     // Modal & Form overrides
+    fullPageContainer: { backgroundColor: '#000000' },
+    fullPageHeader: { backgroundColor: '#09090b', borderBottomColor: '#1f2937' },
+    backBtnText: { color: '#ffffff' },
+    fullPageTitle: { color: '#ffffff' },
     modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
     modalContent: { backgroundColor: '#121212', borderColor: '#27272a' },
     modalTitle: { color: '#ffffff' },

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert, RefreshControl, FlatList } from 'react-native';
-import { Search, Calendar, X, Receipt, Trash2, User, Ban, ChevronRight, Tag } from 'lucide-react-native';
+import { Search, Calendar, X, Receipt, Trash2, User, Ban, ChevronRight, Tag, ArrowLeft } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
@@ -474,167 +474,158 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
         }}
       />
 
-      {/* Detailed Order Modal (BOTTOM SHEET) */}
+      {/* Detailed Order Screen (FULL SCREEN PAGE) */}
       <Modal
         visible={selectedOrder !== null}
-        transparent={true}
-        animationType="none"
+        animationType="slide"
+        presentationStyle="fullScreen"
         onRequestClose={() => setSelectedOrder(null)}
       >
-        <MotiView
-          pointerEvents={selectedOrder !== null ? 'auto' : 'none'}
-          animate={{
-            opacity: selectedOrder !== null ? 1 : 0
-          }}
-          transition={{ type: 'timing', duration: 120 }}
-          style={StyleSheet.absoluteFill}
-        >
+        <View style={styles.fullPageContainer}>
+          {/* HEADER BACK BUTTON */}
+          <View style={styles.fullPageHeader}>
+            <TouchableOpacity onPress={() => setSelectedOrder(null)} style={styles.backBtn} activeOpacity={0.7}>
+              <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+              <Text style={styles.backBtnText}>Retour</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.fullPageTitle} numberOfLines={1}>
+              {selectedOrder ? `Commande #${getDisplayTicketId(selectedOrder)}` : ''}
+            </Text>
+            <View style={{ width: 70 }} />
+          </View>
+
           {selectedOrder && (
-            <View style={styles.compactModalOverlay}>
-              <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedOrder(null)}>
-                <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-              </TouchableOpacity>
-            <View style={[styles.compactModalView, { maxHeight: '90%' }]}>
-              <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Commande #{getDisplayTicketId(selectedOrder)}</Text>
-                <TouchableOpacity onPress={() => setSelectedOrder(null)}>
-                  <X size={20} color="#71717a" />
+            <ScrollView 
+              contentContainerStyle={styles.fullPageScroll} 
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.detailCard}>
+                <TouchableOpacity
+                  onPress={() => {
+                    const client = customers.find(c => c.id === selectedOrder.customer_id);
+                    if (client) {
+                      setSelectedClient(client);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                  style={[styles.clientPillBtn, { marginBottom: 8 }]}
+                >
+                  <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
+                  <Text style={styles.clientPillBtnText}>
+                    {getCustomerName(selectedOrder.customer_id)}
+                  </Text>
                 </TouchableOpacity>
+                <Text style={styles.detailDate}>Enregistrée le : {selectedOrder.created_at.replace('T', ' ').substring(0, 16)}</Text>
+                <Text style={styles.detailDate}>
+                  Retrait prévu le : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
+                </Text>
+                
+                <View style={[styles.statusTag, { backgroundColor: getStatusColor(selectedOrder.statut).bg, borderColor: getStatusColor(selectedOrder.statut).border, alignSelf: 'flex-start', marginTop: 10, borderWidth: 1 }]}>
+                  <Text style={[styles.statusTagText, { color: getStatusColor(selectedOrder.statut).text }]}>
+                    {getStatusColor(selectedOrder.statut).label}
+                  </Text>
+                </View>
+
+                {(() => {
+                  const client = customers.find(c => c.id === selectedOrder.customer_id);
+                  if (client?.active_subscription) {
+                    const remaining = client.active_subscription.remaining_clothes;
+                    const total = client.active_subscription.total_clothes;
+                    const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                    return (
+                      <View style={[styles.cardSubscriptionGaugeContainer, { marginTop: 12 }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <Text style={styles.cardSubText}>Abonnement : {client.active_subscription.name}</Text>
+                          <Text style={styles.cardSubTextBold}>{remaining} / {total} vêt.</Text>
+                        </View>
+                        <View style={styles.cardProgressBarBg}>
+                          <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
+                        </View>
+                      </View>
+                    );
+                  }
+                  return null;
+                })()}
               </View>
 
-              <ScrollView 
-                style={{ flexGrow: 0 }}
-                contentContainerStyle={styles.compactModalScroll} 
-                showsVerticalScrollIndicator={false}
-              >
-                <View style={styles.detailCard}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      const client = customers.find(c => c.id === selectedOrder.customer_id);
-                      if (client) {
-                        setSelectedClient(client);
-                      }
-                    }}
-                    activeOpacity={0.8}
-                    style={[styles.clientPillBtn, { marginBottom: 8 }]}
-                  >
-                    <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
-                    <Text style={styles.clientPillBtnText}>
-                      {getCustomerName(selectedOrder.customer_id)}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.detailDate}>Enregistrée le : {selectedOrder.created_at.replace('T', ' ').substring(0, 16)}</Text>
-                  <Text style={styles.detailDate}>
-                    Retrait prévu le : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
-                  </Text>
-                  
-                  <View style={[styles.statusTag, { backgroundColor: getStatusColor(selectedOrder.statut).bg, borderColor: getStatusColor(selectedOrder.statut).border, alignSelf: 'flex-start', marginTop: 10, borderWidth: 1 }]}>
-                    <Text style={[styles.statusTagText, { color: getStatusColor(selectedOrder.statut).text }]}>
-                      {getStatusColor(selectedOrder.statut).label}
-                    </Text>
+              <Text style={styles.sectionTitle}>Articles</Text>
+              <View style={styles.detailCard}>
+                {(selectedOrder.items || selectedOrder.articles || []).map((art) => (
+                  <View key={`${art.article}-${art.service}`} style={styles.articleRow}>
+                    <Text style={styles.articleText}>{art.article} ({(art.service || '').replace(/_/g, ' ')}) x{art.quantite}</Text>
+                    <Text style={styles.articlePrice}>{formatPrice(art.prix * art.quantite)}</Text>
                   </View>
-
-                  {(() => {
-                    const client = customers.find(c => c.id === selectedOrder.customer_id);
-                    if (client?.active_subscription) {
-                      const remaining = client.active_subscription.remaining_clothes;
-                      const total = client.active_subscription.total_clothes;
-                      const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                      return (
-                        <View style={[styles.cardSubscriptionGaugeContainer, { marginTop: 12 }]}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <Text style={styles.cardSubText}>Abonnement : {client.active_subscription.name}</Text>
-                            <Text style={styles.cardSubTextBold}>{remaining} / {total} vêt.</Text>
-                          </View>
-                          <View style={styles.cardProgressBarBg}>
-                            <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
-                          </View>
-                        </View>
-                      );
-                    }
-                    return null;
-                  })()}
-                </View>
-
-                <Text style={styles.sectionTitle}>Articles</Text>
-                <View style={styles.detailCard}>
-                  {(selectedOrder.items || selectedOrder.articles || []).map((art) => (
-                    <View key={`${art.article}-${art.service}`} style={styles.articleRow}>
-                      <Text style={styles.articleText}>{art.article} ({(art.service || '').replace(/_/g, ' ')}) x{art.quantite}</Text>
-                      <Text style={styles.articlePrice}>{formatPrice(art.prix * art.quantite)}</Text>
-                    </View>
-                  ))}
-                  <View style={styles.divider} />
-                  {selectedOrder.remise_pourcentage > 0 && (
-                    <>
-                      <View style={styles.articleRow}>
-                        <Text style={styles.subLabel}>Sous-total</Text>
-                        <Text style={styles.subValue}>
-                          {formatPrice((selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0))}
-                        </Text>
-                      </View>
-                      <View style={styles.articleRow}>
-                        <Text style={[styles.subLabel, { color: '#ef4444' }]}>Réduction ({selectedOrder.remise_pourcentage}%)</Text>
-                        <Text style={[styles.subValue, { color: '#ef4444', fontWeight: '600' }]}>
-                          -{formatPrice(
-                            (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) - 
-                            (selectedOrder.prix_total || selectedOrder.total)
-                          )}
-                        </Text>
-                      </View>
-                    </>
-                  )}
-                  <View style={styles.articleRow}>
-                    <Text style={styles.totalLabel}>Total</Text>
-                    <Text style={styles.totalValue}>{formatPrice(selectedOrder.prix_total || selectedOrder.total)}</Text>
-                  </View>
-                  <View style={styles.articleRow}>
-                    <Text style={styles.subLabel}>Avance payée</Text>
-                    <Text style={styles.subValue}>{formatPrice(selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : selectedOrder.avance)}</Text>
-                  </View>
-                  <View style={styles.articleRow}>
-                    <Text style={styles.subLabel}>Reste à payer</Text>
-                    <Text style={styles.subValue}>
-                      {formatPrice((selectedOrder.prix_total || selectedOrder.total) - (selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : (selectedOrder.avance || 0)))}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.sectionTitle}>Paiement & Mode</Text>
-                <View style={styles.detailCard}>
-                  <Text style={styles.logisticsText}>Mode de règlement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement || 'Non spécifié'}</Text>
-                </View>
-
-                {selectedOrder.statut === 'annule' && selectedOrder.motif_annulation && (
+                ))}
+                <View style={styles.divider} />
+                {selectedOrder.remise_pourcentage > 0 && (
                   <>
-                    <Text style={[styles.sectionTitle, { color: '#ef4444' }]}>Motif d'annulation</Text>
-                    <View style={[styles.detailCard, { borderColor: 'rgba(239, 68, 68, 0.2)', borderWidth: 1, backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.05)' : 'rgba(239, 68, 68, 0.03)' }]}>
-                      <Text style={[styles.logisticsText, { color: '#ef4444', fontWeight: '600' }]}>
-                        {selectedOrder.motif_annulation}
+                    <View style={styles.articleRow}>
+                      <Text style={styles.subLabel}>Sous-total</Text>
+                      <Text style={styles.subValue}>
+                        {formatPrice((selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0))}
+                      </Text>
+                    </View>
+                    <View style={styles.articleRow}>
+                      <Text style={[styles.subLabel, { color: '#ef4444' }]}>Réduction ({selectedOrder.remise_pourcentage}%)</Text>
+                      <Text style={[styles.subValue, { color: '#ef4444', fontWeight: '600' }]}>
+                        -{formatPrice(
+                          (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) - 
+                          (selectedOrder.prix_total || selectedOrder.total)
+                        )}
                       </Text>
                     </View>
                   </>
                 )}
-
-                {/* Cancel & Delete Buttons */}
-                {selectedOrder.statut !== 'annule' && selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && 
-                 currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage' && (
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 8 }}>
-                    <TouchableOpacity
-                      onPress={() => handleCancelOrder(selectedOrder)}
-                      activeOpacity={0.8}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
-                    >
-                      <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler la commande</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                </ScrollView>
+                <View style={styles.articleRow}>
+                  <Text style={styles.totalLabel}>Total</Text>
+                  <Text style={styles.totalValue}>{formatPrice(selectedOrder.prix_total || selectedOrder.total)}</Text>
+                </View>
+                <View style={styles.articleRow}>
+                  <Text style={styles.subLabel}>Avance payée</Text>
+                  <Text style={styles.subValue}>{formatPrice(selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : selectedOrder.avance)}</Text>
+                </View>
+                <View style={styles.articleRow}>
+                  <Text style={styles.subLabel}>Reste à payer</Text>
+                  <Text style={styles.subValue}>
+                    {formatPrice((selectedOrder.prix_total || selectedOrder.total) - (selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : (selectedOrder.avance || 0)))}
+                  </Text>
+                </View>
               </View>
-            </View>
+
+              <Text style={styles.sectionTitle}>Paiement & Mode</Text>
+              <View style={styles.detailCard}>
+                <Text style={styles.logisticsText}>Mode de règlement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement || 'Non spécifié'}</Text>
+              </View>
+
+              {selectedOrder.statut === 'annule' && selectedOrder.motif_annulation && (
+                <>
+                  <Text style={[styles.sectionTitle, { color: '#ef4444' }]}>Motif d'annulation</Text>
+                  <View style={[styles.detailCard, { borderColor: 'rgba(239, 68, 68, 0.2)', borderWidth: 1, backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.05)' : 'rgba(239, 68, 68, 0.03)' }]}>
+                    <Text style={[styles.logisticsText, { color: '#ef4444', fontWeight: '600' }]}>
+                      {selectedOrder.motif_annulation}
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              {/* Cancel & Delete Buttons */}
+              {selectedOrder.statut !== 'annule' && selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && 
+               currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage' && (
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => handleCancelOrder(selectedOrder)}
+                    activeOpacity={0.8}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
+                  >
+                    <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
+                    <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler la commande</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
           )}
-        </MotiView>
+        </View>
       </Modal>
 
       {/* MODAL : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
@@ -1737,6 +1728,44 @@ const baseStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  fullPageContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    paddingTop: Platform.OS === 'ios' ? 48 : 24,
+  },
+  fullPageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingRight: 10,
+  },
+  backBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  fullPageTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'center',
+    flex: 1,
+  },
+  fullPageScroll: {
+    padding: 16,
+    paddingBottom: 40,
+  },
   compactModalOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -1765,6 +1794,10 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
+    fullPageContainer: { backgroundColor: '#000000' },
+    fullPageHeader: { backgroundColor: '#09090b', borderBottomColor: '#1f2937' },
+    backBtnText: { color: '#ffffff' },
+    fullPageTitle: { color: '#ffffff' },
     compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
     popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
     compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
-import { User, Phone, MapPin, Edit3, Trash2, X, Award } from 'lucide-react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, Platform } from 'react-native';
+import { User, Phone, MapPin, Edit3, Trash2, ArrowLeft, Award, CreditCard, Calendar, CheckCircle2 } from 'lucide-react-native';
 import SafeBlurView from './SafeBlurView';
 const BlurView = SafeBlurView;
 import { MotiView } from './SafeView';
@@ -101,357 +101,452 @@ export default function ClientDetailModal({
   };
 
   return (
-    <View style={styles.absoluteModalContainer}>
-      <View style={styles.compactModalOverlay}>
-        <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
-          <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-        </TouchableOpacity>
+    <Modal
+      visible={visible && !!client}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
+      <View style={styles.fullPageContainer}>
+        {/* EN-TÊTE PAGE ENTIÈRE AVEC BOUTON RETOUR */}
+        <View style={styles.fullPageHeader}>
+          <TouchableOpacity onPress={onClose} style={styles.backBtn} activeOpacity={0.7}>
+            <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+            <Text style={styles.backBtnText}>Retour</Text>
+          </TouchableOpacity>
 
-        <MotiView
-          from={{ opacity: 0, scale: 0.88, translateY: 48 }}
-          animate={{ opacity: 1, scale: 1, translateY: 0 }}
-          transition={{ type: 'spring', damping: 16, mass: 0.8 }}
-          style={[styles.compactModalView, { maxHeight: '90%' }]}
-        >
-          <View style={styles.compactModalHeader}>
-            <Text style={styles.compactModalTitle}>Fiche Client</Text>
-            <TouchableOpacity onPress={onClose}>
-              <X size={20} color="#71717a" />
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.fullPageTitle} numberOfLines={1}>Fiche Client</Text>
+          <View style={{ width: 70 }} />
+        </View>
 
-          <ScrollView contentContainerStyle={styles.compactModalScroll} showsVerticalScrollIndicator={false}>
-            <View style={styles.detailCard}>
-              <Text style={styles.clientProfileName}>{activeClient.prenom} {activeClient.nom}</Text>
-              <Text style={styles.clientProfilePhone}>{activeClient.telephone}</Text>
-              <Text style={styles.clientProfileAddress}>{activeClient.adresse || 'Aucune adresse renseignée'}</Text>
-              <Text style={styles.clientProfilePreferences}>Préférence : {activeClient.preferences_pliage || 'Plié'}</Text>
-              
-              <View style={styles.clientActionRow}>
-                {onEditClient && (
-                  <TouchableOpacity
-                    onPress={() => onEditClient(activeClient)}
-                    style={styles.clientEditBtn}
-                  >
-                    <Edit3 size={14} color="#2563eb" />
-                    <Text style={styles.clientEditBtnText}>Modifier</Text>
-                  </TouchableOpacity>
-                )}
-                {currentUser && currentUser.role !== 'livreur' && (
-                  <TouchableOpacity
-                    onPress={() => handleDeleteCustomer(activeClient.id)}
-                    style={styles.clientDeleteBtn}
-                  >
-                    <Trash2 size={14} color="#ef4444" />
-                    <Text style={styles.clientDeleteBtnText}>Supprimer</Text>
-                  </TouchableOpacity>
-                )}
+        <ScrollView contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
+          {/* PROFILE CARD */}
+          <View style={styles.detailCard}>
+            <View style={styles.profileHeaderRow}>
+              <View style={styles.profileAvatar}>
+                <Text style={styles.profileAvatarText}>
+                  {(activeClient.prenom?.[0] || "") + (activeClient.nom?.[0] || "")}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.clientProfileName}>{activeClient.prenom} {activeClient.nom}</Text>
+                <View style={styles.iconInfoRow}>
+                  <Phone size={13} color={isDarkMode ? '#38bdf8' : '#002cf7'} />
+                  <Text style={styles.clientProfilePhone}>{activeClient.telephone}</Text>
+                </View>
+                {activeClient.adresse ? (
+                  <View style={styles.iconInfoRow}>
+                    <MapPin size={13} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+                    <Text style={styles.clientProfileAddress}>{activeClient.adresse}</Text>
+                  </View>
+                ) : null}
               </View>
             </View>
 
-            {/* SECTION ABONNEMENT CLIENT */}
-            <Text style={styles.detailSectionTitle}>Forfait d'Abonnement</Text>
-            <View style={styles.premiumSubscriptionCard}>
-              <View style={styles.subscriptionHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Award size={16} color="#002cf7" />
-                  <Text style={styles.subscriptionTitle}>Forfait d'Abonnement</Text>
-                </View>
-                {activeClient.active_subscription && (
-                  <View style={styles.subActiveBadge}>
-                    <Text style={styles.subActiveBadgeText}>Actif</Text>
-                  </View>
-                )}
+            <View style={styles.divider} />
+
+            <View style={styles.metricsGrid}>
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Préférence pliage</Text>
+                <Text style={styles.metricValue}>
+                  {activeClient.preferences_pliage === 'Cintre' ? 'Sur Cintre 👔' : (activeClient.preferences_pliage || 'Plié 📦')}
+                </Text>
               </View>
 
-              {activeClient.active_subscription ? (
-                <View style={{ gap: 10 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
-                    <Text style={styles.subPlanBalance}>
-                      Solde : {activeClient.active_subscription.remaining_clothes} / {activeClient.active_subscription.total_clothes} vêt.
-                    </Text>
-                  </View>
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Points Fidélité</Text>
+                <Text style={[styles.metricValue, { color: '#059669', fontWeight: '800' }]}>
+                  ⭐ {activeClient.points_fidelite || 0} pts
+                </Text>
+              </View>
+            </View>
 
-                  {/* Barre de progression */}
-                  {(() => {
-                    const remaining = activeClient.active_subscription.remaining_clothes;
-                    const total = activeClient.active_subscription.total_clothes;
-                    const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                    return (
-                      <View style={{ gap: 4 }}>
-                        <View style={styles.progressBarBg}>
-                          <View style={[styles.progressBarFill, { width: `${percentUsed}%` }]} />
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={styles.progressText}>Consommé : {percentUsed}%</Text>
-                          <Text style={styles.progressText}>Restant : {remaining} vêtements</Text>
-                        </View>
-                      </View>
-                    );
-                  })()}
+            <View style={styles.metricsGrid}>
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Solde Dette Encours</Text>
+                <Text style={[styles.metricValue, { color: (activeClient.solde_dette || 0) > 0 ? '#ef4444' : '#10b981', fontWeight: '800' }]}>
+                  {formatPrice(activeClient.solde_dette || 0)}
+                </Text>
+              </View>
 
-                  <View style={styles.subDatesRow}>
-                    <Text style={styles.subDateText}>
-                      Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
-                    </Text>
-                    <Text style={styles.subDateText}>
-                      Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
-                    </Text>
-                  </View>
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Membre depuis</Text>
+                <Text style={styles.metricValue}>
+                  {activeClient.created_at ? new Date(activeClient.created_at).toLocaleDateString('fr-FR') : 'Récemment'}
+                </Text>
+              </View>
+            </View>
 
-                  {currentUser && currentUser.role !== 'livreur' && (
-                    <TouchableOpacity
-                      onPress={() => handleUnsubscribeCrm(activeClient.id)}
-                      style={styles.unsubscribeBtn}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
-                    </TouchableOpacity>
-                  )}
+            <View style={styles.clientActionRow}>
+              {onEditClient && (
+                <TouchableOpacity
+                  onPress={() => onEditClient(activeClient)}
+                  style={styles.clientEditBtn}
+                  activeOpacity={0.8}
+                >
+                  <Edit3 size={15} color={isDarkMode ? '#60a5fa' : '#2563eb'} />
+                  <Text style={styles.clientEditBtnText}>Modifier le profil</Text>
+                </TouchableOpacity>
+              )}
+              {currentUser && currentUser.role !== 'livreur' && (
+                <TouchableOpacity
+                  onPress={() => handleDeleteCustomer(activeClient.id)}
+                  style={styles.clientDeleteBtn}
+                  activeOpacity={0.8}
+                >
+                  <Trash2 size={15} color={isDarkMode ? '#f87171' : '#ef4444'} />
+                  <Text style={styles.clientDeleteBtnText}>Supprimer</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* SECTION ABONNEMENT CLIENT */}
+          <Text style={styles.detailSectionTitle}>Forfait d'Abonnement</Text>
+          <View style={styles.premiumSubscriptionCard}>
+            <View style={styles.subscriptionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Award size={18} color="#002cf7" />
+                <Text style={styles.subscriptionTitle}>Forfait d'Abonnement</Text>
+              </View>
+              {activeClient.active_subscription && (
+                <View style={styles.subActiveBadge}>
+                  <Text style={styles.subActiveBadgeText}>Actif</Text>
                 </View>
-              ) : (
-                currentUser && currentUser.role !== 'livreur' ? (
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                    <View style={{ flex: 1 }}>
-                      <CustomSelect
-                        value={selectedCrmSubId}
-                        onChange={(val) => setSelectedCrmSubId(val)}
-                        options={[
-                          { label: "-- Choisir une formule --", value: "" },
-                          ...(catalog || []).filter(item => item && item.service === 'abonnement').map(sub => ({
-                            label: `${sub.article} (${(sub.prix || 0).toLocaleString('fr-FR')} F/m)`,
-                            value: sub.id
-                          }))
-                        ]}
-                        placeholder="Choisir une formule"
-                      />
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
-                      style={styles.subscribeBtn}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.subscribeBtnText}>Souscrire</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <Text style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', marginTop: 4 }}>
-                    Souscription réservée aux gérants et agents d'accueil
-                  </Text>
-                )
               )}
             </View>
 
-            {/* Historique Client */}
-            <Text style={styles.detailSectionTitle}>Historique des Commandes</Text>
-            {(() => {
-              const clientOrders = (orders || []).filter(o => o && o.customer_id === activeClient.id);
-              return clientOrders.length === 0 ? (
-                <Text style={styles.noResultsText}>Aucune commande pour ce client</Text>
-              ) : (
-                clientOrders.map(item => {
-                  const status = getStatusColor(item.statut);
+            {activeClient.active_subscription ? (
+              <View style={{ gap: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
+                  <Text style={styles.subPlanBalance}>
+                    Solde : {activeClient.active_subscription.remaining_clothes} / {activeClient.active_subscription.total_clothes} vêt.
+                  </Text>
+                </View>
+
+                {/* Barre de progression */}
+                {(() => {
+                  const remaining = activeClient.active_subscription.remaining_clothes;
+                  const total = activeClient.active_subscription.total_clothes;
+                  const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
                   return (
-                    <View key={item.id} style={styles.orderHistoryItem}>
-                      <View>
-                        <Text style={styles.orderHistoryNo}>Ticket #{getDisplayTicketId(item)}</Text>
-                        <Text style={styles.orderHistoryDate}>{item.created_at ? item.created_at.split('T')[0] : 'N/A'}</Text>
+                    <View style={{ gap: 6 }}>
+                      <View style={styles.progressBarBg}>
+                        <View style={[styles.progressBarFill, { width: `${percentUsed}%` }]} />
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, marginBottom: 4, borderWidth: 1 }]}>
-                          <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
-                        </View>
-                        <Text style={styles.orderHistoryTotal}>{formatPrice(item.prix_total || item.total)}</Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={styles.progressText}>Consommé : {percentUsed}%</Text>
+                        <Text style={styles.progressText}>Restant : {remaining} vêtements</Text>
                       </View>
                     </View>
                   );
-                })
-              );
-            })()}
-          </ScrollView>
-        </MotiView>
+                })()}
+
+                <View style={styles.subDatesRow}>
+                  <Text style={styles.subDateText}>
+                    Du : {new Date(activeClient.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}
+                  </Text>
+                  <Text style={styles.subDateText}>
+                    Au : {new Date(activeClient.active_subscription.expires_at).toLocaleDateString('fr-FR')}
+                  </Text>
+                </View>
+
+                {currentUser && currentUser.role !== 'livreur' && (
+                  <TouchableOpacity
+                    onPress={() => handleUnsubscribeCrm(activeClient.id)}
+                    style={styles.unsubscribeBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.unsubscribeBtnText}>Résilier l'abonnement</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              currentUser && currentUser.role !== 'livreur' ? (
+                <View style={{ flexDirection: 'column', gap: 10, marginTop: 4 }}>
+                  <CustomSelect
+                    value={selectedCrmSubId}
+                    onChange={(val) => setSelectedCrmSubId(val)}
+                    options={[
+                      { label: "-- Choisir une formule d'abonnement --", value: "" },
+                      ...(catalog || []).filter(item => item && item.service === 'abonnement').map(sub => ({
+                        label: `${sub.article} (${(sub.prix || 0).toLocaleString('fr-FR')} F/m)`,
+                        value: sub.id
+                      }))
+                    ]}
+                    placeholder="Choisir une formule"
+                  />
+                  <TouchableOpacity
+                    onPress={() => handleSubscribeCrm(activeClient.id, selectedCrmSubId)}
+                    style={styles.subscribeBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.subscribeBtnText}>Souscrire cet abonnement</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <Text style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', marginTop: 4 }}>
+                  Souscription réservée aux gérants et agents d'accueil
+                </Text>
+              )
+            )}
+          </View>
+
+          {/* HISTORIQUE CLIENT */}
+          <Text style={styles.detailSectionTitle}>Historique des Commandes ({((orders || []).filter(o => o && o.customer_id === activeClient.id)).length})</Text>
+          {(() => {
+            const clientOrders = (orders || []).filter(o => o && o.customer_id === activeClient.id);
+            return clientOrders.length === 0 ? (
+              <View style={styles.detailCard}>
+                <Text style={styles.noResultsText}>Aucune commande enregistrée pour ce client</Text>
+              </View>
+            ) : (
+              clientOrders.map(item => {
+                const status = getStatusColor(item.statut);
+                return (
+                  <View key={item.id} style={styles.orderHistoryItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.orderHistoryNo}>Ticket #{getDisplayTicketId(item)}</Text>
+                      <Text style={styles.orderHistoryDate}>Enregistrée le {item.created_at ? item.created_at.split('T')[0] : 'N/A'}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                      <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, borderWidth: 1 }]}>
+                        <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
+                      </View>
+                      <Text style={styles.orderHistoryTotal}>{formatPrice(item.prix_total || item.total)}</Text>
+                    </View>
+                  </View>
+                );
+              })
+            );
+          })()}
+        </ScrollView>
       </View>
-    </View>
+    </Modal>
   );
 }
 
 function getStyles(isDarkMode) {
-  const base = {
-    absoluteModalContainer: {
-      position: 'absolute',
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      zIndex: 10000,
-    },
-    compactModalOverlay: {
+  return {
+    fullPageContainer: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(241, 245, 249, 0.55)',
-      padding: 16,
+      backgroundColor: isDarkMode ? '#000000' : '#ffffff',
+      paddingTop: Platform.OS === 'ios' ? 48 : 24,
     },
-    compactModalView: {
-      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-      borderRadius: 24,
-      padding: 20,
-      width: '100%',
-      maxWidth: 380,
-      borderColor: isDarkMode ? '#27272a' : 'transparent',
-      borderWidth: isDarkMode ? 1 : 0,
-      shadowColor: 'transparent',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0,
-      shadowRadius: 0,
-      elevation: 0,
-    },
-    compactModalHeader: {
+    fullPageHeader: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 16,
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#1f2937' : '#e2e8f0',
+      backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
     },
-    compactModalTitle: {
-      fontSize: 18,
+    backBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 4,
+      paddingRight: 10,
+    },
+    backBtnText: {
+      fontSize: 15,
       fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#09090b',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
     },
-    compactModalScroll: {
-      paddingBottom: 10,
+    fullPageTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
+      textAlign: 'center',
+      flex: 1,
+    },
+    fullPageScroll: {
+      padding: 16,
+      paddingBottom: 40,
     },
     detailCard: {
-      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 16,
+      backgroundColor: isDarkMode ? '#121212' : '#f8fafc',
+      borderRadius: 20,
+      padding: 18,
+      marginBottom: 20,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       borderWidth: 1,
     },
-    clientProfileName: {
+    profileHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+    },
+    profileAvatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: isDarkMode ? '#1d4ed8' : '#002cf7',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    profileAvatarText: {
       fontSize: 18,
-      fontWeight: '700',
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+    clientProfileName: {
+      fontSize: 19,
+      fontWeight: '800',
       color: isDarkMode ? '#ffffff' : '#09090b',
       marginBottom: 4,
+    },
+    iconInfoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 2,
     },
     clientProfilePhone: {
       fontSize: 14,
       color: isDarkMode ? '#38bdf8' : '#002cf7',
-      fontWeight: '600',
-      marginBottom: 4,
+      fontWeight: '700',
     },
     clientProfileAddress: {
       fontSize: 13,
-      color: isDarkMode ? '#d4d4d8' : '#64748b',
-      marginBottom: 4,
+      color: isDarkMode ? '#94a3b8' : '#64748b',
     },
-    clientProfilePreferences: {
-      fontSize: 12,
-      color: isDarkMode ? '#a1a1aa' : '#475569',
-      fontWeight: '500',
-      marginBottom: 12,
+    divider: {
+      height: 1,
+      backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      marginVertical: 14,
+    },
+    metricsGrid: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 10,
+    },
+    metricItem: {
+      flex: 1,
+      backgroundColor: isDarkMode ? '#18181b' : '#ffffff',
+      borderRadius: 14,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+    },
+    metricLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      marginBottom: 4,
+      textTransform: 'uppercase',
+    },
+    metricValue: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
     },
     clientActionRow: {
       flexDirection: 'row',
       gap: 10,
-      marginTop: 4,
+      marginTop: 12,
     },
     clientEditBtn: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: 6,
       backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#eff6ff',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 8,
+      paddingVertical: 10,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.2)',
     },
     clientEditBtnText: {
-      fontSize: 12,
-      fontWeight: '600',
+      fontSize: 13,
+      fontWeight: '700',
       color: isDarkMode ? '#60a5fa' : '#2563eb',
     },
     clientDeleteBtn: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: 6,
       backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 8,
+      paddingVertical: 10,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)',
     },
     clientDeleteBtnText: {
-      fontSize: 12,
-      fontWeight: '600',
+      fontSize: 13,
+      fontWeight: '700',
       color: isDarkMode ? '#f87171' : '#ef4444',
     },
     detailSectionTitle: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: isDarkMode ? '#d4d4d8' : '#334155',
-      marginBottom: 8,
-      marginTop: 6,
+      fontSize: 15,
+      fontWeight: '800',
+      color: isDarkMode ? '#f1f5f9' : '#0f172a',
+      marginBottom: 10,
+      marginTop: 10,
     },
     premiumSubscriptionCard: {
-      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
-      borderRadius: 16,
-      padding: 14,
-      marginBottom: 16,
-      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      backgroundColor: isDarkMode ? '#121212' : '#f8fafc',
+      borderRadius: 20,
+      padding: 16,
+      marginBottom: 20,
       borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
     },
     subscriptionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 10,
+      marginBottom: 12,
     },
     subscriptionTitle: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#09090b',
+      fontSize: 15,
+      fontWeight: '800',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
     },
     subActiveBadge: {
-      backgroundColor: 'rgba(34, 197, 94, 0.15)',
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 99,
+      backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.15)' : '#ecfdf5',
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      borderRadius: 12,
       borderWidth: 1,
-      borderColor: 'rgba(34, 197, 94, 0.3)',
+      borderColor: isDarkMode ? '#059669' : '#a7f3d0',
     },
     subActiveBadgeText: {
       fontSize: 11,
-      fontWeight: '700',
-      color: '#16a34a',
+      fontWeight: '800',
+      color: isDarkMode ? '#4ade80' : '#059669',
     },
     subPlanName: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: isDarkMode ? '#38bdf8' : '#002cf7',
+      fontSize: 16,
+      fontWeight: '800',
+      color: isDarkMode ? '#ffffff' : '#002cf7',
     },
     subPlanBalance: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: isDarkMode ? '#d4d4d8' : '#475569',
+      fontSize: 13,
+      fontWeight: '700',
+      color: isDarkMode ? '#38bdf8' : '#0284c7',
     },
     progressBarBg: {
       height: 8,
       backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0',
-      borderRadius: 99,
+      borderRadius: 4,
       overflow: 'hidden',
     },
     progressBarFill: {
       height: '100%',
       backgroundColor: '#002cf7',
-      borderRadius: 99,
+      borderRadius: 4,
     },
     progressText: {
       fontSize: 11,
-      color: isDarkMode ? '#a1a1aa' : '#64748b',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      fontWeight: '600',
     },
     subDatesRow: {
       flexDirection: 'row',
@@ -459,77 +554,76 @@ function getStyles(isDarkMode) {
       marginTop: 4,
     },
     subDateText: {
-      fontSize: 11,
-      color: isDarkMode ? '#a1a1aa' : '#64748b',
+      fontSize: 12,
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      fontWeight: '500',
     },
     unsubscribeBtn: {
       backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
-      paddingVertical: 8,
-      borderRadius: 8,
+      paddingVertical: 10,
+      borderRadius: 12,
       alignItems: 'center',
       marginTop: 6,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)',
     },
     unsubscribeBtnText: {
-      color: isDarkMode ? '#f87171' : '#dc2626',
-      fontSize: 12,
-      fontWeight: '600',
+      fontSize: 13,
+      fontWeight: '700',
+      color: isDarkMode ? '#f87171' : '#ef4444',
     },
     subscribeBtn: {
       backgroundColor: '#002cf7',
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderRadius: 10,
+      paddingVertical: 12,
+      borderRadius: 12,
       alignItems: 'center',
-      justifyContent: 'center',
     },
     subscribeBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
       color: '#ffffff',
-      fontSize: 12,
-      fontWeight: '600',
     },
     orderHistoryItem: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
-      padding: 12,
-      borderRadius: 12,
+      backgroundColor: isDarkMode ? '#121212' : '#f8fafc',
+      borderRadius: 16,
+      padding: 14,
       marginBottom: 8,
-      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
     },
     orderHistoryNo: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#09090b',
+      fontSize: 14,
+      fontWeight: '800',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
     },
     orderHistoryDate: {
-      fontSize: 11,
-      color: isDarkMode ? '#a1a1aa' : '#64748b',
+      fontSize: 12,
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      marginTop: 2,
     },
     orderHistoryTotal: {
-      fontSize: 13,
-      fontWeight: '700',
+      fontSize: 14,
+      fontWeight: '800',
       color: isDarkMode ? '#38bdf8' : '#002cf7',
     },
     statusTag: {
       paddingHorizontal: 8,
       paddingVertical: 2,
-      borderRadius: 99,
+      borderRadius: 8,
     },
     statusTagText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
     },
     noResultsText: {
-      textAlign: 'center',
-      color: isDarkMode ? '#a1a1aa' : '#64748b',
       fontSize: 13,
-      marginVertical: 12,
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      fontStyle: 'italic',
+      textAlign: 'center',
+      paddingVertical: 10,
     },
   };
-
-  return StyleSheet.create(base);
 }
