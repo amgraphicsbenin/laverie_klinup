@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView, StatusBar as RNStatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { initializeDatabase } from './src/services/db';
 import { useDbState } from './src/hooks/useDbState';
@@ -316,6 +316,11 @@ export default function App() {
 
   const appContent = (
     <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000000' : '#ffffff' }}>
+      <ExpoStatusBar 
+        style={isDarkMode ? 'light' : 'dark'} 
+        backgroundColor={isDarkMode ? '#000000' : '#ffffff'}
+        translucent={Platform.OS === 'android'}
+      />
       {!dbReady ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#000000' : '#ffffff' }}>
           <ActivityIndicator size="large" color="#002cf7" />
@@ -520,21 +525,32 @@ export default function App() {
       )}
       {/* GLOBAL FLOATING SUCCESS TOAST */}
       {successToast.visible && (
-        <View
+        <MotiView
+          from={{ opacity: 0, translateY: -20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          exit={{ opacity: 0, translateY: -20 }}
+          transition={{ type: 'timing', duration: 220 }}
           pointerEvents="auto"
-          style={styles.globalToastContainer}
+          style={[
+            styles.globalToastContainer,
+            {
+              top: Platform.OS === 'android' 
+                ? (RNStatusBar.currentHeight || insets.top || 24) + 12 
+                : Math.max(insets.top + 8, 20),
+            }
+          ]}
         >
-          <BlurView intensity={Platform.OS === 'ios' ? 45 : 95} tint="light" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={Platform.OS === 'ios' ? 45 : 95} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           <View style={styles.globalToastContent}>
             <View style={styles.toastIconCircle}>
               <MaterialCommunityIcons name="check-bold" size={16} color="#ffffff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.toastTitle}>Succès</Text>
-              <Text style={styles.toastMessage}>{successToast.message}</Text>
+              <Text style={[styles.toastTitle, { color: isDarkMode ? '#4ade80' : '#15803d' }]}>Succès</Text>
+              <Text style={[styles.toastMessage, { color: isDarkMode ? '#e4e4e7' : '#475569' }]}>{successToast.message}</Text>
             </View>
           </View>
-        </View>
+        </MotiView>
       )}
       {/* GLOBAL CUSTOM PREMIUM ALERT MODAL */}
       {customAlertState.visible && (
@@ -816,20 +832,19 @@ const styles = StyleSheet.create({
   },
   globalToastContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 20 : 10,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: 'rgba(34, 197, 94, 0.3)',
+    borderColor: 'rgba(34, 197, 94, 0.35)',
     padding: 14,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 24,
-    elevation: 999,
-    zIndex: 9999,
+    elevation: 99999,
+    zIndex: 99999,
     overflow: 'hidden',
   },
   globalToastContent: {

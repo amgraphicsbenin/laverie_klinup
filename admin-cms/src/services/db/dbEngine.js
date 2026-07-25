@@ -17,9 +17,41 @@ export const notifyListeners = () => {
   listeners.forEach(l => l());
 };
 
+export function normalizeOrderStatus(rawStatus) {
+  if (!rawStatus) return 'en_attente';
+  const s = String(rawStatus).trim().toLowerCase();
+  if (s === 'pending' || s === 'attente' || s === 'en_attente') return 'en_attente';
+  if (s === 'processing' || s === 'traitement') return 'traitement';
+  if (s === 'washing' || s === 'lavage_cours' || s === 'en_cours_lavage') return 'en_cours_lavage';
+  if (s === 'ironing' || s === 'repassage_cours' || s === 'en_cours_repassage') return 'en_cours_repassage';
+  if (s === 'ready' || s === 'pret') return 'pret';
+  if (s === 'a_livrer') return 'a_livrer';
+  if (s === 'a_recuperer') return 'a_recuperer';
+  if (s === 'in_delivery' || s === 'delivering' || s === 'en_cours_livraison') return 'en_cours_livraison';
+  if (s === 'livre' || s === 'delivered' || s === 'completed' || s === 'restitue') return 'restitue';
+  if (s === 'canceled' || s === 'cancelled' || s === 'annule') return 'annule';
+  if (s === 'retard' || s === 'en_retard' || s === 'late') return 'traitement';
+  return 'en_attente';
+}
+
 export function hydrateOrder(order) {
   if (!order) return order;
   const hydrated = { ...order };
+
+  hydrated.statut = normalizeOrderStatus(order.statut || order.status);
+
+  const isCompleted = hydrated.statut === 'restitue' || hydrated.statut === 'annule';
+  if (!isCompleted && order.due_date) {
+    const dueDateObj = new Date(order.due_date);
+    if (!isNaN(dueDateObj.getTime()) && dueDateObj < new Date()) {
+      hydrated.est_en_retard = true;
+    } else {
+      hydrated.est_en_retard = false;
+    }
+  } else {
+    hydrated.est_en_retard = false;
+  }
+
   if (order.subscription_details) {
     if (order.subscription_details.remise_pourcentage !== undefined) {
       hydrated.remise_pourcentage = Number(order.subscription_details.remise_pourcentage) || 0;
@@ -32,6 +64,66 @@ export function hydrateOrder(order) {
     }
   }
   return hydrated;
+}
+
+export function reconcileOrderStates() {
+  if (!memoryDb || !Array.isArray(memoryDb.orders)) return false;
+  let hasChanges = false;
+  const now = new Date();
+
+  memoryDb.orders.forEach(order => {
+    if (!order) return;
+
+    const normalized = normalizeOrderStatus(order.statut || order.status);
+    if (order.statut !== normalized) {
+      order.statut = normalized;
+      hasChanges = true;
+    }
+
+    const isCompleted = order.statut === 'restitue' || order.statut === 'annule';
+    let isLate = false;
+    if (!isCompleted && order.due_date) {
+      const dueDateObj = new Date(order.due_date);
+      if (!isNaN(dueDateObj.getTime()) && dueDateObj < now) {
+        isLate = true;
+      }
+    }
+
+    if (order.est_en_retard !== isLate) {
+      order.est_en_retard = isLate;
+      hasChanges = true;
+    }
+
+    if (order.prix_total !== undefined && typeof order.prix_total !== 'number') {
+      order.prix_total = Number(order.prix_total) || 0;
+      hasChanges = true;
+    }
+    if (order.avance_payee !== undefined && typeof order.avance_payee !== 'number') {
+      order.avance_payee = Number(order.avance_payee) || 0;
+      hasChanges = true;
+    }
+  });
+
+  return hasChanges;
+}
+
+let orderCronTimerAdmin = null;
+export function startOrderStateCron() {
+  if (orderCronTimerAdmin) return;
+  if (reconcileOrderStates()) {
+    persist();
+    notifyListeners();
+  }
+  orderCronTimerAdmin = setInterval(() => {
+    try {
+      if (reconcileOrderStates()) {
+        persist();
+        notifyListeners();
+      }
+    } catch (e) {
+      console.warn('[Admin Order Cron] Silent error during reconciliation:', e);
+    }
+  }, 5000);
 }
 
 export const dbEngine = {
@@ -557,8 +649,17 @@ export const dbEngine = {
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
     const originalCustomerState = customer ? { ...customer } : null;
 
+    let normalizedStatus = newStatus;
+    if (newStatus === 'livre') normalizedStatus = 'restitue';
+    else if (newStatus === 'lavage_cours') normalizedStatus = 'en_cours_lavage';
+    else if (newStatus === 'repassage_cours') normalizedStatus = 'en_cours_repassage';
+    else if (newStatus === 'attente') normalizedStatus = 'en_attente';
+    else if (newStatus === 'retard' || newStatus === 'en_retard') normalizedStatus = 'traitement';
+    else if (!normalizedStatus) normalizedStatus = 'restitue';
+
     const oldStatus = order.statut;
-    order.statut = newStatus;
+    order.statut = normalizedStatus;
+    const newStatusVal = normalizedStatus;
 
     let typeLivraison = order.subscription_details?.type_livraison;
     if (newStatus === 'a_recuperer') {

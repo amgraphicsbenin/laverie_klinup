@@ -493,7 +493,7 @@ export default function OrdersTab({
 
                     {/* Action Step Buttons Workflow */}
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
-                      {order.statut === 'en_attente' && (
+                      {(order.statut === 'en_attente' || order.statut === 'attente' || order.statut === 'retard' || order.statut === 'en_retard') && (
                         <button
                           type="button"
                           className="btn btn-primary"
@@ -581,6 +581,16 @@ export default function OrdersTab({
                           onClick={() => handleStartDelivery(order, 'restitue')}
                         >
                           <CheckCircle2 size={15} /> Terminer la livraison
+                        </button>
+                      )}
+                      {!['en_attente', 'attente', 'traitement', 'en_cours_lavage', 'lavage_cours', 'en_cours_repassage', 'repassage_cours', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'restitue', 'annule', 'retard', 'en_retard'].includes(order.statut) && (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', background: '#7c3aed', border: 'none', color: '#fff' }}
+                          onClick={() => handleStatusChange(order.id, 'traitement')}
+                        >
+                          <Zap size={15} /> Passer au traitement
                         </button>
                       )}
 

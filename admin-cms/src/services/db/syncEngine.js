@@ -1,6 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { STORAGE_KEYS, DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG } from './seeds';
-import { memoryDb, notifyListeners, hydrateOrder } from './dbEngine';
+import { memoryDb, notifyListeners, hydrateOrder, startOrderStateCron } from './dbEngine';
 
 let isUsingRemote = false;
 export function getIsUsingRemote() {
@@ -53,6 +53,7 @@ export function loadFromLocalStorage() {
   
   memoryDb.current_user = loadData(STORAGE_KEYS.CURRENT_USER, null);
   memoryDb.pin_reset_requests = loadData('klin_up_pin_reset_requests', []);
+  startOrderStateCron();
   notifyListeners();
 }
 

@@ -203,10 +203,12 @@ export default function GestionScreen({
     if (!currentUser) return false;
     const role = currentUser.role;
     if (role === 'super_admin' || role === 'manager') return true;
+
+    const s = String(status || '').trim().toLowerCase();
     
     if (role === 'agent_lavage_repassage') {
-      const allowed = ['en_attente', 'attente', 'traitement', 'en_cours_lavage', 'lavage_cours', 'en_cours_repassage', 'repassage_cours'];
-      return allowed.includes(status) && (
+      const allowed = ['en_attente', 'attente', 'pending', 'traitement', 'processing', 'en_cours_lavage', 'lavage_cours', 'washing', 'en_cours_repassage', 'repassage_cours', 'ironing', 'retard', 'en_retard', 'late'];
+      return allowed.includes(s) && (
         targetStatus === 'traitement' || 
         targetStatus === 'en_cours_lavage' || 
         targetStatus === 'en_cours_repassage' || 
@@ -216,15 +218,17 @@ export default function GestionScreen({
     
     if (role === 'agent_accueil') {
       return (
-        (status === 'pret' && (targetStatus === 'a_livrer' || targetStatus === 'a_recuperer')) ||
-        (status === 'a_recuperer' && (targetStatus === 'restitue' || targetStatus === 'livre'))
+        ((s === 'pret' || s === 'ready') && (targetStatus === 'a_livrer' || targetStatus === 'a_recuperer')) ||
+        (s === 'a_recuperer' && (targetStatus === 'restitue' || targetStatus === 'livre')) ||
+        ((s === 'retard' || s === 'en_retard' || s === 'late' || s === 'en_attente' || s === 'attente' || s === 'pending') && targetStatus === 'traitement')
       );
     }
     
     if (role === 'livreur') {
       return (
-        (status === 'a_livrer' && targetStatus === 'en_cours_livraison') ||
-        (status === 'en_cours_livraison' && (targetStatus === 'restitue' || targetStatus === 'livre'))
+        (s === 'a_livrer' && targetStatus === 'en_cours_livraison') ||
+        ((s === 'en_cours_livraison' || s === 'in_delivery') && (targetStatus === 'restitue' || targetStatus === 'livre')) ||
+        ((s === 'retard' || s === 'en_retard' || s === 'late') && (targetStatus === 'en_cours_livraison' || targetStatus === 'restitue'))
       );
     }
     
@@ -235,26 +239,36 @@ export default function GestionScreen({
   const [showOrderDetails, setShowOrderDetails] = useState(false);
 
   const getNextStatusStyle = (currentStatus) => {
-    switch (currentStatus) {
+    const s = String(currentStatus || '').trim().toLowerCase();
+    switch (s) {
       case 'attente':
       case 'en_attente':
+      case 'pending':
+      case 'retard':
+      case 'en_retard':
+      case 'late':
         return { bg: '#7c3aed', text: '#ffffff', label: 'Passer au traitement' };
       case 'traitement':
+      case 'processing':
         return { bg: '#002cf7', text: '#ffffff', label: 'Lancer le lavage' };
       case 'lavage_cours':
       case 'en_cours_lavage':
+      case 'washing':
         return { bg: '#0d9488', text: '#ffffff', label: 'Passer au repassage' };
       case 'repassage_cours':
       case 'en_cours_repassage':
+      case 'ironing':
         return { bg: '#059669', text: '#ffffff', label: 'Prêt' };
       case 'a_livrer':
         return { bg: '#4f46e5', text: '#ffffff', label: 'Démarrer la livraison' };
       case 'en_cours_livraison':
+      case 'in_delivery':
+      case 'delivering':
         return { bg: '#09090b', text: '#ffffff', label: 'Terminer la livraison' };
       case 'a_recuperer':
         return { bg: '#d97706', text: '#ffffff', label: 'Marquer comme récupéré' };
       default:
-        return null;
+        return { bg: '#7c3aed', text: '#ffffff', label: 'Passer au traitement' };
     }
   };
   const [selectedCategory, setSelectedCategory] = useState('Tous');
@@ -368,15 +382,17 @@ export default function GestionScreen({
   // Status transitions
   const handleNextStatus = async (order, updateSelected = false) => {
     let nextStatus = 'en_attente';
-    const status = order.statut;
-    if (status === 'attente' || status === 'en_attente') nextStatus = 'traitement';
-    else if (status === 'traitement') nextStatus = 'en_cours_lavage';
-    else if (status === 'lavage_cours' || status === 'en_cours_lavage') nextStatus = 'en_cours_repassage';
-    else if (status === 'repassage_cours' || status === 'en_cours_repassage') nextStatus = 'pret';
+    const status = String(order.statut || order.status || '').trim().toLowerCase();
+    if (status === 'attente' || status === 'en_attente' || status === 'pending') nextStatus = 'traitement';
+    else if (status === 'traitement' || status === 'processing') nextStatus = 'en_cours_lavage';
+    else if (status === 'lavage_cours' || status === 'en_cours_lavage' || status === 'washing') nextStatus = 'en_cours_repassage';
+    else if (status === 'repassage_cours' || status === 'en_cours_repassage' || status === 'ironing') nextStatus = 'pret';
+    else if (status === 'pret' || status === 'ready') nextStatus = 'a_livrer';
     else if (status === 'a_livrer') nextStatus = 'en_cours_livraison';
-    else if (status === 'en_cours_livraison') nextStatus = 'livre';
+    else if (status === 'en_cours_livraison' || status === 'in_delivery' || status === 'delivering') nextStatus = 'livre';
     else if (status === 'a_recuperer') nextStatus = 'restitue';
-    else return;
+    else if (status === 'retard' || status === 'en_retard' || status === 'late') nextStatus = 'traitement';
+    else nextStatus = 'traitement';
 
     const isFinal = nextStatus === 'livre' || nextStatus === 'restitue';
 
@@ -1280,13 +1296,16 @@ export default function GestionScreen({
                       }
                       
                       let targetStatus = null;
-                      if (status === 'attente' || status === 'en_attente') targetStatus = 'traitement';
-                      else if (status === 'traitement') targetStatus = 'en_cours_lavage';
-                      else if (status === 'lavage_cours' || status === 'en_cours_lavage') targetStatus = 'en_cours_repassage';
-                      else if (status === 'repassage_cours' || status === 'en_cours_repassage') targetStatus = 'pret';
-                      else if (status === 'a_livrer') targetStatus = 'en_cours_livraison';
-                      else if (status === 'en_cours_livraison') targetStatus = 'restitue';
-                      else if (status === 'a_recuperer') targetStatus = 'restitue';
+                      const s = String(status || '').trim().toLowerCase();
+                      if (s === 'attente' || s === 'en_attente' || s === 'pending') targetStatus = 'traitement';
+                      else if (s === 'traitement' || s === 'processing') targetStatus = 'en_cours_lavage';
+                      else if (s === 'lavage_cours' || s === 'en_cours_lavage' || s === 'washing') targetStatus = 'en_cours_repassage';
+                      else if (s === 'repassage_cours' || s === 'en_cours_repassage' || s === 'ironing') targetStatus = 'pret';
+                      else if (s === 'a_livrer') targetStatus = 'en_cours_livraison';
+                      else if (s === 'en_cours_livraison' || s === 'in_delivery' || s === 'delivering') targetStatus = 'restitue';
+                      else if (s === 'a_recuperer') targetStatus = 'restitue';
+                      else if (s === 'retard' || s === 'en_retard' || s === 'late') targetStatus = 'traitement';
+                      else targetStatus = 'traitement';
 
                       if (!targetStatus) return null;
                       
@@ -1295,7 +1314,8 @@ export default function GestionScreen({
                       if (!nextStyle) return null;
                       
                       const getNextStatusIcon = (status) => {
-                        if (status === 'attente' || status === 'en_attente') return 'Sparkles';
+                        const iconS = String(status || '').trim().toLowerCase();
+                        if (iconS === 'attente' || iconS === 'en_attente' || iconS === 'pending' || iconS === 'retard' || iconS === 'en_retard' || iconS === 'late') return 'Sparkles';
                         if (status === 'traitement') return 'Wind';
                         if (status === 'lavage_cours' || status === 'en_cours_lavage') return 'Shirt';
                         if (status === 'repassage_cours' || status === 'en_cours_repassage') return 'Check';
@@ -1676,18 +1696,19 @@ export default function GestionScreen({
                    
                    // For all other statuses, render a single button
                    const getSingleStatusDetails = () => {
-                     let targetStatus = null;
-                     if (status === 'attente' || status === 'en_attente') targetStatus = 'traitement';
-                     else if (status === 'traitement') targetStatus = 'en_cours_lavage';
-                     else if (status === 'lavage_cours' || status === 'en_cours_lavage') targetStatus = 'en_cours_repassage';
-                     else if (status === 'repassage_cours' || status === 'en_cours_repassage') targetStatus = 'pret';
-                     else if (status === 'a_livrer') targetStatus = 'en_cours_livraison';
-                     else if (status === 'en_cours_livraison') targetStatus = 'livre';
-                     else if (status === 'a_recuperer') targetStatus = 'restitue';
+                      let targetStatus = null;
+                      if (status === 'attente' || status === 'en_attente') targetStatus = 'traitement';
+                      else if (status === 'traitement') targetStatus = 'en_cours_lavage';
+                      else if (status === 'lavage_cours' || status === 'en_cours_lavage') targetStatus = 'en_cours_repassage';
+                      else if (status === 'repassage_cours' || status === 'en_cours_repassage') targetStatus = 'pret';
+                      else if (status === 'a_livrer') targetStatus = 'en_cours_livraison';
+                      else if (status === 'en_cours_livraison') targetStatus = 'livre';
+                      else if (status === 'a_recuperer') targetStatus = 'restitue';
+                      else if (status === 'retard' || status === 'en_retard') targetStatus = 'traitement';
 
-                     if (!targetStatus) return null;
+                      if (!targetStatus) return null;
 
-                     if (status === 'attente' || status === 'en_attente') {
+                      if (status === 'attente' || status === 'en_attente' || status === 'retard' || status === 'en_retard') {
                        return {
                          label: 'Passer au traitement',
                          icon: 'Sparkles',

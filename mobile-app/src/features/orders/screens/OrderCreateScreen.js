@@ -34,6 +34,52 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
   const [clientPrefPliage, setClientPrefPliage] = useState('Plié');
 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
+  const isSubscriptionMode = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
+
+  useEffect(() => {
+    if (isSubscriptionMode) {
+      setOrderAvance('0');
+      setOrderDiscount('0');
+      setOrderUrgency('Normal');
+    }
+  }, [isSubscriptionMode]);
+
+  const resetForm = () => {
+    setOrderClient('');
+    setSelectedArticles([]);
+    setOrderAvance('0');
+    setOrderPaymentMethod('Espèce');
+    setOrderDiscount('0');
+    setOrderUrgency('Normal');
+    setExpandedArticles([]);
+    setPayWithSubscription(false);
+    setSubscribePlanId('');
+    setClientSearchQuery('');
+  };
+
+  const handleCancelOrder = () => {
+    const hasData = !!orderClient || selectedArticles.length > 0 || parseFloat(orderAvance) > 0 || parseInt(orderDiscount) > 0 || !!subscribePlanId;
+    if (hasData) {
+      Alert.alert(
+        "Confirmer l'annulation",
+        "Voulez-vous vraiment annuler la création de cette commande ? Toutes les informations saisies seront réinitialisées.",
+        [
+          { text: "Continuer l'édition", style: "cancel" },
+          {
+            text: "Oui, annuler",
+            style: "destructive",
+            onPress: () => {
+              resetForm();
+              if (onNavigate) onNavigate('accueil');
+            }
+          }
+        ]
+      );
+    } else {
+      resetForm();
+      if (onNavigate) onNavigate('accueil');
+    }
+  };
 
   useEffect(() => {
     if (activeCustomer && activeCustomer.active_subscription) {
@@ -122,10 +168,10 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
     const discountPercent = Number(orderDiscount) || 0;
     const discountAmount = Math.round(currentTotal * (discountPercent / 100));
     const netTotal = currentTotal - discountAmount;
-    
+
     const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
     const isImmediateSub = !!subscribePlanId;
-    
+
     const finalModeReglement = isSubscriptionActive ? (isImmediateSub ? orderPaymentMethod : 'abonnement') : orderPaymentMethod;
     const finalAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
 
@@ -196,7 +242,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
       setClientPrefPliage('Plié');
 
       if (onShowSuccess) onShowSuccess(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès !`);
-      
+
       // Auto-select the newly created client and switch back to Order Creation form!
       setOrderClient(newCustomer.id);
       setActiveMode('commande');
@@ -248,7 +294,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
 
       {activeMode === 'client' ? (
         /* PAGE 2: NOUVEAU CLIENT */
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -324,7 +370,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             </View>
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             activeOpacity={0.85}
             onPress={handleCreateClient}
             style={styles.submitBtn}
@@ -334,7 +380,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
         </ScrollView>
       ) : (
         /* PAGE 1: NOUVELLE COMMANDE */
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -426,19 +472,19 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             </View>
 
             <View style={styles.fixedArticleContainer}>
-              <ScrollView 
-                nestedScrollEnabled={true} 
+              <ScrollView
+                nestedScrollEnabled={true}
                 showsVerticalScrollIndicator={true}
                 style={styles.fixedArticleScrollView}
                 contentContainerStyle={{ paddingRight: 4, paddingBottom: 4 }}
               >
                 {(() => {
                   const uniqueArticles = [...new Set(catalog
-                    .filter(c => 
+                    .filter(c =>
                       c.article &&
-                      c.categorie !== 'system_setting' && 
-                      c.service !== 'system' && 
-                      c.categorie !== 'abonnement' && 
+                      c.categorie !== 'system_setting' &&
+                      c.service !== 'system' &&
+                      c.categorie !== 'abonnement' &&
                       c.service !== 'abonnement' &&
                       !c.id?.startsWith('setting_') &&
                       c.is_active !== false &&
@@ -452,8 +498,8 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                   }
 
                   return uniqueArticles.map(articleName => {
-                    const items = catalog.filter(c => 
-                      c.article && 
+                    const items = catalog.filter(c =>
+                      c.article &&
                       c.article.trim().toLowerCase() === articleName.toLowerCase() &&
                       c.categorie !== 'system_setting' &&
                       c.service !== 'system' &&
@@ -463,7 +509,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                       c.is_active !== false &&
                       (c.service === 'lavage_simple' || c.service === 'repassage' || c.service === 'traitement')
                     );
-                    
+
                     const isExpanded = isArticleExpanded(articleName, items);
                     const getQtyInCart = (itemId) => {
                       const cartItem = selectedArticles.find(a => a.id === itemId);
@@ -474,7 +520,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                       <View key={articleName} style={styles.clothingCard}>
                         <View style={styles.clothingHeader}>
                           <Text style={styles.clothingName}>{articleName}</Text>
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             onPress={() => toggleExpandArticle(articleName)}
                             style={isExpanded ? styles.clothingCloseBtn : styles.clothingAddBtn}
                           >
@@ -487,10 +533,10 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                         {isExpanded && (
                           <View style={styles.servicesContainer}>
                             {items.map(item => {
-                              const serviceLabel = 
+                              const serviceLabel =
                                 (item.service === 'lavage_simple' || item.service === 'traitement') ? 'Traitement' :
-                                item.service === 'repassage' ? 'Repassage' :
-                                item.service ? item.service.replace(/_/g, ' ') : 'Service';
+                                  item.service === 'repassage' ? 'Repassage' :
+                                    item.service ? item.service.replace(/_/g, ' ') : 'Service';
 
                               const qty = getQtyInCart(item.id);
 
@@ -501,7 +547,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                                     <Text style={styles.servicePrice}>{formatPrice(item.prix)}</Text>
                                   </View>
                                   {qty === 0 ? (
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                       onPress={() => addArticleToOrder(item)}
                                       style={styles.serviceAddBtn}
                                     >
@@ -540,21 +586,33 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             </View>
 
             {/* Niveau d'urgence */}
-            <Text style={styles.formLabel}>Niveau d'Urgence</Text>
-            <View style={styles.urgencyRow}>
+            <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
+              Niveau d'Urgence
+            </Text>
+            <View style={[styles.urgencyRow, isSubscriptionMode && { opacity: 0.7 }]}>
               {['Normal', 'Express'].map((level) => {
-                const isActive = orderUrgency === level;
+                const isActive = (isSubscriptionMode ? 'Normal' : orderUrgency) === level;
+                const isDisabled = isSubscriptionMode;
                 return (
                   <TouchableOpacity
                     key={level}
-                    onPress={() => setOrderUrgency(level)}
+                    disabled={isDisabled}
+                    onPress={() => !isDisabled && setOrderUrgency(level)}
                     style={[
-                      styles.urgencyBtn, 
-                      isActive && { backgroundColor: level === 'Express' ? '#e11d48' : '#002cf7', borderColor: level === 'Express' ? '#e11d48' : '#002cf7' }
+                      styles.urgencyBtn,
+                      isActive ? { backgroundColor: '#002cf7', borderColor: '#002cf7' } : null,
+                      isDisabled && level === 'Express' && {
+                        backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                        borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+                      }
                     ]}
-                    activeOpacity={0.8}
+                    activeOpacity={isDisabled ? 1 : 0.8}
                   >
-                    <Text style={[styles.urgencyBtnText, isActive && { color: '#ffffff' }]}>
+                    <Text style={[
+                      styles.urgencyBtnText,
+                      isActive && { color: '#ffffff' },
+                      isDisabled && level === 'Express' && { color: isDarkMode ? '#52525b' : '#94a3b8' }
+                    ]}>
                       {level === 'Express' ? '⚡ Express (24h)' : '⏱ Normal (48h)'}
                     </Text>
                   </TouchableOpacity>
@@ -565,12 +623,23 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             {/* Avance & Mode de paiement */}
             <View style={[styles.formRowInline, { zIndex: 20, elevation: 20 }]}>
               <View style={styles.formFieldInline}>
-                <Text style={styles.formLabel}>Avance (FCFA)</Text>
+                <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
+                  Avance (FCFA)
+                </Text>
                 <TextInput
                   keyboardType="numeric"
-                  value={orderAvance}
+                  value={isSubscriptionMode ? '0' : orderAvance}
                   onChangeText={setOrderAvance}
-                  style={styles.formInput}
+                  editable={!isSubscriptionMode}
+                  style={[
+                    styles.formInput,
+                    isSubscriptionMode && {
+                      backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                      color: isDarkMode ? '#52525b' : '#94a3b8',
+                      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+                      opacity: 0.7
+                    }
+                  ]}
                 />
               </View>
               <View style={[styles.formFieldInline, { zIndex: 20, elevation: 20 }]}>
@@ -589,18 +658,29 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             </View>
 
             {/* Réduction (%) */}
-            <Text style={styles.formLabel}>Réduction (%)</Text>
+            <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
+              Réduction (%)
+            </Text>
             <TextInput
               keyboardType="numeric"
-              value={orderDiscount}
+              value={isSubscriptionMode ? '0' : orderDiscount}
               onChangeText={(val) => {
                 const num = parseInt(val, 10);
                 if (val === '') setOrderDiscount('0');
                 else if (!isNaN(num) && num >= 0 && num <= 100) setOrderDiscount(num.toString());
               }}
-              style={styles.formInput}
+              editable={!isSubscriptionMode}
+              style={[
+                styles.formInput,
+                isSubscriptionMode && {
+                  backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                  color: isDarkMode ? '#52525b' : '#94a3b8',
+                  borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+                  opacity: 0.7
+                }
+              ]}
               placeholder="Ex: 10"
-              placeholderTextColor="#a1a1aa"
+              placeholderTextColor={isDarkMode ? '#52525b' : '#a1a1aa'}
             />
           </View>
 
@@ -609,7 +689,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
             let currentTotal = 0;
             let isImmediateSub = false;
-            
+
             if (subscribePlanId) {
               const subPlan = catalog.find(c => c.id === subscribePlanId && c.categorie === 'abonnement');
               currentTotal = subPlan ? subPlan.prix : 0;
@@ -631,17 +711,78 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             const netTotal = currentTotal - discountAmount;
             const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
             const currentReste = netTotal - currentAvance;
+            const totalClothes = selectedArticles.reduce((sum, item) => sum + item.quantity, 0);
+            const clothesBaseValue = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const subPlan = subscribePlanId ? catalog.find(c => c.id === subscribePlanId && c.categorie === 'abonnement') : null;
 
             return (
               <View style={styles.receiptPreviewCard}>
                 <Text style={styles.receiptSectionTitle}>Récapitulatif de la Facture</Text>
-                
-                <View style={styles.receiptRow}>
-                  <Text style={styles.receiptRowLabel}>Total Brut</Text>
-                  <Text style={styles.receiptRowVal}>
-                    {isSubscriptionActive && !isImmediateSub ? 'Forfait Abonnement' : formatPrice(currentTotal)}
-                  </Text>
-                </View>
+
+                {isImmediateSub && subPlan ? (
+                  <>
+                    <View style={styles.receiptRow}>
+                      <Text style={styles.receiptRowLabel}>Abonnement Choisi</Text>
+                      <Text style={[styles.receiptRowVal, { fontWeight: '700', color: isDarkMode ? '#38bdf8' : '#002cf7' }]}>
+                        {subPlan.article} ({subPlan.nombre_vetements || 0} vêt.)
+                      </Text>
+                    </View>
+                    <View style={styles.receiptRow}>
+                      <Text style={styles.receiptRowLabel}>Prix Souscription</Text>
+                      <Text style={styles.receiptRowVal}>{formatPrice(subPlan.prix)}</Text>
+                    </View>
+                    <View style={styles.receiptRow}>
+                      <Text style={styles.receiptRowLabel}>Vêtements Commande En Cours</Text>
+                      <Text style={styles.receiptRowVal}>
+                        {totalClothes} vêt. (Valeur {formatPrice(clothesBaseValue)})
+                      </Text>
+                    </View>
+                    <View style={styles.receiptRow}>
+                      <Text style={styles.receiptRowLabel}>Prise en Charge par l'Abonnement</Text>
+                      <Text style={[styles.receiptRowVal, { color: '#10b981', fontWeight: '700' }]}>
+                        -{totalClothes} vêt. (0 FCFA)
+                      </Text>
+                    </View>
+                    <View style={styles.receiptRow}>
+                      <Text style={styles.receiptRowLabelBold}>Solde Restant (Nouvel Abonnement)</Text>
+                      <Text style={[styles.receiptRowValBold, { color: '#10b981' }]}>
+                        {Math.max(0, (subPlan.nombre_vetements || 0) - totalClothes)} vêt.
+                      </Text>
+                    </View>
+                  </>
+                ) : isSubscriptionActive && activeCustomer && activeCustomer.active_subscription ? (
+                  <>
+                    <View style={styles.receiptRow}>
+                      <Text style={styles.receiptRowLabel}>Formule Active</Text>
+                      <Text style={[styles.receiptRowVal, { fontWeight: '700', color: isDarkMode ? '#38bdf8' : '#002cf7' }]}>
+                        {activeCustomer.active_subscription.name}
+                      </Text>
+                    </View>
+                    <View style={styles.receiptRow}>
+                      <Text style={styles.receiptRowLabel}>Solde Actuel</Text>
+                      <Text style={styles.receiptRowVal}>
+                        {activeCustomer.active_subscription.remaining_clothes} vêt.
+                      </Text>
+                    </View>
+                    <View style={styles.receiptRow}>
+                      <Text style={styles.receiptRowLabel}>Vêtements Déduits</Text>
+                      <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>
+                        -{totalClothes} vêt.
+                      </Text>
+                    </View>
+                    <View style={styles.receiptRow}>
+                      <Text style={styles.receiptRowLabelBold}>Solde Restant (Abonnement)</Text>
+                      <Text style={[styles.receiptRowValBold, { color: '#10b981' }]}>
+                        {activeCustomer.active_subscription.remaining_clothes - totalClothes} vêt.
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.receiptRow}>
+                    <Text style={styles.receiptRowLabel}>Total Brut</Text>
+                    <Text style={styles.receiptRowVal}>{formatPrice(currentTotal)}</Text>
+                  </View>
+                )}
 
                 {discountAmount > 0 && (
                   <View style={styles.receiptRow}>
@@ -672,14 +813,34 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             );
           })()}
 
-          {/* Action Button */}
-          <TouchableOpacity 
-            activeOpacity={0.85}
-            onPress={handleCreateOrder}
-            style={styles.submitBtn}
-          >
-            <Text style={styles.submitBtnText}>Valider et Créer la Commande</Text>
-          </TouchableOpacity>
+          {/* Action Buttons */}
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, marginBottom: 12 }}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleCancelOrder}
+              style={[
+                styles.submitBtn,
+                {
+                  flex: 1,
+                  backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? '#27272a' : '#cbd5e1',
+                }
+              ]}
+            >
+              <Text style={[styles.submitBtnText, { color: isDarkMode ? '#e4e4e7' : '#475569' }]}>
+                Annuler
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleCreateOrder}
+              style={[styles.submitBtn, { flex: 2 }]}
+            >
+              <Text style={styles.submitBtnText}>Créer la Commande</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
     </View>

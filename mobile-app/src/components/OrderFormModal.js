@@ -28,6 +28,15 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
   const [subscribePlanId, setSubscribePlanId] = useState('');
 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
+  const isSubscriptionMode = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
+
+  useEffect(() => {
+    if (isSubscriptionMode) {
+      setOrderAvance('0');
+      setOrderDiscount('0');
+      setOrderUrgency('Normal');
+    }
+  }, [isSubscriptionMode]);
 
   useEffect(() => {
     if (activeCustomer && activeCustomer.active_subscription) {
@@ -38,20 +47,41 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
     setSubscribePlanId('');
   }, [orderClient]);
 
-  // Reset form when opening
-  useEffect(() => {
-    if (visible) {
-      setOrderClient('');
-      setSelectedArticles([]);
-      setOrderAvance('0');
-      setOrderPaymentMethod('Espèce');
-      setOrderDiscount('0');
-      setOrderUrgency('Normal');
-      setExpandedArticles([]);
-      setPayWithSubscription(false);
-      setSubscribePlanId('');
+  const resetForm = () => {
+    setOrderClient('');
+    setSelectedArticles([]);
+    setOrderAvance('0');
+    setOrderPaymentMethod('Espèce');
+    setOrderDiscount('0');
+    setOrderUrgency('Normal');
+    setExpandedArticles([]);
+    setPayWithSubscription(false);
+    setSubscribePlanId('');
+  };
+
+  const handleCancelOrder = () => {
+    const hasData = !!orderClient || selectedArticles.length > 0 || parseFloat(orderAvance) > 0 || parseInt(orderDiscount) > 0 || !!subscribePlanId;
+    if (hasData) {
+      Alert.alert(
+        "Confirmer l'annulation",
+        "Voulez-vous vraiment annuler la création de cette commande ? Toutes les informations saisies seront réinitialisées.",
+        [
+          { text: "Continuer l'édition", style: "cancel" },
+          { 
+            text: "Oui, annuler", 
+            style: "destructive", 
+            onPress: () => {
+              resetForm();
+              onClose();
+            } 
+          }
+        ]
+      );
+    } else {
+      resetForm();
+      onClose();
     }
-  }, [visible]);
+  };
 
   const isArticleExpanded = (articleName, items) => {
     if (expandedArticles.includes(articleName)) return true;
@@ -211,7 +241,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
           >
             <View style={styles.compactModalHeader}>
               <Text style={styles.compactModalTitle}>Nouvelle Commande</Text>
-              <TouchableOpacity onPress={onClose}>
+              <TouchableOpacity onPress={handleCancelOrder}>
                 <X size={20} color="#71717a" />
               </TouchableOpacity>
             </View>
@@ -430,21 +460,33 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
               </View>
 
               {/* Niveau d'urgence */}
-              <Text style={styles.formLabel}>Urgence</Text>
-              <View style={styles.urgencyRow}>
+              <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
+                Urgence
+              </Text>
+              <View style={[styles.urgencyRow, isSubscriptionMode && { opacity: 0.7 }]}>
                 {['Normal', 'Express'].map((level) => {
-                  const isActive = orderUrgency === level;
+                  const isActive = (isSubscriptionMode ? 'Normal' : orderUrgency) === level;
+                  const isDisabled = isSubscriptionMode;
                   return (
                     <TouchableOpacity
                       key={level}
-                      onPress={() => setOrderUrgency(level)}
+                      disabled={isDisabled}
+                      onPress={() => !isDisabled && setOrderUrgency(level)}
                       style={[
                         styles.urgencyBtn, 
-                        isActive ? { backgroundColor: level === 'Express' ? '#e11d48' : '#002cf7', borderColor: level === 'Express' ? '#e11d48' : '#002cf7' } : null
+                        isActive ? { backgroundColor: '#002cf7', borderColor: '#002cf7' } : null,
+                        isDisabled && level === 'Express' && {
+                          backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                          borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+                        }
                       ]}
-                      activeOpacity={0.8}
+                      activeOpacity={isDisabled ? 1 : 0.8}
                     >
-                      <Text style={[styles.urgencyBtnText, isActive && { color: '#ffffff' }]}>
+                      <Text style={[
+                        styles.urgencyBtnText, 
+                        isActive && { color: '#ffffff' },
+                        isDisabled && level === 'Express' && { color: isDarkMode ? '#52525b' : '#94a3b8' }
+                      ]}>
                         {level === 'Express' ? 'Express (24h)' : 'Normal (48h)'}
                       </Text>
                     </TouchableOpacity>
@@ -455,12 +497,23 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
               {/* Avance et Mode de règlement (same line) */}
               <View style={[styles.formRowInline, { zIndex: 20, elevation: 20 }]}>
                 <View style={styles.formFieldInline}>
-                  <Text style={styles.formLabel}>Avance (FCFA)</Text>
+                  <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
+                    Avance (FCFA)
+                  </Text>
                   <TextInput
                     keyboardType="numeric"
-                    value={orderAvance}
+                    value={isSubscriptionMode ? '0' : orderAvance}
                     onChangeText={setOrderAvance}
-                    style={styles.formInput}
+                    editable={!isSubscriptionMode}
+                    style={[
+                      styles.formInput,
+                      isSubscriptionMode && {
+                        backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                        color: isDarkMode ? '#52525b' : '#94a3b8',
+                        borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+                        opacity: 0.7
+                      }
+                    ]}
                   />
                 </View>
                 <View style={[styles.formFieldInline, { zIndex: 20, elevation: 20 }]}>
@@ -479,18 +532,29 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
               </View>
 
               {/* Réduction (%) */}
-              <Text style={styles.formLabel}>Réduction (%)</Text>
+              <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
+                Réduction (%)
+              </Text>
               <TextInput
                 keyboardType="numeric"
-                value={orderDiscount}
+                value={isSubscriptionMode ? '0' : orderDiscount}
                 onChangeText={(val) => {
                   const num = parseInt(val, 10);
                   if (val === '') setOrderDiscount('0');
                   else if (!isNaN(num) && num >= 0 && num <= 100) setOrderDiscount(num.toString());
                 }}
-                style={styles.formInput}
+                editable={!isSubscriptionMode}
+                style={[
+                  styles.formInput,
+                  isSubscriptionMode && {
+                    backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                    color: isDarkMode ? '#52525b' : '#94a3b8',
+                    borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+                    opacity: 0.7
+                  }
+                ]}
                 placeholder="Ex: 10"
-                placeholderTextColor="#a1a1aa"
+                placeholderTextColor={isDarkMode ? '#52525b' : '#a1a1aa'}
               />
 
               {/* Live Receipt Card */}
@@ -548,7 +612,42 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                       </View>
                     )}
 
-                    {isSubscriptionActive && !isImmediateSub && activeCustomer && activeCustomer.active_subscription ? (
+                    {isImmediateSub && subPlan ? (
+                      <>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabel}>Abonnement Choisi</Text>
+                          <Text style={[styles.receiptRowVal, { fontWeight: '700', color: isDarkMode ? '#38bdf8' : '#002cf7' }]}>
+                            {subPlan.article} ({subPlan.nombre_vetements || 0} vêt.)
+                          </Text>
+                        </View>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabel}>Prix Souscription</Text>
+                          <Text style={styles.receiptRowVal}>{formatPrice(subPlan.prix)}</Text>
+                        </View>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabel}>Vêtements Commande En Cours</Text>
+                          <Text style={styles.receiptRowVal}>
+                            {getTotalClothesCount()} vêt. (Valeur {formatPrice(selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0))})
+                          </Text>
+                        </View>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabel}>Prise en Charge par l'Abonnement</Text>
+                          <Text style={[styles.receiptRowVal, { color: '#10b981', fontWeight: '700' }]}>
+                            -{getTotalClothesCount()} vêt. (0 FCFA)
+                          </Text>
+                        </View>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabelBold}>Solde Restant (Nouvel Abonnement)</Text>
+                          <Text style={[styles.receiptRowValBold, { color: '#10b981' }]}>
+                            {Math.max(0, (subPlan.nombre_vetements || 0) - getTotalClothesCount())} vêt.
+                          </Text>
+                        </View>
+                        <View style={styles.receiptRow}>
+                          <Text style={styles.receiptRowLabelBold}>Net à Payer (Abonnement)</Text>
+                          <Text style={[styles.receiptRowValBold, { color: '#002cf7' }]}>{formatPrice(netTotal)}</Text>
+                        </View>
+                      </>
+                    ) : isSubscriptionActive && !isImmediateSub && activeCustomer && activeCustomer.active_subscription ? (
                       <>
                         <View style={styles.receiptRow}>
                           <Text style={styles.receiptRowLabel}>Formule Active</Text>
@@ -611,12 +710,31 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                 );
               })()}
 
-              <TouchableOpacity
-                onPress={handleCreateOrder}
-                style={styles.submitOrderBtn}
-              >
-                <Text style={styles.submitOrderBtnText}>Enregistrer la Commande</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                <TouchableOpacity
+                  onPress={handleCancelOrder}
+                  style={[
+                    styles.submitOrderBtn,
+                    {
+                      flex: 1,
+                      backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? '#27272a' : '#cbd5e1',
+                    }
+                  ]}
+                >
+                  <Text style={[styles.submitOrderBtnText, { color: isDarkMode ? '#e4e4e7' : '#475569' }]}>
+                    Annuler
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleCreateOrder}
+                  style={[styles.submitOrderBtn, { flex: 2 }]}
+                >
+                  <Text style={styles.submitOrderBtnText}>Enregistrer la Commande</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </MotiView>
         </View>

@@ -164,15 +164,17 @@ export default function useOrderActions({
    */
   const handleNextStatus = async (order, updateSelected = false) => {
     let nextStatus = 'en_attente';
-    const status = order.statut;
-    if (status === 'attente' || status === 'en_attente') nextStatus = 'traitement';
-    else if (status === 'traitement') nextStatus = 'en_cours_lavage';
-    else if (status === 'lavage_cours' || status === 'en_cours_lavage') nextStatus = 'en_cours_repassage';
-    else if (status === 'repassage_cours' || status === 'en_cours_repassage') nextStatus = 'pret';
+    const status = (order.statut || order.status || '').toLowerCase().trim();
+    if (status === 'attente' || status === 'en_attente' || status === 'pending') nextStatus = 'traitement';
+    else if (status === 'traitement' || status === 'processing') nextStatus = 'en_cours_lavage';
+    else if (status === 'lavage_cours' || status === 'en_cours_lavage' || status === 'washing') nextStatus = 'en_cours_repassage';
+    else if (status === 'repassage_cours' || status === 'en_cours_repassage' || status === 'ironing') nextStatus = 'pret';
+    else if (status === 'pret' || status === 'ready') nextStatus = 'a_livrer';
     else if (status === 'a_livrer') nextStatus = 'en_cours_livraison';
-    else if (status === 'en_cours_livraison') nextStatus = 'livre';
+    else if (status === 'en_cours_livraison' || status === 'in_delivery' || status === 'delivering') nextStatus = 'livre';
     else if (status === 'a_recuperer') nextStatus = 'restitue';
-    else return;
+    else if (status === 'retard' || status === 'en_retard' || status === 'late') nextStatus = 'traitement';
+    else nextStatus = 'traitement';
 
     const isFinal = nextStatus === 'livre' || nextStatus === 'restitue';
 

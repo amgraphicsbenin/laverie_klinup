@@ -72,12 +72,39 @@ export default function AdminView({ activeTab, onManageStaff }) {
     const cust = customers.find(c => c.id === selectedCustomerId);
     if (subscribePlanId) {
       setPayWithSubscription(true);
+      setNiveauUrgence('Normal');
     } else if (cust && cust.active_subscription) {
       setPayWithSubscription(true);
+      setNiveauUrgence('Normal');
     } else {
       setPayWithSubscription(false);
     }
   }, [selectedCustomerId, customers, subscribePlanId]);
+
+  const resetOrderRegistrationForm = () => {
+    setSelectedCustomerId('');
+    setArticleQuantities({});
+    setArticleServices({});
+    setNiveauUrgence('Normal');
+    setModeReglement('especes');
+    setAvancePayee('');
+    setRemisePourcentage('0');
+    setPayWithSubscription(false);
+    setSubscribePlanId('');
+  };
+
+  const handleCancelOrderRegistration = () => {
+    const hasData = !!selectedCustomerId || Object.values(articleQuantities).some(q => q > 0) || !!subscribePlanId || Number(avancePayee) > 0 || Number(remisePourcentage) > 0;
+    if (hasData) {
+      if (window.confirm("Voulez-vous vraiment annuler la création de cette commande ? Toutes les informations saisies seront réinitialisées.")) {
+        resetOrderRegistrationForm();
+        setShowOrderRegistrationModal(false);
+      }
+    } else {
+      resetOrderRegistrationForm();
+      setShowOrderRegistrationModal(false);
+    }
+  };
 
   // Flow de Livraison / Paiement Final
   const [showDeliveryPaymentModal, setShowDeliveryPaymentModal] = useState(false);
@@ -2919,7 +2946,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 type="button"
                 className="btn btn-outline"
                 style={{ padding: '0.25rem', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                onClick={() => setShowOrderRegistrationModal(false)}
+                onClick={handleCancelOrderRegistration}
               >
                 <X size={16} />
               </button>
@@ -3194,18 +3221,34 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
               {/* Form Settings Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
-                  <label style={{ fontSize: '0.75rem' }}>Urgence</label>
-                  <CustomSelect
-                    className="input-control"
-                    style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                    value={niveauUrgence}
-                    onChange={(e) => setNiveauUrgence(e.target.value)}
-                  >
-                    <option value="Normal">Normal</option>
-                    <option value="Express">Express (+50%)</option>
-                  </CustomSelect>
-                </div>
+                {(() => {
+                  const activeCust = customers.find(c => c.id === selectedCustomerId);
+                  const isSubMode = (payWithSubscription && activeCust && activeCust.active_subscription) || !!subscribePlanId;
+
+                  return (
+                    <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                      <label style={{ fontSize: '0.75rem', color: isSubMode ? 'var(--text-secondary)' : 'inherit' }}>Urgence</label>
+                      <CustomSelect
+                        className="input-control"
+                        disabled={isSubMode}
+                        style={{
+                          padding: '0.45rem',
+                          fontSize: '0.8rem',
+                          borderRadius: '8px',
+                          backgroundColor: isSubMode ? 'var(--bg-hover)' : 'inherit',
+                          color: isSubMode ? 'var(--text-muted)' : 'inherit',
+                          cursor: isSubMode ? 'not-allowed' : 'pointer',
+                          opacity: isSubMode ? 0.6 : 1
+                        }}
+                        value={isSubMode ? 'Normal' : niveauUrgence}
+                        onChange={(e) => setNiveauUrgence(e.target.value)}
+                      >
+                        <option value="Normal">Normal</option>
+                        {!isSubMode && <option value="Express">Express (+50%)</option>}
+                      </CustomSelect>
+                    </div>
+                  );
+                })()}
 
                 <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
                   <label style={{ fontSize: '0.75rem' }}>Règlement</label>
@@ -3228,35 +3271,145 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </CustomSelect>
                 </div>
               </div>
+              {(() => {
+                const activeCust = customers.find(c => c.id === selectedCustomerId);
+                const isSubMode = (payWithSubscription && activeCust && activeCust.active_subscription) || !!subscribePlanId;
 
-              {(!payWithSubscription || !!subscribePlanId) && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
-                  <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
-                    <label style={{ fontSize: '0.75rem' }}>Acompte Versé (FCFA)</label>
-                    <input
-                      type="number"
-                      className="input-control"
-                      style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                      placeholder="Ex: 2000"
-                      value={avancePayee}
-                      onChange={(e) => setAvancePayee(e.target.value)}
-                    />
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.5rem' }}>
+                    <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                      <label style={{ fontSize: '0.75rem', color: isSubMode ? 'var(--text-secondary)' : 'inherit' }}>
+                        Acompte Versé (FCFA)
+                      </label>
+                      <input
+                        type="number"
+                        className="input-control"
+                        disabled={isSubMode}
+                        style={{
+                          padding: '0.45rem',
+                          fontSize: '0.8rem',
+                          borderRadius: '8px',
+                          backgroundColor: isSubMode ? 'var(--bg-hover)' : 'inherit',
+                          color: isSubMode ? 'var(--text-muted)' : 'inherit',
+                          cursor: isSubMode ? 'not-allowed' : 'text',
+                          opacity: isSubMode ? 0.6 : 1
+                        }}
+                        placeholder="Ex: 2000"
+                        value={isSubMode ? '0' : avancePayee}
+                        onChange={(e) => setAvancePayee(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
+                      <label style={{ fontSize: '0.75rem', color: isSubMode ? 'var(--text-secondary)' : 'inherit' }}>
+                        Réduction (%)
+                      </label>
+                      <input
+                        type="number"
+                        className="input-control"
+                        disabled={isSubMode}
+                        style={{
+                          padding: '0.45rem',
+                          fontSize: '0.8rem',
+                          borderRadius: '8px',
+                          backgroundColor: isSubMode ? 'var(--bg-hover)' : 'inherit',
+                          color: isSubMode ? 'var(--text-muted)' : 'inherit',
+                          cursor: isSubMode ? 'not-allowed' : 'text',
+                          opacity: isSubMode ? 0.6 : 1
+                        }}
+                        placeholder="Ex: 10"
+                        min="0"
+                        max="100"
+                        value={isSubMode ? '0' : remisePourcentage}
+                        onChange={(e) => setRemisePourcentage(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="form-group" style={{ marginBottom: 0, gap: '0.25rem' }}>
-                    <label style={{ fontSize: '0.75rem' }}>Réduction (%)</label>
-                    <input
-                      type="number"
-                      className="input-control"
-                      style={{ padding: '0.45rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                      placeholder="Ex: 10"
-                      min="0"
-                      max="100"
-                      value={remisePourcentage}
-                      onChange={(e) => setRemisePourcentage(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
+                );
+              })()}
+              {(() => {
+                if (subscribePlanId) {
+                  const subPlan = catalog.find(c => c.id === subscribePlanId && c.categorie === 'abonnement');
+                  const totalClothes = getTotalClothesCount();
+                  const rawArticlesValue = Object.keys(articleQuantities).reduce((sum, cloth) => {
+                    const qty = articleQuantities[cloth] || 0;
+                    if (qty <= 0) return sum;
+                    const svc = articleServices[cloth] || 'lavage_simple';
+                    const item = catalog.find(c => c.article === cloth && c.service === svc);
+                    return sum + ((item ? item.prix : 1500) * qty);
+                  }, 0);
+                  const quota = subPlan ? (subPlan.nombre_vetements || 0) : 0;
+                  const remainingAfterOrder = Math.max(0, quota - totalClothes);
+
+                  return (
+                    <div style={{
+                      background: 'rgba(37, 99, 235, 0.06)',
+                      border: '1px solid rgba(37, 99, 235, 0.2)',
+                      borderRadius: '10px',
+                      padding: '0.6rem 0.8rem',
+                      marginTop: '0.5rem',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.3rem'
+                    }}>
+                      <div style={{ fontWeight: 700, color: 'var(--primary)', borderBottom: '1px solid rgba(37, 99, 235, 0.15)', paddingBottom: '0.25rem', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Récapitulatif Nouvel Abonnement</span>
+                        <span>{subPlan ? subPlan.article : ''} ({quota} vêt.)</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                        <span>Articles commande ({totalClothes} vêtements) :</span>
+                        <span style={{ fontWeight: 600, textDecoration: 'line-through', color: '#ef4444' }}>{rawArticlesValue.toLocaleString()} FCFA</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', fontWeight: 700 }}>
+                        <span>Prise en charge par le nouvel abonnement :</span>
+                        <span>-{totalClothes} vêt. (0 FCFA)</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-primary)', fontWeight: 700 }}>
+                        <span>Solde abonnement disponible après commande :</span>
+                        <span style={{ color: '#16a34a' }}>{remainingAfterOrder} / {quota} vêt.</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (payWithSubscription && activeCustomer && activeCustomer.active_subscription) {
+                  const totalClothes = getTotalClothesCount();
+                  const remaining = activeCustomer.active_subscription.remaining_clothes;
+                  const remainingAfterOrder = remaining - totalClothes;
+                  return (
+                    <div style={{
+                      background: 'rgba(16, 185, 129, 0.06)',
+                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                      borderRadius: '10px',
+                      padding: '0.6rem 0.8rem',
+                      marginTop: '0.5rem',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.3rem'
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#059669', borderBottom: '1px solid rgba(16, 185, 129, 0.15)', paddingBottom: '0.25rem', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Déduction Formule Active</span>
+                        <span>{activeCustomer.active_subscription.name}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                        <span>Solde d'abonnement actuel :</span>
+                        <span style={{ fontWeight: 600 }}>{remaining} vêt.</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444', fontWeight: 700 }}>
+                        <span>Vêtements déduits pour cette commande :</span>
+                        <span>-{totalClothes} vêt.</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-primary)', fontWeight: 700 }}>
+                        <span>Solde d'abonnement après commande :</span>
+                        <span style={{ color: remainingAfterOrder >= 0 ? '#16a34a' : '#ef4444' }}>{remainingAfterOrder} vêt.</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
 
               {/* Total and Actions */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
@@ -3283,7 +3436,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   <button
                     type="button"
                     className="btn btn-outline"
-                    onClick={() => setShowOrderRegistrationModal(false)}
+                    onClick={handleCancelOrderRegistration}
                     style={{ padding: '0.45rem 1rem', fontSize: '0.78rem', borderRadius: '8px' }}
                   >
                     Annuler

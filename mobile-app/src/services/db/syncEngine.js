@@ -7,7 +7,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../supabaseClient';
-import { memoryDb, db, hydrateOrder } from './dbEngine';
+import { memoryDb, db, hydrateOrder, startOrderStateCron } from './dbEngine';
 import { 
   DEFAULT_STAFF, 
   DEFAULT_CUSTOMERS, 
@@ -503,4 +503,5 @@ export function setupRealtime() {
 export async function initializeDatabase() {
   await loadFromLocalStorage();
   await initDb();
+  startOrderStateCron();
 }
