@@ -190,7 +190,7 @@ export const dbEngine = {
   getStaff: () => {
     const currentStoreId = memoryDb.selected_store_id || 'all';
     if (currentStoreId === 'all') return [...memoryDb.staff];
-    return memoryDb.staff.filter(s => s.role === 'super_admin' || s.store_id === currentStoreId || (!s.store_id && currentStoreId === 'store_central'));
+    return memoryDb.staff.filter(s => s.role === 'super_admin' || s.store_id === currentStoreId || s.store_id === 'all' || (!s.store_id && currentStoreId === 'store_central'));
   },
 
   getAllCustomers: () => [...memoryDb.customers],
@@ -948,11 +948,7 @@ export const dbEngine = {
     persist();
     notifyListeners();
 
-    performMutation('insert', 'staff', newMember.id, newMember, () => {
-      memoryDb.staff = memoryDb.staff.filter(s => s.id !== newMember.id);
-      persist();
-      notifyListeners();
-    });
+    performMutation('insert', 'staff', newMember.id, newMember);
     return newMember;
   },
 

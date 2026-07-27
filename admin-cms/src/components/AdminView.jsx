@@ -355,7 +355,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const [newStaffRole, setNewStaffRole] = useState('agent_accueil');
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffTel, setNewStaffTel] = useState('');
-  const [newStaffStoreId, setNewStaffStoreId] = useState('store_central');
+  const [newStaffStoreId, setNewStaffStoreId] = useState('');
 
   // Formulaire d'édition
   const [editStaffNom, setEditStaffNom] = useState('');
@@ -436,6 +436,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const handleCreateStaff = (e) => {
     e.preventDefault();
     if (!newStaffNom || !newStaffPrenom) return;
+    if (!newStaffStoreId) {
+      alert("Veuillez sélectionner un point de laverie d'affectation pour cet employé.");
+      return;
+    }
 
     const defaultPerms = getRoleDefaultPermissions(newStaffRole);
 
@@ -445,7 +449,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       role: newStaffRole,
       email: newStaffEmail,
       telephone: newStaffTel,
-      store_id: newStaffStoreId || 'store_central',
+      store_id: newStaffStoreId,
       statut: 'actif',
       permissions: defaultPerms
     });
@@ -457,7 +461,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setNewStaffRole('agent_accueil');
     setNewStaffEmail('');
     setNewStaffTel('');
-    setNewStaffStoreId('store_central');
+    setNewStaffStoreId('');
     refreshAdminData();
   };
 
@@ -2220,12 +2224,14 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </div>
 
                 <div className="form-group">
-                  <label>Point de Laverie d'affectation</label>
+                  <label>Point de Laverie d'affectation <span style={{ color: '#ef4444' }}>*</span></label>
                   <CustomSelect
                     className="input-control"
                     value={newStaffStoreId}
                     onChange={(e) => setNewStaffStoreId(e.target.value)}
+                    required
                   >
+                    <option value="">-- Sélectionner un point de laverie * --</option>
                     <option value="all">Tous les points (Accès Global Super Admin)</option>
                     {db.getStores().map(s => (
                       <option key={s.id} value={s.id}>

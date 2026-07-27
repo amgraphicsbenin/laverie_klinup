@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../services/db';
-import { playNotificationSound } from '../services/soundService';
+import { sendSystemNotification } from '../services/notificationService';
 
 export function useDbState() {
   const [customers, setCustomers] = useState(() => db.getCustomers() || []);
@@ -35,7 +35,8 @@ export function useDbState() {
 
       const unreadCount = newNotifs.filter(n => !n.read).length;
       if (!isInitialMount.current && unreadCount > prevUnreadCountRef.current) {
-        playNotificationSound();
+        const latestNotif = newNotifs.find(n => !n.read);
+        sendSystemNotification(latestNotif?.action || 'KLIN UP', latestNotif?.details || 'Nouvelle notification');
       }
       prevUnreadCountRef.current = unreadCount;
       if (isInitialMount.current) {

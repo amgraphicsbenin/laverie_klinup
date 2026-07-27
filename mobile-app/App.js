@@ -19,6 +19,7 @@ import { OrderFormModal } from './src/components/OrderFormModal';
 import { registerAlertHandler } from './src/services/alert';
 import SplashScreen from './src/components/SplashScreen';
 import FlaticonIcon from './src/components/FlaticonIcon';
+import { initSystemNotifications } from './src/services/notificationService';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -161,6 +162,7 @@ export default function App() {
       const startTime = Date.now();
       try {
         await initializeDatabase();
+        await initSystemNotifications();
       } catch (err) {
         console.error("DB Initialization error", err);
       } finally {
@@ -402,7 +404,7 @@ export default function App() {
             top: 6,
             width: pillWidth,
             height: 62,
-            borderRadius: 14,
+            borderRadius: 9999,
             backgroundColor: isDarkMode ? '#1d4ed8' : '#2563eb',
             shadowColor: 'transparent',
             shadowOffset: { width: 0, height: 0 },
@@ -782,7 +784,7 @@ const styles = StyleSheet.create({
     zIndex: 10000,
     flexDirection: 'row',
     backgroundColor: '#f3f4f8',
-    borderRadius: 19,
+    borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 4,
@@ -809,7 +811,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 5,
-    borderRadius: 26,
+    borderRadius: 9999,
     width: '100%',
     height: 62,
   },

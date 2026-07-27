@@ -255,16 +255,25 @@ export async function initDb(forceSync = false) {
     
     await syncOfflineQueue();
     
-    if (staffData && staffData.length > 0) memoryDb.staff = staffData;
+    // Merge remote staff with local memoryDb.staff so locally created staff accounts are never wiped out on reload
+    if (staffData) {
+      const mergedStaff = [...(staffData || [])];
+      (memoryDb.staff || []).forEach(localItem => {
+        if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
+          mergedStaff.push(localItem);
+        }
+      });
+      memoryDb.staff = mergedStaff;
+    }
     
-    const { data: custData } = await supabase.from('customers').select('*');
-    if (custData && custData.length > 0) memoryDb.customers = custData;
+    const { data: custData, error: custErr } = await supabase.from('customers').select('*');
+    if (!custErr) memoryDb.customers = custData || [];
     
-    const { data: ordData } = await supabase.from('orders').select('*');
-    if (ordData && ordData.length > 0) memoryDb.orders = ordData.map(hydrateOrder);
+    const { data: ordData, error: ordErr } = await supabase.from('orders').select('*');
+    if (!ordErr) memoryDb.orders = (ordData || []).map(hydrateOrder);
     
-    const { data: logData } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(200);
-    if (logData && logData.length > 0) memoryDb.logs = logData;
+    const { data: logData, error: logErr } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(200);
+    if (!logErr) memoryDb.logs = logData || [];
     
     const { data: catData } = await supabase.from('catalog').select('*');
     if (catData && catData.length > 0) {
@@ -300,8 +309,8 @@ export async function initDb(forceSync = false) {
       memoryDb.catalog = merged;
     }
     
-    const { data: reqData } = await supabase.from('pin_reset_requests').select('*').order('created_at', { ascending: false });
-    if (reqData && reqData.length > 0) memoryDb.pin_reset_requests = reqData;
+    const { data: reqData, error: reqErr } = await supabase.from('pin_reset_requests').select('*').order('created_at', { ascending: false });
+    if (!reqErr) memoryDb.pin_reset_requests = reqData || [];
     
     persist();
     notifyListeners();
@@ -317,8 +326,14 @@ export async function refreshStaff() {
   if (!supabase) return;
   try {
     const { data, error } = await supabase.from('staff').select('*');
-    if (!error && data && data.length > 0) {
-      memoryDb.staff = data;
+    if (!error && data) {
+      const mergedStaff = [...(data || [])];
+      (memoryDb.staff || []).forEach(localItem => {
+        if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
+          mergedStaff.push(localItem);
+        }
+      });
+      memoryDb.staff = mergedStaff;
       persist();
       notifyListeners();
     }

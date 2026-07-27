@@ -14,7 +14,7 @@ import {
 } from './seeds';
 import { performMutation, initDb, persist } from './syncEngine';
 import { supabase } from '../supabaseClient';
-import { playNotificationSound } from '../soundService';
+import { sendSystemNotification } from '../notificationService';
 
 // Base de données locale en mémoire
 export const memoryDb = {
@@ -325,7 +325,7 @@ export const db = {
         read: false
       });
 
-      playNotificationSound();
+      sendSystemNotification(newLog.action, newLog.details);
     }
     persist();
     db.notify();
