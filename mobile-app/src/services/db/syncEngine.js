@@ -228,27 +228,26 @@ export async function performMutation(action, table, recordId, data, rollbackFn)
         db.notify();
         await addToSyncQueue(action, table, recordId, data);
         startAutoReconnect();
-      } else if (errCode === '42703' || (errMsg.includes('column') && errMsg.includes('does not exist'))) {
-        console.warn(`[DB Sync] Colonne inexistante dans Supabase. Repli sans motif_annulation.`);
-        if (table === 'orders' && sanitizedData.motif_annulation !== undefined) {
-          const retriedData = { ...sanitizedData };
-          delete retriedData.motif_annulation;
-          
-          let retryRes;
-          if (action === 'insert') {
-            retryRes = await supabase.from(table).insert(retriedData);
-          } else if (action === 'update') {
-            retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
-          }
-          
-          if (retryRes && retryRes.error) {
-            console.error(`[DB Sync] Échec du repli de la mutation :`, retryRes.error.message);
-            if (rollbackFn) rollbackFn(retryRes.error);
-          } else {
-            console.log(`[DB Sync] ✅ Mutation de repli réussie.`);
-          }
+      } else if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('column') || errMsg.includes('schema cache')) {
+        console.warn(`[DB Sync] Colonne non trouvée dans Supabase (${errMsg}). Tentative de repli immédiate...`);
+        const retriedData = { ...sanitizedData };
+        delete retriedData.store_id;
+        delete retriedData.motif_annulation;
+        delete retriedData.remise_pourcentage;
+        delete retriedData.remise_montant;
+        
+        let retryRes;
+        if (action === 'insert') {
+          retryRes = await supabase.from(table).insert(retriedData);
+        } else if (action === 'update') {
+          retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
+        }
+        
+        if (retryRes && retryRes.error) {
+          console.error(`[DB Sync] Échec du repli de la mutation :`, retryRes.error.message);
+          if (rollbackFn) rollbackFn(retryRes.error);
         } else {
-          if (rollbackFn) rollbackFn(res.error);
+          console.log(`[DB Sync] ✅ Mutation de repli réussie.`);
         }
       } else {
         console.error(`[DB Sync] Erreur de base de données :`, res.error.message);
@@ -384,6 +383,7 @@ export async function initDb(isRetry = false) {
 
       console.log("[DB Sync] ✅ Connecté à Supabase.");
       await syncOfflineQueue();
+      checkAndEvictDisabledCurrentUser();
       await persist();
       db.notify();
 
@@ -419,6 +419,7 @@ export async function refreshStaff() {
         }
       });
       memoryDb.staff = validStaff;
+      checkAndEvictDisabledCurrentUser();
       await persist();
       db.notify();
     }
@@ -556,6 +557,22 @@ export function setupRealtime() {
           }
         }
 
+        // Éviction automatique immédiate si l'utilisateur actuellement connecté est désactivé ou supprimé
+        if (table === 'staff' && memoryDb.current_user) {
+          const currentId = memoryDb.current_user.id;
+          const currentEmail = (memoryDb.current_user.email || '').toLowerCase();
+          
+          if (eventType === 'DELETE' && oldRow && (oldRow.id === currentId || (oldRow.email && oldRow.email.toLowerCase() === currentEmail))) {
+            console.warn("[Auth Realtime] Compte supprimé à distance. Déconnexion immédiate de l'application mobile !");
+            memoryDb.current_user = null;
+          } else if (eventType === 'UPDATE' && newRow && (newRow.id === currentId || (newRow.email && newRow.email.toLowerCase() === currentEmail))) {
+            if (newRow.statut === 'suspendu' || newRow.statut === 'inactif') {
+              console.warn("[Auth Realtime] Compte désactivé/suspendu à distance. Déconnexion immédiate de l'application mobile !");
+              memoryDb.current_user = null;
+            }
+          }
+        }
+
         persist();
         db.notify();
       })
@@ -564,10 +581,59 @@ export function setupRealtime() {
 }
 
 /**
+ * Vérifie si l'utilisateur actuellement connecté a été désactivé ou suspendu, et le déconnecte le cas échéant.
+ */
+export function checkAndEvictDisabledCurrentUser() {
+  if (!memoryDb.current_user || !memoryDb.staff) return false;
+  const currentId = memoryDb.current_user.id;
+  const currentEmail = (memoryDb.current_user.email || '').toLowerCase();
+  
+  const foundInStaff = memoryDb.staff.find(s => 
+    (s.id && s.id === currentId) || 
+    (s.email && s.email.toLowerCase() === currentEmail)
+  );
+
+  if (foundInStaff && (foundInStaff.statut === 'suspendu' || foundInStaff.statut === 'inactif')) {
+    console.warn("[Auth] Détection d'un compte suspendu ou inactif. Déconnexion forcée !");
+    memoryDb.current_user = null;
+    persist();
+    db.notify();
+    return true;
+  }
+  return false;
+}
+
+// Security Heartbeat : Vérification périodique du statut du compte connecté auprès de Supabase
+let securityHeartbeatInterval = null;
+function startSecurityHeartbeat() {
+  if (securityHeartbeatInterval) return;
+  securityHeartbeatInterval = setInterval(async () => {
+    if (memoryDb.current_user && supabase) {
+      try {
+        const email = memoryDb.current_user.email;
+        if (email) {
+          const { data } = await supabase.from('staff').select('id, statut').ilike('email', email.trim()).maybeSingle();
+          if (data && (data.statut === 'suspendu' || data.statut === 'inactif')) {
+            console.warn(`[Security Heartbeat] Compte mobile désactivé (${data.statut}). Déconnexion forcée immédiate !`);
+            memoryDb.current_user = null;
+            await persist();
+            db.notify();
+          }
+        }
+      } catch (e) {
+        // Erreurs réseau temporaires ignorées
+      }
+    }
+  }, 10000);
+}
+
+/**
  * Initialise l'ensemble de la base de données.
  */
 export async function initializeDatabase() {
   await loadFromLocalStorage();
   await initDb();
+  checkAndEvictDisabledCurrentUser();
+  startSecurityHeartbeat();
   startOrderStateCron();
 }

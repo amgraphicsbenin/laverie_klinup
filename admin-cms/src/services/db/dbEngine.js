@@ -944,7 +944,7 @@ export const dbEngine = {
     return newMember;
   },
 
-  updateStaff: (id, updatedFields) => {
+  updateStaff: async (id, updatedFields) => {
     const member = memoryDb.staff.find(s => s.id === id);
     if (member) {
       const original = { ...member };
@@ -957,7 +957,7 @@ export const dbEngine = {
       if (updatedFields.store_id !== undefined) member.store_id = updatedFields.store_id;
       if (updatedFields.permissions !== undefined) member.permissions = { ...member.permissions, ...updatedFields.permissions };
       
-      dbEngine.logAction('MODIFICATION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} mis à jour`);
+      dbEngine.logAction('MODIFICATION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} mis à jour (${member.statut})`);
       persist();
       notifyListeners();
 
@@ -968,11 +968,14 @@ export const dbEngine = {
         email: member.email,
         telephone: member.telephone,
         statut: member.statut,
-        store_id: member.store_id,
         permissions: member.permissions
       };
+      if (member.store_id) {
+        updateData.store_id = member.store_id;
+      }
 
-      performMutation('update', 'staff', id, updateData, () => {
+      await performMutation('update', 'staff', id, updateData, () => {
+        console.warn("[DB] Échec de la mise à jour Supabase, annulation locale...");
         Object.assign(member, original);
         persist();
         notifyListeners();

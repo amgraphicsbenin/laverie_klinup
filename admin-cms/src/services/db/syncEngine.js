@@ -192,8 +192,8 @@ export async function performMutation(action, table, recordId, data, rollbackFn)
         notifyListeners();
         addToSyncQueue(action, table, recordId, data);
         startAutoReconnect();
-      } else if (errCode === '42703' || (errMsg.includes('column') && errMsg.includes('does not exist'))) {
-        console.warn(`[DB] La colonne n'existe pas dans Supabase. Tentative de repli sans colonnes facultatives...`);
+      } else if (errCode === 'PGRST204' || errCode === '42703' || errMsg.includes('column') || errMsg.includes('schema cache')) {
+        console.warn(`[DB] Colonne non trouvée dans le cache Supabase (${errMsg}). Tentative de repli immédiate...`);
         const retriedData = { ...sanitizedData };
         delete retriedData.store_id;
         delete retriedData.motif_annulation;

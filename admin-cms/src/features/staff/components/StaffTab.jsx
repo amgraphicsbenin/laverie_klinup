@@ -681,7 +681,7 @@ export default function StaffTab({
                     paginatedStaff.map((s) => {
                       const isSelected = selectedStaffIds.includes(s.id);
                       const roleMeta = getRoleMeta(s.role);
-                      const isSuspended = s.statut === 'suspendu';
+                      const isSuspended = s.statut === 'suspendu' || s.statut === 'inactif';
                       const prenom = s.prenom || '';
                       const nom = s.nom || '';
                       const initiales = `${prenom.charAt(0)}${nom.charAt(0)}`.toUpperCase() || 'U';
@@ -836,10 +836,11 @@ export default function StaffTab({
                           <td style={{ padding: '0.75rem' }}>
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={async () => {
                                 const newStatut = isSuspended ? 'actif' : 'suspendu';
-                                db.updateStaff(s.id, { statut: newStatut });
-                                refreshAdminData();
+                                s.statut = newStatut;
+                                await db.updateStaff(s.id, { statut: newStatut });
+                                if (refreshAdminData) refreshAdminData();
                               }}
                               style={{
                                 border: 'none',

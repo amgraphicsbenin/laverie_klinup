@@ -415,12 +415,12 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setEditStaffPermissions(getRoleDefaultPermissions(role));
   };
 
-  const handleSaveStaff = (e) => {
+  const handleSaveStaff = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!selectedStaffId) return false;
 
     try {
-      db.updateStaff(selectedStaffId, {
+      await db.updateStaff(selectedStaffId, {
         nom: editStaffNom,
         prenom: editStaffPrenom,
         role: editStaffRole,
