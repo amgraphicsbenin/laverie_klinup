@@ -126,14 +126,17 @@ export async function persist() {
  */
 function sanitizePayload(table, data) {
   if (!data) return data;
+  const sanitized = { ...data };
+  // store_id est désormais un champ obligatoire transmis à Supabase
   if (table === 'orders') {
-    const sanitized = { ...data };
     delete sanitized.remise_pourcentage;
     delete sanitized.remise_montant;
     delete sanitized.prix_base_avant_remise;
-    return sanitized;
+  } else if (table === 'catalog') {
+    delete sanitized.sku;
+    delete sanitized.prix_urgent;
   }
-  return data;
+  return sanitized;
 }
 
 /**
@@ -308,7 +311,14 @@ export async function initDb(isRetry = false) {
       }
 
       if (staffRes.status === 'fulfilled' && !staffRes.value?.error && staffRes.value?.data?.length > 0) {
-        memoryDb.staff = staffRes.value.data;
+        const remoteStaff = staffRes.value.data || [];
+        const mergedStaff = [...remoteStaff];
+        (memoryDb.staff || []).forEach(localItem => {
+          if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
+            mergedStaff.push(localItem);
+          }
+        });
+        memoryDb.staff = mergedStaff;
       }
       if (custRes.status === 'fulfilled' && !custRes.value?.error) {
         memoryDb.customers = custRes.value.data || [];
@@ -391,6 +401,26 @@ export async function initDb(isRetry = false) {
   }
 }
 
+export async function refreshStaff() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('staff').select('*');
+    if (!error && data) {
+      const mergedStaff = [...(data || [])];
+      (memoryDb.staff || []).forEach(localItem => {
+        if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
+          mergedStaff.push(localItem);
+        }
+      });
+      memoryDb.staff = mergedStaff;
+      await persist();
+      db.notify();
+    }
+  } catch (e) {
+    console.error("[DB Sync] Échec du rafraîchissement du personnel :", e);
+  }
+}
+
 // Reconnexion automatique
 let reconnectInterval = null;
 export function startAutoReconnect() {
@@ -426,13 +456,25 @@ export async function startPeriodicSync() {
   syncInterval = setInterval(async () => {
     if (!supabase) return;
     try {
-      const [custRes, orderRes, logsRes, reqsRes] = await Promise.allSettled([
+      const [staffRes, custRes, orderRes, logsRes, reqsRes] = await Promise.allSettled([
+        withTimeout(supabase.from('staff').select('*'), 5000, 'sync-staff'),
         withTimeout(supabase.from('customers').select('*'), 5000, 'sync-customers'),
         withTimeout(supabase.from('orders').select('*'), 5000, 'sync-orders'),
         withTimeout(supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }), 5000, 'sync-logs'),
         withTimeout(supabase.from('pin_reset_requests').select('*'), 5000, 'sync-reqs'),
       ]);
       let changed = false;
+      if (staffRes.status === 'fulfilled' && !staffRes.value?.error && staffRes.value?.data?.length > 0) {
+        const remoteStaff = staffRes.value.data || [];
+        const mergedStaff = [...remoteStaff];
+        (memoryDb.staff || []).forEach(localItem => {
+          if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
+            mergedStaff.push(localItem);
+          }
+        });
+        memoryDb.staff = mergedStaff;
+        changed = true;
+      }
       if (custRes.status === 'fulfilled' && !custRes.value?.error) { memoryDb.customers = custRes.value.data || []; changed = true; }
       if (orderRes.status === 'fulfilled' && !orderRes.value?.error) {
         const remoteOrders = orderRes.value.data || [];

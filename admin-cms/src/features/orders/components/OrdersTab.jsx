@@ -19,9 +19,11 @@ import {
   Package,
   User,
   Check,
-  Zap
+  Zap,
+  Download
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
+import { exportOrdersCSV } from '../../../utils/exportUtils';
 
 export default function OrdersTab({
   orders,
@@ -77,7 +79,7 @@ export default function OrdersTab({
     pret: { bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.25)', label: 'Prêt' },
     a_livrer: { bg: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.25)', label: 'À livrer' },
     a_recuperer: { bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: 'rgba(217, 119, 6, 0.25)', label: 'À récupérer' },
-    en_cours_livraison: { bg: 'rgba(15, 23, 42, 0.12)', color: '#0f172a', border: 'rgba(15, 23, 42, 0.25)', label: 'En livraison' },
+    en_cours_livraison: { bg: 'rgba(79, 70, 229, 0.10)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.22)', label: 'En livraison' },
     restitue: { bg: 'rgba(16, 185, 129, 0.08)', color: '#059669', border: 'rgba(16, 185, 129, 0.2)', label: 'Livré / Récupéré' },
     annule: { bg: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.2)', label: 'Annulée' }
   };
@@ -251,8 +253,18 @@ export default function OrdersTab({
               </p>
             </div>
 
-            {/* Filter Pills */}
-            <div style={{ display: 'flex', background: 'var(--bg-app)', padding: '0.25rem', borderRadius: '10px', border: '1px solid var(--border-color)', gap: '0.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => exportOrdersCSV(orders)}
+                style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                title="Exporter toutes les commandes en CSV"
+              >
+                <Download size={14} /> CSV
+              </button>
+              {/* Filter Pills */}
+              <div style={{ display: 'flex', background: 'var(--bg-app)', padding: '0.25rem', borderRadius: '10px', border: '1px solid var(--border-color)', gap: '0.25rem' }}>
               <button
                 type="button"
                 className="btn"
@@ -315,6 +327,7 @@ export default function OrdersTab({
               </button>
             </div>
           </div>
+        </div>
 
           {/* Liste des cartes Suivi d'Atelier */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '680px', overflowY: 'auto', paddingRight: '0.25rem' }}>

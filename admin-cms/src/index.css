@@ -84,7 +84,7 @@
   scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
 
-/* Custom premium scrollbar style */
+/* Custom premium scrollbar style — seule définition */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -95,13 +95,13 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.18);
   border-radius: 10px;
   transition: background 0.3s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.32);
 }
 
 body {
@@ -212,22 +212,7 @@ button, input, select, textarea {
 .main-content > *:nth-child(4) { animation-delay: 0.16s; }
 .main-content > *:nth-child(n+5) { animation-delay: 0.20s; }
 
-/* Scrollbar Personnalisée */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  border-radius: 10px;
-  opacity: 0.5;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
-}
+/* Scrollbar — voir définition plus haut */
 
 /* Layout Principal */
 .app-container {
@@ -421,7 +406,7 @@ button, input, select, textarea {
 /* Zone de contenu principale */
 .main-content {
   flex-grow: 1;
-  padding: 1.5rem 2rem 6rem 2rem;
+  padding: 1.5rem 2rem 2.5rem 2rem;
   overflow-y: auto;
   height: 100vh;
   display: flex;
@@ -949,11 +934,11 @@ table {
 
 th {
   padding: 0.85rem 1rem;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.75px;
+  letter-spacing: 0.65px;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -973,7 +958,7 @@ tr td {
 }
 
 tr:hover td {
-  background: rgba(59, 130, 246, 0.03) !important;
+  background: rgba(59, 130, 246, 0.06) !important;
 }
 
 .badge {
@@ -1019,15 +1004,18 @@ tr:hover td {
   color: #2B82F0;
   border: 1px solid rgba(43, 130, 240, 0.2);
 }
+.badge-en_cours_livraison {
+  background: rgba(79, 70, 229, 0.10);
+  color: #4f46e5;
+  border: 1px solid rgba(79, 70, 229, 0.22);
+}
 .badge-a_recuperer {
   background: rgba(16, 185, 129, 0.1);
   color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
-.badge-en_cours_livraison {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.2);
+.badge-en_cours_livraison_overrides {
+  /* old a_recuperer-style entry — now consolidated above */
 }
 .badge-en_retard {
   background: var(--status-late-light);
@@ -1037,7 +1025,7 @@ tr:hover td {
   background: var(--status-delivered-light);
   color: var(--status-delivered);
   text-decoration: line-through;
-  opacity: 0.6;
+  opacity: 0.75;
 }
 
 /* Formulaires */
@@ -1485,4 +1473,15 @@ tr:hover td {
   background: var(--primary-light);
   color: var(--primary);
   font-weight: 600;
+}
+
+/* ========================================================
+   CLASSE TITRE DE GRAPHIQUE / SECTION (LogsTab, Charts)
+   ======================================================== */
+.chart-title {
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
 }

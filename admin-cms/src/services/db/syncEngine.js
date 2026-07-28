@@ -1,6 +1,7 @@
-import { supabase } from '../supabaseClient';
-import { STORAGE_KEYS, DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG, DEFAULT_STORES } from './seeds';
-import { memoryDb, notifyListeners, hydrateOrder, startOrderStateCron } from './dbEngine';
+import { supabase } from '../supabaseClient.js';
+import { STORAGE_KEYS, DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG, DEFAULT_STORES, DEFAULT_ROLES } from './seeds.js';
+import { memoryDb, notifyListeners } from './memoryStore.js';
+import { hydrateOrder, startOrderStateCron } from './dbEngine.js';
 
 let isUsingRemote = false;
 export function getIsUsingRemote() {
@@ -39,14 +40,11 @@ const saveData = (key, data) => {
 export function loadFromLocalStorage() {
   memoryDb.stores = loadData(STORAGE_KEYS.STORES, DEFAULT_STORES);
   memoryDb.selected_store_id = loadData(STORAGE_KEYS.SELECTED_STORE, 'all');
+  memoryDb.roles = loadData(STORAGE_KEYS.ROLES, DEFAULT_ROLES);
   
   const rawStaff = loadData(STORAGE_KEYS.STAFF, DEFAULT_STAFF);
-  // Filter staff to ensure ONLY super admin (andre.koutomi98@gmail.com) or newly created custom staff members remain
-  const cleanedStaff = (rawStaff || []).filter(s => s.email === 'andre.koutomi98@gmail.com' || (s.id && !['u1','u2','u3','u5','u6'].includes(s.id)));
-  if (cleanedStaff.length === 0) {
-    cleanedStaff.push(DEFAULT_STAFF[0]);
-  }
-  memoryDb.staff = cleanedStaff;
+  const validStaff = Array.isArray(rawStaff) && rawStaff.length > 0 ? rawStaff : [...DEFAULT_STAFF];
+  memoryDb.staff = validStaff;
 
   memoryDb.customers = loadData(STORAGE_KEYS.CUSTOMERS, DEFAULT_CUSTOMERS);
   const loadedOrders = loadData(STORAGE_KEYS.ORDERS, DEFAULT_ORDERS);
@@ -63,13 +61,23 @@ export function loadFromLocalStorage() {
   
   const currentUser = loadData(STORAGE_KEYS.CURRENT_USER, null);
   // Ensure current user is valid, otherwise default to super admin Koutomi André
-  if (!currentUser || (currentUser.email !== 'andre.koutomi98@gmail.com' && !cleanedStaff.some(s => s.id === currentUser.id))) {
+  if (!currentUser || (currentUser.email !== 'andre.koutomi98@gmail.com' && !validStaff.some(s => s.id === currentUser.id))) {
     memoryDb.current_user = DEFAULT_STAFF[0];
   } else {
     memoryDb.current_user = currentUser;
   }
   
   memoryDb.pin_reset_requests = loadData('klin_up_pin_reset_requests', []);
+  memoryDb.settings = loadData('klin_up_app_settings', {
+    express_hours: 6,
+    express_markup: 50,
+    normal_hours: 48,
+    receipt_header: "KLIN UP - Laverie & Pressing Premium",
+    receipt_footer: "Merci de votre confiance ! A bientot chez KLIN UP."
+  });
+  memoryDb.cash_closures = loadData('klin_up_cash_closures', []);
+  memoryDb.debt_payments = loadData('klin_up_debt_payments', []);
+
   startOrderStateCron();
   notifyListeners();
 }
@@ -77,6 +85,7 @@ export function loadFromLocalStorage() {
 export function persist() {
   saveData(STORAGE_KEYS.STORES, memoryDb.stores);
   saveData(STORAGE_KEYS.SELECTED_STORE, memoryDb.selected_store_id);
+  saveData(STORAGE_KEYS.ROLES, memoryDb.roles);
   saveData(STORAGE_KEYS.STAFF, memoryDb.staff);
   saveData(STORAGE_KEYS.CUSTOMERS, memoryDb.customers);
   saveData(STORAGE_KEYS.ORDERS, memoryDb.orders);
@@ -84,6 +93,9 @@ export function persist() {
   // Catalog is NOT stored locally (direct DB query mode)
   saveData(STORAGE_KEYS.CURRENT_USER, memoryDb.current_user);
   saveData('klin_up_pin_reset_requests', memoryDb.pin_reset_requests);
+  saveData('klin_up_app_settings', memoryDb.settings);
+  saveData('klin_up_cash_closures', memoryDb.cash_closures);
+  saveData('klin_up_debt_payments', memoryDb.debt_payments);
 }
 
 function addToSyncQueue(action, table, recordId, data) {
@@ -101,20 +113,17 @@ function addToSyncQueue(action, table, recordId, data) {
 
 function sanitizePayload(table, data) {
   if (!data) return data;
+  const sanitized = { ...data };
+  // store_id est désormais un champ obligatoire transmis à Supabase
   if (table === 'orders') {
-    const sanitized = { ...data };
     delete sanitized.remise_pourcentage;
     delete sanitized.remise_montant;
     delete sanitized.prix_base_avant_remise;
-    return sanitized;
-  }
-  if (table === 'catalog') {
-    const sanitized = { ...data };
+  } else if (table === 'catalog') {
     delete sanitized.sku;
     delete sanitized.prix_urgent;
-    return sanitized;
   }
-  return data;
+  return sanitized;
 }
 
 export async function syncOfflineQueue() {

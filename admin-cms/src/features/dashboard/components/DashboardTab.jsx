@@ -51,10 +51,21 @@ export default function DashboardTab({
   onManageStaff
 }) {
   const [activeStageFilter, setActiveStageFilter] = useState('all');
+  const [showCashClosureModal, setShowCashClosureModal] = useState(false);
+  const [actualCash, setActualCash] = useState('');
+  const [actualMomo, setActualMomo] = useState('');
+  const [closureNotes, setClosureNotes] = useState('');
+
   const selectedStoreId = db.getSelectedStoreId ? db.getSelectedStoreId() : 'all';
   const stores = db.getStores ? db.getStores() : [];
   const currentStore = stores.find(s => s.id === selectedStoreId);
   const storeName = currentStore ? currentStore.nom : 'Tous les points (Vue Globale)';
+
+  // Calculate today's theoretical cash totals
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayOrders = orders.filter(o => o.created_at && o.created_at.startsWith(todayStr) && o.statut !== 'annule');
+  const expectedCash = todayOrders.filter(o => o.mode_reglement === 'especes' || !o.mode_reglement).reduce((sum, o) => sum + Number(o.avance_payee || o.prix_total || 0), 0);
+  const expectedMomo = todayOrders.filter(o => o.mode_reglement === 'mobile_money' || o.mode_reglement === 'kpay' || o.mode_reglement === 'flooz' || o.mode_reglement === 'mtn').reduce((sum, o) => sum + Number(o.avance_payee || o.prix_total || 0), 0);
 
   // Calculate live breakdown by stage
   const countWashing = orders.filter(o => o.statut === 'en_cours_lavage').length;
@@ -84,7 +95,7 @@ export default function DashboardTab({
           color: 'var(--text-primary)',
           boxShadow: 'var(--shadow-sm)',
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '1.25rem',
@@ -117,6 +128,27 @@ export default function DashboardTab({
 
         {/* Action Buttons */}
         <div style={{ zIndex: 1, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={() => setShowCashClosureModal(true)}
+            style={{
+              background: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              color: '#10b981',
+              padding: '0.65rem 1.1rem',
+              borderRadius: '12px',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: 'var(--shadow-sm)'
+            }}
+          >
+            <Award size={16} /> Clôture Caisse (Z)
+          </button>
+
           <button
             type="button"
             onClick={onManageStaff}
@@ -655,6 +687,92 @@ export default function DashboardTab({
           )}
         </div>
       </div>
+
+      {showCashClosureModal && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '480px', borderRadius: '20px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', background: 'var(--bg-card)', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>
+                🔒 Clôture de Caisse Journalière (Z)
+              </h3>
+              <button type="button" onClick={() => setShowCashClosureModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '0.85rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.82rem' }}>
+                <div><strong>Total Théorique Espèces :</strong> {expectedCash.toLocaleString()} FCFA</div>
+                <div style={{ marginTop: '4px' }}><strong>Total Théorique Mobile Money :</strong> {expectedMomo.toLocaleString()} FCFA</div>
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.82rem' }}>Montant Physique Espèces Réel (FCFA)</label>
+                <input
+                  type="number"
+                  className="input-control"
+                  placeholder={`Ex: ${expectedCash}`}
+                  value={actualCash}
+                  onChange={(e) => setActualCash(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.82rem' }}>Montant Mobile Money Réel (FCFA)</label>
+                <input
+                  type="number"
+                  className="input-control"
+                  placeholder={`Ex: ${expectedMomo}`}
+                  value={actualMomo}
+                  onChange={(e) => setActualMomo(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.82rem' }}>Notes / Explications des Écarts</label>
+                <textarea
+                  className="input-control"
+                  rows="2"
+                  placeholder="Remarques éventuelles sur la journée de caisse..."
+                  value={closureNotes}
+                  onChange={(e) => setClosureNotes(e.target.value)}
+                />
+              </div>
+
+              {actualCash !== '' && (
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: (Number(actualCash) - expectedCash) < 0 ? '#ef4444' : '#10b981' }}>
+                  Écart Espèces : {(Number(actualCash) - expectedCash).toLocaleString()} FCFA
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowCashClosureModal(false)}>
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ flex: 1, background: '#10b981', borderColor: '#10b981' }}
+                  onClick={() => {
+                    db.closeDailyCashRegister({
+                      expected_cash: expectedCash,
+                      actual_cash: actualCash || expectedCash,
+                      expected_momo: expectedMomo,
+                      actual_momo: actualMomo || expectedMomo,
+                      notes: closureNotes
+                    });
+                    alert("Clôture de caisse validée et enregistrée avec succès !");
+                    setShowCashClosureModal(false);
+                    setActualCash('');
+                    setActualMomo('');
+                    setClosureNotes('');
+                  }}
+                >
+                  Valider la Clôture Z
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -6,8 +6,122 @@ export const STORAGE_KEYS = {
   CATALOG: 'klin_up_catalog',
   CURRENT_USER: 'klin_up_current_user',
   STORES: 'klin_up_stores',
-  SELECTED_STORE: 'klin_up_selected_store'
+  SELECTED_STORE: 'klin_up_selected_store',
+  ROLES: 'klin_up_roles'
 };
+
+export const DEFAULT_ROLES = [
+  {
+    id: 'super_admin',
+    key: 'super_admin',
+    label: 'Super Administrateur',
+    shortLabel: 'Admin',
+    color: '#2563eb',
+    description: 'Accès complet au CMS, gestion du personnel, paramètres système et audit.',
+    isSystem: true,
+    permissions: {
+      can_view_dashboard: true,
+      can_manage_orders: true,
+      can_manage_crm: true,
+      can_edit_catalog: true,
+      can_manage_stores: true,
+      can_view_logs: true,
+      can_manage_staff: true,
+      can_access_mobile: true,
+      can_create_orders_mobile: true,
+      can_manage_delivery_mobile: true,
+      can_manage_workshop_mobile: true
+    }
+  },
+  {
+    id: 'manager',
+    key: 'manager',
+    label: 'Manager Caisse',
+    shortLabel: 'Manager',
+    color: '#0284c7',
+    description: 'Gestion des encaissements, commandes, clients et catalogue d\'articles.',
+    isSystem: true,
+    permissions: {
+      can_view_dashboard: true,
+      can_manage_orders: true,
+      can_manage_crm: true,
+      can_edit_catalog: true,
+      can_manage_stores: false,
+      can_view_logs: false,
+      can_manage_staff: false,
+      can_access_mobile: true,
+      can_create_orders_mobile: true,
+      can_manage_delivery_mobile: false,
+      can_manage_workshop_mobile: false
+    }
+  },
+  {
+    id: 'agent_accueil',
+    key: 'agent_accueil',
+    label: 'Agent d\'accueil',
+    shortLabel: 'Accueil',
+    color: '#16a34a',
+    description: 'Réception des clients et enregistrement des commandes (App Mobile).',
+    isSystem: true,
+    permissions: {
+      can_view_dashboard: false,
+      can_manage_orders: false,
+      can_manage_crm: false,
+      can_edit_catalog: false,
+      can_manage_stores: false,
+      can_view_logs: false,
+      can_manage_staff: false,
+      can_access_mobile: true,
+      can_create_orders_mobile: true,
+      can_manage_delivery_mobile: false,
+      can_manage_workshop_mobile: false
+    }
+  },
+  {
+    id: 'livreur',
+    key: 'livreur',
+    label: 'Livreur',
+    shortLabel: 'Livreur',
+    color: '#d97706',
+    description: 'Collecte et livraison des colis textiles à domicile (App Mobile).',
+    isSystem: true,
+    permissions: {
+      can_view_dashboard: false,
+      can_manage_orders: false,
+      can_manage_crm: false,
+      can_edit_catalog: false,
+      can_manage_stores: false,
+      can_view_logs: false,
+      can_manage_staff: false,
+      can_access_mobile: true,
+      can_create_orders_mobile: false,
+      can_manage_delivery_mobile: true,
+      can_manage_workshop_mobile: false
+    }
+  },
+  {
+    id: 'agent_lavage_repassage',
+    key: 'agent_lavage_repassage',
+    label: 'Agent Atelier (Lavage/Repassage)',
+    shortLabel: 'Atelier',
+    color: '#8b5cf6',
+    description: 'Traitement des textiles, lavage, séchage et repassage (App Mobile).',
+    isSystem: true,
+    permissions: {
+      can_view_dashboard: false,
+      can_manage_orders: false,
+      can_manage_crm: false,
+      can_edit_catalog: false,
+      can_manage_stores: false,
+      can_view_logs: false,
+      can_manage_staff: false,
+      can_access_mobile: true,
+      can_create_orders_mobile: false,
+      can_manage_delivery_mobile: false,
+      can_manage_workshop_mobile: true
+    }
+  }
+];
 
 export const DEFAULT_STORES = [
   {

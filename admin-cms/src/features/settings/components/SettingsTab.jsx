@@ -65,6 +65,30 @@ export default function SettingsTab({
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Temps de traitement standard de laverie (ex: 48)</span>
         </div>
 
+        <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700 }}>Modèle En-tête & Pied de Reçu / Facture</h4>
+          <div className="form-group">
+            <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>En-tête de Reçu (Titre / NIF / IFU)</label>
+            <input
+              type="text"
+              className="input-control"
+              placeholder="Ex: KLIN UP - Laverie & Pressing Premium (NIF: 12345678)"
+              value={db.getSettings ? (db.getSettings().receipt_header || '') : ''}
+              onChange={(e) => db.updateSettings && db.updateSettings({ receipt_header: e.target.value })}
+            />
+          </div>
+          <div className="form-group">
+            <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>Pied de Reçu (Mentions Légales & Conditions)</label>
+            <input
+              type="text"
+              className="input-control"
+              placeholder="Ex: Merci de votre confiance ! Retrait sous 30 jours."
+              value={db.getSettings ? (db.getSettings().receipt_footer || '') : ''}
+              onChange={(e) => db.updateSettings && db.updateSettings({ receipt_footer: e.target.value })}
+            />
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.5rem' }}>
           <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 2rem', fontWeight: 700, fontSize: '0.85rem' }}>
             Enregistrer les paramètres

@@ -82,6 +82,14 @@ CREATE TABLE IF NOT EXISTS public.catalog (
   livraison_gratuite BOOLEAN DEFAULT FALSE
 );
 
+-- Migrations idempotentes : ajout des colonnes si la table existait déjà antérieurement
+ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS nombre_vetements INTEGER;
+ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS ramassage BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS nombre_ramassages INTEGER;
+ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS ramassage_gratuit BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS livraison_gratuite BOOLEAN DEFAULT FALSE;
+
 -- 6. Table: pin_reset_requests
 CREATE TABLE IF NOT EXISTS public.pin_reset_requests (
   id TEXT PRIMARY KEY,
@@ -340,9 +348,114 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ========================================================
--- MIGRATION : Ajout des colonnes created_by à orders
--- ADD COLUMN IF NOT EXISTS est idempotent nativement.
+-- MIGRATION : Rattachement Obligatoire aux Points de Laverie (stores / store_id)
 -- ========================================================
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_by_id TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+
+-- 1. Création de la table stores si elle n'existe pas encore
+CREATE TABLE IF NOT EXISTS public.stores (
+  id TEXT PRIMARY KEY,
+  nom TEXT NOT NULL,
+  code TEXT UNIQUE NOT NULL,
+  adresse TEXT,
+  telephone TEXT,
+  statut TEXT DEFAULT 'actif',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insertion du point de laverie par défaut (idempotent)
+INSERT INTO public.stores (id, nom, code, adresse, statut)
+VALUES ('store_central', 'Laverie Centrale / Siège', 'LAV-001', 'Siège Principal', 'actif')
+ON CONFLICT (id) DO NOTHING;
+
+-- 2. Ajout de store_id à orders
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS store_id TEXT;
+
+-- 3. Migration des commandes historiques orphelines vers store_central
+UPDATE public.orders 
+SET store_id = 'store_central' 
+WHERE store_id IS NULL OR TRIM(store_id) = '' OR store_id = 'all';
+
+-- 4. Application de la contrainte NOT NULL
+ALTER TABLE public.orders ALTER COLUMN store_id SET NOT NULL;
+
+-- 5. Trigger de sécurité pour rejeter les commandes sans store_id au niveau SQL
+CREATE OR REPLACE FUNCTION public.check_order_store_id()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.store_id IS NULL OR TRIM(NEW.store_id) = '' OR NEW.store_id = 'all' THEN
+    RAISE EXCEPTION 'ERREUR CRITIQUE DATABASE : Création de commande refusée sans point de laverie valide (store_id).';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_order_store ON public.orders;
+CREATE TRIGGER trg_enforce_order_store
+BEFORE INSERT OR UPDATE ON public.orders
+FOR EACH ROW EXECUTE FUNCTION public.check_order_store_id();
+
+-- ========================================================
+-- DIRECTIVES AUTH : Synchronisation automatique auth.users & RLS Mobile
+-- ========================================================
+
+-- 1. Politique RLS permettant à l'application mobile (anon) de vérifier l'existence d'un email de personnel
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Vérification email login personnel" ON public.staff;
+  CREATE POLICY "Vérification email login personnel" ON public.staff
+    FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2. Fonction SQL de synchronisation automatique vers auth.users (Supabase Auth)
+CREATE OR REPLACE FUNCTION public.sync_staff_to_auth_users()
+RETURNS TRIGGER AS $$
+DECLARE
+  new_auth_id UUID;
+BEGIN
+  IF NEW.email IS NOT NULL AND NEW.email != '' THEN
+    -- Vérifier si l'utilisateur existe déjà dans auth.users
+    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE LOWER(email) = LOWER(NEW.email)) THEN
+      new_auth_id := gen_random_uuid();
+      INSERT INTO auth.users (
+        id,
+        instance_id,
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        created_at,
+        updated_at,
+        role,
+        aud
+      ) VALUES (
+        new_auth_id,
+        '00000000-0000-0000-0000-000000000000',
+        LOWER(NEW.email),
+        crypt(COALESCE(NEW.code_pin, '000000'), gen_salt('bf')),
+        CURRENT_TIMESTAMP,
+        jsonb_build_object('provider', 'email', 'providers', array['email']),
+        jsonb_build_object('nom', NEW.nom, 'prenom', NEW.prenom, 'role', NEW.role),
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP,
+        'authenticated',
+        'authenticated'
+      );
+    END IF;
+  END IF;
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- Ne pas bloquer l'insertion métier si auth.users n'est pas accessible directement via l'utilisateur anon/postgres
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3. Trigger d'exécution de la synchronisation staff -> auth.users
+DROP TRIGGER IF EXISTS trg_sync_staff_auth ON public.staff;
+CREATE TRIGGER trg_sync_staff_auth
+AFTER INSERT OR UPDATE OF email, code_pin ON public.staff
+FOR EACH ROW EXECUTE FUNCTION public.sync_staff_to_auth_users();
+
+
 

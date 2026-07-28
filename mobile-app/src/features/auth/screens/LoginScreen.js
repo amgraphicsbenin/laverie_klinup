@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ActivityIndicator, BackHandler } from 'react-native';
 import { Mail, ChevronLeft } from 'lucide-react-native';
-import { db } from '../../../services/db';
+import { db, memoryDb } from '../../../services/db';
+import { supabase } from '../../../services/supabaseClient';
 
 export default function LoginScreen() {
   const isDarkMode = db.isDarkMode ? db.isDarkMode() : false;
@@ -30,20 +31,53 @@ export default function LoginScreen() {
     return () => backHandler.remove();
   }, [selectedUser]);
 
-  const handleEmailSubmit = () => {
+  const handleEmailSubmit = async () => {
     if (!email) return;
     setLoading(true);
-    // Simulate lookup in local staff list
-    setTimeout(() => {
-      const staffList = db.getStaff();
-      const found = staffList.find(s => s.email.toLowerCase().trim() === email.toLowerCase().trim());
-      setLoading(false);
-      if (found) {
-        setSelectedUser(found);
-      } else {
-        alert("Email introuvable. Veuillez vérifier vos identifiants.");
+    const targetEmail = email.trim().toLowerCase();
+
+    try {
+      if (db.refreshData) {
+        await db.refreshData();
       }
-    }, 500);
+    } catch (e) {
+      console.warn("[Login] Erreur rafraîchissement:", e);
+    }
+
+    const staffList = db.getStaff ? db.getStaff() : [];
+    let found = staffList.find(s => s.email && s.email.trim().toLowerCase() === targetEmail);
+
+    // Requête directe de secours Supabase si l'utilisateur venant d'être créé n'est pas encore dans memoryDb
+    if (!found && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('staff')
+          .select('*')
+          .ilike('email', targetEmail)
+          .maybeSingle();
+
+        if (data && !error) {
+          found = data;
+          if (memoryDb && memoryDb.staff && !memoryDb.staff.some(s => s.id === data.id)) {
+            memoryDb.staff.push(data);
+            if (db.notify) db.notify();
+          }
+        }
+      } catch (err) {
+        console.warn("[Login] Recherche directe Supabase échouée :", err);
+      }
+    }
+
+    setLoading(false);
+    if (found) {
+      if (found.statut === 'inactif' || found.statut === 'suspendu') {
+        alert("Ce compte utilisateur est inactif ou suspendu. Veuillez contacter votre administrateur.");
+        return;
+      }
+      setSelectedUser(found);
+    } else {
+      alert("Email introuvable. Veuillez vérifier vos identifiants.");
+    }
   };
 
   const handlePinInput = (val) => {
@@ -52,7 +86,8 @@ export default function LoginScreen() {
     setPin(cleaned);
 
     if (cleaned.length === 6 && selectedUser) {
-      if (selectedUser.code_pin === cleaned) {
+      const userPin = selectedUser.code_pin || '000000';
+      if (userPin === cleaned) {
         db.setCurrentUser(selectedUser);
         setSelectedUser(null);
         setPin('');

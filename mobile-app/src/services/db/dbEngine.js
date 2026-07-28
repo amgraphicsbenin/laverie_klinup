@@ -969,13 +969,15 @@ export const db = {
   // --- GESTION DU PERSONNEL (STAFF) ---
 
   addStaff: (member) => {
+    const defaultPin = member.code_pin || '000000';
     const newMember = {
-      id: 'u_' + Math.random().toString(36).substring(2, 11),
+      id: member.id || ('u_' + Math.random().toString(36).substring(2, 11)),
       nom: member.nom,
       prenom: member.prenom,
       role: member.role || 'agent_accueil',
-      email: member.email || `${member.prenom.toLowerCase()}.${member.nom.toLowerCase()}@klinup.com`,
+      email: member.email ? member.email.trim().toLowerCase() : `${member.prenom.toLowerCase()}.${member.nom.toLowerCase()}@klinup.com`,
       telephone: member.telephone || '',
+      code_pin: defaultPin,
       statut: member.statut || 'actif',
       permissions: member.permissions || {
         can_view_dashboard: member.role === 'super_admin' || member.role === 'manager',

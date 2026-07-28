@@ -1,6 +1,7 @@
 import React from 'react';
-import { Search, Filter, AlertCircle } from 'lucide-react';
+import { Search, Filter, AlertCircle, Download } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
+import { exportLogsCSV } from '../../../utils/exportUtils';
 
 export default function LogsTab({
   logSearchText,
@@ -12,7 +13,18 @@ export default function LogsTab({
 }) {
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <h3 className="chart-title" style={{ margin: 0 }}>Traces d'Audit & Sécurité Opérationnelle</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3 className="chart-title" style={{ margin: 0 }}>Traces d'Audit & Sécurité Opérationnelle</h3>
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={() => exportLogsCSV(filteredLogs, staff)}
+          style={{ padding: '0.4rem 0.85rem', fontSize: '0.78rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+          title="Exporter les traces d'audit en CSV"
+        >
+          <Download size={14} /> Exporter CSV
+        </button>
+      </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
         <div style={{ flexGrow: 1, position: 'relative' }}>

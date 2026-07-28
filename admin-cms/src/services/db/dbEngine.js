@@ -1,23 +1,8 @@
-import { DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG, DEFAULT_STORES } from './seeds';
-import { performMutation, persist } from './syncEngine';
+import { DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG, DEFAULT_STORES, DEFAULT_ROLES } from './seeds.js';
+import { memoryDb, listeners, notifyListeners } from './memoryStore.js';
+import { performMutation, persist } from './syncEngine.js';
 
-export const memoryDb = {
-  stores: DEFAULT_STORES,
-  selected_store_id: 'all',
-  staff: DEFAULT_STAFF,
-  customers: DEFAULT_CUSTOMERS,
-  orders: DEFAULT_ORDERS,
-  logs: DEFAULT_LOGS,
-  catalog: DEFAULT_CATALOG,
-  current_user: null,
-  pin_reset_requests: []
-};
-
-export const listeners = new Set();
-
-export const notifyListeners = () => {
-  listeners.forEach(l => l());
-};
+export { memoryDb, listeners, notifyListeners };
 
 export function normalizeOrderStatus(rawStatus) {
   if (!rawStatus) return 'en_attente';
@@ -643,10 +628,15 @@ export const dbEngine = {
 
     const currentUser = dbEngine.getCurrentUser();
 
+    let targetStoreId = orderData.store_id || (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null);
+    if (!targetStoreId || targetStoreId === 'all') {
+      throw new Error("IMPOSSIBLE DE CRÉER LA COMMANDE : Aucun point de laverie (boutique) actif n'est sélectionné. Veuillez spécifier un point de laverie.");
+    }
+
     const newOrder = {
       id: 'o_' + Math.random().toString(36).substr(2, 9),
       customer_id: orderData.customer_id,
-      store_id: orderData.store_id || (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central'),
+      store_id: targetStoreId,
       statut: 'en_attente',
       type_article: orderData.type_article,
       type_service: orderData.type_service,
@@ -924,13 +914,15 @@ export const dbEngine = {
   },
 
   addStaff: (member) => {
+    const defaultPin = member.code_pin || '000000';
     const newMember = {
-      id: 'u_' + Math.random().toString(36).substr(2, 9),
+      id: member.id || ('u_' + Math.random().toString(36).substr(2, 9)),
       nom: member.nom,
       prenom: member.prenom,
       role: member.role || 'agent_accueil',
-      email: member.email || `${member.prenom.toLowerCase()}.${member.nom.toLowerCase()}@klinup.com`,
+      email: member.email ? member.email.trim().toLowerCase() : `${member.prenom.toLowerCase()}.${member.nom.toLowerCase()}@klinup.com`,
       telephone: member.telephone || '',
+      code_pin: defaultPin,
       statut: member.statut || 'actif',
       store_id: member.store_id || (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central'),
       permissions: member.permissions || {
@@ -962,6 +954,7 @@ export const dbEngine = {
       if (updatedFields.email !== undefined) member.email = updatedFields.email;
       if (updatedFields.telephone !== undefined) member.telephone = updatedFields.telephone;
       if (updatedFields.statut !== undefined) member.statut = updatedFields.statut;
+      if (updatedFields.store_id !== undefined) member.store_id = updatedFields.store_id;
       if (updatedFields.permissions !== undefined) member.permissions = { ...member.permissions, ...updatedFields.permissions };
       
       dbEngine.logAction('MODIFICATION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} mis à jour`);
@@ -975,6 +968,7 @@ export const dbEngine = {
         email: member.email,
         telephone: member.telephone,
         statut: member.statut,
+        store_id: member.store_id,
         permissions: member.permissions
       };
 
@@ -1173,5 +1167,141 @@ export const dbEngine = {
       return staffMember;
     }
     return null;
+  },
+
+  getRoles: () => {
+    return memoryDb.roles || DEFAULT_ROLES;
+  },
+
+  saveRole: (roleData) => {
+    if (!memoryDb.roles) memoryDb.roles = [...DEFAULT_ROLES];
+    const key = roleData.key || (roleData.label || 'role').toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const existingIndex = memoryDb.roles.findIndex(r => r.id === roleData.id || r.key === key);
+    
+    const roleObj = {
+      id: roleData.id || ('role_' + Math.random().toString(36).substr(2, 9)),
+      key: key,
+      label: roleData.label || 'Nouveau Rôle',
+      shortLabel: roleData.shortLabel || roleData.label || 'Rôle',
+      color: roleData.color || '#2563eb',
+      description: roleData.description || '',
+      isSystem: !!roleData.isSystem,
+      permissions: roleData.permissions || {},
+      created_at: roleData.created_at || new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      memoryDb.roles[existingIndex] = { ...memoryDb.roles[existingIndex], ...roleObj };
+      dbEngine.logAction('MODIFICATION_ROLE', `Rôle ${roleObj.label} mis à jour.`);
+    } else {
+      memoryDb.roles.push(roleObj);
+      dbEngine.logAction('CREATION_ROLE', `Nouveau rôle ${roleObj.label} créé.`);
+    }
+    persist();
+    notifyListeners();
+    return roleObj;
+  },
+
+  deleteRole: (roleId) => {
+    if (!memoryDb.roles) return false;
+    const roleIndex = memoryDb.roles.findIndex(r => r.id === roleId || r.key === roleId);
+    if (roleIndex >= 0) {
+      const role = memoryDb.roles[roleIndex];
+      if (role.isSystem) {
+        alert("Impossible de supprimer un rôle système par défaut.");
+        return false;
+      }
+      memoryDb.roles.splice(roleIndex, 1);
+      dbEngine.logAction('SUPPRESSION_ROLE', `Rôle ${role.label} supprimé.`);
+      persist();
+      notifyListeners();
+      return true;
+    }
+    return false;
+  },
+
+  getSettings: () => {
+    return memoryDb.settings || {
+      express_hours: 6,
+      express_markup: 50,
+      normal_hours: 48,
+      receipt_header: "KLIN UP - Laverie & Pressing Premium",
+      receipt_footer: "Merci de votre confiance ! A bientot chez KLIN UP."
+    };
+  },
+
+  updateSettings: (newSettings) => {
+    memoryDb.settings = { ...memoryDb.settings, ...newSettings };
+    dbEngine.logAction('MODIFICATION_PARAMETRES', `Paramètres système mis à jour.`);
+    persist();
+    notifyListeners();
+    performMutation('update', 'app_settings', 'global', memoryDb.settings);
+    return memoryDb.settings;
+  },
+
+  getCashClosures: () => memoryDb.cash_closures ? [...memoryDb.cash_closures] : [],
+
+  closeDailyCashRegister: (closureData) => {
+    const currentUser = dbEngine.getCurrentUser();
+    const storeId = closureData.store_id || memoryDb.selected_store_id;
+    const newClosure = {
+      id: 'closure_' + Math.random().toString(36).substr(2, 9),
+      store_id: storeId,
+      cashier_id: currentUser ? currentUser.id : 'system',
+      cashier_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Agent Caisse',
+      expected_cash: Number(closureData.expected_cash || 0),
+      actual_cash: Number(closureData.actual_cash || 0),
+      expected_momo: Number(closureData.expected_momo || 0),
+      actual_momo: Number(closureData.actual_momo || 0),
+      cash_gap: Number(closureData.actual_cash || 0) - Number(closureData.expected_cash || 0),
+      momo_gap: Number(closureData.actual_momo || 0) - Number(closureData.expected_momo || 0),
+      notes: closureData.notes || '',
+      closed_at: new Date().toISOString()
+    };
+    if (!memoryDb.cash_closures) memoryDb.cash_closures = [];
+    memoryDb.cash_closures.unshift(newClosure);
+    dbEngine.logAction('CLOTURE_CAISSE', `Clôture de caisse effectuée par ${newClosure.cashier_name} (Écart Espèces: ${newClosure.cash_gap} FCFA)`);
+    persist();
+    notifyListeners();
+    performMutation('insert', 'cash_closures', newClosure.id, newClosure);
+    return newClosure;
+  },
+
+  getDebtPayments: () => memoryDb.debt_payments ? [...memoryDb.debt_payments] : [],
+
+  payCustomerDebt: (customerId, amountPaid, notes = '') => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer) throw new Error("Client non trouvé");
+    const amount = Number(amountPaid);
+    if (isNaN(amount) || amount <= 0) throw new Error("Montant de règlement invalide");
+
+    const previousDebt = Number(customer.solde_dette || 0);
+    const newDebt = Math.max(0, previousDebt - amount);
+    customer.solde_dette = newDebt;
+
+    const currentUser = dbEngine.getCurrentUser();
+    const paymentRecord = {
+      id: 'pay_' + Math.random().toString(36).substr(2, 9),
+      customer_id: customerId,
+      customer_name: `${customer.prenom} ${customer.nom}`,
+      amount_paid: amount,
+      previous_debt: previousDebt,
+      remaining_debt: newDebt,
+      user_id: currentUser ? currentUser.id : null,
+      user_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Agent',
+      notes,
+      created_at: new Date().toISOString()
+    };
+
+    if (!memoryDb.debt_payments) memoryDb.debt_payments = [];
+    memoryDb.debt_payments.unshift(paymentRecord);
+
+    dbEngine.logAction('REGLEMENT_DETTE', `Règlement de dette de ${amount} FCFA pour ${customer.prenom} ${customer.nom} (Solde restant: ${newDebt} FCFA)`);
+    persist();
+    notifyListeners();
+
+    performMutation('update', 'customers', customerId, { solde_dette: newDebt });
+    performMutation('insert', 'debt_payments', paymentRecord.id, paymentRecord);
+    return paymentRecord;
   }
 };

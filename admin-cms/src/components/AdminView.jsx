@@ -403,7 +403,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setEditStaffEmail(selectedMember.email || `${selectedMember.prenom.toLowerCase()}.${selectedMember.nom.toLowerCase()}@klinup.com`);
       setEditStaffTel(selectedMember.telephone || '');
       setEditStaffStatut(selectedMember.statut || 'actif');
-      setEditStaffStoreId(selectedMember.store_id || 'store_central');
+      setEditStaffStoreId(selectedMember.store_id || selectedMember.laverie_id || selectedMember.laverie || (selectedMember.role === 'super_admin' ? 'all' : ''));
 
       const defaultPerms = getRoleDefaultPermissions(selectedMember.role);
       setEditStaffPermissions(selectedMember.permissions || defaultPerms);
@@ -416,21 +416,27 @@ export default function AdminView({ activeTab, onManageStaff }) {
   };
 
   const handleSaveStaff = (e) => {
-    e.preventDefault();
-    if (!selectedStaffId) return;
+    if (e && e.preventDefault) e.preventDefault();
+    if (!selectedStaffId) return false;
 
-    db.updateStaff(selectedStaffId, {
-      nom: editStaffNom,
-      prenom: editStaffPrenom,
-      role: editStaffRole,
-      email: editStaffEmail,
-      telephone: editStaffTel,
-      statut: editStaffStatut,
-      store_id: editStaffStoreId,
-      permissions: editStaffPermissions
-    });
-    alert("Profil du personnel mis à jour avec succès !");
-    refreshAdminData();
+    try {
+      db.updateStaff(selectedStaffId, {
+        nom: editStaffNom,
+        prenom: editStaffPrenom,
+        role: editStaffRole,
+        email: editStaffEmail,
+        telephone: editStaffTel,
+        statut: editStaffStatut,
+        store_id: editStaffStoreId,
+        permissions: editStaffPermissions
+      });
+      alert("Profil du personnel mis à jour avec succès !");
+      refreshAdminData();
+      return true;
+    } catch (err) {
+      alert("Erreur lors de la mise à jour du profil : " + err.message);
+      return false;
+    }
   };
 
   const handleCreateStaff = (e) => {
@@ -441,14 +447,24 @@ export default function AdminView({ activeTab, onManageStaff }) {
       return;
     }
 
+    const emailToUse = (newStaffEmail ? newStaffEmail.trim() : `${newStaffPrenom.toLowerCase().trim()}.${newStaffNom.toLowerCase().trim()}@klinup.com`).toLowerCase();
+    
+    // Check email uniqueness to prevent collisions
+    const emailExists = (staff || []).some(s => s.email && s.email.toLowerCase() === emailToUse);
+    if (emailExists) {
+      alert(`L'adresse email "${emailToUse}" est déjà attribuée à un membre du personnel.`);
+      return;
+    }
+
     const defaultPerms = getRoleDefaultPermissions(newStaffRole);
 
     const newMember = db.addStaff({
-      nom: newStaffNom,
-      prenom: newStaffPrenom,
+      nom: newStaffNom.trim(),
+      prenom: newStaffPrenom.trim(),
       role: newStaffRole,
-      email: newStaffEmail,
+      email: emailToUse,
       telephone: newStaffTel,
+      code_pin: '000000',
       store_id: newStaffStoreId,
       statut: 'actif',
       permissions: defaultPerms
@@ -2104,8 +2120,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {/* ========================================================
          ONGLET : GESTION DES ACCÈS / PERSONNEL (STAFF ACCESS)
          ======================================================== */}
-      {activeTab === 'staff_management' && (
+      {(activeTab === 'staff_management' || activeTab === 'staff_roles' || activeTab === 'staff_users') && (
         <StaffTab
+          subTab={activeTab === 'staff_roles' ? 'roles' : 'users'}
           staff={staff}
           selectedStaffId={selectedStaffId}
           setSelectedStaffId={setSelectedStaffId}
@@ -2215,11 +2232,17 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     value={newStaffRole}
                     onChange={(e) => setNewStaffRole(e.target.value)}
                   >
-                    <option value="agent_accueil">Agent d'accueil (Mobile App)</option>
-                    <option value="manager">Manager Caisse (CMS)</option>
-                    <option value="super_admin">Super Administrateur (CMS)</option>
-                    <option value="livreur">Livreur (Mobile App)</option>
-                    <option value="agent_lavage_repassage">Agent de lavage / Repassage (Mobile App)</option>
+                    {((db.getRoles ? db.getRoles() : []).length > 0 ? db.getRoles() : [
+                      { key: 'super_admin', label: 'Super Administrateur' },
+                      { key: 'manager', label: 'Gérant (Manager)' },
+                      { key: 'agent_accueil', label: 'Agent d\'Accueil / Caisse' },
+                      { key: 'agent_lavage_repassage', label: 'Agent Atelier (Lavage / Repassage)' },
+                      { key: 'livreur', label: 'Livreur / Agent de Collecte' }
+                    ]).map(r => (
+                      <option key={r.id || r.key} value={r.key}>
+                        {r.label}
+                      </option>
+                    ))}
                   </CustomSelect>
                 </div>
 

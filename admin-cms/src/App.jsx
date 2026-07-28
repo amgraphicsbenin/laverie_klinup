@@ -238,12 +238,17 @@ function App() {
                           msgStr.toLowerCase().includes('synchronisés') ||
                           msgStr.toLowerCase().includes('démarré');
         
-        setCustomDialog({
-          message: msgStr,
-          title: isError ? 'Erreur' : isSuccess ? 'Succès' : 'Information',
-          type: isError ? 'error' : isSuccess ? 'success' : 'info',
-          isConfirm: false,
-          resolve
+        setCustomDialog(prev => {
+          if (prev && typeof prev.resolve === 'function') {
+            prev.resolve(false);
+          }
+          return {
+            message: msgStr,
+            title: isError ? 'Erreur' : isSuccess ? 'Succès' : 'Information',
+            type: isError ? 'error' : isSuccess ? 'success' : 'info',
+            isConfirm: false,
+            resolve
+          };
         });
       });
     };
@@ -251,12 +256,17 @@ function App() {
     window.confirm = (message) => {
       const msgStr = typeof message === 'object' ? JSON.stringify(message) : String(message);
       return new Promise((resolve) => {
-        setCustomDialog({
-          message: msgStr,
-          title: 'Confirmation',
-          type: 'confirm',
-          isConfirm: true,
-          resolve
+        setCustomDialog(prev => {
+          if (prev && typeof prev.resolve === 'function') {
+            prev.resolve(false);
+          }
+          return {
+            message: msgStr,
+            title: 'Confirmation',
+            type: 'confirm',
+            isConfirm: true,
+            resolve
+          };
         });
       });
     };
@@ -267,16 +277,20 @@ function App() {
     };
   }, []);
 
+  const [selectedStoreId, setSelectedStoreIdState] = useState(() => db.getSelectedStoreId());
+
   useEffect(() => {
     setCurrentUser(db.getCurrentUser());
     setStaffList(db.getStaff());
     setDbIsRemote(db.isRemote());
+    setSelectedStoreIdState(db.getSelectedStoreId());
 
     const unsubscribe = db.subscribe(() => {
       setCurrentUser(db.getCurrentUser());
       setStaffList(db.getStaff());
       setDbTick(prev => prev + 1);
       setDbIsRemote(db.isRemote());
+      setSelectedStoreIdState(db.getSelectedStoreId());
     });
     return () => unsubscribe();
   }, []);
@@ -287,7 +301,7 @@ function App() {
     
     let matchedUser = db.getStaff().find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
     
-    if (!matchedUser && db.isRemote()) {
+    if (!matchedUser) {
       try {
         await db.refreshStaff();
         matchedUser = db.getStaff().find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
@@ -318,6 +332,43 @@ function App() {
     setResetEmail('');
   };
 
+  // Auto-logout after 15 minutes of inactivity (Session Timeout)
+  useEffect(() => {
+    if (!currentUser) return;
+    let inactivityTimer;
+
+    const resetTimer = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        db.setCurrentUser(null);
+        alert("Session expirée suite à 15 minutes d'inactivité. Veuillez vous reconnecter.");
+      }, 15 * 60 * 1000);
+    };
+
+    window.addEventListener('mousemove', resetTimer);
+    window.addEventListener('keydown', resetTimer);
+    window.addEventListener('click', resetTimer);
+    resetTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keydown', resetTimer);
+      window.removeEventListener('click', resetTimer);
+    };
+  }, [currentUser]);
+
+  // Global Keyboard Shortcuts (ESC: Close Dialogs)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (customDialog) setCustomDialog(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [customDialog]);
+
   const handleKeypadPress = (val) => {
     if (pinError || isUnlocking) return;
     
@@ -334,6 +385,9 @@ function App() {
     if (newCode.length === 6) {
       if (selectedLoginUser.code_pin === newCode) {
         setIsUnlocking(true);
+        if (newCode === '000000') {
+          alert("🔒 Sécurité : Vous êtes connecté avec le PIN par défaut (000000). Pensez à réinitialiser votre PIN.");
+        }
         setTimeout(() => {
           db.setCurrentUser(selectedLoginUser);
           setSelectedLoginUser(null);
@@ -473,7 +527,7 @@ function App() {
                 required
                 placeholder="Email de l'administrateur"
                 value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
+                onChange={(e) => setLoginEmail(e.target.value.trimStart())}
                 style={{
                   width: '100%',
                   padding: '0.95rem 1.25rem',
@@ -720,12 +774,52 @@ function App() {
               {isSuperAdmin && (
                 <>
                   <li 
-                    className={`menu-item ${adminMenu === 'staff_management' ? 'active' : ''}`}
-                    onClick={() => setAdminMenu('staff_management')}
+                    className={`menu-item ${['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) ? 'active' : ''}`}
+                    onClick={() => setAdminMenu(adminMenu === 'staff_roles' ? 'staff_roles' : 'staff_users')}
                   >
                     <MIcon name="admin_panel_settings" size={20} />
                     Gestion des Accès
                   </li>
+                  {['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) && (
+                    <div style={{ paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', margin: '0.25rem 0' }}>
+                      <div 
+                        style={{
+                          fontSize: '0.78rem',
+                          padding: '0.35rem 0.65rem',
+                          borderRadius: '8px',
+                          color: (adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'var(--primary)' : 'var(--text-secondary)',
+                          background: (adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'rgba(0, 44, 247, 0.08)' : 'transparent',
+                          fontWeight: (adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 700 : 500,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}
+                        onClick={() => setAdminMenu('staff_users')}
+                      >
+                        <MIcon name="group" size={16} />
+                        1. Gestion Utilisateurs
+                      </div>
+                      <div 
+                        style={{
+                          fontSize: '0.78rem',
+                          padding: '0.35rem 0.65rem',
+                          borderRadius: '8px',
+                          color: adminMenu === 'staff_roles' ? 'var(--primary)' : 'var(--text-secondary)',
+                          background: adminMenu === 'staff_roles' ? 'rgba(0, 44, 247, 0.08)' : 'transparent',
+                          fontWeight: adminMenu === 'staff_roles' ? 700 : 500,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}
+                        onClick={() => setAdminMenu('staff_roles')}
+                      >
+                        <MIcon name="verified_user" size={16} />
+                        2. Config. des Rôles
+                      </div>
+                    </div>
+                  )}
                   <li 
                     className={`menu-item ${adminMenu === 'logs' ? 'active' : ''}`}
                     onClick={() => setAdminMenu('logs')}
@@ -773,7 +867,8 @@ function App() {
               {hasAdminAccess && adminMenu === 'crm_management' && "Clients CRM"}
               {hasAdminAccess && adminMenu === 'catalog' && "Catalogue Tarifs"}
               {hasAdminAccess && adminMenu === 'laundry_points' && "Points de Laverie"}
-              {hasAdminAccess && adminMenu === 'staff_management' && "Gestion des Accès"}
+              {hasAdminAccess && (adminMenu === 'staff_management' || adminMenu === 'staff_users') && "Gestion Utilisateurs"}
+              {hasAdminAccess && adminMenu === 'staff_roles' && "Configuration des Rôles"}
               {hasAdminAccess && adminMenu === 'logs' && "Journal d'Audit"}
               {hasAdminAccess && adminMenu === 'settings' && "Paramètres Système"}
             </h1>
@@ -784,7 +879,8 @@ function App() {
               {hasAdminAccess && adminMenu === 'crm_management' && "Fiches clients, encours financiers et fidélité."}
               {hasAdminAccess && adminMenu === 'catalog' && "Gestion de la grille de prix de traitement de laverie B2B."}
               {hasAdminAccess && adminMenu === 'laundry_points' && "Gestion des différents points de vente, boutiques et ateliers de laverie."}
-              {hasAdminAccess && adminMenu === 'staff_management' && "Habilitations du personnel, gestion des rôles et autorisations d'accès."}
+              {hasAdminAccess && (adminMenu === 'staff_management' || adminMenu === 'staff_users') && "Habilitations du personnel, gestion des rôles et autorisations d'accès."}
+              {hasAdminAccess && adminMenu === 'staff_roles' && "Définition et configuration des permissions des rôles système."}
               {hasAdminAccess && adminMenu === 'logs' && "Traçabilité des actions et sécurité des transactions."}
               {hasAdminAccess && adminMenu === 'settings' && "Configuration globale des délais et majorations d'urgence de la laverie."}
             </p>
@@ -796,8 +892,11 @@ function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.35rem 0.65rem', borderRadius: '10px' }}>
                 <MIcon name="storefront" size={18} style={{ color: 'var(--primary)' }} />
                 <select
-                  value={db.getSelectedStoreId()}
-                  onChange={(e) => db.setSelectedStoreId(e.target.value)}
+                  value={selectedStoreId}
+                  onChange={(e) => {
+                    db.setSelectedStoreId(e.target.value);
+                    setSelectedStoreIdState(e.target.value);
+                  }}
                   style={{
                     border: 'none',
                     background: 'transparent',

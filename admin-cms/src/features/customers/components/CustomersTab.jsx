@@ -16,9 +16,11 @@ import {
   ShieldCheck,
   Tag,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Download
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
+import { exportCustomersCSV } from '../../../utils/exportUtils';
 
 export default function CustomersTab({
   customers,
@@ -75,7 +77,7 @@ export default function CustomersTab({
     pret: { bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', label: 'Prêt' },
     a_livrer: { bg: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', label: 'À livrer' },
     a_recuperer: { bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706', label: 'À récupérer' },
-    en_cours_livraison: { bg: 'rgba(15, 23, 42, 0.12)', color: '#0f172a', label: 'En livraison' },
+    en_cours_livraison: { bg: 'rgba(79, 70, 229, 0.10)', color: '#4f46e5', label: 'En livraison' },
     restitue: { bg: 'rgba(16, 185, 129, 0.08)', color: '#059669', label: 'Livré / Récupéré' },
     annule: { bg: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', label: 'Annulée' }
   };
@@ -242,14 +244,25 @@ export default function CustomersTab({
                 Fiches CRM & historiques de fréquentation
               </p>
             </div>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setShowNewCustomerModal(true)}
-              style={{ padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--primary)', color: '#fff', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)' }}
-            >
-              <UserPlus size={15} /> Nouveau
-            </button>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => exportCustomersCSV(customers)}
+                style={{ padding: '0.45rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                title="Exporter la liste des clients en CSV"
+              >
+                <Download size={14} /> CSV
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setShowNewCustomerModal(true)}
+                style={{ padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--primary)', color: '#fff', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)' }}
+              >
+                <UserPlus size={15} /> Nouveau
+              </button>
+            </div>
           </div>
 
           {/* Search Input */}
