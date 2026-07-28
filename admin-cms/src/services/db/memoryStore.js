@@ -1,7 +1,7 @@
 import { DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG, DEFAULT_STORES, DEFAULT_ROLES } from './seeds.js';
 
 export const memoryDb = {
-  stores: DEFAULT_STORES,
+  stores: [],
   selected_store_id: 'all',
   roles: DEFAULT_ROLES,
   staff: DEFAULT_STAFF,

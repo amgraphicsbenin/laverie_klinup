@@ -466,7 +466,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
     }
   };
 
-  const handleCreateStaff = (e) => {
+  const handleCreateStaff = async (e) => {
     e.preventDefault();
     if (!newStaffNom || !newStaffPrenom) return;
     if (!newStaffStoreId) {
@@ -485,27 +485,32 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
     const defaultPerms = getRoleDefaultPermissions(newStaffRole);
 
-    const newMember = db.addStaff({
-      nom: newStaffNom.trim(),
-      prenom: newStaffPrenom.trim(),
-      role: newStaffRole,
-      email: emailToUse,
-      telephone: newStaffTel,
-      code_pin: '000000',
-      store_id: newStaffStoreId,
-      statut: 'actif',
-      permissions: defaultPerms
-    });
+    try {
+      const newMember = await db.addStaff({
+        nom: newStaffNom.trim(),
+        prenom: newStaffPrenom.trim(),
+        role: newStaffRole,
+        email: emailToUse,
+        telephone: newStaffTel,
+        code_pin: '000000',
+        store_id: newStaffStoreId,
+        statut: 'actif',
+        permissions: defaultPerms
+      });
 
-    setSelectedStaffId(newMember.id);
-    setShowNewStaffModal(false);
-    setNewStaffNom('');
-    setNewStaffPrenom('');
-    setNewStaffRole('agent_accueil');
-    setNewStaffEmail('');
-    setNewStaffTel('');
-    setNewStaffStoreId('');
-    refreshAdminData();
+      setSelectedStaffId(newMember.id);
+      setShowNewStaffModal(false);
+      setNewStaffNom('');
+      setNewStaffPrenom('');
+      setNewStaffRole('agent_accueil');
+      setNewStaffEmail('');
+      setNewStaffTel('');
+      setNewStaffStoreId('');
+      refreshAdminData();
+      alert(`Employé "${newMember.prenom} ${newMember.nom}" créé avec succès dans la base de données !`);
+    } catch (err) {
+      alert("Erreur lors de la création de l'employé : " + err.message);
+    }
   };
 
   const handleDeleteStaff = async (id) => {
@@ -518,10 +523,15 @@ export default function AdminView({ activeTab, onManageStaff }) {
       return;
     }
 
-    db.logAction('SUPPRESSION_PERSONNEL', `Suppression définitive de ${staffName} | Motif : ${motif.trim()}`);
-    db.deleteStaff(id);
-    setSelectedStaffId('');
-    refreshAdminData();
+    try {
+      db.logAction('SUPPRESSION_PERSONNEL', `Suppression définitive de ${staffName} | Motif : ${motif.trim()}`);
+      await db.deleteStaff(id);
+      setSelectedStaffId('');
+      refreshAdminData();
+      alert(`Compte "${staffName}" supprimé avec succès de la base de données !`);
+    } catch (err) {
+      alert("Erreur lors de la suppression de l'employé : " + err.message);
+    }
   };
 
   useEffect(() => {
@@ -1327,13 +1337,18 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setEditingPrice(item.prix.toString());
   };
 
-  const handleSavePrice = (e) => {
+  const handleSavePrice = async (e) => {
     e.preventDefault();
     if (!editingItem || !editingPrice) return;
 
-    db.updateCatalogPrice(editingItem.id, Number(editingPrice));
-    setEditingItem(null);
-    refreshAdminData();
+    try {
+      await db.updateCatalogPrice(editingItem.id, Number(editingPrice));
+      setEditingItem(null);
+      refreshAdminData();
+      alert("Prix mis à jour avec succès dans la base de données !");
+    } catch (err) {
+      alert("Erreur lors de la mise à jour du prix : " + err.message);
+    }
   };
 
   const handleStartEditProduct = (groupedItem) => {
@@ -1382,7 +1397,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setShowEditCatalogModal(true);
   };
 
-  const handleSaveProductAdvanced = (e) => {
+  const handleSaveProductAdvanced = async (e) => {
     e.preventDefault();
     if (!editingItem || !editArtName) return;
 
@@ -1412,101 +1427,115 @@ export default function AdminView({ activeTab, onManageStaff }) {
       return;
     }
 
-    if (editArtCategory === 'individuel') {
-      // Traitement
-      if (editArtTraitementActive) {
-        if (editingItem.traitement) {
-          db.updateCatalogItem(editingItem.traitement.id, {
-            article: editArtName.trim(),
-            service: 'lavage_simple',
-            prix: Number(editArtTraitementPrice),
-            prix_urgent: Number(editArtTraitementUrgentPrice),
-            description: ''
-          });
+    try {
+      if (editArtCategory === 'individuel') {
+        // Traitement
+        if (editArtTraitementActive) {
+          if (editingItem.traitement) {
+            await db.updateCatalogItem(editingItem.traitement.id, {
+              article: editArtName.trim(),
+              service: 'lavage_simple',
+              prix: Number(editArtTraitementPrice),
+              prix_urgent: Number(editArtTraitementUrgentPrice),
+              description: ''
+            });
+          } else {
+            await db.addCatalogItem(
+              editArtName.trim(),
+              'lavage_simple',
+              Number(editArtTraitementPrice),
+              'individuel',
+              '',
+              Number(editArtTraitementUrgentPrice)
+            );
+          }
         } else {
-          db.addCatalogItem(
-            editArtName.trim(),
-            'lavage_simple',
-            Number(editArtTraitementPrice),
-            'individuel',
-            '',
-            Number(editArtTraitementUrgentPrice)
-          );
+          if (editingItem.traitement) {
+            await db.deleteCatalogItem(editingItem.traitement.id);
+          }
+        }
+
+        // Repassage
+        if (editArtRepassageActive) {
+          if (editingItem.repassage) {
+            await db.updateCatalogItem(editingItem.repassage.id, {
+              article: editArtName.trim(),
+              service: 'repassage',
+              prix: Number(editArtRepassagePrice),
+              prix_urgent: Number(editArtRepassageUrgentPrice),
+              description: ''
+            });
+          } else {
+            await db.addCatalogItem(
+              editArtName.trim(),
+              'repassage',
+              Number(editArtRepassagePrice),
+              'individuel',
+              '',
+              Number(editArtRepassageUrgentPrice)
+            );
+          }
+        } else {
+          if (editingItem.repassage) {
+            await db.deleteCatalogItem(editingItem.repassage.id);
+          }
         }
       } else {
-        if (editingItem.traitement) {
-          db.deleteCatalogItem(editingItem.traitement.id);
-        }
+        // Subscription case
+        const finalDescription = editArtAdvantages.map(a => a.trim()).filter(Boolean).join(' | ');
+        await db.updateCatalogItem(editingItem.id, {
+          article: editArtName.trim(),
+          service: 'abonnement',
+          prix: Number(editArtPrice),
+          description: finalDescription,
+          nombre_vetements: editArtNombreVetements ? Number(editArtNombreVetements) : null,
+          ramassage: editArtRamassage,
+          nombre_ramassages: editArtRamassage && editArtNombreRamassages ? Number(editArtNombreRamassages) : null,
+          ramassage_gratuit: editArtRamassage ? editArtRamassageGratuit : false,
+          livraison_gratuite: editArtLivraisonGratuite
+        });
       }
 
-      // Repassage
-      if (editArtRepassageActive) {
-        if (editingItem.repassage) {
-          db.updateCatalogItem(editingItem.repassage.id, {
-            article: editArtName.trim(),
-            service: 'repassage',
-            prix: Number(editArtRepassagePrice),
-            prix_urgent: Number(editArtRepassageUrgentPrice),
-            description: ''
-          });
-        } else {
-          db.addCatalogItem(
-            editArtName.trim(),
-            'repassage',
-            Number(editArtRepassagePrice),
-            'individuel',
-            '',
-            Number(editArtRepassageUrgentPrice)
-          );
-        }
-      } else {
-        if (editingItem.repassage) {
-          db.deleteCatalogItem(editingItem.repassage.id);
-        }
-      }
-    } else {
-      // Subscription case
-      const finalDescription = editArtAdvantages.map(a => a.trim()).filter(Boolean).join(' | ');
-      db.updateCatalogItem(editingItem.id, {
-        article: editArtName.trim(),
-        service: 'abonnement',
-        prix: Number(editArtPrice),
-        description: finalDescription,
-        nombre_vetements: editArtNombreVetements ? Number(editArtNombreVetements) : null,
-        ramassage: editArtRamassage,
-        nombre_ramassages: editArtRamassage && editArtNombreRamassages ? Number(editArtNombreRamassages) : null,
-        ramassage_gratuit: editArtRamassage ? editArtRamassageGratuit : false,
-        livraison_gratuite: editArtLivraisonGratuite
-      });
+      setEditingItem(null);
+      setShowEditCatalogModal(false);
+      setEditArtName('');
+      setEditArtPrice('');
+      setEditArtDescription('');
+      setEditArtAdvantages(['']);
+      setEditArtNombreVetements('');
+      setEditArtRamassage(false);
+      setEditArtNombreRamassages('');
+      setEditArtRamassageGratuit(false);
+      setEditArtLivraisonGratuite(false);
+      setEditArtNameError('');
+      refreshAdminData();
+      alert("Produit mis à jour avec succès dans la base de données !");
+    } catch (err) {
+      alert("Erreur lors de l'enregistrement du produit : " + err.message);
     }
-
-    setEditingItem(null);
-    setShowEditCatalogModal(false);
-    setEditArtName('');
-    setEditArtPrice('');
-    setEditArtDescription('');
-    setEditArtAdvantages(['']);
-    setEditArtNombreVetements('');
-    setEditArtRamassage(false);
-    setEditArtNombreRamassages('');
-    setEditArtRamassageGratuit(false);
-    setEditArtLivraisonGratuite(false);
-    setEditArtNameError('');
-    refreshAdminData();
   };
 
-  const handleToggleCatalogItemActive = (groupedItem) => {
-    db.toggleCatalogItemActive(groupedItem.article || groupedItem.id);
-    refreshAdminData();
+  const handleToggleCatalogItemActive = async (groupedItem) => {
+    try {
+      await db.toggleCatalogItemActive(groupedItem.article || groupedItem.id);
+      refreshAdminData();
+    } catch (err) {
+      alert("Erreur de modification du statut : " + err.message);
+    }
   };
 
   const handleDeleteCatalogItem = async (groupedItem) => {
     const name = groupedItem.article;
     const idsToDelete = groupedItem.allIds || [groupedItem.id];
     if (await confirm(`Voulez-vous vraiment supprimer l'article "${name}" du catalogue ?`)) {
-      db.deleteCatalogItemsBatch(idsToDelete);
-      setSelectedCatalogIds(prev => prev.filter(x => x !== groupedItem.id));
-      refreshAdminData();
+      try {
+        await db.deleteCatalogItemsBatch(idsToDelete);
+        setSelectedCatalogIds(prev => prev.filter(x => x !== groupedItem.id));
+        refreshAdminData();
+        alert(`Article "${name}" supprimé avec succès de la base de données.`);
+      } catch (err) {
+        alert("Erreur lors de la suppression : " + err.message);
+      }
     }
   };
 
@@ -1524,13 +1553,18 @@ export default function AdminView({ activeTab, onManageStaff }) {
           }
         }
       });
-      db.deleteCatalogItemsBatch(idsToDelete);
-      setSelectedCatalogIds([]);
-      refreshAdminData();
+      try {
+        await db.deleteCatalogItemsBatch(idsToDelete);
+        setSelectedCatalogIds([]);
+        refreshAdminData();
+        alert("Articles supprimés avec succès de la base de données.");
+      } catch (err) {
+        alert("Erreur lors de la suppression des articles : " + err.message);
+      }
     }
   };
 
-  const handleAddCatalogItem = (e) => {
+  const handleAddCatalogItem = async (e) => {
     e.preventDefault();
     if (!newArtName) return;
 
@@ -1560,56 +1594,61 @@ export default function AdminView({ activeTab, onManageStaff }) {
       return;
     }
 
-    if (newArtCategory === 'individuel') {
-      if (newArtTraitementActive) {
-        db.addCatalogItem(
+    try {
+      if (newArtCategory === 'individuel') {
+        if (newArtTraitementActive) {
+          await db.addCatalogItem(
+            newArtName.trim(),
+            'lavage_simple',
+            Number(newArtTraitementPrice),
+            'individuel',
+            '',
+            Number(newArtTraitementUrgentPrice)
+          );
+        }
+        if (newArtRepassageActive) {
+          await db.addCatalogItem(
+            newArtName.trim(),
+            'repassage',
+            Number(newArtRepassagePrice),
+            'individuel',
+            '',
+            Number(newArtRepassageUrgentPrice)
+          );
+        }
+      } else {
+        const finalDescription = newArtAdvantages.map(a => a.trim()).filter(Boolean).join(' | ');
+        await db.addCatalogItem(
           newArtName.trim(),
-          'lavage_simple',
-          Number(newArtTraitementPrice),
-          'individuel',
-          '',
-          Number(newArtTraitementUrgentPrice)
+          'abonnement',
+          Number(newArtPrice),
+          newArtCategory,
+          finalDescription,
+          null, // prix_urgent
+          newArtNombreVetements ? Number(newArtNombreVetements) : null,
+          newArtRamassage,
+          newArtRamassage && newArtNombreRamassages ? Number(newArtNombreRamassages) : null,
+          newArtRamassage ? newArtRamassageGratuit : false,
+          newArtLivraisonGratuite
         );
       }
-      if (newArtRepassageActive) {
-        db.addCatalogItem(
-          newArtName.trim(),
-          'repassage',
-          Number(newArtRepassagePrice),
-          'individuel',
-          '',
-          Number(newArtRepassageUrgentPrice)
-        );
-      }
-    } else {
-      const finalDescription = newArtAdvantages.map(a => a.trim()).filter(Boolean).join(' | ');
-      db.addCatalogItem(
-        newArtName.trim(),
-        'abonnement',
-        Number(newArtPrice),
-        newArtCategory,
-        finalDescription,
-        null, // prix_urgent
-        newArtNombreVetements ? Number(newArtNombreVetements) : null,
-        newArtRamassage,
-        newArtRamassage && newArtNombreRamassages ? Number(newArtNombreRamassages) : null,
-        newArtRamassage ? newArtRamassageGratuit : false,
-        newArtLivraisonGratuite
-      );
-    }
 
-    refreshAdminData();
-    setShowAddCatalogModal(false);
-    setNewArtName('');
-    setNewArtPrice('');
-    setNewArtDescription('');
-    setNewArtAdvantages(['']);
-    setNewArtNombreVetements('');
-    setNewArtRamassage(false);
-    setNewArtNombreRamassages('');
-    setNewArtRamassageGratuit(false);
-    setNewArtLivraisonGratuite(false);
-    setNewArtNameError('');
+      refreshAdminData();
+      setShowAddCatalogModal(false);
+      setNewArtName('');
+      setNewArtPrice('');
+      setNewArtDescription('');
+      setNewArtAdvantages(['']);
+      setNewArtNombreVetements('');
+      setNewArtRamassage(false);
+      setNewArtNombreRamassages('');
+      setNewArtRamassageGratuit(false);
+      setNewArtLivraisonGratuite(false);
+      setNewArtNameError('');
+      alert(`Produit "${newArtName.trim()}" créé avec succès dans la base de données !`);
+    } catch (err) {
+      alert("Erreur lors de la création du produit : " + err.message);
+    }
   };
 
   const renderArrowBtn = () => (
@@ -1735,12 +1774,12 @@ export default function AdminView({ activeTab, onManageStaff }) {
     return base;
   };
 
-  const handleCreateCustomer = (e) => {
+  const handleCreateCustomer = async (e) => {
     e.preventDefault();
     if (!newCustNom || !newCustPrenom || !newCustTel || !newCustAdresse) return;
 
     try {
-      const newCustomer = db.addCustomer({
+      const newCustomer = await db.addCustomer({
         nom: newCustNom,
         prenom: newCustPrenom,
         telephone: newCustTel,
@@ -1757,12 +1796,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setNewCustTel('');
       setNewCustIndicatif('229');
       setNewCustAdresse('');
+      alert(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès dans la base de données !`);
     } catch (err) {
-      alert("Erreur de création : " + err.message);
+      alert("Erreur de création du client : " + err.message);
     }
   };
 
-  const handleCreateOrder = (e) => {
+  const handleCreateOrder = async (e) => {
     e.preventDefault();
     if (!selectedCustomerId) {
       alert("Veuillez sélectionner ou créer un client");
@@ -1813,7 +1853,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
     };
 
     try {
-      const newOrder = db.createOrder(orderData);
+      const newOrder = await db.createOrder(orderData);
       refreshAdminData();
       setCreatedOrder(newOrder);
       setAvancePayee('');
@@ -1842,8 +1882,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
         }
         sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
       }
+      alert(`Commande ${newOrder.identifiant_unique_marquage} enregistrée avec succès dans la base de données !`);
     } catch (err) {
-      alert("Erreur d'enregistrement : " + err.message);
+      alert("Erreur d'enregistrement de la commande : " + err.message);
     }
   };
 
@@ -1852,15 +1893,19 @@ export default function AdminView({ activeTab, onManageStaff }) {
     const remainingToPay = order.prix_total - order.avance_payee;
     if (remainingToPay <= 0) {
       if (await confirm(`Confirmer la finalisation de la commande ${order.identifiant_unique_marquage} ?`)) {
-        db.updateOrderStatus(order.id, finalStatus);
-        refreshAdminData();
+        try {
+          await db.updateOrderStatus(order.id, finalStatus);
+          refreshAdminData();
 
-        // Notification WhatsApp livraison directe (déjà payé)
-        const customer = customers.find(c => c.id === order.customer_id);
-        if (customer) {
-          const finalStatusLabel = finalStatus === 'a_livrer' ? 'mise en livraison' : finalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
-          const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${finalStatusLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
-          sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+          // Notification WhatsApp livraison directe (déjà payé)
+          const customer = customers.find(c => c.id === order.customer_id);
+          if (customer) {
+            const finalStatusLabel = finalStatus === 'a_livrer' ? 'mise en livraison' : finalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
+            const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${finalStatusLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+            sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+          }
+        } catch (err) {
+          alert("Erreur de mise à jour du statut : " + err.message);
         }
       }
     } else {
@@ -1871,7 +1916,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
     }
   };
 
-  const handleConfirmDelivery = (e) => {
+  const handleConfirmDelivery = async (e) => {
     e.preventDefault();
     if (!delivOrder) return;
 
@@ -1880,84 +1925,98 @@ export default function AdminView({ activeTab, onManageStaff }) {
       return;
     }
 
-    db.deliverOrderWithPayment(
-      delivOrder.id, 
-      Number(delivAmountPaid || 0), 
-      delivPaymentMethod, 
-      delivFinalStatus,
-      delivPaymentMethod === 'mobile_money' ? momoRefNumber.trim() : null
-    );
-    refreshAdminData();
-    setShowDeliveryPaymentModal(false);
+    try {
+      await db.deliverOrderWithPayment(
+        delivOrder.id, 
+        Number(delivAmountPaid || 0), 
+        delivPaymentMethod, 
+        delivFinalStatus,
+        delivPaymentMethod === 'mobile_money' ? momoRefNumber.trim() : null
+      );
+      refreshAdminData();
+      setShowDeliveryPaymentModal(false);
 
-    // Notification WhatsApp solde livraison
-    const customer = customers.find(c => c.id === delivOrder.customer_id);
-    if (customer) {
-      const finalStatusLabel = delivFinalStatus === 'a_livrer' ? 'mise en livraison' : delivFinalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
-      const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la ${finalStatusLabel} de votre commande ${delivOrder.identifiant_unique_marquage} et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
-      sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      // Notification WhatsApp solde livraison
+      const customer = customers.find(c => c.id === delivOrder.customer_id);
+      if (customer) {
+        const finalStatusLabel = delivFinalStatus === 'a_livrer' ? 'mise en livraison' : delivFinalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
+        const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la ${finalStatusLabel} de votre commande ${delivOrder.identifiant_unique_marquage} et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
+        sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      }
+
+      setDelivOrder(null);
+      setMomoRefNumber('');
+      setMomoRefError('');
+      alert("Livraison et paiement enregistrés avec succès dans la base de données !");
+    } catch (err) {
+      alert("Erreur lors de la livraison : " + err.message);
     }
-
-    setDelivOrder(null);
-    setMomoRefNumber('');
-    setMomoRefError('');
   };
 
-  const handlePayDebt = (e) => {
+  const handlePayDebt = async (e) => {
     e.preventDefault();
     if (!selectedCrmCustomer || !debtPaymentAmount) return;
 
-    db.updateCustomerDebt(selectedCrmCustomer.id, -Number(debtPaymentAmount));
-    db.logAction('RÈGLEMENT_DETTE', `Client ${selectedCrmCustomer.prenom} ${selectedCrmCustomer.nom} a réglé ${debtPaymentAmount} FCFA de sa dette`);
+    try {
+      await db.updateCustomerDebt(selectedCrmCustomer.id, -Number(debtPaymentAmount));
+      db.logAction('RÈGLEMENT_DETTE', `Client ${selectedCrmCustomer.prenom} ${selectedCrmCustomer.nom} a réglé ${debtPaymentAmount} FCFA de sa dette`);
 
-    refreshAdminData();
-    setShowDebtPaymentModal(false);
+      refreshAdminData();
+      setShowDebtPaymentModal(false);
 
-    const updatedCustomers = db.getCustomers();
-    const updatedCustomer = updatedCustomers.find(c => c.id === selectedCrmCustomer.id);
-    setSelectedCrmCustomer(updatedCustomer);
+      const updatedCustomers = db.getCustomers();
+      const updatedCustomer = updatedCustomers.find(c => c.id === selectedCrmCustomer.id);
+      setSelectedCrmCustomer(updatedCustomer);
 
-    // Notification WhatsApp règlement dette
-    if (updatedCustomer) {
-      const text = `Bonjour ${updatedCustomer.prenom} ${updatedCustomer.nom}, nous confirmons le paiement de ${Number(debtPaymentAmount).toLocaleString()} FCFA pour le règlement de votre dette chez KLIN UP.\nVotre nouveau solde débiteur est de ${updatedCustomer.solde_dette.toLocaleString()} FCFA.\nMerci et à bientôt !`;
-      sendWhatsAppMessage(updatedCustomer.telephone, text, updatedCustomer.indicatif);
+      // Notification WhatsApp règlement dette
+      if (updatedCustomer) {
+        const text = `Bonjour ${updatedCustomer.prenom} ${updatedCustomer.nom}, nous confirmons le paiement de ${Number(debtPaymentAmount).toLocaleString()} FCFA pour le règlement de votre dette chez KLIN UP.\nVotre nouveau solde débiteur est de ${updatedCustomer.solde_dette.toLocaleString()} FCFA.\nMerci et à bientôt !`;
+        sendWhatsAppMessage(updatedCustomer.telephone, text, updatedCustomer.indicatif);
+      }
+
+      setDebtPaymentAmount('');
+      alert("Règlement de dette enregistré avec succès dans la base de données !");
+    } catch (err) {
+      alert("Erreur lors du règlement de la dette : " + err.message);
     }
-
-    setDebtPaymentAmount('');
   };
 
-  const handleStatusChange = (orderId, nextStatus) => {
+  const handleStatusChange = async (orderId, nextStatus) => {
     const order = orders.find(o => o.id === orderId);
-    db.updateOrderStatus(orderId, nextStatus);
-    refreshAdminData();
+    try {
+      await db.updateOrderStatus(orderId, nextStatus);
+      refreshAdminData();
 
-    // Notification WhatsApp changement statut
-    if (order) {
-      const customer = customers.find(c => c.id === order.customer_id);
-      if (customer) {
-        let text = '';
-        if (nextStatus === 'traitement') {
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est maintenant prise en charge et en cours de traitement chez KLIN UP.`;
-        } else if (nextStatus === 'en_cours_lavage') {
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est en cours de lavage/séchage chez KLIN UP.`;
-        } else if (nextStatus === 'en_cours_repassage') {
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est en cours de repassage chez KLIN UP.`;
-        } else if (nextStatus === 'pret') {
-          const remaining = order.prix_total - order.avance_payee;
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer.\nReste à payer: ${remaining.toLocaleString()} FCFA.\nÀ bientôt chez KLIN UP !`;
-        } else if (nextStatus === 'a_livrer') {
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en cours de livraison à votre adresse.`;
-        } else if (nextStatus === 'a_recuperer') {
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en attente de récupération à la laverie.`;
-        } else if (nextStatus === 'restitue') {
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
-        } else if (nextStatus === 'annule') {
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été annulée.`;
-        }
-        if (text) {
-          sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      // Notification WhatsApp changement statut
+      if (order) {
+        const customer = customers.find(c => c.id === order.customer_id);
+        if (customer) {
+          let text = '';
+          if (nextStatus === 'traitement') {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est maintenant prise en charge et en cours de traitement chez KLIN UP.`;
+          } else if (nextStatus === 'en_cours_lavage') {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est en cours de lavage/séchage chez KLIN UP.`;
+          } else if (nextStatus === 'en_cours_repassage') {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est en cours de repassage chez KLIN UP.`;
+          } else if (nextStatus === 'pret') {
+            const remaining = order.prix_total - order.avance_payee;
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer.\nReste à payer: ${remaining.toLocaleString()} FCFA.\nÀ bientôt chez KLIN UP !`;
+          } else if (nextStatus === 'a_livrer') {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en cours de livraison à votre adresse.`;
+          } else if (nextStatus === 'a_recuperer') {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en attente de récupération à la laverie.`;
+          } else if (nextStatus === 'restitue') {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+          } else if (nextStatus === 'annule') {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été annulée.`;
+          }
+          if (text) {
+            sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+          }
         }
       }
+    } catch (err) {
+      alert("Erreur lors du changement de statut : " + err.message);
     }
   };
 
@@ -1982,7 +2041,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setShowCancelModal(true);
   };
 
-  const handleConfirmCancelOrder = (e) => {
+  const handleConfirmCancelOrder = async (e) => {
     e.preventDefault();
     const error = validateCancelReason(cancelReason);
     if (error) {
@@ -1991,20 +2050,25 @@ export default function AdminView({ activeTab, onManageStaff }) {
     }
     if (!orderToCancel) return;
 
-    db.cancelOrder(orderToCancel.id, cancelReason.trim());
-    refreshAdminData();
-    setShowCancelModal(false);
+    try {
+      await db.cancelOrder(orderToCancel.id, cancelReason.trim());
+      refreshAdminData();
+      setShowCancelModal(false);
 
-    // Notification WhatsApp annulation
-    const customer = customers.find(c => c.id === orderToCancel.customer_id);
-    if (customer) {
-      const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${orderToCancel.identifiant_unique_marquage} a été annulée.\nMotif : ${cancelReason.trim()}`;
-      sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      // Notification WhatsApp annulation
+      const customer = customers.find(c => c.id === orderToCancel.customer_id);
+      if (customer) {
+        const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${orderToCancel.identifiant_unique_marquage} a été annulée.\nMotif : ${cancelReason.trim()}`;
+        sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      }
+
+      setOrderToCancel(null);
+      setCancelReason('');
+      setCancelReasonError('');
+      alert("Commande annulée avec succès dans la base de données.");
+    } catch (err) {
+      alert("Erreur lors de l'annulation : " + err.message);
     }
-
-    setOrderToCancel(null);
-    setCancelReason('');
-    setCancelReasonError('');
   };
 
 

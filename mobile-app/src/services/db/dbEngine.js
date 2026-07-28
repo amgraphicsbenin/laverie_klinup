@@ -16,17 +16,17 @@ import { performMutation, initDb, persist } from './syncEngine';
 import { supabase } from '../supabaseClient';
 import { sendSystemNotification } from '../notificationService';
 
-// Base de données locale en mémoire
+// Base de données locale en mémoire (chargée en direct depuis Supabase)
 export const memoryDb = {
-  staff: DEFAULT_STAFF,
-  customers: DEFAULT_CUSTOMERS,
-  orders: DEFAULT_ORDERS,
-  logs: DEFAULT_LOGS,
+  staff: [],
+  customers: [],
+  orders: [],
+  logs: [],
   notifications: [],
-  catalog: DEFAULT_CATALOG,
+  catalog: [],
+  stores: [],
   current_user: null,
   pin_reset_requests: [],
-  sync_queue: [],
   dark_mode: false
 };
 
@@ -341,7 +341,7 @@ export const db = {
    * @param {Object} customer - Les informations de base du client (nom, prenom, telephone, adresse, indicatif).
    * @returns {Object} Le client créé.
    */
-  addCustomer: (customer) => {
+  addCustomer: async (customer) => {
     const cleanPhone = customer.telephone.trim();
     const phoneExists = memoryDb.customers.some(c => c.telephone.trim() === cleanPhone);
     if (phoneExists) {
@@ -359,23 +359,17 @@ export const db = {
       solde_dette: 0.00,
       created_at: new Date().toISOString()
     };
+    await performMutation('insert', 'customers', newCustomer.id, newCustomer);
     memoryDb.customers.push(newCustomer);
     db.logAction('CREATION_CLIENT', `Client ${newCustomer.prenom} ${newCustomer.nom} ajouté (Tel: ${newCustomer.telephone})`);
-    persist();
     db.notify();
-
-    performMutation('insert', 'customers', newCustomer.id, newCustomer, () => {
-      memoryDb.customers = memoryDb.customers.filter(c => c.id !== newCustomer.id);
-      persist();
-      db.notify();
-    });
     return newCustomer;
   },
 
   /**
    * Modifie un client existant et applique les mutations réseau.
    */
-  updateCustomer: (id, updatedFields) => {
+  updateCustomer: async (id, updatedFields) => {
     const customer = memoryDb.customers.find(c => c.id === id);
     if (customer) {
       if (updatedFields.telephone) {
@@ -385,34 +379,19 @@ export const db = {
           throw new Error("Ce numéro de téléphone est déjà associé à un autre client actif.");
         }
       }
-      const original = { ...customer };
-
-      customer.nom = updatedFields.nom ?? customer.nom;
-      customer.prenom = updatedFields.prenom ?? customer.prenom;
-      customer.telephone = updatedFields.telephone ? updatedFields.telephone.trim() : customer.telephone;
-      customer.adresse = updatedFields.adresse ?? customer.adresse;
-      customer.preferences_pliage = updatedFields.preferences_pliage ?? customer.preferences_pliage;
-      
-      db.logAction('MODIFICATION_CLIENT', `Client ${customer.prenom} ${customer.nom} mis à jour`);
-      persist();
-      db.notify();
 
       const updateData = {
-        nom: customer.nom,
-        prenom: customer.prenom,
-        telephone: customer.telephone,
-        adresse: customer.adresse,
-        preferences_pliage: customer.preferences_pliage
+        nom: updatedFields.nom ?? customer.nom,
+        prenom: updatedFields.prenom ?? customer.prenom,
+        telephone: updatedFields.telephone ? updatedFields.telephone.trim() : customer.telephone,
+        adresse: updatedFields.adresse ?? customer.adresse,
+        preferences_pliage: updatedFields.preferences_pliage ?? customer.preferences_pliage
       };
 
-      performMutation('update', 'customers', id, updateData, () => {
-        const current = memoryDb.customers.find(c => c.id === id);
-        if (current) {
-          Object.assign(current, original);
-          persist();
-          db.notify();
-        }
-      });
+      await performMutation('update', 'customers', id, updateData);
+      Object.assign(customer, updateData);
+      db.logAction('MODIFICATION_CLIENT', `Client ${customer.prenom} ${customer.nom} mis à jour`);
+      db.notify();
       return customer;
     }
     return null;
@@ -421,20 +400,14 @@ export const db = {
   /**
    * Supprime définitivement un client.
    */
-  deleteCustomer: (id) => {
+  deleteCustomer: async (id) => {
     const idx = memoryDb.customers.findIndex(c => c.id === id);
     if (idx !== -1) {
       const customer = memoryDb.customers[idx];
+      await performMutation('delete', 'customers', id);
       memoryDb.customers.splice(idx, 1);
       db.logAction('SUPPRESSION_CLIENT', `Client ${customer.prenom} ${customer.nom} supprimé`);
-      persist();
       db.notify();
-
-      performMutation('delete', 'customers', id, null, () => {
-        memoryDb.customers.push(customer);
-        persist();
-        db.notify();
-      });
       return true;
     }
     return false;
@@ -479,41 +452,31 @@ export const db = {
     }
   },
 
-  updateCatalogItem: (id, updatedFields) => {
+  updateCatalogItem: async (id, updatedFields) => {
     const item = memoryDb.catalog.find(i => i.id === id);
     if (item) {
       const oldName = item.article;
       const oldPrice = item.prix;
       const oldDesc = item.description || '';
-      const original = { ...item };
       
-      if (updatedFields.article !== undefined) item.article = updatedFields.article;
-      if (updatedFields.prix !== undefined) item.prix = Number(updatedFields.prix);
-      if (updatedFields.description !== undefined) item.description = updatedFields.description;
-      
+      const updateData = {
+        article: updatedFields.article !== undefined ? updatedFields.article : item.article,
+        prix: updatedFields.prix !== undefined ? Number(updatedFields.prix) : item.prix,
+        description: updatedFields.description !== undefined ? updatedFields.description : item.description
+      };
+
+      await performMutation('update', 'catalog', id, updateData);
+      Object.assign(item, updateData);
       db.logAction(
         'MODIFICATION_TARIF', 
         `Item ${oldName} modifié : Formule(${oldName} -> ${item.article}), Prix(${oldPrice} -> ${item.prix} F), Description(${oldDesc} -> ${item.description})`
       );
-      persist();
       db.notify();
-
-      const updateData = {
-        article: item.article,
-        prix: item.prix,
-        description: item.description
-      };
-
-      performMutation('update', 'catalog', id, updateData, () => {
-        Object.assign(item, original);
-        persist();
-        db.notify();
-      });
       return item;
     }
   },
 
-  addCatalogItem: (article, service, prix, categorie = 'individuel', description = '') => {
+  addCatalogItem: async (article, service, prix, categorie = 'individuel', description = '') => {
     const newItem = {
       id: 'cat_' + Math.random().toString(36).substring(2, 11),
       article,
@@ -522,16 +485,10 @@ export const db = {
       categorie,
       description
     };
+    await performMutation('insert', 'catalog', newItem.id, newItem);
     memoryDb.catalog.push(newItem);
     db.logAction('AJOUT_CATALOGUE', `Nouvel article ajouté au catalogue: ${article} (${service}) - ${prix} FCFA`);
-    persist();
     db.notify();
-
-    performMutation('insert', 'catalog', newItem.id, newItem, () => {
-      memoryDb.catalog = memoryDb.catalog.filter(i => i.id !== newItem.id);
-      persist();
-      db.notify();
-    });
     return newItem;
   },
 
@@ -540,9 +497,8 @@ export const db = {
   /**
    * Crée une commande, calcule les tarifs/abonnements, et applique les fidélités.
    */
-  createOrder: (orderData) => {
+  createOrder: async (orderData) => {
     const customer = memoryDb.customers.find(c => c.id === orderData.customer_id);
-    const originalCustomerState = customer ? structuredClone(customer) : null;
     
     let subscribedPlan = null;
     if (orderData.subscribe_plan_id && customer) {
@@ -658,14 +614,7 @@ export const db = {
     const initialStatus = orderData.statut === 'attente' ? 'en_attente' : (orderData.statut || 'en_attente');
 
     const newOrder = {
-      id: (() => {
-        const numericIds = memoryDb.orders.map(o => {
-          const num = Number.parseInt(o.id, 10);
-          return Number.isNaN(num) ? 0 : num;
-        });
-        const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
-        return String(Math.max(1001, maxId + 1));
-      })(),
+      id: orderData.id || ('o_' + Math.random().toString(36).substr(2, 9)),
       customer_id: orderData.customer_id,
       statut: initialStatus,
       type_article: orderData.type_article || (inputItems[0] ? inputItems[0].article : 'Divers'),
@@ -711,29 +660,18 @@ export const db = {
       prix_base_avant_remise: basePriceBeforeRemise
     };
 
+    await performMutation('insert', 'orders', newOrder.id, newOrder);
     memoryDb.orders.push(newOrder);
 
     if (isSubscriptionOrder) {
       if (subscribedPlan) {
-        db.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} créée avec souscription immédiate à ${subscribedPlan.article} (${totalClothes} vêtements débités, nouveau solde: ${customer.active_subscription.remaining_clothes} vêtements)`);
+        db.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} créée avec souscription immédiate à ${subscribedPlan.article} (${totalClothes} vêtements débités)`);
       } else {
-        db.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} (${totalClothes} vêtements) débitée de l'abonnement ${customer.active_subscription.name} de ${customer.prenom} ${customer.nom} (Nouveau solde: ${customer.active_subscription.remaining_clothes} vêtements)`);
+        db.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} (${totalClothes} vêtements) débitée de l'abonnement ${customer.active_subscription.name}`);
       }
     } else {
       db.logAction('CREATION_COMMANDE', `Commande ${codeMarquage} créée pour ${customer ? customer.prenom + ' ' + customer.nom : 'Client inconnu'} (${totalPrice} FCFA)`);
     }
-
-    persist();
-    db.notify();
-
-    performMutation('insert', 'orders', newOrder.id, newOrder, () => {
-      memoryDb.orders = memoryDb.orders.filter(o => o.id !== newOrder.id);
-      if (customer && originalCustomerState) {
-        Object.assign(customer, originalCustomerState);
-      }
-      persist();
-      db.notify();
-    });
 
     if (customer) {
       const updateData = {
@@ -741,15 +679,17 @@ export const db = {
         points_fidelite: customer.points_fidelite,
         active_subscription: customer.active_subscription
       };
-      performMutation('update', 'customers', customer.id, updateData);
+      await performMutation('update', 'customers', customer.id, updateData).catch(e => console.warn('[DB] Customer update error:', e));
     }
+
+    db.notify();
     return newOrder;
   },
 
   /**
    * Met à jour le statut d'une commande.
    */
-  updateOrderStatus: (orderId, newStatus) => {
+  updateOrderStatus: async (orderId, newStatus) => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
@@ -761,9 +701,7 @@ export const db = {
     else if (newStatus === 'retard' || newStatus === 'en_retard') normalizedStatus = 'traitement';
     else if (!normalizedStatus) normalizedStatus = 'restitue';
 
-    const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
-    const originalCustomerState = customer ? { ...customer } : null;
 
     const oldStatus = order.statut;
     order.statut = normalizedStatus;
@@ -801,17 +739,15 @@ export const db = {
           customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
           db.logAction('PAIEMENT_FINAL', `Règlement du solde restant (${remainingToPay} FCFA) par le client ${customer.prenom} ${customer.nom} lors de la restitution`);
           
-          performMutation('update', 'customers', customer.id, {
+          await performMutation('update', 'customers', customer.id, {
             solde_dette: customer.solde_dette,
             points_fidelite: customer.points_fidelite
-          });
+          }).catch(e => console.warn('[DB] Customer update error:', e));
         }
       }
     }
 
     db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${newStatus}'`);
-    persist();
-    db.notify();
 
     const updateData = {
       statut: order.statut,
@@ -819,21 +755,15 @@ export const db = {
       subscription_details: order.subscription_details
     };
 
-    performMutation('update', 'orders', orderId, updateData, () => {
-      Object.assign(order, originalOrderState);
-      if (customer && originalCustomerState) {
-        Object.assign(customer, originalCustomerState);
-      }
-      persist();
-      db.notify();
-    });
+    await performMutation('update', 'orders', orderId, updateData);
+    db.notify();
     return order;
   },
 
   /**
    * Finalise une commande en validant le paiement final et en restituant les vêtements.
    */
-  deliverOrderWithPayment: (orderId, amountPaid, paymentMethod, finalStatus = 'restitue', referencePaiement = null) => {
+  deliverOrderWithPayment: async (orderId, amountPaid, paymentMethod, finalStatus = 'restitue', referencePaiement = null) => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
@@ -842,9 +772,7 @@ export const db = {
       normalizedFinalStatus = finalStatus === 'livre' ? 'restitue' : finalStatus;
     }
 
-    const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
-    const originalCustomerState = customer ? { ...customer } : null;
 
     const oldStatus = order.statut;
 
@@ -886,10 +814,10 @@ export const db = {
       const newPoints = Math.floor(cleanAmountPaid / 1000) * 1;
       customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
       
-      performMutation('update', 'customers', customer.id, {
+      await performMutation('update', 'customers', customer.id, {
         solde_dette: customer.solde_dette,
         points_fidelite: customer.points_fidelite
-      });
+      }).catch(e => console.warn('[DB] Customer update error:', e));
     }
 
     db.logAction(
@@ -897,8 +825,6 @@ export const db = {
       `Livraison commande ${order.identifiant_unique_marquage || order.id}. Paiement reçu : ${cleanAmountPaid} FCFA (Méthode: ${paymentMethod})` + (referencePaiement ? ` (Réf: ${referencePaiement})` : '')
     );
     db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${normalizedFinalStatus}'`);
-    persist();
-    db.notify();
 
     const updateData = {
       statut: order.statut,
@@ -910,27 +836,19 @@ export const db = {
       reference_paiement: order.reference_paiement
     };
 
-    performMutation('update', 'orders', orderId, updateData, () => {
-      Object.assign(order, originalOrderState);
-      if (customer && originalCustomerState) {
-        Object.assign(customer, originalCustomerState);
-      }
-      persist();
-      db.notify();
-    });
+    await performMutation('update', 'orders', orderId, updateData);
+    db.notify();
     return order;
   },
 
   /**
    * Annule une commande et ajuste les soldes débiteurs en conséquence.
    */
-  cancelOrder: (orderId, reason = '') => {
+  cancelOrder: async (orderId, reason = '') => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
-    const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
-    const originalCustomerState = customer ? { ...customer } : null;
 
     order.statut = 'annule';
     order.motif_annulation = reason;
@@ -938,37 +856,27 @@ export const db = {
     const unpaid = order.prix_total - order.avance_payee;
     if (unpaid > 0 && customer) {
       customer.solde_dette = Math.max(0, Number(customer.solde_dette) - unpaid);
-      performMutation('update', 'customers', customer.id, { solde_dette: customer.solde_dette });
+      await performMutation('update', 'customers', customer.id, { solde_dette: customer.solde_dette }).catch(e => console.warn('[DB] Customer update error:', e));
     }
 
     db.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage} annulée. Motif : ${reason}`);
-    persist();
+    await performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason });
     db.notify();
-
-    performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason }, () => {
-      Object.assign(order, originalOrderState);
-      if (customer && originalCustomerState) {
-        Object.assign(customer, originalCustomerState);
-      }
-      persist();
-      db.notify();
-    });
     return order;
   },
 
-  deleteOrder: (id) => {
+  deleteOrder: async (id) => {
     const idx = memoryDb.orders.findIndex(o => o.id === id);
     if (idx !== -1) {
+      await performMutation('delete', 'orders', id);
       memoryDb.orders.splice(idx, 1);
-      performMutation('delete', 'orders', id, null);
-      persist();
       db.notify();
     }
   },
 
   // --- GESTION DU PERSONNEL (STAFF) ---
 
-  addStaff: (member) => {
+  addStaff: async (member) => {
     const defaultPin = member.code_pin || '000000';
     const newMember = {
       id: member.id || ('u_' + Math.random().toString(36).substring(2, 11)),
@@ -989,68 +897,42 @@ export const db = {
       },
       created_at: new Date().toISOString()
     };
+    await performMutation('insert', 'staff', newMember.id, newMember);
     memoryDb.staff.push(newMember);
     db.logAction('CREATION_PERSONNEL', `Personnel ${newMember.prenom} ${newMember.nom} ajouté (Rôle: ${newMember.role})`);
-    persist();
     db.notify();
-
-    performMutation('insert', 'staff', newMember.id, newMember, () => {
-      memoryDb.staff = memoryDb.staff.filter(s => s.id !== newMember.id);
-      persist();
-      db.notify();
-    });
     return newMember;
   },
 
-  updateStaff: (id, updatedFields) => {
+  updateStaff: async (id, updatedFields) => {
     const member = memoryDb.staff.find(s => s.id === id);
     if (member) {
-      const original = { ...member };
-      if (updatedFields.nom !== undefined) member.nom = updatedFields.nom;
-      if (updatedFields.prenom !== undefined) member.prenom = updatedFields.prenom;
-      if (updatedFields.role !== undefined) member.role = updatedFields.role;
-      if (updatedFields.email !== undefined) member.email = updatedFields.email;
-      if (updatedFields.telephone !== undefined) member.telephone = updatedFields.telephone;
-      if (updatedFields.statut !== undefined) member.statut = updatedFields.statut;
-      if (updatedFields.permissions !== undefined) member.permissions = { ...member.permissions, ...updatedFields.permissions };
-      
-      db.logAction('MODIFICATION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} mis à jour`);
-      persist();
-      db.notify();
-
       const updateData = {
-        nom: member.nom,
-        prenom: member.prenom,
-        role: member.role,
-        email: member.email,
-        telephone: member.telephone,
-        statut: member.statut,
-        permissions: member.permissions
+        nom: updatedFields.nom ?? member.nom,
+        prenom: updatedFields.prenom ?? member.prenom,
+        role: updatedFields.role ?? member.role,
+        email: updatedFields.email ?? member.email,
+        telephone: updatedFields.telephone ?? member.telephone,
+        statut: updatedFields.statut ?? member.statut,
+        permissions: updatedFields.permissions ? { ...member.permissions, ...updatedFields.permissions } : member.permissions
       };
 
-      performMutation('update', 'staff', id, updateData, () => {
-        Object.assign(member, original);
-        persist();
-        db.notify();
-      });
+      await performMutation('update', 'staff', id, updateData);
+      Object.assign(member, updateData);
+      db.logAction('MODIFICATION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} mis à jour`);
+      db.notify();
       return member;
     }
   },
 
-  deleteStaff: (id) => {
+  deleteStaff: async (id) => {
     const index = memoryDb.staff.findIndex(s => s.id === id);
     if (index !== -1) {
       const member = memoryDb.staff[index];
+      await performMutation('delete', 'staff', id);
       memoryDb.staff.splice(index, 1);
       db.logAction('SUPPRESSION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} supprimé`);
-      persist();
       db.notify();
-
-      performMutation('delete', 'staff', id, null, () => {
-        memoryDb.staff.push(member);
-        persist();
-        db.notify();
-      });
       return true;
     }
     return false;
@@ -1058,11 +940,10 @@ export const db = {
 
   // --- GESTION DES ABONNEMENTS CLIENTS ---
 
-  subscribeCustomer: (customerId, catalogItemId) => {
+  subscribeCustomer: async (customerId, catalogItemId) => {
     const customer = memoryDb.customers.find(c => c.id === customerId);
     const subPlan = memoryDb.catalog.find(c => c.id === catalogItemId && c.service === 'abonnement');
     if (customer && subPlan) {
-      const originalSubState = customer.active_subscription ? { ...customer.active_subscription } : null;
       let clothesCount = 25;
       if (subPlan.article.includes('Premium') || subPlan.id === 'sub2') clothesCount = 50;
       else if (subPlan.article.includes('Prestige') || subPlan.id === 'sub3') clothesCount = 100;
@@ -1072,7 +953,7 @@ export const db = {
       const expires = new Date();
       expires.setMonth(now.getMonth() + 1);
 
-      customer.active_subscription = {
+      const activeSub = {
         catalog_item_id: subPlan.id,
         name: subPlan.article,
         total_clothes: clothesCount,
@@ -1081,34 +962,22 @@ export const db = {
         expires_at: expires.toISOString()
       };
 
+      await performMutation('update', 'customers', customerId, { active_subscription: activeSub });
+      customer.active_subscription = activeSub;
       db.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subPlan.article} (${clothesCount} vêtements, ${subPlan.prix} FCFA)`);
-      persist();
       db.notify();
-
-      performMutation('update', 'customers', customerId, { active_subscription: customer.active_subscription }, () => {
-        customer.active_subscription = originalSubState;
-        persist();
-        db.notify();
-      });
       return customer;
     }
   },
 
-  unsubscribeCustomer: (customerId) => {
+  unsubscribeCustomer: async (customerId) => {
     const customer = memoryDb.customers.find(c => c.id === customerId);
     if (customer?.active_subscription) {
-      const originalSubState = { ...customer.active_subscription };
       const oldName = customer.active_subscription.name;
+      await performMutation('update', 'customers', customerId, { active_subscription: null });
       delete customer.active_subscription;
       db.logAction('DESABONNEMENT', `Client ${customer.prenom} ${customer.nom} s'est désabonné de ${oldName}`);
-      persist();
       db.notify();
-
-      performMutation('update', 'customers', customerId, { active_subscription: null }, () => {
-        customer.active_subscription = originalSubState;
-        persist();
-        db.notify();
-      });
       return customer;
     }
   },

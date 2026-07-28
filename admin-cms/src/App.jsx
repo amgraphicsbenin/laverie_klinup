@@ -27,6 +27,10 @@ function App() {
   const [adminMenu, setAdminMenu] = useState('dashboard'); // dashboard, catalog, logs
   const [staffList, setStaffList] = useState([]);
 
+  // Supabase init loading state
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [initError, setInitError] = useState(null);
+
   // Authentication states
   const [selectedLoginUser, setSelectedLoginUser] = useState(null);
   const [pinCode, setPinCode] = useState('');
@@ -283,11 +287,7 @@ function App() {
   const [selectedStoreId, setSelectedStoreIdState] = useState(() => db.getSelectedStoreId());
 
   useEffect(() => {
-    setCurrentUser(db.getCurrentUser());
-    setStaffList(db.getStaff());
-    setDbIsRemote(db.isRemote());
-    setSelectedStoreIdState(db.getSelectedStoreId());
-
+    // Subscribe to memory store changes first
     const unsubscribe = db.subscribe(() => {
       setCurrentUser(db.getCurrentUser());
       setStaffList(db.getStaff());
@@ -295,6 +295,27 @@ function App() {
       setDbIsRemote(db.isRemote());
       setSelectedStoreIdState(db.getSelectedStoreId());
     });
+
+    // Load all data from Supabase
+    db.init()
+      .then(() => {
+        setCurrentUser(db.getCurrentUser());
+        setStaffList(db.getStaff());
+        setDbIsRemote(db.isRemote());
+        setSelectedStoreIdState(db.getSelectedStoreId());
+        setIsInitializing(false);
+      })
+      .catch(err => {
+        console.error('[App] Initialisation échouée:', err);
+        setInitError(err?.message || 'Impossible de joindre le serveur Supabase.');
+        // Still show data from defaults even on error
+        setCurrentUser(db.getCurrentUser());
+        setStaffList(db.getStaff());
+        setDbIsRemote(db.isRemote());
+        setSelectedStoreIdState(db.getSelectedStoreId());
+        setIsInitializing(false);
+      });
+
     return () => unsubscribe();
   }, []);
 
@@ -425,6 +446,88 @@ function App() {
   }, [selectedLoginUser, pinCode, pinError, isUnlocking]);
 
 
+  // ── Supabase loading screen ──────────────────────────────────────────────
+  if (isInitializing) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+        gap: '2rem',
+        fontFamily: 'var(--font-body, Inter, sans-serif)',
+      }}>
+        <img src={logoGold} alt="KLIN UP" style={{ width: '180px', opacity: 0.9 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+          <div style={{
+            width: '48px', height: '48px',
+            border: '3px solid rgba(255,255,255,0.1)',
+            borderTop: '3px solid #f59e0b',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', margin: 0, letterSpacing: '0.05em' }}>
+            Connexion à Supabase en cours…
+          </p>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  // ── Supabase connection error screen ─────────────────────────────────────
+  if (initError) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+        gap: '1.5rem',
+        padding: '2rem',
+        fontFamily: 'var(--font-body, Inter, sans-serif)',
+      }}>
+        <img src={logoGold} alt="KLIN UP" style={{ width: '160px', opacity: 0.8 }} />
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.08)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '16px',
+          padding: '2rem',
+          maxWidth: '420px',
+          width: '100%',
+          textAlign: 'center',
+          display: 'flex', flexDirection: 'column', gap: '1rem'
+        }}>
+          <div style={{ color: '#ef4444', fontSize: '2rem' }}>⚠️</div>
+          <h2 style={{ color: '#fca5a5', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+            Connexion Supabase impossible
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', margin: 0, lineHeight: 1.6 }}>
+            {initError}
+          </p>
+          <button
+            onClick={() => { setInitError(null); setIsInitializing(true); db.init().then(() => { setCurrentUser(db.getCurrentUser()); setStaffList(db.getStaff()); setDbIsRemote(db.isRemote()); setSelectedStoreIdState(db.getSelectedStoreId()); setIsInitializing(false); }).catch(err => { setInitError(err?.message || 'Erreur de connexion.'); setIsInitializing(false); }); }}
+            style={{
+              background: 'rgba(245, 158, 11, 0.15)',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              color: '#f59e0b',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+            }}
+          >
+            Réessayer la connexion
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (

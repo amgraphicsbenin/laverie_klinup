@@ -1,8 +1,10 @@
-import { DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG, DEFAULT_STORES, DEFAULT_ROLES } from './seeds.js';
+import { DEFAULT_ROLES } from './seeds.js';
 import { memoryDb, listeners, notifyListeners } from './memoryStore.js';
-import { performMutation, persist } from './syncEngine.js';
+import { performMutation, saveSession, removeSession } from './syncEngine.js';
 
 export { memoryDb, listeners, notifyListeners };
+
+// ─── Order helpers ─────────────────────────────────────────────────────────
 
 export function normalizeOrderStatus(rawStatus) {
   if (!rawStatus) return 'en_attente';
@@ -24,31 +26,23 @@ export function normalizeOrderStatus(rawStatus) {
 export function hydrateOrder(order) {
   if (!order) return order;
   const hydrated = { ...order };
-
   hydrated.statut = normalizeOrderStatus(order.statut || order.status);
 
   const isCompleted = hydrated.statut === 'restitue' || hydrated.statut === 'annule';
   if (!isCompleted && order.due_date) {
-    const dueDateObj = new Date(order.due_date);
-    if (!isNaN(dueDateObj.getTime()) && dueDateObj < new Date()) {
-      hydrated.est_en_retard = true;
-    } else {
-      hydrated.est_en_retard = false;
-    }
+    const d = new Date(order.due_date);
+    hydrated.est_en_retard = !isNaN(d.getTime()) && d < new Date();
   } else {
     hydrated.est_en_retard = false;
   }
 
   if (order.subscription_details) {
-    if (order.subscription_details.remise_pourcentage !== undefined) {
+    if (order.subscription_details.remise_pourcentage !== undefined)
       hydrated.remise_pourcentage = Number(order.subscription_details.remise_pourcentage) || 0;
-    }
-    if (order.subscription_details.remise_montant !== undefined) {
+    if (order.subscription_details.remise_montant !== undefined)
       hydrated.remise_montant = Number(order.subscription_details.remise_montant) || 0;
-    }
-    if (order.subscription_details.prix_base_avant_remise !== undefined) {
+    if (order.subscription_details.prix_base_avant_remise !== undefined)
       hydrated.prix_base_avant_remise = Number(order.subscription_details.prix_base_avant_remise) || 0;
-    }
   }
   return hydrated;
 }
@@ -57,74 +51,143 @@ export function reconcileOrderStates() {
   if (!memoryDb || !Array.isArray(memoryDb.orders)) return false;
   let hasChanges = false;
   const now = new Date();
-
   memoryDb.orders.forEach(order => {
     if (!order) return;
-
     const normalized = normalizeOrderStatus(order.statut || order.status);
-    if (order.statut !== normalized) {
-      order.statut = normalized;
-      hasChanges = true;
-    }
-
+    if (order.statut !== normalized) { order.statut = normalized; hasChanges = true; }
     const isCompleted = order.statut === 'restitue' || order.statut === 'annule';
     let isLate = false;
     if (!isCompleted && order.due_date) {
-      const dueDateObj = new Date(order.due_date);
-      if (!isNaN(dueDateObj.getTime()) && dueDateObj < now) {
-        isLate = true;
-      }
+      const d = new Date(order.due_date);
+      if (!isNaN(d.getTime()) && d < now) isLate = true;
     }
-
-    if (order.est_en_retard !== isLate) {
-      order.est_en_retard = isLate;
-      hasChanges = true;
-    }
-
+    if (order.est_en_retard !== isLate) { order.est_en_retard = isLate; hasChanges = true; }
     if (order.prix_total !== undefined && typeof order.prix_total !== 'number') {
-      order.prix_total = Number(order.prix_total) || 0;
-      hasChanges = true;
+      order.prix_total = Number(order.prix_total) || 0; hasChanges = true;
     }
     if (order.avance_payee !== undefined && typeof order.avance_payee !== 'number') {
-      order.avance_payee = Number(order.avance_payee) || 0;
-      hasChanges = true;
+      order.avance_payee = Number(order.avance_payee) || 0; hasChanges = true;
     }
   });
-
   return hasChanges;
 }
 
 let orderCronTimerAdmin = null;
 export function startOrderStateCron() {
   if (orderCronTimerAdmin) return;
-  if (reconcileOrderStates()) {
-    persist();
-    notifyListeners();
-  }
+  if (reconcileOrderStates()) notifyListeners();
   orderCronTimerAdmin = setInterval(() => {
-    try {
-      if (reconcileOrderStates()) {
-        persist();
-        notifyListeners();
-      }
-    } catch (e) {
-      console.warn('[Admin Order Cron] Silent error during reconciliation:', e);
-    }
+    try { if (reconcileOrderStates()) notifyListeners(); } catch (e) { /* silent */ }
   }, 5000);
 }
 
+// ─── Main dbEngine ────────────────────────────────────────────────────────
+// All mutating methods are async and Supabase-first:
+//   1. await performMutation(...) — throws if Supabase fails
+//   2. update memoryDb — only after Supabase confirms
+//   3. notifyListeners() — update React UI
+
 export const dbEngine = {
+
+  // ── Getters (synchronous) ──────────────────────────────────────────────
+
   getStores: () => memoryDb.stores ? [...memoryDb.stores] : [],
   getSelectedStoreId: () => memoryDb.selected_store_id || 'all',
+
+  getAllStaff: () => [...memoryDb.staff],
+  getStaff: () => {
+    const sid = memoryDb.selected_store_id || 'all';
+    if (sid === 'all') return [...memoryDb.staff];
+    return memoryDb.staff.filter(
+      s => s.role === 'super_admin' || s.store_id === sid || s.store_id === 'all' || (!s.store_id && sid === 'store_central')
+    );
+  },
+
+  getAllCustomers: () => [...memoryDb.customers],
+  getCustomers: () => {
+    const sid = memoryDb.selected_store_id || 'all';
+    if (sid === 'all') return [...memoryDb.customers];
+    return memoryDb.customers.filter(c => c.store_id === sid || (!c.store_id && sid === 'store_central'));
+  },
+
+  getAllOrders: () => [...memoryDb.orders],
+  getOrders: () => {
+    const sid = memoryDb.selected_store_id || 'all';
+    if (sid === 'all') return [...memoryDb.orders];
+    return memoryDb.orders.filter(o => o.store_id === sid || (!o.store_id && sid === 'store_central'));
+  },
+
+  getAllLogs: () => [...memoryDb.logs],
+  getLogs: () => {
+    const sid = memoryDb.selected_store_id || 'all';
+    if (sid === 'all') return [...memoryDb.logs];
+    return memoryDb.logs.filter(l => l.store_id === sid || (!l.store_id && sid === 'store_central'));
+  },
+
+  getCatalog: () => [...memoryDb.catalog],
+  getCurrentUser: () => memoryDb.current_user ? { ...memoryDb.current_user } : null,
+  getRoles: () => memoryDb.roles || DEFAULT_ROLES,
+  getSettings: () => memoryDb.settings || {
+    express_hours: 6, express_markup: 50, normal_hours: 48,
+    receipt_header: 'KLIN UP - Laverie & Pressing Premium',
+    receipt_footer: 'Merci de votre confiance ! A bientot chez KLIN UP.'
+  },
+  getCashClosures: () => memoryDb.cash_closures ? [...memoryDb.cash_closures] : [],
+  getDebtPayments: () => memoryDb.debt_payments ? [...memoryDb.debt_payments] : [],
+  getPinResetRequests: () => memoryDb.pin_reset_requests ? [...memoryDb.pin_reset_requests] : [],
+
+  canUserViewCA: (user) => !!(user && (user.role === 'super_admin' || user.role === 'manager')),
+  canUserViewDashboard: (user) => !!(user && (user.role === 'super_admin' || user.role === 'manager')),
+  canUserManageOrders: (user) => !!user,
+  canUserManageCRM: (user) => !!user,
+  canUserEditCatalog: (user) => !!(user && (user.role === 'super_admin' || user.role === 'manager')),
+  canUserManageStaff: (user) => !!(user && user.role === 'super_admin'),
+
+  // ── Session/preference setters (localStorage only, not business data) ──
+
+  setCurrentUser: (user) => {
+    memoryDb.current_user = user;
+    if (user) {
+      saveSession('klin_up_current_user', user);
+      dbEngine.logAction('CONNEXION', `Connexion de ${user.prenom} ${user.nom} (${user.role})`);
+    } else {
+      removeSession('klin_up_current_user');
+      dbEngine.logAction('DECONNEXION', `Déconnexion de l'utilisateur`);
+    }
+    notifyListeners();
+  },
+
   setSelectedStoreId: (storeId) => {
     memoryDb.selected_store_id = storeId;
+    saveSession('klin_up_selected_store', storeId);
     const store = memoryDb.stores?.find(s => s.id === storeId);
     const storeName = store ? store.nom : 'Tous les points (Global)';
     dbEngine.logAction('CHANGEMENT_POINT_LAVERIE', `Changement du point de laverie actif vers : ${storeName}`);
-    persist();
     notifyListeners();
   },
-  addStore: (storeData) => {
+
+  // ── Activity log — fire-and-forget to Supabase, immediate in memory ────
+
+  logAction: (action, details) => {
+    const currentUser = dbEngine.getCurrentUser();
+    const newLog = {
+      id: 'l_' + Math.random().toString(36).substr(2, 9),
+      user_id: currentUser ? currentUser.id : null,
+      store_id: memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central',
+      action,
+      details,
+      timestamp: new Date().toISOString(),
+    };
+    memoryDb.logs.unshift(newLog);
+    notifyListeners();
+    performMutation('insert', 'activity_logs', newLog.id, newLog)
+      .catch(e => console.warn('[DB] Log sync failed:', e.message));
+    return newLog;
+  },
+
+  // ── Stores ─────────────────────────────────────────────────────────────
+
+  addStore: async (storeData) => {
     const newStore = {
       id: 'store_' + Math.random().toString(36).substr(2, 9),
       nom: storeData.nom || 'Nouveau Point',
@@ -135,106 +198,60 @@ export const dbEngine = {
       responsable_id: storeData.responsable_id || null,
       responsable_nom: storeData.responsable_nom || '',
       statut: storeData.statut || 'actif',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
+    try {
+      await performMutation('insert', 'stores', newStore.id, newStore);
+    } catch (e) {
+      console.warn('[DB] Stores table may not exist in Supabase:', e.message);
+    }
     if (!memoryDb.stores) memoryDb.stores = [];
     memoryDb.stores.unshift(newStore);
     dbEngine.logAction('CREATION_POINT_LAVERIE', `Création du point de laverie ${newStore.nom} (${newStore.code})`);
-    persist();
     notifyListeners();
     return newStore;
   },
-  updateStore: (id, storeData) => {
+
+  updateStore: async (id, storeData) => {
     if (!memoryDb.stores) return null;
     const idx = memoryDb.stores.findIndex(s => s.id === id);
-    if (idx !== -1) {
-      memoryDb.stores[idx] = { ...memoryDb.stores[idx], ...storeData };
-      dbEngine.logAction('MODIFICATION_POINT_LAVERIE', `Modification du point de laverie ${memoryDb.stores[idx].nom}`);
-      persist();
-      notifyListeners();
-      return memoryDb.stores[idx];
+    if (idx === -1) return null;
+    try {
+      await performMutation('update', 'stores', id, storeData);
+    } catch (e) {
+      console.warn('[DB] Stores table may not exist in Supabase:', e.message);
     }
-    return null;
+    memoryDb.stores[idx] = { ...memoryDb.stores[idx], ...storeData };
+    dbEngine.logAction('MODIFICATION_POINT_LAVERIE', `Modification du point de laverie ${memoryDb.stores[idx].nom}`);
+    notifyListeners();
+    return memoryDb.stores[idx];
   },
-  deleteStore: (id) => {
+
+  deleteStore: async (id) => {
     if (!memoryDb.stores) return false;
     const store = memoryDb.stores.find(s => s.id === id);
-    if (store) {
-      memoryDb.stores = memoryDb.stores.filter(s => s.id !== id);
-      if (memoryDb.selected_store_id === id) {
-        memoryDb.selected_store_id = 'all';
-      }
-      dbEngine.logAction('SUPPRESSION_POINT_LAVERIE', `Suppression du point de laverie ${store.nom}`);
-      persist();
-      notifyListeners();
-      return true;
+    if (!store) return false;
+    try {
+      await performMutation('delete', 'stores', id, null);
+    } catch (e) {
+      console.warn('[DB] Stores table may not exist in Supabase:', e.message);
     }
-    return false;
-  },
-  getAllStaff: () => [...memoryDb.staff],
-  getStaff: () => {
-    const currentStoreId = memoryDb.selected_store_id || 'all';
-    if (currentStoreId === 'all') return [...memoryDb.staff];
-    return memoryDb.staff.filter(s => s.role === 'super_admin' || s.store_id === currentStoreId || s.store_id === 'all' || (!s.store_id && currentStoreId === 'store_central'));
-  },
-
-  getAllCustomers: () => [...memoryDb.customers],
-  getCustomers: () => {
-    const currentStoreId = memoryDb.selected_store_id || 'all';
-    if (currentStoreId === 'all') return [...memoryDb.customers];
-    return memoryDb.customers.filter(c => c.store_id === currentStoreId || (!c.store_id && currentStoreId === 'store_central'));
-  },
-
-  getAllOrders: () => [...memoryDb.orders],
-  getOrders: () => {
-    const currentStoreId = memoryDb.selected_store_id || 'all';
-    if (currentStoreId === 'all') return [...memoryDb.orders];
-    return memoryDb.orders.filter(o => o.store_id === currentStoreId || (!o.store_id && currentStoreId === 'store_central'));
-  },
-
-  getAllLogs: () => [...memoryDb.logs],
-  getLogs: () => {
-    const currentStoreId = memoryDb.selected_store_id || 'all';
-    if (currentStoreId === 'all') return [...memoryDb.logs];
-    return memoryDb.logs.filter(l => l.store_id === currentStoreId || (!l.store_id && currentStoreId === 'store_central'));
-  },
-  getCatalog: () => [...memoryDb.catalog],
-  getCurrentUser: () => memoryDb.current_user ? { ...memoryDb.current_user } : null,
-
-  setCurrentUser: (user) => {
-    memoryDb.current_user = user;
-    if (user) {
-      dbEngine.logAction('CONNEXION', `Connexion de ${user.prenom} ${user.nom} (${user.role})`);
-    } else {
-      dbEngine.logAction('DECONNEXION', `Déconnexion de l'utilisateur`);
+    memoryDb.stores = memoryDb.stores.filter(s => s.id !== id);
+    if (memoryDb.selected_store_id === id) {
+      memoryDb.selected_store_id = 'all';
+      saveSession('klin_up_selected_store', 'all');
     }
-    persist();
+    dbEngine.logAction('SUPPRESSION_POINT_LAVERIE', `Suppression du point de laverie ${store.nom}`);
     notifyListeners();
+    return true;
   },
 
-  logAction: (action, details) => {
-    const currentUser = dbEngine.getCurrentUser();
-    const newLog = {
-      id: 'l_' + Math.random().toString(36).substr(2, 9),
-      user_id: currentUser ? currentUser.id : null,
-      store_id: memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central',
-      action,
-      details,
-      timestamp: new Date().toISOString()
-    };
-    memoryDb.logs.unshift(newLog);
-    persist();
-    notifyListeners();
+  // ── Customers ──────────────────────────────────────────────────────────
 
-    performMutation('insert', 'activity_logs', newLog.id, newLog);
-    return newLog;
-  },
-
-  addCustomer: (customer) => {
+  addCustomer: async (customer) => {
     const cleanPhone = customer.telephone.trim();
-    const phoneExists = memoryDb.customers.some(c => c.telephone.trim() === cleanPhone);
-    if (phoneExists) {
-      throw new Error("Ce numéro de téléphone est déjà associé à un autre client actif.");
+    if (memoryDb.customers.some(c => c.telephone.trim() === cleanPhone)) {
+      throw new Error('Ce numéro de téléphone est déjà associé à un autre client actif.');
     }
     const newCustomer = {
       id: 'c_' + Math.random().toString(36).substr(2, 9),
@@ -245,203 +262,197 @@ export const dbEngine = {
       indicatif: customer.indicatif || '229',
       preferences_pliage: customer.preferences_pliage || 'Plié',
       points_fidelite: 0,
-      solde_dette: 0.00,
+      solde_dette: 0.0,
       store_id: customer.store_id || (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central'),
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
+
+    await performMutation('insert', 'customers', newCustomer.id, newCustomer);
+
     memoryDb.customers.push(newCustomer);
     dbEngine.logAction('CREATION_CLIENT', `Client ${newCustomer.prenom} ${newCustomer.nom} ajouté (Tel: ${newCustomer.telephone})`);
-    persist();
     notifyListeners();
-
-    performMutation('insert', 'customers', newCustomer.id, newCustomer, () => {
-      memoryDb.customers = memoryDb.customers.filter(c => c.id !== newCustomer.id);
-      persist();
-      notifyListeners();
-    });
     return newCustomer;
   },
 
-  updateCustomer: (id, updatedFields) => {
+  updateCustomer: async (id, updatedFields) => {
     const customer = memoryDb.customers.find(c => c.id === id);
-    if (customer) {
-      if (updatedFields.telephone) {
-        const cleanPhone = updatedFields.telephone.trim();
-        const phoneExists = memoryDb.customers.some(c => c.id !== id && c.telephone.trim() === cleanPhone);
-        if (phoneExists) {
-          throw new Error("Ce numéro de téléphone est déjà associé à un autre client actif.");
-        }
+    if (!customer) return null;
+
+    if (updatedFields.telephone) {
+      const cleanPhone = updatedFields.telephone.trim();
+      if (memoryDb.customers.some(c => c.id !== id && c.telephone.trim() === cleanPhone)) {
+        throw new Error('Ce numéro de téléphone est déjà associé à un autre client actif.');
       }
-      const original = { ...customer };
-
-      customer.nom = updatedFields.nom ?? customer.nom;
-      customer.prenom = updatedFields.prenom ?? customer.prenom;
-      customer.telephone = updatedFields.telephone ? updatedFields.telephone.trim() : customer.telephone;
-      customer.adresse = updatedFields.adresse ?? customer.adresse;
-      customer.preferences_pliage = updatedFields.preferences_pliage ?? customer.preferences_pliage;
-      
-      dbEngine.logAction('MODIFICATION_CLIENT', `Client ${customer.prenom} ${customer.nom} mis à jour`);
-      persist();
-      notifyListeners();
-
-      const updateData = {
-        nom: customer.nom,
-        prenom: customer.prenom,
-        telephone: customer.telephone,
-        adresse: customer.adresse,
-        preferences_pliage: customer.preferences_pliage
-      };
-
-      performMutation('update', 'customers', id, updateData, () => {
-        const current = memoryDb.customers.find(c => c.id === id);
-        if (current) {
-          Object.assign(current, original);
-          persist();
-          notifyListeners();
-        }
-      });
-      return customer;
     }
-    return null;
+
+    const updateData = {
+      nom: updatedFields.nom ?? customer.nom,
+      prenom: updatedFields.prenom ?? customer.prenom,
+      telephone: updatedFields.telephone ? updatedFields.telephone.trim() : customer.telephone,
+      adresse: updatedFields.adresse ?? customer.adresse,
+      preferences_pliage: updatedFields.preferences_pliage ?? customer.preferences_pliage,
+    };
+
+    await performMutation('update', 'customers', id, updateData);
+
+    Object.assign(customer, updateData);
+    dbEngine.logAction('MODIFICATION_CLIENT', `Client ${customer.prenom} ${customer.nom} mis à jour`);
+    notifyListeners();
+    return customer;
   },
 
-  deleteCustomer: (id) => {
+  deleteCustomer: async (id) => {
     const idx = memoryDb.customers.findIndex(c => c.id === id);
-    if (idx !== -1) {
-      const customer = memoryDb.customers[idx];
-      memoryDb.customers.splice(idx, 1);
-      dbEngine.logAction('SUPPRESSION_CLIENT', `Client ${customer.prenom} ${customer.nom} supprimé`);
-      persist();
-      notifyListeners();
+    if (idx === -1) return false;
+    const customer = memoryDb.customers[idx];
 
-      performMutation('delete', 'customers', id, null, () => {
-        memoryDb.customers.push(customer);
-        persist();
-        notifyListeners();
-      });
-      return true;
-    }
-    return false;
+    await performMutation('delete', 'customers', id, null);
+
+    memoryDb.customers.splice(idx, 1);
+    dbEngine.logAction('SUPPRESSION_CLIENT', `Client ${customer.prenom} ${customer.nom} supprimé`);
+    notifyListeners();
+    return true;
   },
 
-  updateCustomerDebt: (customerId, amount) => {
+  updateCustomerDebt: async (customerId, amount) => {
     const customer = memoryDb.customers.find(c => c.id === customerId);
-    if (customer) {
-      const originalDebt = customer.solde_dette;
-      customer.solde_dette = Math.max(0, Number(customer.solde_dette) + Number(amount));
-      dbEngine.logAction('MAJ_SOLDE_FINANCIER', `Solde dette de ${customer.prenom} ${customer.nom} modifié de ${amount} FCFA (Nouveau solde: ${customer.solde_dette} FCFA)`);
-      persist();
-      notifyListeners();
+    if (!customer) return;
+    const newDebt = Math.max(0, Number(customer.solde_dette) + Number(amount));
 
-      performMutation('update', 'customers', customerId, { solde_dette: customer.solde_dette }, () => {
-        customer.solde_dette = originalDebt;
-        persist();
-        notifyListeners();
-      });
-    }
+    await performMutation('update', 'customers', customerId, { solde_dette: newDebt });
+
+    customer.solde_dette = newDebt;
+    dbEngine.logAction('MAJ_SOLDE_FINANCIER', `Solde dette de ${customer.prenom} ${customer.nom} modifié de ${amount} FCFA (Nouveau solde: ${newDebt} FCFA)`);
+    notifyListeners();
   },
 
-  updateCatalogPrice: (id, newPrice) => {
+  subscribeCustomer: async (customerId, catalogItemId) => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    const subPlan = memoryDb.catalog.find(c => c.id === catalogItemId && c.service === 'abonnement');
+    if (!customer || !subPlan) return null;
+
+    let clothesCount = 25;
+    if (subPlan.article.includes('Premium') || subPlan.id === 'sub2') clothesCount = 50;
+    else if (subPlan.article.includes('Prestige') || subPlan.id === 'sub3') clothesCount = 100;
+    else if (subPlan.article.includes('VIP') || subPlan.id === 'sub4') clothesCount = 200;
+
+    const now = new Date();
+    const expires = new Date();
+    expires.setMonth(now.getMonth() + 1);
+    const newSub = {
+      catalog_item_id: subPlan.id,
+      name: subPlan.article,
+      total_clothes: clothesCount,
+      remaining_clothes: clothesCount,
+      subscribed_at: now.toISOString(),
+      expires_at: expires.toISOString(),
+    };
+
+    await performMutation('update', 'customers', customerId, { active_subscription: newSub });
+
+    customer.active_subscription = newSub;
+    dbEngine.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subPlan.article} (${clothesCount} vêtements, ${subPlan.prix} FCFA)`);
+    notifyListeners();
+    return customer;
+  },
+
+  unsubscribeCustomer: async (customerId) => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer || !customer.active_subscription) return null;
+    const oldName = customer.active_subscription.name;
+
+    await performMutation('update', 'customers', customerId, { active_subscription: null });
+
+    delete customer.active_subscription;
+    dbEngine.logAction('DESABONNEMENT', `Client ${customer.prenom} ${customer.nom} s'est désabonné de ${oldName}`);
+    notifyListeners();
+    return customer;
+  },
+
+  payCustomerDebt: async (customerId, amountPaid, notes = '') => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer) throw new Error('Client non trouvé');
+    const amount = Number(amountPaid);
+    if (isNaN(amount) || amount <= 0) throw new Error('Montant de règlement invalide');
+
+    const previousDebt = Number(customer.solde_dette || 0);
+    const newDebt = Math.max(0, previousDebt - amount);
+    const currentUser = dbEngine.getCurrentUser();
+    const paymentRecord = {
+      id: 'pay_' + Math.random().toString(36).substr(2, 9),
+      customer_id: customerId,
+      customer_name: `${customer.prenom} ${customer.nom}`,
+      amount_paid: amount,
+      previous_debt: previousDebt,
+      remaining_debt: newDebt,
+      user_id: currentUser ? currentUser.id : null,
+      user_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Agent',
+      notes,
+      created_at: new Date().toISOString(),
+    };
+
+    await performMutation('update', 'customers', customerId, { solde_dette: newDebt });
+    await performMutation('insert', 'debt_payments', paymentRecord.id, paymentRecord);
+
+    customer.solde_dette = newDebt;
+    if (!memoryDb.debt_payments) memoryDb.debt_payments = [];
+    memoryDb.debt_payments.unshift(paymentRecord);
+    dbEngine.logAction('REGLEMENT_DETTE', `Règlement de dette de ${amount} FCFA pour ${customer.prenom} ${customer.nom} (Solde restant: ${newDebt} FCFA)`);
+    notifyListeners();
+    return paymentRecord;
+  },
+
+  // ── Catalog ────────────────────────────────────────────────────────────
+
+  updateCatalogPrice: async (id, newPrice) => {
     const item = memoryDb.catalog.find(i => i.id === id);
-    if (item) {
-      const oldPrice = item.prix;
-      item.prix = Number(newPrice);
-      dbEngine.logAction('MODIFICATION_TARIF', `Tarif ${item.article} + ${item.service} modifié de ${oldPrice} à ${newPrice} FCFA`);
-      persist();
-      notifyListeners();
+    if (!item) return;
+    const oldPrice = item.prix;
 
-      performMutation('update', 'catalog', id, { prix: item.prix }, () => {
-        item.prix = oldPrice;
-        persist();
-        notifyListeners();
-      });
-    }
+    await performMutation('update', 'catalog', id, { prix: Number(newPrice) });
+
+    item.prix = Number(newPrice);
+    dbEngine.logAction('MODIFICATION_TARIF', `Tarif ${item.article} + ${item.service} modifié de ${oldPrice} à ${newPrice} FCFA`);
+    notifyListeners();
   },
 
-  updateCatalogItem: (id, updatedFields) => {
+  updateCatalogItem: async (id, updatedFields) => {
     const item = memoryDb.catalog.find(i => i.id === id);
-    if (item) {
-      const original = { ...item };
-      
-      if (updatedFields.article !== undefined) item.article = updatedFields.article;
-      if (updatedFields.prix !== undefined) item.prix = Number(updatedFields.prix);
-      if (updatedFields.description !== undefined) item.description = updatedFields.description;
-      if (updatedFields.service !== undefined) item.service = updatedFields.service;
-      if (updatedFields.prix_urgent !== undefined) item.prix_urgent = Number(updatedFields.prix_urgent);
-      
-      if (updatedFields.nombre_vetements !== undefined) {
-        item.nombre_vetements = updatedFields.nombre_vetements !== null ? Number(updatedFields.nombre_vetements) : null;
-      }
-      if (updatedFields.ramassage !== undefined) {
-        item.ramassage = updatedFields.ramassage !== null ? Boolean(updatedFields.ramassage) : null;
-      }
-      if (updatedFields.nombre_ramassages !== undefined) {
-        item.nombre_ramassages = updatedFields.nombre_ramassages !== null ? Number(updatedFields.nombre_ramassages) : null;
-      }
-      if (updatedFields.ramassage_gratuit !== undefined) {
-        item.ramassage_gratuit = updatedFields.ramassage_gratuit !== null ? Boolean(updatedFields.ramassage_gratuit) : null;
-      }
-      if (updatedFields.livraison_gratuite !== undefined) {
-        item.livraison_gratuite = updatedFields.livraison_gratuite !== null ? Boolean(updatedFields.livraison_gratuite) : null;
-      }
-      
-      dbEngine.logAction(
-        'MODIFICATION_TARIF', 
-        `Item ${original.article} modifié : ${JSON.stringify(updatedFields)}`
-      );
-      persist();
-      notifyListeners();
+    if (!item) return null;
 
-      const updateData = {
-        article: item.article,
-        prix: item.prix,
-        description: item.description,
-        service: item.service,
-        prix_urgent: item.prix_urgent,
-        nombre_vetements: item.nombre_vetements,
-        ramassage: item.ramassage,
-        nombre_ramassages: item.nombre_ramassages,
-        ramassage_gratuit: item.ramassage_gratuit,
-        livraison_gratuite: item.livraison_gratuite
-      };
+    const updateData = {};
+    if (updatedFields.article !== undefined) updateData.article = updatedFields.article;
+    if (updatedFields.prix !== undefined) updateData.prix = Number(updatedFields.prix);
+    if (updatedFields.description !== undefined) updateData.description = updatedFields.description;
+    if (updatedFields.service !== undefined) updateData.service = updatedFields.service;
+    if (updatedFields.prix_urgent !== undefined) updateData.prix_urgent = Number(updatedFields.prix_urgent);
+    if (updatedFields.nombre_vetements !== undefined) updateData.nombre_vetements = updatedFields.nombre_vetements !== null ? Number(updatedFields.nombre_vetements) : null;
+    if (updatedFields.ramassage !== undefined) updateData.ramassage = updatedFields.ramassage !== null ? Boolean(updatedFields.ramassage) : null;
+    if (updatedFields.nombre_ramassages !== undefined) updateData.nombre_ramassages = updatedFields.nombre_ramassages !== null ? Number(updatedFields.nombre_ramassages) : null;
+    if (updatedFields.ramassage_gratuit !== undefined) updateData.ramassage_gratuit = updatedFields.ramassage_gratuit !== null ? Boolean(updatedFields.ramassage_gratuit) : null;
+    if (updatedFields.livraison_gratuite !== undefined) updateData.livraison_gratuite = updatedFields.livraison_gratuite !== null ? Boolean(updatedFields.livraison_gratuite) : null;
 
-      performMutation('update', 'catalog', id, updateData, () => {
-        Object.assign(item, original);
-        persist();
-        notifyListeners();
-      });
-      return item;
-    }
+    await performMutation('update', 'catalog', id, updateData);
+
+    Object.assign(item, updateData);
+    dbEngine.logAction('MODIFICATION_TARIF', `Item ${item.article} modifié : ${JSON.stringify(updatedFields)}`);
+    notifyListeners();
+    return item;
   },
 
-  addCatalogItem: (
-    article, 
-    service, 
-    prix, 
-    categorie = 'individuel', 
-    description = '', 
-    prix_urgent = null,
-    nombre_vetements = null,
-    ramassage = false,
-    nombre_ramassages = null,
-    ramassage_gratuit = false,
-    livraison_gratuite = false
+  addCatalogItem: async (
+    article, service, prix, categorie = 'individuel', description = '',
+    prix_urgent = null, nombre_vetements = null, ramassage = false,
+    nombre_ramassages = null, ramassage_gratuit = false, livraison_gratuite = false
   ) => {
     const artCode = article.trim().substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
-    const srvCode = service === 'lavage_simple' ? 'LAV' :
-                    service === 'repassage' ? 'REP' :
-                    service === 'nettoyage_a_sec' ? 'SEC' : 'GEN';
-    const randomCode = Math.random().toString(36).substr(2, 4).toUpperCase();
-    const sku = `KLIN-${artCode}-${srvCode}-${randomCode}`;
+    const srvCode = service === 'lavage_simple' ? 'LAV' : service === 'repassage' ? 'REP' : service === 'nettoyage_a_sec' ? 'SEC' : 'GEN';
+    const sku = `KLIN-${artCode}-${srvCode}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
     const newItem = {
       id: 'cat_' + Math.random().toString(36).substr(2, 9),
-      article,
-      service,
-      prix: Number(prix),
-      categorie,
-      description,
-      sku,
+      article, service, prix: Number(prix), categorie, description, sku,
       prix_urgent: prix_urgent !== null ? Number(prix_urgent) : null,
       nombre_vetements: nombre_vetements !== null ? Number(nombre_vetements) : null,
       ramassage: Boolean(ramassage),
@@ -449,87 +460,79 @@ export const dbEngine = {
       ramassage_gratuit: Boolean(ramassage_gratuit),
       livraison_gratuite: Boolean(livraison_gratuite),
       is_active: true,
-      statut: 'actif'
+      statut: 'actif',
     };
+
+    await performMutation('insert', 'catalog', newItem.id, newItem);
+
     memoryDb.catalog.push(newItem);
     dbEngine.logAction('AJOUT_CATALOGUE', `Nouvel article ajouté au catalogue: ${article} (${service}) - SKU: ${sku} - ${prix} FCFA (Urgent: ${prix_urgent})`);
-    persist();
     notifyListeners();
-
-    performMutation('insert', 'catalog', newItem.id, newItem, () => {
-      memoryDb.catalog = memoryDb.catalog.filter(i => i.id !== newItem.id);
-      persist();
-      notifyListeners();
-    });
     return newItem;
   },
 
-  toggleCatalogItemActive: (idOrArticleName) => {
-    const itemsToToggle = memoryDb.catalog.filter(i => 
-      i.id === idOrArticleName || 
+  toggleCatalogItemActive: async (idOrArticleName) => {
+    const itemsToToggle = memoryDb.catalog.filter(
+      i => i.id === idOrArticleName ||
       (i.article && i.article.trim().toLowerCase() === String(idOrArticleName).trim().toLowerCase())
     );
     if (itemsToToggle.length === 0) return false;
 
     const isCurrentlyActive = itemsToToggle.some(i => i.is_active !== false && i.statut !== 'inactif');
     const newActive = !isCurrentlyActive;
+    const articleLabel = itemsToToggle[0].article;
+
+    await Promise.all(
+      itemsToToggle.map(item =>
+        performMutation('update', 'catalog', item.id, {
+          is_active: newActive,
+          statut: newActive ? 'actif' : 'inactif',
+        })
+      )
+    );
 
     itemsToToggle.forEach(item => {
       item.is_active = newActive;
       item.statut = newActive ? 'actif' : 'inactif';
     });
 
-    const articleLabel = itemsToToggle[0].article;
-    dbEngine.logAction(
-      'MODIFICATION_CATALOGUE', 
-      `Produit "${articleLabel}" ${newActive ? 'ACTIVÉ' : 'DÉSACTIVÉ'} sur le catalogue`
-    );
-
-    persist();
+    dbEngine.logAction('MODIFICATION_CATALOGUE', `Produit "${articleLabel}" ${newActive ? 'ACTIVÉ' : 'DÉSACTIVÉ'} sur le catalogue`);
     notifyListeners();
-
-    itemsToToggle.forEach(item => {
-      performMutation('update', 'catalog', item.id, {
-        is_active: item.is_active,
-        statut: item.statut
-      });
-    });
-
     return newActive;
   },
 
-  deleteCatalogItem: (id) => {
+  deleteCatalogItem: async (id) => {
     const idx = memoryDb.catalog.findIndex(i => i.id === id);
-    if (idx !== -1) {
-      const item = memoryDb.catalog[idx];
-      memoryDb.catalog.splice(idx, 1);
-      dbEngine.logAction('SUPPRESSION_CATALOGUE', `Article supprimé du catalogue: ${item.article} (${item.service})`);
-      persist();
-      notifyListeners();
+    if (idx === -1) return;
+    const item = memoryDb.catalog[idx];
 
-      performMutation('delete', 'catalog', id, null);
-    }
+    await performMutation('delete', 'catalog', id, null);
+
+    memoryDb.catalog.splice(idx, 1);
+    dbEngine.logAction('SUPPRESSION_CATALOGUE', `Article supprimé du catalogue: ${item.article} (${item.service})`);
+    notifyListeners();
   },
 
-  deleteCatalogItemsBatch: (ids) => {
+  deleteCatalogItemsBatch: async (ids) => {
     if (!Array.isArray(ids) || ids.length === 0) return;
     const itemsToDelete = memoryDb.catalog.filter(i => ids.includes(i.id));
+
+    await Promise.all(ids.map(id => performMutation('delete', 'catalog', id, null)));
+
     memoryDb.catalog = memoryDb.catalog.filter(i => !ids.includes(i.id));
     const namesList = itemsToDelete.map(item => `${item.article} (${item.service})`).join(', ');
     dbEngine.logAction('SUPPRESSION_CATALOGUE_BATCH', `${itemsToDelete.length} articles supprimés du catalogue: ${namesList}`);
-    persist();
     notifyListeners();
-
-    ids.forEach(id => {
-      performMutation('delete', 'catalog', id, null);
-    });
   },
 
-  createOrder: (orderData) => {
+  // ── Orders ─────────────────────────────────────────────────────────────
+
+  createOrder: async (orderData) => {
     const customer = memoryDb.customers.find(c => c.id === orderData.customer_id);
-    const originalCustomerState = customer ? structuredClone(customer) : null;
-    
+
+    // Build subscription if requested
     let subscribedPlan = null;
+    let newSubscription = null;
     if (orderData.subscribe_plan_id && customer) {
       subscribedPlan = memoryDb.catalog.find(c => c.id === orderData.subscribe_plan_id && c.service === 'abonnement');
       if (subscribedPlan) {
@@ -537,57 +540,51 @@ export const dbEngine = {
         if (subscribedPlan.article.includes('Premium') || subscribedPlan.id === 'sub2') clothesCount = 50;
         else if (subscribedPlan.article.includes('Prestige') || subscribedPlan.id === 'sub3') clothesCount = 100;
         else if (subscribedPlan.article.includes('VIP') || subscribedPlan.id === 'sub4') clothesCount = 200;
-
         const now = new Date();
         const expires = new Date();
         expires.setMonth(now.getMonth() + 1);
-
-        customer.active_subscription = {
+        newSubscription = {
           catalog_item_id: subscribedPlan.id,
           name: subscribedPlan.article,
           total_clothes: clothesCount,
           remaining_clothes: clothesCount,
           subscribed_at: now.toISOString(),
-          expires_at: expires.toISOString()
+          expires_at: expires.toISOString(),
         };
-
-        dbEngine.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subscribedPlan.article} (${clothesCount} vêtements, ${subscribedPlan.prix} FCFA) lors de la création de commande`);
       }
     }
 
-    const isSubscriptionOrder = (!!orderData.pay_with_subscription || !!orderData.subscribe_plan_id) && customer && !!customer.active_subscription;
-    
+    // Work on a copy of the customer for calculations
+    const workingCustomer = customer ? { ...customer } : null;
+    if (newSubscription && workingCustomer) workingCustomer.active_subscription = newSubscription;
+
+    const isSubscriptionOrder = (!!orderData.pay_with_subscription || !!orderData.subscribe_plan_id)
+      && workingCustomer && !!workingCustomer.active_subscription;
+
+    // Price calculation
     let totalPrice = 0;
     let totalClothes = 0;
-
     if (orderData.items && orderData.items.length > 0) {
-      orderData.items.forEach(item => {
-        totalClothes += Number(item.quantite);
-      });
+      orderData.items.forEach(item => { totalClothes += Number(item.quantite); });
     } else {
       totalClothes = 1;
     }
 
     if (isSubscriptionOrder) {
-      const remaining = customer.active_subscription.remaining_clothes;
-      if (remaining < totalClothes) {
-        throw new Error(`Solde d'abonnement insuffisant. Requis: ${totalClothes}, Disponible: ${remaining}`);
-      }
-      customer.active_subscription.remaining_clothes -= totalClothes;
+      const remaining = workingCustomer.active_subscription.remaining_clothes;
+      if (remaining < totalClothes) throw new Error(`Solde d'abonnement insuffisant. Requis: ${totalClothes}, Disponible: ${remaining}`);
+      workingCustomer.active_subscription.remaining_clothes -= totalClothes;
       totalPrice = subscribedPlan ? subscribedPlan.prix : 0;
     } else {
       if (orderData.items && orderData.items.length > 0) {
         orderData.items.forEach(item => {
-          const catalogItem = memoryDb.catalog.find(c => c.article === item.article && c.service === item.service);
-          const itemPrice = catalogItem ? catalogItem.prix : 1500;
-          totalPrice += itemPrice * item.quantite;
+          const cat = memoryDb.catalog.find(c => c.article === item.article && c.service === item.service);
+          totalPrice += (cat ? cat.prix : 1500) * item.quantite;
         });
       } else {
-        const catalogItem = memoryDb.catalog.find(item => item.article === orderData.type_article && item.service === orderData.type_service);
-        const basePrice = catalogItem ? catalogItem.prix : 1500;
-        totalPrice = basePrice;
+        const cat = memoryDb.catalog.find(i => i.article === orderData.type_article && i.service === orderData.type_service);
+        totalPrice = cat ? cat.prix : 1500;
       }
-
       if (orderData.niveau_urgence === 'Express') {
         const expressMarkupItem = memoryDb.catalog.find(c => c.id === 'setting_express_markup');
         const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
@@ -606,31 +603,25 @@ export const dbEngine = {
     const advancePaid = (isSubscriptionOrder && !subscribedPlan) ? 0 : Number(orderData.avance_payee || 0);
     const unpaidBalance = totalPrice - advancePaid;
 
-    if (customer && unpaidBalance > 0) {
-      customer.solde_dette = Math.max(0, Number(customer.solde_dette) + unpaidBalance);
-    }
+    let newDebt = customer ? Number(customer.solde_dette) : 0;
+    let newPoints = customer ? Number(customer.points_fidelite || 0) : 0;
+    if (workingCustomer && unpaidBalance > 0) newDebt = Math.max(0, newDebt + unpaidBalance);
+    if (workingCustomer && advancePaid > 0) newPoints = newPoints + Math.floor(advancePaid / 1000);
 
-    if (customer && advancePaid > 0) {
-      const newPoints = Math.floor(advancePaid / 1000) * 1;
-      customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
-    }
-
-    const codeMarquage = 'KLIN-' + Math.floor(100000 + Math.random() * 900000).toString();
-    
     const expressHoursItem = memoryDb.catalog.find(c => c.id === 'setting_express_hours');
     const expressHours = expressHoursItem ? Number(expressHoursItem.prix) : 6;
     const normalHoursItem = memoryDb.catalog.find(c => c.id === 'setting_normal_hours');
     const normalHours = normalHoursItem ? Number(normalHoursItem.prix) : 48;
     const hoursToAdd = orderData.niveau_urgence === 'Express' ? expressHours : normalHours;
-    
-    const dueDate = new Date(Date.now() + 3600000 * hoursToAdd).toISOString();
-    const nowStr = new Date().toISOString();
 
+    const codeMarquage = 'KLIN-' + Math.floor(100000 + Math.random() * 900000).toString();
+    const nowStr = new Date().toISOString();
+    const dueDate = new Date(Date.now() + 3600000 * hoursToAdd).toISOString();
     const currentUser = dbEngine.getCurrentUser();
 
     let targetStoreId = orderData.store_id || (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null);
     if (!targetStoreId || targetStoreId === 'all') {
-      throw new Error("IMPOSSIBLE DE CRÉER LA COMMANDE : Aucun point de laverie (boutique) actif n'est sélectionné. Veuillez spécifier un point de laverie.");
+      throw new Error("IMPOSSIBLE DE CRÉER LA COMMANDE : Aucun point de laverie actif n'est sélectionné. Veuillez spécifier un point de laverie.");
     }
 
     const newOrder = {
@@ -654,75 +645,67 @@ export const dbEngine = {
       solde_paid_at: unpaidBalance <= 0 ? nowStr : null,
       items: orderData.items || [],
       created_by_id: currentUser ? currentUser.id : null,
-      created_by_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : null
+      created_by_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : null,
     };
 
     if (isSubscriptionOrder) {
       newOrder.is_subscription_order = true;
       newOrder.subscription_details = {
-        name: customer.active_subscription.name,
-        previous_balance: customer.active_subscription.remaining_clothes + totalClothes,
-        new_balance: customer.active_subscription.remaining_clothes,
-        clothes_deducted: totalClothes
+        name: workingCustomer.active_subscription.name,
+        previous_balance: workingCustomer.active_subscription.remaining_clothes + totalClothes,
+        new_balance: workingCustomer.active_subscription.remaining_clothes,
+        clothes_deducted: totalClothes,
+        ...(subscribedPlan ? { immediate_subscription: { id: subscribedPlan.id, name: subscribedPlan.article, prix: subscribedPlan.prix } } : {}),
       };
-      if (subscribedPlan) {
-        newOrder.subscription_details.immediate_subscription = {
-          id: subscribedPlan.id,
-          name: subscribedPlan.article,
-          prix: subscribedPlan.prix
-        };
-      }
     }
-
     newOrder.subscription_details = {
       ...(newOrder.subscription_details || {}),
       remise_pourcentage: discountPercent,
       remise_montant: discountAmount,
-      prix_base_avant_remise: basePriceBeforeRemise
+      prix_base_avant_remise: basePriceBeforeRemise,
     };
 
-    memoryDb.orders.push(newOrder);
+    // ── Write to Supabase — order: new subscription first, then order, then customer update
+    if (customer && newSubscription) {
+      await performMutation('update', 'customers', customer.id, { active_subscription: newSubscription });
+    }
+    await performMutation('insert', 'orders', newOrder.id, newOrder);
+    if (customer) {
+      const custData = { solde_dette: newDebt, points_fidelite: newPoints };
+      if (isSubscriptionOrder && workingCustomer?.active_subscription) {
+        custData.active_subscription = workingCustomer.active_subscription;
+      }
+      await performMutation('update', 'customers', customer.id, custData);
+    }
+
+    // ── Update memory only after Supabase confirms ─────────────────────
+    if (customer) {
+      customer.solde_dette = newDebt;
+      customer.points_fidelite = newPoints;
+      if (newSubscription) customer.active_subscription = workingCustomer.active_subscription;
+      else if (isSubscriptionOrder && workingCustomer?.active_subscription) {
+        customer.active_subscription = workingCustomer.active_subscription;
+      }
+    }
+    memoryDb.orders.push(hydrateOrder(newOrder));
 
     if (isSubscriptionOrder) {
       if (subscribedPlan) {
-        dbEngine.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} créée avec souscription immédiate à ${subscribedPlan.article} (${totalClothes} vêtements débités, nouveau solde: ${customer.active_subscription.remaining_clothes} vêtements)`);
+        dbEngine.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} créée avec souscription immédiate à ${subscribedPlan.article} (${totalClothes} vêtements débités, nouveau solde: ${workingCustomer.active_subscription.remaining_clothes} vêtements)`);
       } else {
-        dbEngine.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} (${totalClothes} vêtements) débitée de l'abonnement ${customer.active_subscription.name} de ${customer.prenom} ${customer.nom} (Nouveau solde: ${customer.active_subscription.remaining_clothes} vêtements)`);
+        dbEngine.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} (${totalClothes} vêtements) débitée de l'abonnement ${workingCustomer.active_subscription.name} de ${customer ? customer.prenom + ' ' + customer.nom : 'Client'} (Nouveau solde: ${workingCustomer.active_subscription.remaining_clothes} vêtements)`);
       }
     } else {
       dbEngine.logAction('CREATION_COMMANDE', `Commande ${codeMarquage} créée pour ${customer ? customer.prenom + ' ' + customer.nom : 'Client inconnu'} (${totalPrice} FCFA)`);
     }
-
-    persist();
     notifyListeners();
-
-    performMutation('insert', 'orders', newOrder.id, newOrder, () => {
-      memoryDb.orders = memoryDb.orders.filter(o => o.id !== newOrder.id);
-      if (customer && originalCustomerState) {
-        Object.assign(customer, originalCustomerState);
-      }
-      persist();
-      notifyListeners();
-    });
-
-    if (customer) {
-      const updateData = {
-        solde_dette: customer.solde_dette,
-        points_fidelite: customer.points_fidelite,
-        active_subscription: customer.active_subscription
-      };
-      performMutation('update', 'customers', customer.id, updateData);
-    }
     return newOrder;
   },
 
-  updateOrderStatus: (orderId, newStatus) => {
+  updateOrderStatus: async (orderId, newStatus) => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
-
-    const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
-    const originalCustomerState = customer ? { ...customer } : null;
 
     let normalizedStatus = newStatus;
     if (newStatus === 'livre') normalizedStatus = 'restitue';
@@ -733,188 +716,133 @@ export const dbEngine = {
     else if (!normalizedStatus) normalizedStatus = 'restitue';
 
     const oldStatus = order.statut;
-    order.statut = normalizedStatus;
-    const newStatusVal = normalizedStatus;
-
     let typeLivraison = order.subscription_details?.type_livraison;
-    if (newStatus === 'a_recuperer') {
-      typeLivraison = 'recuperation';
-    } else if (newStatus === 'a_livrer' || newStatus === 'en_cours_livraison') {
-      typeLivraison = 'livraison';
-    } else if (newStatus === 'restitue') {
-      if (oldStatus === 'a_recuperer') {
-        typeLivraison = 'recuperation';
-      } else if (oldStatus === 'en_cours_livraison' || oldStatus === 'a_livrer') {
-        typeLivraison = 'livraison';
-      }
+    if (newStatus === 'a_recuperer') typeLivraison = 'recuperation';
+    else if (newStatus === 'a_livrer' || newStatus === 'en_cours_livraison') typeLivraison = 'livraison';
+    else if (newStatus === 'restitue') {
+      if (oldStatus === 'a_recuperer') typeLivraison = 'recuperation';
+      else if (oldStatus === 'en_cours_livraison' || oldStatus === 'a_livrer') typeLivraison = 'livraison';
     }
 
-    if (typeLivraison) {
-      order.subscription_details = {
-        ...(order.subscription_details || {}),
-        type_livraison: typeLivraison
-      };
-    }
+    const newSubDetails = typeLivraison
+      ? { ...(order.subscription_details || {}), type_livraison: typeLivraison }
+      : order.subscription_details;
 
-    if (newStatus === 'restitue' || newStatus === 'a_livrer' || newStatus === 'a_recuperer') {
-      order.solde_paid_at = new Date().toISOString();
+    let newSoldePaidAt = order.solde_paid_at;
+    let customerUpdateData = null;
+    if (normalizedStatus === 'restitue' || normalizedStatus === 'a_livrer' || normalizedStatus === 'a_recuperer') {
+      newSoldePaidAt = new Date().toISOString();
       if (customer) {
         const remainingToPay = order.prix_total - order.avance_payee;
         if (remainingToPay > 0) {
-          customer.solde_dette = Math.max(0, Number(customer.solde_dette) - remainingToPay);
-          const newPoints = Math.floor(remainingToPay / 1000) * 1;
-          customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
-          dbEngine.logAction('PAIEMENT_FINAL', `Règlement du solde restant (${remainingToPay} FCFA) par le client ${customer.prenom} ${customer.nom} lors de la restitution`);
-          
-          performMutation('update', 'customers', customer.id, {
-            solde_dette: customer.solde_dette,
-            points_fidelite: customer.points_fidelite
-          });
+          customerUpdateData = {
+            solde_dette: Math.max(0, Number(customer.solde_dette) - remainingToPay),
+            points_fidelite: (customer.points_fidelite || 0) + Math.floor(remainingToPay / 1000),
+          };
         }
       }
     }
 
+    const orderUpdateData = { statut: normalizedStatus, solde_paid_at: newSoldePaidAt, subscription_details: newSubDetails };
+
+    await performMutation('update', 'orders', orderId, orderUpdateData);
+    if (customerUpdateData) {
+      await performMutation('update', 'customers', customer.id, customerUpdateData);
+      dbEngine.logAction('PAIEMENT_FINAL', `Règlement du solde restant par le client ${customer.prenom} ${customer.nom} lors de la restitution`);
+    }
+
+    Object.assign(order, orderUpdateData);
+    if (customerUpdateData && customer) Object.assign(customer, customerUpdateData);
+
     dbEngine.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage} passée de '${oldStatus}' à '${newStatus}'`);
-    persist();
     notifyListeners();
-
-    const updateData = {
-      statut: order.statut,
-      solde_paid_at: order.solde_paid_at,
-      subscription_details: order.subscription_details
-    };
-
-    performMutation('update', 'orders', orderId, updateData, () => {
-      Object.assign(order, originalOrderState);
-      if (customer && originalCustomerState) {
-        Object.assign(customer, originalCustomerState);
-      }
-      persist();
-      notifyListeners();
-    });
     return order;
   },
 
-  deliverOrderWithPayment: (orderId, amountPaid, paymentMethod, finalStatus = 'restitue', referencePaiement = null) => {
+  deliverOrderWithPayment: async (orderId, amountPaid, paymentMethod, finalStatus = 'restitue', referencePaiement = null) => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
-
-    const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
-    const originalCustomerState = customer ? { ...customer } : null;
 
     const oldStatus = order.statut;
-    order.statut = finalStatus;
-    order.mode_reglement = paymentMethod;
-    if (referencePaiement) {
-      order.reference_momo = referencePaiement;
-      order.reference_paiement = referencePaiement;
-    }
-    
-    order.avance_payee = Number(order.avance_payee) + Number(amountPaid);
-    order.solde_paid_at = new Date().toISOString();
+    const newAvance = Number(order.avance_payee) + Number(amountPaid);
+    const newSoldePaidAt = new Date().toISOString();
 
     let typeLivraison = order.subscription_details?.type_livraison;
     if (finalStatus === 'restitue') {
-      if (oldStatus === 'a_recuperer') {
-        typeLivraison = 'recuperation';
-      } else if (oldStatus === 'en_cours_livraison' || oldStatus === 'a_livrer') {
-        typeLivraison = 'livraison';
-      }
+      if (oldStatus === 'a_recuperer') typeLivraison = 'recuperation';
+      else if (oldStatus === 'en_cours_livraison' || oldStatus === 'a_livrer') typeLivraison = 'livraison';
     }
+    const newSubDetails = typeLivraison
+      ? { ...(order.subscription_details || {}), type_livraison: typeLivraison }
+      : order.subscription_details;
 
-    if (typeLivraison) {
-      order.subscription_details = {
-        ...(order.subscription_details || {}),
-        type_livraison: typeLivraison
-      };
-    }
-
-    if (customer && amountPaid > 0) {
-      customer.solde_dette = Math.max(0, Number(customer.solde_dette) - Number(amountPaid));
-      const newPoints = Math.floor(amountPaid / 1000) * 1;
-      customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
-      
-      performMutation('update', 'customers', customer.id, {
-        solde_dette: customer.solde_dette,
-        points_fidelite: customer.points_fidelite
-      });
-    }
-
-    dbEngine.logAction(
-      'PAIEMENT_FINAL', 
-      `Livraison commande ${order.identifiant_unique_marquage}. Paiement reçu : ${amountPaid} FCFA (Méthode: ${paymentMethod})` + (referencePaiement ? ` (Réf: ${referencePaiement})` : '')
-    );
-    dbEngine.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage} passée de '${oldStatus}' à '${finalStatus}'`);
-    persist();
-    notifyListeners();
-
-    const updateData = {
-      statut: order.statut,
-      mode_reglement: order.mode_reglement,
-      avance_payee: order.avance_payee,
-      solde_paid_at: order.solde_paid_at,
-      subscription_details: order.subscription_details,
-      reference_momo: order.reference_momo,
-      reference_paiement: order.reference_paiement
+    const orderUpdate = {
+      statut: finalStatus,
+      mode_reglement: paymentMethod,
+      avance_payee: newAvance,
+      solde_paid_at: newSoldePaidAt,
+      subscription_details: newSubDetails,
+      reference_momo: referencePaiement,
+      reference_paiement: referencePaiement,
     };
 
-    performMutation('update', 'orders', orderId, updateData, () => {
-      Object.assign(order, originalOrderState);
-      if (customer && originalCustomerState) {
-        Object.assign(customer, originalCustomerState);
-      }
-      persist();
-      notifyListeners();
-    });
+    await performMutation('update', 'orders', orderId, orderUpdate);
+
+    let customerUpdate = null;
+    if (customer && Number(amountPaid) > 0) {
+      customerUpdate = {
+        solde_dette: Math.max(0, Number(customer.solde_dette) - Number(amountPaid)),
+        points_fidelite: (customer.points_fidelite || 0) + Math.floor(amountPaid / 1000),
+      };
+      await performMutation('update', 'customers', customer.id, customerUpdate);
+    }
+
+    Object.assign(order, orderUpdate);
+    if (customerUpdate && customer) Object.assign(customer, customerUpdate);
+
+    dbEngine.logAction('PAIEMENT_FINAL', `Livraison commande ${order.identifiant_unique_marquage}. Paiement reçu : ${amountPaid} FCFA (Méthode: ${paymentMethod})${referencePaiement ? ` (Réf: ${referencePaiement})` : ''}`);
+    dbEngine.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage} passée de '${oldStatus}' à '${finalStatus}'`);
+    notifyListeners();
     return order;
   },
 
-  cancelOrder: (orderId, reason = '') => {
+  cancelOrder: async (orderId, reason = '') => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
-
-    const originalOrderState = { ...order };
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
-    const originalCustomerState = customer ? { ...customer } : null;
-
-    const oldStatus = order.statut;
-    order.statut = 'annule';
-    order.motif_annulation = reason;
 
     const unpaid = order.prix_total - order.avance_payee;
+    let customerUpdate = null;
     if (unpaid > 0 && customer) {
-      customer.solde_dette = Math.max(0, Number(customer.solde_dette) - unpaid);
-      performMutation('update', 'customers', customer.id, { solde_dette: customer.solde_dette });
+      customerUpdate = { solde_dette: Math.max(0, Number(customer.solde_dette) - unpaid) };
     }
 
-    dbEngine.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage} annulée. Motif : ${reason}`);
-    persist();
-    notifyListeners();
+    await performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason });
+    if (customerUpdate) await performMutation('update', 'customers', customer.id, customerUpdate);
 
-    performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason }, () => {
-      Object.assign(order, originalOrderState);
-      if (customer && originalCustomerState) {
-        Object.assign(customer, originalCustomerState);
-      }
-      persist();
-      notifyListeners();
-    });
+    order.statut = 'annule';
+    order.motif_annulation = reason;
+    if (customerUpdate && customer) customer.solde_dette = customerUpdate.solde_dette;
+
+    dbEngine.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage} annulée. Motif : ${reason}`);
+    notifyListeners();
     return order;
   },
 
-  deleteOrder: (id) => {
+  deleteOrder: async (id) => {
     const idx = memoryDb.orders.findIndex(o => o.id === id);
-    if (idx !== -1) {
-      memoryDb.orders.splice(idx, 1);
-      persist();
-      notifyListeners();
-      performMutation('delete', 'orders', id, null);
-    }
+    if (idx === -1) return;
+
+    await performMutation('delete', 'orders', id, null);
+
+    memoryDb.orders.splice(idx, 1);
+    notifyListeners();
   },
 
-  addStaff: (member) => {
-    const defaultPin = member.code_pin || '000000';
+  // ── Staff ──────────────────────────────────────────────────────────────
+
+  addStaff: async (member) => {
     const newMember = {
       id: member.id || ('u_' + Math.random().toString(36).substr(2, 9)),
       nom: member.nom,
@@ -922,7 +850,7 @@ export const dbEngine = {
       role: member.role || 'agent_accueil',
       email: member.email ? member.email.trim().toLowerCase() : `${member.prenom.toLowerCase()}.${member.nom.toLowerCase()}@klinup.com`,
       telephone: member.telephone || '',
-      code_pin: defaultPin,
+      code_pin: member.code_pin || '000000',
       statut: member.statut || 'actif',
       store_id: member.store_id || (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central'),
       permissions: member.permissions || {
@@ -931,268 +859,137 @@ export const dbEngine = {
         can_manage_crm: true,
         can_edit_catalog: member.role === 'super_admin' || member.role === 'manager',
         can_view_logs: member.role === 'super_admin',
-        can_manage_staff: member.role === 'super_admin'
+        can_manage_staff: member.role === 'super_admin',
       },
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
+
+    await performMutation('insert', 'staff', newMember.id, newMember);
+
     memoryDb.staff.push(newMember);
     dbEngine.logAction('CREATION_PERSONNEL', `Personnel ${newMember.prenom} ${newMember.nom} ajouté (Rôle: ${newMember.role})`);
-    persist();
     notifyListeners();
-
-    performMutation('insert', 'staff', newMember.id, newMember);
     return newMember;
   },
 
   updateStaff: async (id, updatedFields) => {
     const member = memoryDb.staff.find(s => s.id === id);
-    if (member) {
-      const original = { ...member };
-      if (updatedFields.nom !== undefined) member.nom = updatedFields.nom;
-      if (updatedFields.prenom !== undefined) member.prenom = updatedFields.prenom;
-      if (updatedFields.role !== undefined) member.role = updatedFields.role;
-      if (updatedFields.email !== undefined) member.email = updatedFields.email;
-      if (updatedFields.telephone !== undefined) member.telephone = updatedFields.telephone;
-      if (updatedFields.statut !== undefined) member.statut = updatedFields.statut;
-      if (updatedFields.store_id !== undefined) member.store_id = updatedFields.store_id;
-      if (updatedFields.permissions !== undefined) member.permissions = { ...member.permissions, ...updatedFields.permissions };
-      
-      dbEngine.logAction('MODIFICATION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} mis à jour (${member.statut})`);
-      persist();
-      notifyListeners();
+    if (!member) return null;
 
-      const updateData = {
-        nom: member.nom,
-        prenom: member.prenom,
-        role: member.role,
-        email: member.email,
-        telephone: member.telephone,
-        statut: member.statut,
-        permissions: member.permissions
-      };
-      if (member.store_id) {
-        updateData.store_id = member.store_id;
-      }
+    const updateData = {};
+    if (updatedFields.nom !== undefined) updateData.nom = updatedFields.nom;
+    if (updatedFields.prenom !== undefined) updateData.prenom = updatedFields.prenom;
+    if (updatedFields.role !== undefined) updateData.role = updatedFields.role;
+    if (updatedFields.email !== undefined) updateData.email = updatedFields.email;
+    if (updatedFields.telephone !== undefined) updateData.telephone = updatedFields.telephone;
+    if (updatedFields.statut !== undefined) updateData.statut = updatedFields.statut;
+    if (updatedFields.store_id !== undefined) updateData.store_id = updatedFields.store_id;
+    if (updatedFields.permissions !== undefined) updateData.permissions = { ...member.permissions, ...updatedFields.permissions };
 
-      await performMutation('update', 'staff', id, updateData, () => {
-        console.warn("[DB] Échec de la mise à jour Supabase, annulation locale...");
-        Object.assign(member, original);
-        persist();
-        notifyListeners();
-      });
-      return member;
-    }
+    await performMutation('update', 'staff', id, updateData);
+
+    Object.assign(member, updateData);
+    dbEngine.logAction('MODIFICATION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} mis à jour (${member.statut})`);
+    notifyListeners();
+    return member;
   },
 
-  deleteStaff: (id) => {
+  deleteStaff: async (id) => {
     const index = memoryDb.staff.findIndex(s => s.id === id);
-    if (index !== -1) {
-      const member = memoryDb.staff[index];
-      memoryDb.staff.splice(index, 1);
-      dbEngine.logAction('SUPPRESSION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} supprimé`);
-      persist();
-      notifyListeners();
+    if (index === -1) return false;
+    const member = memoryDb.staff[index];
 
-      performMutation('delete', 'staff', id, null, () => {
-        memoryDb.staff.push(member);
-        persist();
-        notifyListeners();
-      });
-      return true;
-    }
-    return false;
-  },
+    await performMutation('delete', 'staff', id, null);
 
-  subscribeCustomer: (customerId, catalogItemId) => {
-    const customer = memoryDb.customers.find(c => c.id === customerId);
-    const subPlan = memoryDb.catalog.find(c => c.id === catalogItemId && c.service === 'abonnement');
-    if (customer && subPlan) {
-      const originalSubState = customer.active_subscription ? { ...customer.active_subscription } : null;
-      let clothesCount = 25;
-      if (subPlan.article.includes('Premium') || subPlan.id === 'sub2') clothesCount = 50;
-      else if (subPlan.article.includes('Prestige') || subPlan.id === 'sub3') clothesCount = 100;
-      else if (subPlan.article.includes('VIP') || subPlan.id === 'sub4') clothesCount = 200;
-
-      const now = new Date();
-      const expires = new Date();
-      expires.setMonth(now.getMonth() + 1);
-
-      customer.active_subscription = {
-        catalog_item_id: subPlan.id,
-        name: subPlan.article,
-        total_clothes: clothesCount,
-        remaining_clothes: clothesCount,
-        subscribed_at: now.toISOString(),
-        expires_at: expires.toISOString()
-      };
-
-      dbEngine.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subPlan.article} (${clothesCount} vêtements, ${subPlan.prix} FCFA)`);
-      persist();
-      notifyListeners();
-
-      performMutation('update', 'customers', customerId, { active_subscription: customer.active_subscription }, () => {
-        customer.active_subscription = originalSubState;
-        persist();
-        notifyListeners();
-      });
-      return customer;
-    }
-  },
-
-  unsubscribeCustomer: (customerId) => {
-    const customer = memoryDb.customers.find(c => c.id === customerId);
-    if (customer && customer.active_subscription) {
-      const originalSubState = { ...customer.active_subscription };
-      const oldName = customer.active_subscription.name;
-      delete customer.active_subscription;
-      dbEngine.logAction('DESABONNEMENT', `Client ${customer.prenom} ${customer.nom} s'est désabonné de ${oldName}`);
-      persist();
-      notifyListeners();
-
-      performMutation('update', 'customers', customerId, { active_subscription: null }, () => {
-        customer.active_subscription = originalSubState;
-        persist();
-        notifyListeners();
-      });
-      return customer;
-    }
-  },
-
-  canUserViewCA: (user) => {
-    if (!user) return false;
-    return user.role === 'super_admin' || user.role === 'manager';
-  },
-
-  canUserViewDashboard: (user) => {
-    if (!user) return false;
-    return user.role === 'super_admin' || user.role === 'manager';
-  },
-
-  canUserManageOrders: (user) => {
-    if (!user) return false;
+    memoryDb.staff.splice(index, 1);
+    dbEngine.logAction('SUPPRESSION_PERSONNEL', `Personnel ${member.prenom} ${member.nom} supprimé`);
+    notifyListeners();
     return true;
   },
 
-  canUserManageCRM: (user) => {
-    if (!user) return false;
-    return true;
-  },
+  // ── PIN reset ──────────────────────────────────────────────────────────
 
-  canUserEditCatalog: (user) => {
-    if (!user) return false;
-    return user.role === 'super_admin' || user.role === 'manager';
-  },
-
-  canUserManageStaff: (user) => {
-    if (!user) return false;
-    return user.role === 'super_admin';
-  },
-
-  getPinResetRequests: () => memoryDb.pin_reset_requests ? [...memoryDb.pin_reset_requests] : [],
-
-  createPinResetRequest: (email) => {
-    if (!memoryDb.pin_reset_requests) {
-      memoryDb.pin_reset_requests = [];
-    }
+  createPinResetRequest: async (email) => {
+    if (!memoryDb.pin_reset_requests) memoryDb.pin_reset_requests = [];
     const staffMember = memoryDb.staff.find(s => s.email && email && s.email.toLowerCase() === email.toLowerCase());
     const newRequest = {
       id: 'req_' + Math.random().toString(36).substr(2, 9),
-      email: email,
+      email,
       staff_name: staffMember ? `${staffMember.prenom} ${staffMember.nom}` : 'Inconnu',
       status: 'pending',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
+
+    await performMutation('insert', 'pin_reset_requests', newRequest.id, newRequest);
+
     memoryDb.pin_reset_requests.unshift(newRequest);
     dbEngine.logAction('DEMANDE_RESET_PIN', `Demande de réinitialisation de PIN reçue pour l'email: ${email}`);
-    persist();
     notifyListeners();
-
-    performMutation('insert', 'pin_reset_requests', newRequest.id, newRequest, () => {
-      memoryDb.pin_reset_requests = memoryDb.pin_reset_requests.filter(r => r.id !== newRequest.id);
-      persist();
-      notifyListeners();
-    });
     return newRequest;
   },
 
-  approvePinResetRequest: (requestId) => {
+  approvePinResetRequest: async (requestId) => {
     if (!memoryDb.pin_reset_requests) return null;
     const req = memoryDb.pin_reset_requests.find(r => r.id === requestId);
-    if (req) {
-      const staffMember = memoryDb.staff.find(s => s.email && req?.email && s.email.toLowerCase() === req.email.toLowerCase());
-      if (staffMember) {
-        const newPin = Math.floor(100000 + Math.random() * 900000).toString();
-        staffMember.code_pin = newPin;
-        req.status = 'approved';
-        req.resolved_pin = newPin;
-        dbEngine.logAction('MODIFICATION_PERSONNEL', `Demande de reset PIN approuvée pour ${staffMember.prenom} ${staffMember.nom}. Nouveau PIN : ${newPin} (Envoyé par email)`);
-        persist();
-        notifyListeners();
+    if (!req) return null;
 
-        performMutation('update', 'staff', staffMember.id, { code_pin: newPin });
-        performMutation('update', 'pin_reset_requests', requestId, { status: 'approved', resolved_pin: newPin });
-        return { req, newPin, staffMember };
-      } else {
-        req.status = 'rejected';
-        dbEngine.logAction('MODIFICATION_PERSONNEL', `Demande de reset PIN rejetée : aucun personnel trouvé pour l'email ${req.email}`);
-        persist();
-        notifyListeners();
-
-        performMutation('update', 'pin_reset_requests', requestId, { status: 'rejected' });
-        return null;
-      }
+    const staffMember = memoryDb.staff.find(s => s.email && req?.email && s.email.toLowerCase() === req.email.toLowerCase());
+    if (staffMember) {
+      const newPin = Math.floor(100000 + Math.random() * 900000).toString();
+      await performMutation('update', 'staff', staffMember.id, { code_pin: newPin });
+      await performMutation('update', 'pin_reset_requests', requestId, { status: 'approved', resolved_pin: newPin });
+      staffMember.code_pin = newPin;
+      req.status = 'approved';
+      req.resolved_pin = newPin;
+      dbEngine.logAction('MODIFICATION_PERSONNEL', `Demande de reset PIN approuvée pour ${staffMember.prenom} ${staffMember.nom}. Nouveau PIN : ${newPin} (Envoyé par email)`);
+      notifyListeners();
+      return { req, newPin, staffMember };
+    } else {
+      await performMutation('update', 'pin_reset_requests', requestId, { status: 'rejected' });
+      req.status = 'rejected';
+      dbEngine.logAction('MODIFICATION_PERSONNEL', `Demande de reset PIN rejetée : aucun personnel trouvé pour l'email ${req.email}`);
+      notifyListeners();
+      return null;
     }
-    return null;
   },
 
-  rejectPinResetRequest: (requestId) => {
+  rejectPinResetRequest: async (requestId) => {
     if (!memoryDb.pin_reset_requests) return;
     const req = memoryDb.pin_reset_requests.find(r => r.id === requestId);
-    if (req) {
-      req.status = 'rejected';
-      dbEngine.logAction('MODIFICATION_PERSONNEL', `Demande de reset PIN rejetée pour l'email ${req.email}`);
-      persist();
-      notifyListeners();
-
-      performMutation('update', 'pin_reset_requests', requestId, { status: 'rejected' });
-    }
+    if (!req) return;
+    await performMutation('update', 'pin_reset_requests', requestId, { status: 'rejected' });
+    req.status = 'rejected';
+    dbEngine.logAction('MODIFICATION_PERSONNEL', `Demande de reset PIN rejetée pour l'email ${req.email}`);
+    notifyListeners();
   },
 
-  resetStaffPin: (userId, newPin) => {
+  resetStaffPin: async (userId, newPin) => {
     const staffMember = memoryDb.staff.find(s => s.id === userId);
-    if (staffMember) {
-      staffMember.code_pin = newPin;
-      dbEngine.logAction('MODIFICATION_PERSONNEL', `Code PIN réinitialisé manuellement par l'admin pour ${staffMember.prenom} ${staffMember.nom}. Nouveau PIN : ${newPin}`);
-      persist();
-      notifyListeners();
-
-      performMutation('update', 'staff', userId, { code_pin: newPin });
-      return staffMember;
-    }
-    return null;
+    if (!staffMember) return null;
+    await performMutation('update', 'staff', userId, { code_pin: newPin });
+    staffMember.code_pin = newPin;
+    dbEngine.logAction('MODIFICATION_PERSONNEL', `Code PIN réinitialisé manuellement par l'admin pour ${staffMember.prenom} ${staffMember.nom}. Nouveau PIN : ${newPin}`);
+    notifyListeners();
+    return staffMember;
   },
 
-  getRoles: () => {
-    return memoryDb.roles || DEFAULT_ROLES;
-  },
+  // ── Roles (memory only — no confirmed Supabase table) ─────────────────
 
   saveRole: (roleData) => {
     if (!memoryDb.roles) memoryDb.roles = [...DEFAULT_ROLES];
     const key = roleData.key || (roleData.label || 'role').toLowerCase().replace(/[^a-z0-9]/g, '_');
     const existingIndex = memoryDb.roles.findIndex(r => r.id === roleData.id || r.key === key);
-    
     const roleObj = {
       id: roleData.id || ('role_' + Math.random().toString(36).substr(2, 9)),
-      key: key,
+      key,
       label: roleData.label || 'Nouveau Rôle',
       shortLabel: roleData.shortLabel || roleData.label || 'Rôle',
       color: roleData.color || '#2563eb',
       description: roleData.description || '',
       isSystem: !!roleData.isSystem,
       permissions: roleData.permissions || {},
-      created_at: roleData.created_at || new Date().toISOString()
+      created_at: roleData.created_at || new Date().toISOString(),
     };
-
     if (existingIndex >= 0) {
       memoryDb.roles[existingIndex] = { ...memoryDb.roles[existingIndex], ...roleObj };
       dbEngine.logAction('MODIFICATION_ROLE', `Rôle ${roleObj.label} mis à jour.`);
@@ -1200,7 +997,6 @@ export const dbEngine = {
       memoryDb.roles.push(roleObj);
       dbEngine.logAction('CREATION_ROLE', `Nouveau rôle ${roleObj.label} créé.`);
     }
-    persist();
     notifyListeners();
     return roleObj;
   },
@@ -1210,41 +1006,33 @@ export const dbEngine = {
     const roleIndex = memoryDb.roles.findIndex(r => r.id === roleId || r.key === roleId);
     if (roleIndex >= 0) {
       const role = memoryDb.roles[roleIndex];
-      if (role.isSystem) {
-        alert("Impossible de supprimer un rôle système par défaut.");
-        return false;
-      }
+      if (role.isSystem) { alert('Impossible de supprimer un rôle système par défaut.'); return false; }
       memoryDb.roles.splice(roleIndex, 1);
       dbEngine.logAction('SUPPRESSION_ROLE', `Rôle ${role.label} supprimé.`);
-      persist();
       notifyListeners();
       return true;
     }
     return false;
   },
 
-  getSettings: () => {
-    return memoryDb.settings || {
-      express_hours: 6,
-      express_markup: 50,
-      normal_hours: 48,
-      receipt_header: "KLIN UP - Laverie & Pressing Premium",
-      receipt_footer: "Merci de votre confiance ! A bientot chez KLIN UP."
-    };
-  },
+  // ── Settings ───────────────────────────────────────────────────────────
 
-  updateSettings: (newSettings) => {
-    memoryDb.settings = { ...memoryDb.settings, ...newSettings };
+  updateSettings: async (newSettings) => {
+    const updated = { ...memoryDb.settings, ...newSettings };
+    try {
+      await performMutation('update', 'app_settings', 'global', updated);
+    } catch (e) {
+      console.warn('[DB] app_settings table may not exist in Supabase:', e.message);
+    }
+    memoryDb.settings = updated;
     dbEngine.logAction('MODIFICATION_PARAMETRES', `Paramètres système mis à jour.`);
-    persist();
     notifyListeners();
-    performMutation('update', 'app_settings', 'global', memoryDb.settings);
     return memoryDb.settings;
   },
 
-  getCashClosures: () => memoryDb.cash_closures ? [...memoryDb.cash_closures] : [],
+  // ── Cash closures ──────────────────────────────────────────────────────
 
-  closeDailyCashRegister: (closureData) => {
+  closeDailyCashRegister: async (closureData) => {
     const currentUser = dbEngine.getCurrentUser();
     const storeId = closureData.store_id || memoryDb.selected_store_id;
     const newClosure = {
@@ -1259,52 +1047,17 @@ export const dbEngine = {
       cash_gap: Number(closureData.actual_cash || 0) - Number(closureData.expected_cash || 0),
       momo_gap: Number(closureData.actual_momo || 0) - Number(closureData.expected_momo || 0),
       notes: closureData.notes || '',
-      closed_at: new Date().toISOString()
+      closed_at: new Date().toISOString(),
     };
+    try {
+      await performMutation('insert', 'cash_closures', newClosure.id, newClosure);
+    } catch (e) {
+      console.warn('[DB] cash_closures table may not exist:', e.message);
+    }
     if (!memoryDb.cash_closures) memoryDb.cash_closures = [];
     memoryDb.cash_closures.unshift(newClosure);
     dbEngine.logAction('CLOTURE_CAISSE', `Clôture de caisse effectuée par ${newClosure.cashier_name} (Écart Espèces: ${newClosure.cash_gap} FCFA)`);
-    persist();
     notifyListeners();
-    performMutation('insert', 'cash_closures', newClosure.id, newClosure);
     return newClosure;
   },
-
-  getDebtPayments: () => memoryDb.debt_payments ? [...memoryDb.debt_payments] : [],
-
-  payCustomerDebt: (customerId, amountPaid, notes = '') => {
-    const customer = memoryDb.customers.find(c => c.id === customerId);
-    if (!customer) throw new Error("Client non trouvé");
-    const amount = Number(amountPaid);
-    if (isNaN(amount) || amount <= 0) throw new Error("Montant de règlement invalide");
-
-    const previousDebt = Number(customer.solde_dette || 0);
-    const newDebt = Math.max(0, previousDebt - amount);
-    customer.solde_dette = newDebt;
-
-    const currentUser = dbEngine.getCurrentUser();
-    const paymentRecord = {
-      id: 'pay_' + Math.random().toString(36).substr(2, 9),
-      customer_id: customerId,
-      customer_name: `${customer.prenom} ${customer.nom}`,
-      amount_paid: amount,
-      previous_debt: previousDebt,
-      remaining_debt: newDebt,
-      user_id: currentUser ? currentUser.id : null,
-      user_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Agent',
-      notes,
-      created_at: new Date().toISOString()
-    };
-
-    if (!memoryDb.debt_payments) memoryDb.debt_payments = [];
-    memoryDb.debt_payments.unshift(paymentRecord);
-
-    dbEngine.logAction('REGLEMENT_DETTE', `Règlement de dette de ${amount} FCFA pour ${customer.prenom} ${customer.nom} (Solde restant: ${newDebt} FCFA)`);
-    persist();
-    notifyListeners();
-
-    performMutation('update', 'customers', customerId, { solde_dette: newDebt });
-    performMutation('insert', 'debt_payments', paymentRecord.id, paymentRecord);
-    return paymentRecord;
-  }
 };
