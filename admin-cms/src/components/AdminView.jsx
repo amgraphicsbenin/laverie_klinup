@@ -191,6 +191,18 @@ export default function AdminView({ activeTab, onManageStaff }) {
     }
   }, [catalog]);
 
+  // Réinitialiser / fermer automatiquement toutes les modales ouvertes lors du changement d'onglet
+  useEffect(() => {
+    setShowEditCatalogModal(false);
+    setShowNewStaffModal(false);
+    setShowNewCustomerModal(false);
+    setShowOrderRegistrationModal(false);
+    setShowDeliveryPaymentModal(false);
+    setShowCancelModal(false);
+    setShowDebtPaymentModal(false);
+    setActiveDetailsCard(null);
+  }, [activeTab]);
+
   const handleSaveSettings = (e) => {
     e.preventDefault();
     const expHours = Number(inputExpressHours);
@@ -419,7 +431,22 @@ export default function AdminView({ activeTab, onManageStaff }) {
     if (e && e.preventDefault) e.preventDefault();
     if (!selectedStaffId) return false;
 
+    const currentMember = (staff || []).find(s => s.id === selectedStaffId);
+    const isDeactivating = (editStaffStatut === 'suspendu' || editStaffStatut === 'inactif') && (currentMember?.statut === 'actif');
+
+    let motif = '';
+    if (isDeactivating) {
+      motif = window.prompt(`Désactivation du compte de "${editStaffPrenom} ${editStaffNom}".\n\nVeuillez indiquer obligatoirement le motif de la désactivation :`);
+      if (!motif || !motif.trim()) {
+        alert("Mise à jour annulée : Le motif de désactivation est obligatoire.");
+        return false;
+      }
+    }
+
     try {
+      if (motif) {
+        db.logAction('SUSPENSION_PERSONNEL', `Désactivation de ${editStaffPrenom} ${editStaffNom} | Motif : ${motif.trim()}`);
+      }
       await db.updateStaff(selectedStaffId, {
         nom: editStaffNom,
         prenom: editStaffPrenom,
@@ -482,11 +509,19 @@ export default function AdminView({ activeTab, onManageStaff }) {
   };
 
   const handleDeleteStaff = async (id) => {
-    if (await confirm("Êtes-vous sûr de vouloir supprimer définitivement cet employé ?")) {
-      db.deleteStaff(id);
-      setSelectedStaffId('');
-      refreshAdminData();
+    const staffMember = (staff || []).find(s => s.id === id);
+    const staffName = staffMember ? `${staffMember.prenom} ${staffMember.nom}` : "cet employé";
+
+    const motif = window.prompt(`Suppression définitive du compte "${staffName}".\n\nVeuillez indiquer obligatoirement le motif de la suppression :`);
+    if (!motif || !motif.trim()) {
+      alert("Suppression annulée : Le motif de suppression est obligatoire.");
+      return;
     }
+
+    db.logAction('SUPPRESSION_PERSONNEL', `Suppression définitive de ${staffName} | Motif : ${motif.trim()}`);
+    db.deleteStaff(id);
+    setSelectedStaffId('');
+    refreshAdminData();
   };
 
   useEffect(() => {
@@ -1101,6 +1136,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
     const groups = {};
 
     catalog.forEach(item => {
+      if (!item || !item.article) return;
       if (item.categorie === 'individuel') {
         const articleKey = item.article.trim().toLowerCase();
         if (!groups[articleKey]) {
@@ -1143,12 +1179,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
     }
 
     return rawGroupedCatalog.filter(item => {
+      if (!item) return false;
       // Search query
       const activeSearch = catalogSearchText;
       if (activeSearch) {
         const q = activeSearch.toLowerCase();
-        const matchName = item.article.toLowerCase().includes(q);
-        const matchDesc = item.description && item.description.toLowerCase().includes(q);
+        const matchName = item.article ? item.article.toLowerCase().includes(q) : false;
+        const matchDesc = item.description ? item.description.toLowerCase().includes(q) : false;
         return matchName || matchDesc;
       }
       
@@ -1175,8 +1212,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
       }
       return true;
     }).sort((a, b) => {
-      if (catalogSortOrder === 'name_asc') return a.article.localeCompare(b.article);
-      if (catalogSortOrder === 'name_desc') return b.article.localeCompare(a.article);
+      const artA = a?.article || '';
+      const artB = b?.article || '';
+      if (catalogSortOrder === 'name_asc') return artA.localeCompare(artB);
+      if (catalogSortOrder === 'name_desc') return artB.localeCompare(artA);
       if (catalogSortOrder === 'price_asc') {
         const priceA = a.categorie === 'abonnement' ? a.prix : Math.min(a.traitement?.prix || Infinity, a.repassage?.prix || Infinity);
         const priceB = b.categorie === 'abonnement' ? b.prix : Math.min(b.traitement?.prix || Infinity, b.repassage?.prix || Infinity);
@@ -1366,7 +1405,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
     // Check unique name constraint (excluding current item records)
     const nameExists = catalog.some(
-      item => !editingItem.allIds?.includes(item.id) && item.id !== editingItem.id && item.article.trim().toLowerCase() === editArtName.trim().toLowerCase()
+      item => item && item.article && !editingItem.allIds?.includes(item.id) && item.id !== editingItem.id && item.article.trim().toLowerCase() === editArtName.trim().toLowerCase()
     );
     if (nameExists) {
       setEditArtNameError(`Le produit "${editArtName}" existe déjà. Chaque nom de produit doit être unique.`);
@@ -1514,7 +1553,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
     // Check unique name constraint
     const nameExists = catalog.some(
-      item => item.article.trim().toLowerCase() === newArtName.trim().toLowerCase()
+      item => item && item.article && item.article.trim().toLowerCase() === newArtName.trim().toLowerCase()
     );
     if (nameExists) {
       setNewArtNameError(`Le produit "${newArtName}" existe déjà. Chaque nom de produit doit être unique.`);
@@ -2636,378 +2675,379 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </div>
                 </>
               )}
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Ajouter</button>
-                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowAddCatalogModal(false)}>Annuler</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================
-         MODAL DE MODIFICATION AVANCÉE D'ARTICLE OU ABONNEMENT
-         ======================================================== */}
-      {showEditCatalogModal && (
-        <div className="modal-backdrop">
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
-            <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              Options d'Édition Avancées
-            </h3>
-
-            <form onSubmit={handleSaveProductAdvanced} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Category info & Name side-by-side */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '0.75rem' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>Catégorie de tarif</label>
-                  <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-app)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    {editArtCategory === 'individuel' ? 'Vêtement individuel' : "Formule d'abonnement"}
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>{editArtCategory === 'individuel' ? "Nom de l'article" : "Nom de la formule d'abonnement"}</label>
-                  <input
-                    type="text"
-                    className="input-control"
-                    required
-                    value={editArtName}
-                    onChange={(e) => setEditArtName(e.target.value)}
-                  />
-                  {editArtNameError && (
-                    <div style={{ color: 'var(--danger)', fontSize: '0.72rem', marginTop: '0.25rem', fontWeight: 600 }}>
-                      {editArtNameError}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {editArtCategory === 'individuel' ? (
-                // Input elements for Clothing items (Traitement and Repassage simultaneous pricing)
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {/* Traitement check & prices */}
-                  <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-app)' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={editArtTraitementActive}
-                        onChange={(e) => setEditArtTraitementActive(e.target.checked)}
-                      />
-                      Activer le service Traitement
-                    </label>
-                    {editArtTraitementActive && (
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
-                          <input
-                            type="number"
-                            className="input-control"
-                            style={{ height: '32px', fontSize: '0.8rem' }}
-                            required
-                            placeholder="Ex: 1000"
-                            value={editArtTraitementPrice}
-                            onChange={(e) => {
-                              setEditArtTraitementPrice(e.target.value);
-                              const val = Number(e.target.value);
-                              if (!isNaN(val)) {
-                                setEditArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
-                          <input
-                            type="number"
-                            className="input-control"
-                            style={{ height: '32px', fontSize: '0.8rem' }}
-                            required
-                            placeholder="Ex: 1500"
-                            value={editArtTraitementUrgentPrice}
-                            onChange={(e) => setEditArtTraitementUrgentPrice(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Repassage check & prices */}
-                  <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-app)' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={editArtRepassageActive}
-                        onChange={(e) => setEditArtRepassageActive(e.target.checked)}
-                      />
-                      Activer le service Repassage
-                    </label>
-                    {editArtRepassageActive && (
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
-                          <input
-                            type="number"
-                            className="input-control"
-                            style={{ height: '32px', fontSize: '0.8rem' }}
-                            required
-                            placeholder="Ex: 500"
-                            value={editArtRepassagePrice}
-                            onChange={(e) => {
-                              setEditArtRepassagePrice(e.target.value);
-                              const val = Number(e.target.value);
-                              if (!isNaN(val)) {
-                                setEditArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
-                          <input
-                            type="number"
-                            className="input-control"
-                            style={{ height: '32px', fontSize: '0.8rem' }}
-                            required
-                            placeholder="Ex: 750"
-                            value={editArtRepassageUrgentPrice}
-                            onChange={(e) => setEditArtRepassageUrgentPrice(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                // Input elements for Subscriptions
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label>Tarif mensuel (FCFA)</label>
-                      <input
-                        type="number"
-                        className="input-control"
-                        required
-                        value={editArtPrice}
-                        onChange={(e) => setEditArtPrice(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label>Nombre de vêtements inclus</label>
-                      <input
-                        type="number"
-                        className="input-control"
-                        placeholder="Ex: 50"
-                        required
-                        value={editArtNombreVetements}
-                        onChange={(e) => setEditArtNombreVetements(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'start' }}>
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label style={{ fontWeight: 600 }}>Service de ramassage ?</label>
-                      <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
-                          <input
-                            type="checkbox"
-                            checked={editArtRamassage}
-                            onChange={() => setEditArtRamassage(true)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          Oui
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
-                          <input
-                            type="checkbox"
-                            checked={!editArtRamassage}
-                            onChange={() => setEditArtRamassage(false)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          Non
-                        </label>
-                      </div>
-
-                      {editArtRamassage && (
-                        <div style={{
-                          background: 'var(--bg-app)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '8px',
-                          padding: '0.65rem 0.75rem',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.5rem',
-                          marginTop: '0.5rem'
-                        }}>
-                          <div className="form-group" style={{ margin: 0 }}>
-                            <label style={{ fontSize: '0.73rem', fontWeight: 700, marginBottom: '0.2rem' }}>Nombre de ramassages / mois</label>
-                            <input
-                              type="number"
-                              className="input-control"
-                              style={{ height: '30px', fontSize: '0.8rem' }}
-                              placeholder="Ex: 4 (Laissez vide si illimité)"
-                              value={editArtNombreRamassages}
-                              onChange={(e) => setEditArtNombreRamassages(e.target.value)}
-                            />
-                          </div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 700, margin: 0 }}>
-                            <input
-                              type="checkbox"
-                              checked={editArtRamassageGratuit}
-                              onChange={(e) => setEditArtRamassageGratuit(e.target.checked)}
-                              style={{ cursor: 'pointer' }}
-                            />
-                            Ramassage gratuit
-                          </label>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label style={{ fontWeight: 600 }}>Livraison gratuite ?</label>
-                      <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
-                          <input
-                            type="checkbox"
-                            checked={editArtLivraisonGratuite}
-                            onChange={() => setEditArtLivraisonGratuite(true)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          Oui
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
-                          <input
-                            type="checkbox"
-                            checked={!editArtLivraisonGratuite}
-                            onChange={() => setEditArtLivraisonGratuite(false)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          Non
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0 }}>
-                      <span>Avantages & Conditions</span>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
-                        Glissez les poignées ☰ pour réordonner
-                      </span>
-                    </label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
-                      {editArtAdvantages.map((adv, idx) => (
-                        <div
-                          key={idx}
-                          draggable={dragAllowedIndex === idx}
-                          onDragStart={(e) => handleDragStart(e, idx)}
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(e, idx, true)}
-                          onDragEnd={() => setDragAllowedIndex(null)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            padding: '0.25rem',
-                            background: 'var(--bg-app)',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border-color)',
-                            transition: 'all 0.2s ease',
-                            opacity: dragAllowedIndex === idx ? 0.7 : 1,
-                          }}
-                        >
-                          <div
-                            onMouseEnter={() => setDragAllowedIndex(idx)}
-                            onMouseLeave={() => setDragAllowedIndex(null)}
-                            style={{
-                              cursor: 'grab',
-                              padding: '0.25rem',
-                              color: 'var(--text-muted)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                            title="Faire glisser pour réordonner"
-                          >
-                            <GripVertical size={14} />
-                          </div>
-                          <input
-                            type="text"
-                            className="input-control"
-                            style={{
-                              height: '30px',
-                              fontSize: '0.8rem',
-                              margin: 0,
-                              flex: 1,
-                              border: 'none',
-                              background: 'transparent',
-                              padding: '0 0.25rem',
-                            }}
-                            placeholder="Ex: Livraison gratuite"
-                            required
-                            value={adv}
-                            onChange={(e) => handleUpdateAdvantage(idx, e.target.value, true)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteAdvantageField(idx, true)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              color: 'var(--text-muted)',
-                              padding: '0.25rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: '4px',
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => handleAddAdvantageField(true)}
-                      style={{
-                        padding: '0.35rem',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        color: 'var(--primary)',
-                        background: 'var(--primary-light)',
-                        border: '1px dashed rgba(59, 130, 246, 0.3)',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.25rem',
-                        marginTop: '0.15rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'var(--primary-light)'}
-                    >
-                      <Plus size={12} /> Ajouter un avantage
-                    </button>
-                  </div>
-                </>
-              )}
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Enregistrer</button>
-                    <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowEditCatalogModal(false)}>Annuler</button>
+                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Ajouter</button>
+                    <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowAddCatalogModal(false)}>Annuler</button>
                   </div>
                 </form>
               </div>
             </div>
           )}
+
+      {/* ========================================================
+         MODAL DE MODIFICATION AVANCÉE D'ARTICLE OU ABONNEMENT
+         ======================================================== */}
+      {showEditCatalogModal && (
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => setShowEditCatalogModal(false)}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25)', border: '1px solid var(--border-color)', margin: 'auto', cursor: 'default' }}>
+              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                Options d'Édition Avancées
+              </h3>
+
+              <form onSubmit={handleSaveProductAdvanced} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {/* Category info & Name side-by-side */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Catégorie de tarif</label>
+                    <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-app)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      {editArtCategory === 'individuel' ? 'Vêtement individuel' : "Formule d'abonnement"}
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>{editArtCategory === 'individuel' ? "Nom de l'article" : "Nom de la formule d'abonnement"}</label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      required
+                      value={editArtName}
+                      onChange={(e) => setEditArtName(e.target.value)}
+                    />
+                    {editArtNameError && (
+                      <div style={{ color: 'var(--danger)', fontSize: '0.72rem', marginTop: '0.25rem', fontWeight: 600 }}>
+                        {editArtNameError}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {editArtCategory === 'individuel' ? (
+                  // Input elements for Clothing items (Traitement and Repassage simultaneous pricing)
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {/* Traitement check & prices */}
+                    <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-app)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={editArtTraitementActive}
+                          onChange={(e) => setEditArtTraitementActive(e.target.checked)}
+                        />
+                        Activer le service Traitement
+                      </label>
+                      {editArtTraitementActive && (
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                            <input
+                              type="number"
+                              className="input-control"
+                              style={{ height: '32px', fontSize: '0.8rem' }}
+                              required
+                              placeholder="Ex: 1000"
+                              value={editArtTraitementPrice}
+                              onChange={(e) => {
+                                setEditArtTraitementPrice(e.target.value);
+                                const val = Number(e.target.value);
+                                if (!isNaN(val)) {
+                                  setEditArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
+                            <input
+                              type="number"
+                              className="input-control"
+                              style={{ height: '32px', fontSize: '0.8rem' }}
+                              required
+                              placeholder="Ex: 1500"
+                              value={editArtTraitementUrgentPrice}
+                              onChange={(e) => setEditArtTraitementUrgentPrice(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Repassage check & prices */}
+                    <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem', background: 'var(--bg-app)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={editArtRepassageActive}
+                          onChange={(e) => setEditArtRepassageActive(e.target.checked)}
+                        />
+                        Activer le service Repassage
+                      </label>
+                      {editArtRepassageActive && (
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                            <input
+                              type="number"
+                              className="input-control"
+                              style={{ height: '32px', fontSize: '0.8rem' }}
+                              required
+                              placeholder="Ex: 500"
+                              value={editArtRepassagePrice}
+                              onChange={(e) => {
+                                setEditArtRepassagePrice(e.target.value);
+                                const val = Number(e.target.value);
+                                if (!isNaN(val)) {
+                                  setEditArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
+                            <input
+                              type="number"
+                              className="input-control"
+                              style={{ height: '32px', fontSize: '0.8rem' }}
+                              required
+                              placeholder="Ex: 750"
+                              value={editArtRepassageUrgentPrice}
+                              onChange={(e) => setEditArtRepassageUrgentPrice(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  // Input elements for Subscriptions
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label>Tarif mensuel (FCFA)</label>
+                        <input
+                          type="number"
+                          className="input-control"
+                          required
+                          value={editArtPrice}
+                          onChange={(e) => setEditArtPrice(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label>Nombre de vêtements inclus</label>
+                        <input
+                          type="number"
+                          className="input-control"
+                          placeholder="Ex: 50"
+                          required
+                          value={editArtNombreVetements}
+                          onChange={(e) => setEditArtNombreVetements(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'start' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontWeight: 600 }}>Service de ramassage ?</label>
+                        <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                            <input
+                              type="checkbox"
+                              checked={editArtRamassage}
+                              onChange={() => setEditArtRamassage(true)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            Oui
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                            <input
+                              type="checkbox"
+                              checked={!editArtRamassage}
+                              onChange={() => setEditArtRamassage(false)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            Non
+                          </label>
+                        </div>
+
+                        {editArtRamassage && (
+                          <div style={{
+                            background: 'var(--bg-app)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            padding: '0.65rem 0.75rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.5rem',
+                            marginTop: '0.5rem'
+                          }}>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label style={{ fontSize: '0.73rem', fontWeight: 700, marginBottom: '0.2rem' }}>Nombre de ramassages / mois</label>
+                              <input
+                                type="number"
+                                className="input-control"
+                                style={{ height: '30px', fontSize: '0.8rem' }}
+                                placeholder="Ex: 4 (Laissez vide si illimité)"
+                                value={editArtNombreRamassages}
+                                onChange={(e) => setEditArtNombreRamassages(e.target.value)}
+                              />
+                            </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 700, margin: 0 }}>
+                              <input
+                                type="checkbox"
+                                checked={editArtRamassageGratuit}
+                                onChange={(e) => setEditArtRamassageGratuit(e.target.checked)}
+                                style={{ cursor: 'pointer' }}
+                              />
+                              Ramassage gratuit
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontWeight: 600 }}>Livraison gratuite ?</label>
+                        <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                            <input
+                              type="checkbox"
+                              checked={editArtLivraisonGratuite}
+                              onChange={() => setEditArtLivraisonGratuite(true)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            Oui
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                            <input
+                              type="checkbox"
+                              checked={!editArtLivraisonGratuite}
+                              onChange={() => setEditArtLivraisonGratuite(false)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            Non
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0 }}>
+                        <span>Avantages & Conditions</span>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                          Glissez les poignées ☰ pour réordonner
+                        </span>
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
+                        {editArtAdvantages.map((adv, idx) => (
+                          <div
+                            key={idx}
+                            draggable={dragAllowedIndex === idx}
+                            onDragStart={(e) => handleDragStart(e, idx)}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, idx, true)}
+                            onDragEnd={() => setDragAllowedIndex(null)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              padding: '0.25rem',
+                              background: 'var(--bg-app)',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                              transition: 'all 0.2s ease',
+                              opacity: dragAllowedIndex === idx ? 0.7 : 1,
+                            }}
+                          >
+                            <div
+                              onMouseEnter={() => setDragAllowedIndex(idx)}
+                              onMouseLeave={() => setDragAllowedIndex(null)}
+                              style={{
+                                cursor: 'grab',
+                                padding: '0.25rem',
+                                color: 'var(--text-muted)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                              title="Faire glisser pour réordonner"
+                            >
+                              <GripVertical size={14} />
+                            </div>
+                            <input
+                              type="text"
+                              className="input-control"
+                              style={{
+                                height: '30px',
+                                fontSize: '0.8rem',
+                                margin: 0,
+                                flex: 1,
+                                border: 'none',
+                                background: 'transparent',
+                                padding: '0 0.25rem',
+                              }}
+                              placeholder="Ex: Livraison gratuite"
+                              required
+                              value={adv}
+                              onChange={(e) => handleUpdateAdvantage(idx, e.target.value, true)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAdvantageField(idx, true)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--text-muted)',
+                                padding: '0.25rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '4px',
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => handleAddAdvantageField(true)}
+                        style={{
+                          padding: '0.35rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: 'var(--primary)',
+                          background: 'var(--primary-light)',
+                          border: '1px dashed rgba(59, 130, 246, 0.3)',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.25rem',
+                          marginTop: '0.15rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'var(--primary-light)'}
+                      >
+                        <Plus size={12} /> Ajouter un avantage
+                      </button>
+                    </div>
+                  </>
+                )}
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Enregistrer</button>
+                  <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowEditCatalogModal(false)}>Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
 
           {/* ========================================================
           MODAL : ENREGISTREMENT COMMANDE (CAISSE ADMIN REDESIGN)

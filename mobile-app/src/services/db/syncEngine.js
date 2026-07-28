@@ -16,6 +16,7 @@ import {
   DEFAULT_CATALOG,
   STORAGE_KEYS 
 } from './seeds';
+import { sendOrderNotification } from '../notificationService';
 
 // État de la connexion au cloud Supabase
 let isUsingRemote = false;
@@ -525,6 +526,13 @@ export function setupRealtime() {
         else if (table === 'catalog') targetList = memoryDb.catalog;
         else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
 
+        // ── Capture de l'ancien statut pour détecter les vrais changements ──
+        let oldOrderStatus = null;
+        if (table === 'orders' && eventType === 'UPDATE') {
+          const existingOrder = targetList.find(x => x.id === newRow.id);
+          oldOrderStatus = existingOrder ? (existingOrder.statut || existingOrder.status) : null;
+        }
+
         if (eventType === 'INSERT') {
           const exists = targetList.some(x => x.id === newRow.id);
           if (!exists) {
@@ -554,6 +562,20 @@ export function setupRealtime() {
           const idx = targetList.findIndex(x => x.id === oldRow.id);
           if (idx !== -1) {
             targetList.splice(idx, 1);
+          }
+        }
+
+        // ── Notification en temps réel pour les événements commandes ──
+        // Déclenché seulement quand la mise à jour vient d'une source EXTERNE
+        // (admin web, autre appareil) — pas pour les mutations locales.
+        if (table === 'orders' && newRow && (eventType === 'INSERT' || eventType === 'UPDATE')) {
+          const hydratedNewOrder = hydrateOrder(newRow);
+          const currentUserId = memoryDb.current_user ? memoryDb.current_user.id : null;
+          const isLocalMutation = currentUserId && newRow.created_by_id === currentUserId && eventType === 'INSERT';
+          
+          // Notifier uniquement pour les événements externes (pas les propres actions de l'utilisateur)
+          if (!isLocalMutation) {
+            sendOrderNotification(eventType, hydratedNewOrder, oldOrderStatus).catch(() => {});
           }
         }
 

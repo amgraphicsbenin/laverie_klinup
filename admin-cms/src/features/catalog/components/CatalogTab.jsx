@@ -484,29 +484,43 @@ export default function CatalogTab({
         </div>
 
         {/* Pagination bar */}
-        {totalCatalogPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', flexShrink: 0 }}>
-            <button
-              className="btn btn-outline"
-              style={{ padding: '0.35rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', minWidth: '80px' }}
-              disabled={catalogCurrentPage === 1}
-              onClick={() => setCatalogCurrentPage(prev => Math.max(1, prev - 1))}
-            >
-              Précédent
-            </button>
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
-              Page {catalogCurrentPage} sur {totalCatalogPages} ({filteredCatalog.length} articles)
-            </span>
-            <button
-              className="btn btn-outline"
-              style={{ padding: '0.35rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', minWidth: '80px' }}
-              disabled={catalogCurrentPage === totalCatalogPages}
-              onClick={() => setCatalogCurrentPage(prev => Math.min(totalCatalogPages, prev + 1))}
-            >
-              Suivant
-            </button>
-          </div>
-        )}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', flexShrink: 0 }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            disabled={catalogCurrentPage <= 1}
+            onClick={() => setCatalogCurrentPage(prev => Math.max(1, prev - 1))}
+            style={{
+              padding: '0.35rem 0.8rem',
+              borderRadius: '8px',
+              fontSize: '0.8rem',
+              minWidth: '80px',
+              opacity: catalogCurrentPage <= 1 ? 0.45 : 1,
+              cursor: catalogCurrentPage <= 1 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Précédent
+          </button>
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+            Page {catalogCurrentPage} sur {Math.max(1, totalCatalogPages)} ({filteredCatalog.length} article{filteredCatalog.length > 1 ? 's' : ''})
+          </span>
+          <button
+            type="button"
+            className="btn btn-outline"
+            disabled={totalCatalogPages <= 1 || catalogCurrentPage >= totalCatalogPages}
+            onClick={() => setCatalogCurrentPage(prev => Math.min(totalCatalogPages, prev + 1))}
+            style={{
+              padding: '0.35rem 0.8rem',
+              borderRadius: '8px',
+              fontSize: '0.8rem',
+              minWidth: '80px',
+              opacity: (totalCatalogPages <= 1 || catalogCurrentPage >= totalCatalogPages) ? 0.45 : 1,
+              cursor: (totalCatalogPages <= 1 || catalogCurrentPage >= totalCatalogPages) ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Suivant
+          </button>
+        </div>
       </div>
     </div>
   );

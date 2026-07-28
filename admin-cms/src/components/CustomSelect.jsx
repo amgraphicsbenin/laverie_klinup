@@ -114,7 +114,7 @@ export default function CustomSelect({
             const isSelected = String(opt.value) === String(value);
             return (
               <div
-                key={opt.value}
+                key={opt.value ?? opt.label ?? Math.random()}
                 onClick={() => handleSelect(opt.value)}
                 className={`custom-select-option ${isSelected ? 'selected' : ''}`}
               >

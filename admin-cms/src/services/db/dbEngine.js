@@ -1094,7 +1094,7 @@ export const dbEngine = {
     if (!memoryDb.pin_reset_requests) {
       memoryDb.pin_reset_requests = [];
     }
-    const staffMember = memoryDb.staff.find(s => s.email.toLowerCase() === email.toLowerCase());
+    const staffMember = memoryDb.staff.find(s => s.email && email && s.email.toLowerCase() === email.toLowerCase());
     const newRequest = {
       id: 'req_' + Math.random().toString(36).substr(2, 9),
       email: email,
@@ -1119,7 +1119,7 @@ export const dbEngine = {
     if (!memoryDb.pin_reset_requests) return null;
     const req = memoryDb.pin_reset_requests.find(r => r.id === requestId);
     if (req) {
-      const staffMember = memoryDb.staff.find(s => s.email.toLowerCase() === req.email.toLowerCase());
+      const staffMember = memoryDb.staff.find(s => s.email && req?.email && s.email.toLowerCase() === req.email.toLowerCase());
       if (staffMember) {
         const newPin = Math.floor(100000 + Math.random() * 900000).toString();
         staffMember.code_pin = newPin;

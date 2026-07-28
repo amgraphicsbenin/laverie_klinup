@@ -68,13 +68,20 @@ export function exportCustomersCSV(customers) {
 
 export function exportLogsCSV(logs, staffList = []) {
   const headers = [
-    { label: 'Horodatage', accessor: 'timestamp' },
-    { label: 'Employé', accessor: r => {
+    { label: 'ID Trace', accessor: 'id' },
+    { label: 'Horodatage (ISO)', accessor: 'timestamp' },
+    { label: 'Date & Heure Formatées', accessor: r => new Date(r.timestamp).toLocaleString() },
+    { label: 'Opérateur / Utilisateur', accessor: r => {
       const u = staffList.find(s => s.id === r.user_id);
-      return u ? `${u.prenom} ${u.nom}` : 'Système';
+      return u ? `${u.prenom} ${u.nom}` : 'Automate / Système';
     }},
-    { label: 'Action', accessor: 'action' },
-    { label: 'Détails', accessor: 'details' }
+    { label: 'Rôle Utilisateur', accessor: r => {
+      const u = staffList.find(s => s.id === r.user_id);
+      return u ? u.role : 'Système';
+    }},
+    { label: 'Point de Laverie (Store ID)', accessor: r => r.store_id || 'store_central' },
+    { label: 'Code Action', accessor: 'action' },
+    { label: 'Détails & Motif de l\'Opération', accessor: 'details' }
   ];
   exportToCSV(`Audit_Logs_KlinUp_${new Date().toISOString().slice(0, 10)}.csv`, headers, logs);
 }

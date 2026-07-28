@@ -19,7 +19,8 @@ import { OrderFormModal } from './src/components/OrderFormModal';
 import { registerAlertHandler } from './src/services/alert';
 import SplashScreen from './src/components/SplashScreen';
 import FlaticonIcon from './src/components/FlaticonIcon';
-import { initSystemNotifications } from './src/services/notificationService';
+import { initSystemNotifications, savePushTokenToSupabase } from './src/services/notificationService';
+import * as Notifications from 'expo-notifications';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -159,23 +160,56 @@ export default function App() {
   // Load database on mount
   useEffect(() => {
     async function setup() {
-      const startTime = Date.now();
       try {
         await initializeDatabase();
         await initSystemNotifications();
       } catch (err) {
         console.error("DB Initialization error", err);
       } finally {
-        const elapsed = Date.now() - startTime;
-        const minSplashTime = 2200; // Display animated splash screen for at least 2.2s for rich experience
-        const remaining = Math.max(0, minSplashTime - elapsed);
-        setTimeout(() => {
-          setDbReady(true);
-        }, remaining);
+        setDbReady(true);
       }
     }
     setup();
   }, []);
+
+  // ── Sauvegarder le push token quand l'utilisateur se connecte ──
+  useEffect(() => {
+    if (currentUser && currentUser.id) {
+      savePushTokenToSupabase(currentUser.id).catch(() => {});
+    }
+  }, [currentUser?.id]);
+
+  // ── Listener foreground : notification reçue quand l'app est ouverte ──
+  const notificationListener = useRef();
+  const responseListener = useRef();
+
+  useEffect(() => {
+    // Notification reçue en foreground (app ouverte)
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log('[Notifications] Reçue en foreground:', notification.request.content.title);
+      // La notification est déjà affichée par setNotificationHandler
+      // On peut optionnellement afficher un toast interne ici
+    });
+
+    // Tap sur une notification (depuis écran verrouillé ou tiroir de notifications)
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      if (data && data.screen === 'gestion') {
+        // Naviguer vers l'écran de gestion des commandes
+        switchTab('gestion');
+      }
+    });
+
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, []);
+
 
   const getAlertIcon = (title, message) => {
     const t = (title || '').toLowerCase();

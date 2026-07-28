@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   User,
   UserPlus,
@@ -323,7 +324,14 @@ export default function StaffTab({
     }
   }, [selectedRoleId, rolesList, selectedRoleObj]);
 
+  const currentUser = db.getCurrentUser ? db.getCurrentUser() : null;
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+
   const handleCopyPin = (pin, staffId) => {
+    if (!isSuperAdmin) {
+      alert("Accès refusé : Seul le Super Administrateur est autorisé à copier les codes PIN.");
+      return;
+    }
     if (!pin) return;
     navigator.clipboard.writeText(pin);
     setCopiedPinId(staffId);
@@ -331,6 +339,10 @@ export default function StaffTab({
   };
 
   const togglePinVisibility = (staffId) => {
+    if (!isSuperAdmin) {
+      alert("Accès refusé : Seul le Super Administrateur est autorisé à voir les codes PIN.");
+      return;
+    }
     setVisiblePins(prev => ({ ...prev, [staffId]: !prev[staffId] }));
   };
 
@@ -688,7 +700,7 @@ export default function StaffTab({
                       const isPinVisible = !!visiblePins[s.id];
                       const isPinCopied = copiedPinId === s.id;
 
-                      const hasPinRequest = pendingRequests.some(r => r.email.toLowerCase() === (s.email || '').toLowerCase());
+                      const hasPinRequest = pendingRequests.some(r => r?.email && (r.email.toLowerCase() === (s.email || '').toLowerCase()));
 
                       return (
                         <tr
@@ -802,27 +814,31 @@ export default function StaffTab({
                           {/* Code PIN */}
                           <td style={{ padding: '0.75rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: isPinVisible ? '2px' : '3px', color: 'var(--text-primary)' }}>
-                                {isPinVisible ? (s.code_pin || '000000') : '••••••'}
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: (isSuperAdmin && isPinVisible) ? '2px' : '3px', color: 'var(--text-primary)' }}>
+                                {(isSuperAdmin && isPinVisible) ? (s.code_pin || '000000') : '••••••'}
                               </span>
 
-                              <button
-                                type="button"
-                                onClick={() => togglePinVisibility(s.id)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex' }}
-                                title={isPinVisible ? "Masquer le PIN" : "Afficher le PIN"}
-                              >
-                                {isPinVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-                              </button>
+                              {isSuperAdmin && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePinVisibility(s.id)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex' }}
+                                    title={isPinVisible ? "Masquer le PIN" : "Afficher le PIN"}
+                                  >
+                                    {isPinVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                                  </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleCopyPin(s.code_pin || '000000', s.id)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: isPinCopied ? 'var(--success)' : 'var(--text-muted)', padding: '2px', display: 'flex' }}
-                                title="Copier le code PIN"
-                              >
-                                {isPinCopied ? <Check size={14} /> : <Copy size={14} />}
-                              </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyPin(s.code_pin || '000000', s.id)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: isPinCopied ? 'var(--success)' : 'var(--text-muted)', padding: '2px', display: 'flex' }}
+                                    title="Copier le code PIN"
+                                  >
+                                    {isPinCopied ? <Check size={14} /> : <Copy size={14} />}
+                                  </button>
+                                </>
+                              )}
 
                               {hasPinRequest && (
                                 <span style={{ fontSize: '0.62rem', background: 'var(--warning-light)', color: 'var(--warning)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
@@ -838,7 +854,23 @@ export default function StaffTab({
                               type="button"
                               onClick={async () => {
                                 const newStatut = isSuspended ? 'actif' : 'suspendu';
+                                let motif = '';
+
+                                if (newStatut === 'suspendu') {
+                                  motif = window.prompt(`Désactivation du compte de "${prenom} ${nom}".\n\nVeuillez indiquer obligatoirement le motif de la désactivation :`);
+                                  if (!motif || !motif.trim()) {
+                                    alert("Action annulée : Le motif de désactivation est obligatoire.");
+                                    return;
+                                  }
+                                }
+
                                 s.statut = newStatut;
+                                if (motif) {
+                                  db.logAction('SUSPENSION_PERSONNEL', `Désactivation de ${prenom} ${nom} | Motif : ${motif.trim()}`);
+                                } else {
+                                  db.logAction('REACTIVATION_PERSONNEL', `Réactivation de ${prenom} ${nom}`);
+                                }
+
                                 await db.updateStaff(s.id, { statut: newStatut });
                                 if (refreshAdminData) refreshAdminData();
                               }}
@@ -914,23 +946,35 @@ export default function StaffTab({
                 <button
                   type="button"
                   className="btn btn-outline"
-                  disabled={staffCurrentPage === 1}
+                  disabled={staffCurrentPage <= 1}
                   onClick={() => setStaffCurrentPage(prev => Math.max(1, prev - 1))}
-                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  style={{
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    borderRadius: '8px',
+                    opacity: staffCurrentPage <= 1 ? 0.45 : 1,
+                    cursor: staffCurrentPage <= 1 ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   <ChevronLeft size={14} /> Précédent
                 </button>
                 
                 <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '0 0.5rem', color: 'var(--text-primary)' }}>
-                  Page {staffCurrentPage} sur {totalStaffPages}
+                  Page {staffCurrentPage} sur {Math.max(1, totalStaffPages)}
                 </span>
 
                 <button
                   type="button"
                   className="btn btn-outline"
-                  disabled={staffCurrentPage >= totalStaffPages}
+                  disabled={totalStaffPages <= 1 || staffCurrentPage >= totalStaffPages}
                   onClick={() => setStaffCurrentPage(prev => Math.min(totalStaffPages, prev + 1))}
-                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  style={{
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    borderRadius: '8px',
+                    opacity: (totalStaffPages <= 1 || staffCurrentPage >= totalStaffPages) ? 0.45 : 1,
+                    cursor: (totalStaffPages <= 1 || staffCurrentPage >= totalStaffPages) ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   Suivant <ChevronRight size={14} />
                 </button>
@@ -1521,20 +1565,23 @@ export default function StaffTab({
       {/* =========================================================================
          MODALE D'ÉDITION DU PROFIL ET ACCÈS D'UN UTILISATEUR
          ========================================================================= */}
-      {showEditUserModal && selectedMember && (
+      {showEditUserModal && selectedMember && createPortal(
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.55)',
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(15, 23, 42, 0.18)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
+          zIndex: 99999,
+          padding: '1rem',
+          boxSizing: 'border-box'
+        }} onClick={() => setShowEditUserModal(false)}>
           <div
             className="card modal-dialog-card"
             onClick={(e) => e.stopPropagation()}
@@ -1833,26 +1880,30 @@ export default function StaffTab({
 
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* =========================================================================
          MODALE : CRÉATION D'UN NOUVEAU RÔLE
          ========================================================================= */}
-      {showNewRoleModal && (
+      {showNewRoleModal && createPortal(
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.55)',
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(15, 23, 42, 0.18)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
+          zIndex: 99999,
+          padding: '1rem',
+          boxSizing: 'border-box'
+        }} onClick={() => setShowNewRoleModal(false)}>
           <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '480px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25)', border: '1px solid var(--border-color)', borderRadius: '20px' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
@@ -1935,7 +1986,8 @@ export default function StaffTab({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

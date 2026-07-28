@@ -38,6 +38,7 @@ function App() {
   const [resetEmail, setResetEmail] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [customDialog, setCustomDialog] = useState(null); // { message, title, type, isConfirm, resolve }
+  const [openSubmenus, setOpenSubmenus] = useState({ staff: true });
 
   // Notifications states & helper functions
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -64,23 +65,25 @@ function App() {
     const list = [];
     
     // 1. PIN reset requests
-    const pinReqs = db.getPinResetRequests();
+    const pinReqs = (db.getPinResetRequests ? db.getPinResetRequests() : []) || [];
     pinReqs.forEach(req => {
+      if (!req) return;
       list.push({
-        id: `pin_${req.id}`,
+        id: `pin_${req.id || Math.random()}`,
         type: 'pin_reset',
         action: 'DEMANDE_RESET_PIN',
         title: req.status === 'pending' ? 'Demande de reset PIN (En attente)' : `Demande de reset PIN (${req.status === 'approved' ? 'Approuvée' : 'Rejetée'})`,
-        message: `L'employé avec l'email ${req.email} a demandé la réinitialisation de son code PIN.`,
-        timestamp: req.created_at,
+        message: `L'employé avec l'email ${req.email || 'inconnu'} a demandé la réinitialisation de son code PIN.`,
+        timestamp: req.created_at || new Date().toISOString(),
         raw: req
       });
     });
 
     // 2. Important logs from activity logs
-    const logs = db.getLogs();
+    const logs = (db.getLogs ? db.getLogs() : []) || [];
     const importantActions = ['MISE_A_JOUR_STATUT', 'CREATION_COMMANDE', 'ANNULATION_COMMANDE', 'RÈGLEMENT_DETTE'];
     logs.forEach(log => {
+      if (!log || !log.action) return;
       if (importantActions.includes(log.action)) {
         let friendlyTitle = 'Notification';
         if (log.action === 'MISE_A_JOUR_STATUT') friendlyTitle = 'Statut de Commande Mis à Jour';
@@ -89,19 +92,19 @@ function App() {
         else if (log.action === 'RÈGLEMENT_DETTE') friendlyTitle = 'Règlement de Dette';
 
         list.push({
-          id: `log_${log.id}`,
+          id: `log_${log.id || Math.random()}`,
           type: 'log_event',
           action: log.action,
           title: friendlyTitle,
-          message: log.details,
-          timestamp: log.timestamp,
+          message: log.details || '',
+          timestamp: log.timestamp || new Date().toISOString(),
           raw: log
         });
       }
     });
 
     // Sort by timestamp desc and limit to 25 items
-    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 25);
+    return list.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)).slice(0, 25);
   })();
 
   const notifications = allNotifications.filter(n => !clearedNotifIds.includes(n.id));
@@ -421,85 +424,7 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedLoginUser, pinCode, pinError, isUnlocking]);
 
-  if (!dbIsRemote) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        background: 'var(--bg-app, #f8fafc)',
-        fontFamily: 'var(--font-main, sans-serif)',
-        padding: '2rem'
-      }}>
-        <div className="card" style={{
-          maxWidth: '420px',
-          width: '100%',
-          padding: '2.5rem',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '1.5rem',
-          background: 'var(--bg-card, #ffffff)',
-          borderRadius: '16px',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
-          border: '1px solid var(--border-color, #e2e8f0)'
-        }}>
-          <div style={{
-            fontSize: '3rem',
-            lineHeight: 1
-          }}>🔌</div>
-          <h2 style={{
-            color: '#ef4444',
-            margin: 0,
-            fontSize: '1.3rem',
-            fontWeight: 800,
-            fontFamily: 'var(--font-title, sans-serif)'
-          }}>Erreur de connexion</h2>
-          <p style={{
-            color: 'var(--text-secondary, #64748b)',
-            fontSize: '0.88rem',
-            lineHeight: 1.5,
-            margin: 0
-          }}>
-            Impossible de communiquer avec la base de données Supabase. L'administration requiert une connexion internet active pour fonctionner.
-          </p>
-          <button
-            type="button"
-            onClick={async () => {
-              alert("Tentative de reconnexion...");
-              const res = await db.testConnection();
-              if (res.success) {
-                alert("Succès ! Connexion établie avec le cloud Supabase. L'administration est maintenant en ligne !");
-                setDbIsRemote(true);
-              } else {
-                alert("Échec de connexion : " + res.error);
-              }
-            }}
-            className="btn btn-primary"
-            style={{
-              width: '100%',
-              padding: '0.75rem 1.5rem',
-              fontSize: '0.88rem',
-              fontWeight: 700,
-              borderRadius: '10px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            <MIcon name="sync" size={16} />
-            Réessayer
-          </button>
 
-        </div>
-      </div>
-    );
-  }
 
   if (!currentUser) {
     return (
@@ -709,8 +634,8 @@ function App() {
     );
   }
 
-  const hasAdminAccess = currentUser.role === 'super_admin' || currentUser.role === 'manager';
-  const isSuperAdmin = currentUser.role === 'super_admin';
+  const hasAdminAccess = currentUser?.role === 'super_admin' || currentUser?.role === 'manager';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   return (
     <div className="app-container">
@@ -775,48 +700,38 @@ function App() {
                 <>
                   <li 
                     className={`menu-item ${['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) ? 'active' : ''}`}
-                    onClick={() => setAdminMenu(adminMenu === 'staff_roles' ? 'staff_roles' : 'staff_users')}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                    onClick={() => setOpenSubmenus(prev => ({ ...prev, staff: !prev.staff }))}
                   >
-                    <MIcon name="admin_panel_settings" size={20} />
-                    Gestion des Accès
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                      <MIcon name="admin_panel_settings" size={20} />
+                      <span>Gestion des Accès</span>
+                    </div>
+                    <MIcon 
+                      name="expand_more" 
+                      size={18} 
+                      style={{ 
+                        transition: 'transform 0.25s ease', 
+                        transform: openSubmenus?.staff ? 'rotate(180deg)' : 'rotate(0deg)',
+                        opacity: 0.7
+                      }} 
+                    />
                   </li>
-                  {['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) && (
-                    <div style={{ paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', margin: '0.25rem 0' }}>
+                  {openSubmenus?.staff && (
+                    <div className="submenu-container">
                       <div 
-                        style={{
-                          fontSize: '0.78rem',
-                          padding: '0.35rem 0.65rem',
-                          borderRadius: '8px',
-                          color: (adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'var(--primary)' : 'var(--text-secondary)',
-                          background: (adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'rgba(0, 44, 247, 0.08)' : 'transparent',
-                          fontWeight: (adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 700 : 500,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem'
-                        }}
+                        className={`submenu-item ${(adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'active' : ''}`}
                         onClick={() => setAdminMenu('staff_users')}
                       >
                         <MIcon name="group" size={16} />
-                        1. Gestion Utilisateurs
+                        <span>1. Gestion Utilisateurs</span>
                       </div>
                       <div 
-                        style={{
-                          fontSize: '0.78rem',
-                          padding: '0.35rem 0.65rem',
-                          borderRadius: '8px',
-                          color: adminMenu === 'staff_roles' ? 'var(--primary)' : 'var(--text-secondary)',
-                          background: adminMenu === 'staff_roles' ? 'rgba(0, 44, 247, 0.08)' : 'transparent',
-                          fontWeight: adminMenu === 'staff_roles' ? 700 : 500,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem'
-                        }}
+                        className={`submenu-item ${adminMenu === 'staff_roles' ? 'active' : ''}`}
                         onClick={() => setAdminMenu('staff_roles')}
                       >
                         <MIcon name="verified_user" size={16} />
-                        2. Config. des Rôles
+                        <span>2. Config. des Rôles</span>
                       </div>
                     </div>
                   )}
@@ -1090,39 +1005,19 @@ function App() {
                 )}
               </div>
 
-              {/* Status de la Base de Données */}
-              <span 
-                title={db.isRemote() ? "Connecté à Supabase Cloud" : "Mode Local / Hors-ligne (Supabase déconnecté)"}
-                style={{ 
-                  fontSize: '0.68rem', 
-                  fontWeight: 800, 
-                  padding: '0.2rem 0.6rem', 
-                  borderRadius: '6px', 
-                  background: db.isRemote() ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)', 
-                  color: db.isRemote() ? '#10b981' : '#d97706',
-                  border: db.isRemote() ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(245, 158, 11, 0.2)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.3px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem'
-                }}
-              >
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: db.isRemote() ? '#10b981' : '#f59e0b', display: 'inline-block' }} />
-                {db.isRemote() ? 'Supabase' : 'Local'}
-              </span>
+
 
               {/* Profil Utilisateur Donezo Header Style */}
               <div className="topbar-profile">
                 <div className="topbar-profile-avatar">
                   <div className="user-avatar" style={{ margin: 0, width: '36px', height: '36px', fontSize: '0.8rem' }}>
-                    {currentUser.prenom.charAt(0)}{currentUser.nom.charAt(0)}
+                    {(currentUser?.prenom?.charAt(0) || 'U')}{(currentUser?.nom?.charAt(0) || '')}
                   </div>
                 </div>
                 <div className="topbar-profile-info">
-                  <span className="topbar-profile-name">{currentUser.prenom} {currentUser.nom}</span>
+                  <span className="topbar-profile-name">{currentUser?.prenom || ''} {currentUser?.nom || 'Utilisateur'}</span>
                   <span className="topbar-profile-email">
-                    {currentUser.email || `${currentUser.prenom.toLowerCase()}.${currentUser.nom.toLowerCase()}@klinup.com`}
+                    {currentUser?.email || `${(currentUser?.prenom || 'user').toLowerCase()}.${(currentUser?.nom || 'admin').toLowerCase()}@klinup.com`}
                   </span>
                 </div>
               </div>
@@ -1139,7 +1034,7 @@ function App() {
               </div>
               <h2 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 700 }}>Espace Réservé</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6' }}>
-                Désolé <strong>{currentUser.prenom} {currentUser.nom}</strong>, votre rôle <strong>{currentUser.role}</strong> ne vous autorise pas à accéder au CMS Administrateur.<br />
+                Désolé <strong>{currentUser?.prenom} {currentUser?.nom}</strong>, votre rôle <strong>{currentUser?.role}</strong> ne vous autorise pas à accéder au CMS Administrateur.<br />
                 Veuillez utiliser l'application de terrain sur le port <strong>5174</strong>.
               </p>
               <button 

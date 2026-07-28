@@ -1,30 +1,84 @@
+/**
+ * @file notificationService.js
+ * @description Service de notifications KLIN UP.
+ * Gère les canaux Android, les permissions, les Expo Push Tokens,
+ * les notifications foreground (avec sonnerie système) et background (push distantes).
+ */
+
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { playNotificationSound } from './soundService';
+import { supabase } from './supabaseClient';
 
-// Configure notification behavior for foreground and background
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIGURATION FOREGROUND HANDLER
+// Affiche alerte + son + badge même quand l'app est ouverte
+// ─────────────────────────────────────────────────────────────────────────────
 try {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
+      priority: Notifications.AndroidNotificationPriority.MAX,
     }),
   });
 } catch (e) {
-  console.warn('Failed to set notification handler:', e);
+  console.warn('[Notifications] setNotificationHandler error:', e);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STATUT DES COMMANDES → Textes lisibles
+// ─────────────────────────────────────────────────────────────────────────────
+const STATUS_LABELS = {
+  en_attente: 'En attente',
+  traitement: 'En cours de traitement',
+  en_cours_lavage: 'En cours de lavage',
+  en_cours_repassage: 'En cours de repassage',
+  pret: 'Prête',
+  a_livrer: 'Prête à livrer',
+  a_recuperer: 'À récupérer',
+  en_cours_livraison: 'En cours de livraison',
+  restitue: 'Restituée / Livrée',
+  annule: 'Annulée',
+};
+
 /**
- * Initializes system notifications for Android & iOS (channel creation + permissions request).
+ * Retourne l'emoji et le texte lisible pour un statut de commande.
+ */
+export function getOrderStatusLabel(statut) {
+  return STATUS_LABELS[statut] || statut || 'Mise à jour';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INITIALISATION — Canaux Android + Permissions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Initialise les canaux Android et demande les permissions de notification.
+ * Doit être appelée au démarrage de l'app (dans App.js).
  */
 export async function initSystemNotifications() {
   try {
     if (Platform.OS === 'android') {
+      // Canal principal pour les commandes (priorité MAX = sonnerie + vibration garantis)
+      await Notifications.setNotificationChannelAsync('orders', {
+        name: 'Commandes KLIN UP',
+        description: 'Notifications de suivi des commandes',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 300, 150, 400],
+        lightColor: '#002cf7',
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        bypassDnd: false,
+      });
+
+      // Canal secondaire pour les alertes générales
       await Notifications.setNotificationChannelAsync('default', {
-        name: 'Notifications KLIN UP',
-        importance: Notifications.Importance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
+        name: 'Notifications générales',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 200, 100, 300],
         lightColor: '#002cf7',
         sound: 'default',
         enableVibrate: true,
@@ -32,55 +86,190 @@ export async function initSystemNotifications() {
       });
     }
 
+    // Demander les permissions (Android 13+ et iOS)
     if (Platform.OS === 'android' || Platform.OS === 'ios') {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
+
       if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+            allowCriticalAlerts: false,
+            provideAppNotificationSettings: false,
+          },
+        });
         finalStatus = status;
       }
+
       if (finalStatus !== 'granted') {
-        console.warn('System notification permissions not granted.');
-      }
-    } else if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (window.Notification.permission === 'default') {
-        await window.Notification.requestPermission();
+        console.warn('[Notifications] Permissions non accordées. Les notifications peuvent ne pas fonctionner.');
+      } else {
+        console.log('[Notifications] ✅ Permissions accordées.');
       }
     }
   } catch (err) {
-    console.warn('Error initializing system notifications:', err);
+    console.warn('[Notifications] Erreur d\'initialisation:', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPO PUSH TOKEN — Pour notifications hors-app
+// ─────────────────────────────────────────────────────────────────────────────
+
+let _cachedPushToken = null;
+
+/**
+ * Récupère le Push Token Expo de cet appareil.
+ * Nécessite un projet Expo enregistré (EAS) pour fonctionner en production.
+ * En dev/Expo Go, fonctionne sans configuration supplémentaire.
+ * @returns {string|null} Le token Expo push ou null si non disponible.
+ */
+export async function getExpoPushToken() {
+  if (_cachedPushToken) return _cachedPushToken;
+
+  if (Platform.OS === 'web') {
+    return null; // Pas de push token sur le web
+  }
+
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.warn('[Notifications] Push token non disponible : permissions refusées.');
+      return null;
+    }
+
+    // Récupérer le token Expo Push
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      // projectId: 'your-project-id', // Décommenter en production EAS
+    });
+
+    _cachedPushToken = tokenData.data;
+    console.log('[Notifications] ✅ Push Token obtenu:', _cachedPushToken);
+    return _cachedPushToken;
+  } catch (err) {
+    // En Expo Go sans configuration EAS, cette erreur est normale en dev
+    console.warn('[Notifications] Push Token non disponible (normal en dev sans EAS):', err.message);
+    return null;
   }
 }
 
 /**
- * Triggers an immediate system notification in the Android status bar / lockscreen (hors-app).
- * 
- * @param {string} title - Notification title
- * @param {string} body - Notification body text
- * @param {object} data - Optional payload data
+ * Sauvegarde le push token de l'utilisateur dans Supabase.
+ * Permet à l'Edge Function d'envoyer des push à cet appareil.
+ * @param {string} userId - L'ID de l'utilisateur staff.
+ */
+export async function savePushTokenToSupabase(userId) {
+  if (!userId || !supabase) return;
+
+  try {
+    const token = await getExpoPushToken();
+    if (!token) return;
+
+    const { error } = await supabase
+      .from('staff')
+      .update({ push_token: token, push_token_updated_at: new Date().toISOString() })
+      .eq('id', userId);
+
+    if (error) {
+      // La colonne push_token peut ne pas exister — ignoré silencieusement
+      console.warn('[Notifications] push_token non sauvegardé (colonne peut-être absente):', error.message);
+    } else {
+      console.log('[Notifications] ✅ push_token sauvegardé pour l\'utilisateur', userId);
+    }
+  } catch (err) {
+    console.warn('[Notifications] Erreur lors de la sauvegarde du push token:', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATION LOCALE IMMÉDIATE (Foreground + Background quand app ouverte)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Déclenche une notification locale immédiate avec sonnerie système.
+ * Fonctionne en foreground ET quand l'app est en arrière-plan.
+ *
+ * @param {string} title - Titre de la notification.
+ * @param {string} body - Corps du message.
+ * @param {object} data - Données supplémentaires (pour navigation au tap).
  */
 export async function sendSystemNotification(title, body, data = {}) {
   try {
-    // Trigger in-app sound and haptic vibration
-    playNotificationSound();
-
     if (Platform.OS === 'android' || Platform.OS === 'ios') {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: title || 'KLIN UP',
           body: body || 'Nouvelle notification',
           sound: 'default',
+          badge: 1,
           priority: Notifications.AndroidNotificationPriority.MAX,
-          data,
+          data: { ...data, _source: 'local' },
+          ...(Platform.OS === 'android' && {
+            channelId: 'orders',
+            vibrate: [0, 300, 150, 400],
+          }),
         },
-        trigger: null, // Immediate display
+        trigger: null, // Immédiat
       });
-    } else if (typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'granted') {
-      new window.Notification(title || 'KLIN UP', {
-        body: body || 'Nouvelle notification',
-      });
+    } else if (typeof window !== 'undefined' && 'Notification' in window) {
+      // Web fallback
+      if (window.Notification.permission === 'granted') {
+        new window.Notification(title || 'KLIN UP', {
+          body: body || 'Nouvelle notification',
+          icon: '/icon.png',
+        });
+      } else if (window.Notification.permission === 'default') {
+        const perm = await window.Notification.requestPermission();
+        if (perm === 'granted') {
+          new window.Notification(title || 'KLIN UP', { body: body || 'Nouvelle notification' });
+        }
+      }
     }
   } catch (err) {
-    console.warn('Error triggering system notification:', err);
+    console.warn('[Notifications] Erreur lors du déclenchement de la notification locale:', err);
   }
+}
+
+/**
+ * Notification spécifique pour un événement de commande.
+ * Construit automatiquement le titre et le corps à partir du statut.
+ *
+ * @param {string} eventType - 'INSERT' | 'UPDATE'
+ * @param {object} order - La commande concernée.
+ * @param {string|null} oldStatus - L'ancien statut (pour UPDATE).
+ */
+export async function sendOrderNotification(eventType, order, oldStatus = null) {
+  if (!order) return;
+
+  const ref = order.identifiant_unique_marquage || order.id || 'N/A';
+  const newStatus = order.statut || order.status || '';
+  const statusLabel = getOrderStatusLabel(newStatus);
+
+  let title = '';
+  let body = '';
+
+  if (eventType === 'INSERT') {
+    title = '🧺 Nouvelle commande reçue';
+    body = `Commande ${ref} créée — ${statusLabel}`;
+  } else if (eventType === 'UPDATE') {
+    if (oldStatus && oldStatus !== newStatus) {
+      title = '📦 Statut mis à jour';
+      body = `Commande ${ref} → ${statusLabel}`;
+    } else {
+      // Pas de changement de statut réel, on ignore
+      return;
+    }
+  } else {
+    return;
+  }
+
+  await sendSystemNotification(title, body, {
+    orderId: order.id,
+    statut: newStatus,
+    ref,
+    screen: 'gestion',
+  });
 }

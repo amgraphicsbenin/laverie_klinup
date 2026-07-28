@@ -684,8 +684,8 @@ export default function OrdersTab({
               const query = historySearchQuery.toLowerCase();
               const filteredHistory = orders.filter(o => {
                 const customer = customers.find(c => c.id === o.customer_id);
-                const clientName = customer ? `${customer.prenom} ${customer.nom}`.toLowerCase() : '';
-                const code = o.identifiant_unique_marquage.toLowerCase();
+                const clientName = customer ? `${customer.prenom || ''} ${customer.nom || ''}`.toLowerCase() : '';
+                const code = (o.identifiant_unique_marquage || o.id || '').toLowerCase();
 
                 const matchesSearch = clientName.includes(query) || code.includes(query);
                 const matchesStatus = historyFilterStatus === 'all' || o.statut === historyFilterStatus;

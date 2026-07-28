@@ -309,6 +309,40 @@ button, input, select, textarea {
   background: rgba(59, 130, 246, 0.06);
 }
 
+.submenu-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-left: 0.75rem;
+  margin: 0.25rem 0 0.5rem 1.25rem;
+  border-left: 2px solid rgba(0, 44, 247, 0.15);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.submenu-item:hover {
+  color: var(--primary);
+  background: rgba(0, 44, 247, 0.05);
+}
+
+.submenu-item.active {
+  color: var(--primary);
+  background: rgba(0, 44, 247, 0.1);
+  font-weight: 700;
+}
+
 .sidebar-footer {
   margin-top: auto;
   border-top: 1px solid var(--border-color);
@@ -558,7 +592,7 @@ button, input, select, textarea {
 }
 
 /* Modales & Fenêtres Flottantes Premium */
-.modal-backdrop {
+.modal-backdrop, .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -567,9 +601,7 @@ button, input, select, textarea {
   width: 100vw;
   height: 100vh;
   z-index: 1200;
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.12);
   display: grid;
   place-items: center;
   padding: 1.25rem;

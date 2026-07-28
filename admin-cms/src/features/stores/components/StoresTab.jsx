@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../../../services/db';
 
 export default function StoresTab({ onShowSuccess }) {
@@ -428,22 +429,25 @@ export default function StoresTab({ onShowSuccess }) {
         )}
       </div>
 
-      {/* CREATE / EDIT MODAL */}
-      {showModal && (
+      {/* CREATE / EDIT MODAL (PORTAL) */}
+      {showModal && createPortal(
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.25)',
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(15, 23, 42, 0.18)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 10000,
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '460px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)' }}>
+          zIndex: 99999,
+          padding: '1rem',
+          boxSizing: 'border-box'
+        }} onClick={() => setShowModal(false)}>
+          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', margin: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span className="material-symbols-rounded">store</span>
@@ -455,74 +459,80 @@ export default function StoresTab({ onShowSuccess }) {
             </div>
 
             <form onSubmit={handleSaveStore} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Nom de la boutique *</label>
                   <input
                     type="text"
                     required
+                    className="input-control"
                     placeholder="Ex: Point Akpakpa - St Jean"
                     value={formNom}
                     onChange={(e) => setFormNom(e.target.value)}
-                    style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none', fontSize: '0.88rem' }}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
                   />
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Code Boutique</label>
                   <input
                     type="text"
                     required
+                    className="input-control"
                     placeholder="KLP-AKP"
                     value={formCode}
                     onChange={(e) => setFormCode(e.target.value)}
-                    style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none', fontSize: '0.88rem', textTransform: 'uppercase' }}
+                    style={{ width: '100%', boxSizing: 'border-box', textTransform: 'uppercase' }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Adresse complète</label>
                   <input
                     type="text"
+                    className="input-control"
                     placeholder="Ex: Carrefour St Jean"
                     value={formAdresse}
                     onChange={(e) => setFormAdresse(e.target.value)}
-                    style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none', fontSize: '0.88rem' }}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
                   />
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Ville</label>
                   <input
                     type="text"
+                    className="input-control"
                     placeholder="Cotonou"
                     value={formVille}
                     onChange={(e) => setFormVille(e.target.value)}
-                    style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none', fontSize: '0.88rem' }}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Téléphone boutique</label>
                   <input
                     type="text"
+                    className="input-control"
                     placeholder="+229 97 00 00 00"
                     value={formTelephone}
                     onChange={(e) => setFormTelephone(e.target.value)}
-                    style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none', fontSize: '0.88rem' }}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
                   />
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Statut Opérationnel</label>
                   <select
+                    className="input-control"
                     value={formStatut}
                     onChange={(e) => setFormStatut(e.target.value)}
-                    style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none', fontSize: '0.88rem', background: 'var(--bg-card)' }}
+                    style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-card)', cursor: 'pointer' }}
                   >
                     <option value="actif">Actif (Ouvert)</option>
                     <option value="inactif">Inactif (Fermé/Maintenance)</option>
@@ -530,12 +540,13 @@ export default function StoresTab({ onShowSuccess }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%', boxSizing: 'border-box' }}>
                 <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Gérant / Responsable du Point</label>
                 <select
+                  className="input-control"
                   value={formResponsableId}
                   onChange={(e) => setFormResponsableId(e.target.value)}
-                  style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none', fontSize: '0.88rem', background: 'var(--bg-card)' }}
+                  style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-card)', cursor: 'pointer' }}
                 >
                   <option value="">-- Aucun responsable assigné --</option>
                   {staff.map(s => (
@@ -554,7 +565,8 @@ export default function StoresTab({ onShowSuccess }) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -341,9 +341,10 @@ export default function CustomersTab({
             {(() => {
               const query = crmSearch.toLowerCase();
               const filteredCrm = customers.filter(c => {
-                const matchesQuery = c.nom.toLowerCase().includes(query) ||
-                  c.prenom.toLowerCase().includes(query) ||
-                  c.telephone.includes(query);
+                const nom = (c.nom || '').toLowerCase();
+                const prenom = (c.prenom || '').toLowerCase();
+                const tel = (c.telephone || '').toLowerCase();
+                const matchesQuery = nom.includes(query) || prenom.includes(query) || tel.includes(query);
                 
                 if (!matchesQuery) return false;
                 if (filterMode === 'abonne') return !!c.active_subscription;
