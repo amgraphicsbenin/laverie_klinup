@@ -310,15 +310,18 @@ export async function initDb(isRetry = false) {
         throw new Error("Tables principales inaccessibles.");
       }
 
-      if (staffRes.status === 'fulfilled' && !staffRes.value?.error && staffRes.value?.data?.length > 0) {
+      if (staffRes.status === 'fulfilled' && !staffRes.value?.error && staffRes.value?.data) {
         const remoteStaff = staffRes.value.data || [];
-        const mergedStaff = [...remoteStaff];
+        const pendingOfflineStaffIds = (memoryDb.sync_queue || [])
+          .filter(q => q.table === 'staff' && q.action === 'INSERT')
+          .map(q => q.recordId);
+        const validStaff = [...remoteStaff];
         (memoryDb.staff || []).forEach(localItem => {
-          if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
-            mergedStaff.push(localItem);
+          if (localItem && localItem.id && pendingOfflineStaffIds.includes(localItem.id) && !validStaff.some(r => r.id === localItem.id)) {
+            validStaff.push(localItem);
           }
         });
-        memoryDb.staff = mergedStaff;
+        memoryDb.staff = validStaff;
       }
       if (custRes.status === 'fulfilled' && !custRes.value?.error) {
         memoryDb.customers = custRes.value.data || [];
@@ -406,13 +409,16 @@ export async function refreshStaff() {
   try {
     const { data, error } = await supabase.from('staff').select('*');
     if (!error && data) {
-      const mergedStaff = [...(data || [])];
+      const pendingOfflineStaffIds = (memoryDb.sync_queue || [])
+        .filter(q => q.table === 'staff' && q.action === 'INSERT')
+        .map(q => q.recordId);
+      const validStaff = [...(data || [])];
       (memoryDb.staff || []).forEach(localItem => {
-        if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
-          mergedStaff.push(localItem);
+        if (localItem && localItem.id && pendingOfflineStaffIds.includes(localItem.id) && !validStaff.some(r => r.id === localItem.id)) {
+          validStaff.push(localItem);
         }
       });
-      memoryDb.staff = mergedStaff;
+      memoryDb.staff = validStaff;
       await persist();
       db.notify();
     }

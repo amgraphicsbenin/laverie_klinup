@@ -369,7 +369,9 @@ INSERT INTO public.stores (id, nom, code, adresse, statut)
 VALUES ('store_central', 'Laverie Centrale / Siège', 'LAV-001', 'Siège Principal', 'actif')
 ON CONFLICT (id) DO NOTHING;
 
--- 2. Ajout de store_id à orders
+-- 2. Ajout de store_id aux tables staff, customers et orders
+ALTER TABLE public.staff ADD COLUMN IF NOT EXISTS store_id TEXT;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS store_id TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS store_id TEXT;
 
 -- 3. Migration des commandes historiques orphelines vers store_central
@@ -456,6 +458,99 @@ DROP TRIGGER IF EXISTS trg_sync_staff_auth ON public.staff;
 CREATE TRIGGER trg_sync_staff_auth
 AFTER INSERT OR UPDATE OF email, code_pin ON public.staff
 FOR EACH ROW EXECUTE FUNCTION public.sync_staff_to_auth_users();
+
+-- 4. Fonction et Trigger SQL de suppression automatique dans auth.users
+CREATE OR REPLACE FUNCTION public.handle_staff_delete()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.email IS NOT NULL AND OLD.email != '' THEN
+    DELETE FROM auth.users WHERE LOWER(email) = LOWER(OLD.email);
+  END IF;
+  RETURN OLD;
+EXCEPTION WHEN OTHERS THEN
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_delete_staff_auth ON public.staff;
+CREATE TRIGGER trg_delete_staff_auth
+AFTER DELETE ON public.staff
+FOR EACH ROW EXECUTE FUNCTION public.handle_staff_delete();
+
+-- 5. Procédure Stockée RPC d'Administration pour la création atomique de compte
+CREATE OR REPLACE FUNCTION public.admin_create_staff_user(
+  p_nom TEXT,
+  p_prenom TEXT,
+  p_role TEXT,
+  p_email TEXT,
+  p_telephone TEXT DEFAULT '',
+  p_code_pin TEXT DEFAULT '000000',
+  p_store_id TEXT DEFAULT 'store_central'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_user_id UUID;
+  v_res JSONB;
+BEGIN
+  p_email := LOWER(TRIM(p_email));
+  
+  IF EXISTS (SELECT 1 FROM public.staff WHERE LOWER(email) = p_email) THEN
+    RAISE EXCEPTION 'Un utilisateur avec cet e-mail existe déjà.';
+  END IF;
+
+  v_user_id := gen_random_uuid();
+
+  -- Insertion dans auth.users
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE LOWER(email) = p_email) THEN
+    INSERT INTO auth.users (
+      id, instance_id, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud
+    ) VALUES (
+      v_user_id, '00000000-0000-0000-0000-000000000000', p_email,
+      crypt(COALESCE(p_code_pin, '000000'), gen_salt('bf')), CURRENT_TIMESTAMP,
+      jsonb_build_object('provider', 'email', 'providers', array['email']),
+      jsonb_build_object('nom', p_nom, 'prenom', p_prenom, 'role', p_role),
+      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'authenticated', 'authenticated'
+    );
+  ELSE
+    SELECT id INTO v_user_id FROM auth.users WHERE LOWER(email) = p_email;
+  END IF;
+
+  -- Insertion dans public.staff
+  INSERT INTO public.staff (
+    id, nom, prenom, role, email, code_pin, statut, telephone, store_id, created_at
+  ) VALUES (
+    v_user_id::text, p_nom, p_prenom, p_role, p_email, p_code_pin, 'actif', p_telephone, p_store_id, CURRENT_TIMESTAMP
+  );
+
+  SELECT row_to_json(s)::jsonb INTO v_res FROM public.staff s WHERE s.id = v_user_id::text;
+  RETURN v_res;
+END;
+$$;
+
+-- 6. Fonction RPC de vérification sécurisée lors de la connexion mobile
+CREATE OR REPLACE FUNCTION public.verify_staff_login(p_email TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_staff RECORD;
+BEGIN
+  p_email := LOWER(TRIM(p_email));
+  SELECT * INTO v_staff FROM public.staff WHERE LOWER(email) = p_email LIMIT 1;
+  IF v_staff.id IS NOT NULL THEN
+    RETURN row_to_json(v_staff)::jsonb;
+  ELSE
+    RETURN NULL;
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.verify_staff_login(TEXT) TO anon, authenticated;
 
 
 

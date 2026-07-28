@@ -47,7 +47,19 @@ export default function LoginScreen() {
     const staffList = db.getStaff ? db.getStaff() : [];
     let found = staffList.find(s => s.email && s.email.trim().toLowerCase() === targetEmail);
 
-    // Requête directe de secours Supabase si l'utilisateur venant d'être créé n'est pas encore dans memoryDb
+    // 1. Essai RPC verify_staff_login sécurisé sur Supabase
+    if (!found && supabase) {
+      try {
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('verify_staff_login', { p_email: targetEmail });
+        if (rpcData && !rpcErr) {
+          found = rpcData;
+        }
+      } catch (e) {
+        // RPC fallback silencieux
+      }
+    }
+
+    // 2. Requête directe de secours Supabase si non trouvé dans le cache local
     if (!found && supabase) {
       try {
         const { data, error } = await supabase
@@ -58,14 +70,21 @@ export default function LoginScreen() {
 
         if (data && !error) {
           found = data;
-          if (memoryDb && memoryDb.staff && !memoryDb.staff.some(s => s.id === data.id)) {
-            memoryDb.staff.push(data);
-            if (db.notify) db.notify();
-          }
         }
       } catch (err) {
         console.warn("[Login] Recherche directe Supabase échouée :", err);
       }
+    }
+
+    // 3. Garantir la présence de l'utilisateur dans memoryDb.staff pour la vérification PIN
+    if (found && memoryDb && memoryDb.staff) {
+      const idx = memoryDb.staff.findIndex(s => s.id === found.id || (s.email && s.email.trim().toLowerCase() === targetEmail));
+      if (idx === -1) {
+        memoryDb.staff.push(found);
+      } else {
+        memoryDb.staff[idx] = { ...memoryDb.staff[idx], ...found };
+      }
+      if (db.notify) db.notify();
     }
 
     setLoading(false);

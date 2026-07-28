@@ -193,26 +193,25 @@ export async function performMutation(action, table, recordId, data, rollbackFn)
         addToSyncQueue(action, table, recordId, data);
         startAutoReconnect();
       } else if (errCode === '42703' || (errMsg.includes('column') && errMsg.includes('does not exist'))) {
-        console.warn(`[DB] La colonne n'existe pas dans Supabase. Tentative de repli sans motif_annulation.`);
-        if (table === 'orders' && sanitizedData.motif_annulation !== undefined) {
-          const retriedData = { ...sanitizedData };
-          delete retriedData.motif_annulation;
-          
-          let retryRes;
-          if (action === 'insert') {
-            retryRes = await supabase.from(table).insert(retriedData);
-          } else if (action === 'update') {
-            retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
-          }
-          
-          if (retryRes && retryRes.error) {
-            console.error(`[DB] Échec du repli de la mutation :`, retryRes.error.message);
-            if (rollbackFn) rollbackFn(retryRes.error);
-          } else {
-            console.log(`[DB] ✅ Repli de la mutation réussi (sans motif_annulation).`);
-          }
+        console.warn(`[DB] La colonne n'existe pas dans Supabase. Tentative de repli sans colonnes facultatives...`);
+        const retriedData = { ...sanitizedData };
+        delete retriedData.store_id;
+        delete retriedData.motif_annulation;
+        delete retriedData.remise_pourcentage;
+        delete retriedData.remise_montant;
+        
+        let retryRes;
+        if (action === 'insert') {
+          retryRes = await supabase.from(table).insert(retriedData);
+        } else if (action === 'update') {
+          retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
+        }
+        
+        if (retryRes && retryRes.error) {
+          console.error(`[DB] Échec du repli de la mutation :`, retryRes.error.message);
+          if (rollbackFn) rollbackFn(retryRes.error);
         } else {
-          if (rollbackFn) rollbackFn(res.error);
+          console.log(`[DB] ✅ Repli de la mutation réussi avec données assainies.`);
         }
       } else {
         console.error(`[DB] Erreur de validation de base de données :`, res.error.message);
@@ -265,14 +264,18 @@ export async function initDb(forceSync = false) {
     await syncOfflineQueue();
     
     // Merge remote staff with local memoryDb.staff so locally created staff accounts are never wiped out on reload
+    // Synchronisation stricte : Supabase est la source de vérité distante
     if (staffData) {
-      const mergedStaff = [...(staffData || [])];
+      const pendingOfflineStaffIds = (loadData('klin_up_sync_queue', []) || [])
+        .filter(q => q.table === 'staff' && q.action === 'INSERT')
+        .map(q => q.recordId);
+      const validStaff = (staffData || []).filter(Boolean);
       (memoryDb.staff || []).forEach(localItem => {
-        if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
-          mergedStaff.push(localItem);
+        if (localItem && localItem.id && pendingOfflineStaffIds.includes(localItem.id) && !validStaff.some(r => r.id === localItem.id)) {
+          validStaff.push(localItem);
         }
       });
-      memoryDb.staff = mergedStaff;
+      memoryDb.staff = validStaff;
     }
     
     const { data: custData, error: custErr } = await supabase.from('customers').select('*');
@@ -323,6 +326,7 @@ export async function initDb(forceSync = false) {
     
     persist();
     notifyListeners();
+    try { setupRealtime(); } catch (e) { console.warn("[DB Realtime] Inaccessible :", e.message); }
   } catch (err) {
     console.warn("[DB] ⚠️ Impossible de joindre Supabase, bascule en local persistant. Erreur :", err.message);
     isUsingRemote = false;
@@ -336,19 +340,74 @@ export async function refreshStaff() {
   try {
     const { data, error } = await supabase.from('staff').select('*');
     if (!error && data) {
-      const mergedStaff = [...(data || [])];
+      const pendingOfflineStaffIds = (loadData('klin_up_sync_queue', []) || [])
+        .filter(q => q.table === 'staff' && q.action === 'INSERT')
+        .map(q => q.recordId);
+      const validStaff = (data || []).filter(Boolean);
       (memoryDb.staff || []).forEach(localItem => {
-        if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
-          mergedStaff.push(localItem);
+        if (localItem && localItem.id && pendingOfflineStaffIds.includes(localItem.id) && !validStaff.some(r => r.id === localItem.id)) {
+          validStaff.push(localItem);
         }
       });
-      memoryDb.staff = mergedStaff;
+      memoryDb.staff = validStaff;
       persist();
       notifyListeners();
     }
   } catch (e) {
     console.error("Failed to refresh staff:", e);
   }
+}
+
+export function setupRealtime() {
+  if (!supabase) return;
+  const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests'];
+  
+  tables.forEach(table => {
+    supabase
+      .channel(`admin_${table}_channel`)
+      .on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
+        const { eventType, new: newRow, old: oldRow } = payload;
+        
+        let targetList = [];
+        if (table === 'staff') targetList = memoryDb.staff;
+        else if (table === 'customers') targetList = memoryDb.customers;
+        else if (table === 'orders') targetList = memoryDb.orders;
+        else if (table === 'activity_logs') targetList = memoryDb.logs;
+        else if (table === 'catalog') targetList = memoryDb.catalog;
+        else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
+
+        if (eventType === 'INSERT') {
+          const exists = targetList.some(x => x.id === newRow.id);
+          if (!exists) {
+            const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
+            if (table === 'activity_logs') {
+              targetList.unshift(rowToAdd);
+            } else {
+              targetList.push(rowToAdd);
+            }
+          }
+        } else if (eventType === 'UPDATE') {
+          const idx = targetList.findIndex(x => x.id === newRow.id);
+          if (idx !== -1) {
+            let mergedRow = { ...newRow };
+            if (table === 'orders') mergedRow = hydrateOrder(mergedRow);
+            targetList[idx] = mergedRow;
+          } else {
+            const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
+            targetList.push(rowToAdd);
+          }
+        } else if (eventType === 'DELETE') {
+          const idx = targetList.findIndex(x => x.id === oldRow.id);
+          if (idx !== -1) {
+            targetList.splice(idx, 1);
+          }
+        }
+
+        persist();
+        notifyListeners();
+      })
+      .subscribe();
+  });
 }
 
 export async function testConnection() {
