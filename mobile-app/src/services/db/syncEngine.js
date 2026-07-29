@@ -552,10 +552,21 @@ export function setupRealtime() {
           }
         }
 
-        // ── Notification en temps réel pour tous les appareils connectés ──
+        // ── Notification en temps réel ciblée par Point de Laverie (store_id) ──
         if (table === 'orders' && newRow && (eventType === 'INSERT' || eventType === 'UPDATE')) {
           const hydratedNewOrder = hydrateOrder(newRow);
-          sendOrderNotification(eventType, hydratedNewOrder, oldOrderStatus).catch(() => {});
+          const currentUser = memoryDb.current_user;
+          
+          if (currentUser) {
+            const orderStoreId = hydratedNewOrder.store_id || 'store_central';
+            const userStoreId = currentUser.store_id || 'store_central';
+            const isSuperAdmin = currentUser.role === 'super_admin' || userStoreId === 'all';
+
+            // Seuls les utilisateurs rattachés au même point de laverie (ou super_admin) reçoivent la notification
+            if (isSuperAdmin || userStoreId === orderStoreId) {
+              sendOrderNotification(eventType, hydratedNewOrder, oldOrderStatus).catch(() => {});
+            }
+          }
         }
 
         // Éviction automatique immédiate si l'utilisateur actuellement connecté est désactivé ou supprimé

@@ -83,10 +83,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Récupérer tous les push tokens du staff actif
+    // Récupérer le staff actif rattaché au point de laverie de la commande
     const { data: staffList, error: staffError } = await supabase
       .from('staff')
-      .select('id, push_token, prenom, nom')
+      .select('id, push_token, role, store_id, prenom, nom')
       .not('push_token', 'is', null)
       .eq('statut', 'actif');
 
@@ -95,12 +95,21 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: staffError.message }), { status: 500 });
     }
 
-    const tokens: string[] = (staffList || [])
+    const orderStoreId = order.store_id || 'store_central';
+
+    // Filtrer les utilisateurs rattachés au MEME point de laverie (ou les super_admin)
+    const targetStaff = (staffList || []).filter((s: { role?: string; store_id?: string }) => {
+      const userStoreId = s.store_id || 'store_central';
+      const isSuperAdmin = s.role === 'super_admin' || userStoreId === 'all';
+      return isSuperAdmin || userStoreId === orderStoreId;
+    });
+
+    const tokens: string[] = targetStaff
       .map((s: { push_token?: string }) => s.push_token)
       .filter((t): t is string => !!t && t.startsWith('ExponentPushToken['));
 
     if (tokens.length === 0) {
-      return new Response(JSON.stringify({ sent: 0, reason: 'Aucun token disponible' }), { status: 200 });
+      return new Response(JSON.stringify({ sent: 0, reason: `Aucun token pour le store ${orderStoreId}` }), { status: 200 });
     }
 
     // Construire le message de notification
