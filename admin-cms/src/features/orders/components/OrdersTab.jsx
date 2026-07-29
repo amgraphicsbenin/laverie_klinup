@@ -739,9 +739,7 @@ export default function OrdersTab({
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                      {order.type_article} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>|</span> {serviceName}
-                    </div>
+
 
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                       <span>Client : <strong style={{ color: 'var(--text-primary)' }}>{clientName}</strong></span>

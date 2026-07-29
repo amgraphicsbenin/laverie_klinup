@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../services/db';
+import OrderFormModal from '../features/orders/components/OrderFormModal';
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -1733,8 +1734,18 @@ export default function AdminView({ activeTab, onManageStaff }) {
     });
   };
 
-  const handleUpdateService = (cloth, service) => {
-    setArticleServices(prev => ({ ...prev, [cloth]: service }));
+  const handleUpdateService = (cloth, serviceKey) => {
+    setArticleServices(prev => {
+      const current = prev[cloth] || ['lavage_simple'];
+      let updated;
+      if (current.includes(serviceKey)) {
+        if (current.length <= 1) return prev;
+        updated = current.filter(s => s !== serviceKey);
+      } else {
+        updated = [...current, serviceKey];
+      }
+      return { ...prev, [cloth]: updated };
+    });
   };
 
   const getTotalClothesCount = () => {
@@ -1755,10 +1766,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
     Object.keys(articleQuantities).forEach(cloth => {
       const qty = articleQuantities[cloth];
       if (qty > 0) {
-        const svc = articleServices[cloth] || 'lavage_simple';
-        const item = catalog.find(c => c.article === cloth && c.service === svc);
-        const price = item ? item.prix : 1500;
-        total += price * qty;
+        const selectedSvcs = articleServices[cloth] || ['lavage_simple'];
+        selectedSvcs.forEach(svc => {
+          const canonicalSvc = (svc === 'traitement') ? 'lavage_simple' : svc;
+          const item = catalog.find(c => c.article === cloth && (c.service === canonicalSvc || c.service === svc));
+          const price = item ? item.prix : (canonicalSvc === 'repassage' ? 1000 : 1500);
+          total += price * qty;
+        });
       }
     });
     return niveauUrgence === 'Express' ? Math.round(total * 1.5) : total;
@@ -1813,10 +1827,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
     Object.keys(articleQuantities).forEach(cloth => {
       const qty = articleQuantities[cloth];
       if (qty > 0) {
-        selectedItems.push({
-          article: cloth,
-          quantite: qty,
-          service: articleServices[cloth] || 'lavage_simple'
+        const selectedSvcs = articleServices[cloth] || ['lavage_simple'];
+        selectedSvcs.forEach(svcKey => {
+          selectedItems.push({
+            article: cloth,
+            quantite: qty,
+            service: svcKey
+          });
         });
       }
     });
@@ -3114,541 +3131,14 @@ export default function AdminView({ activeTab, onManageStaff }) {
       )}
 
           {/* ========================================================
-          MODAL : ENREGISTREMENT COMMANDE (CAISSE ADMIN REDESIGN)
+          MODAL : ENREGISTREMENT COMMANDE (APPLICATION FLOW & DESIGN)
           ======================================================== */}
-          {showOrderRegistrationModal && (
-            <ModalPortal>
-              <div className="modal-backdrop">
-                <div 
-                  className="card modal-dialog-card" 
-                  onClick={(e) => e.stopPropagation()} 
-                  style={{ 
-                    width: '100%', 
-                    maxWidth: '660px', 
-                    maxHeight: '85vh', 
-                    overflow: 'hidden', 
-                    background: 'var(--bg-card)', 
-                    padding: '1.25rem 1.5rem', 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '0.85rem',
-                    borderRadius: '24px'
-                  }}
-                >
-                {/* Header bar */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.65rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                    <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(0, 44, 247, 0.08)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ShoppingBag size={18} />
-                    </div>
-                    <div>
-                      <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                        Nouvelle Commande Caisse
-                      </h3>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                        Enregistrement de dépôt & marquage d'articles
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    style={{ padding: '0.25rem', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    onClick={handleCancelOrderRegistration}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleCreateOrder} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', overflowY: 'auto', minHeight: 0, flex: '1 1 auto', paddingRight: '0.25rem' }}>
-
-                  {/* 👤 SECTION 1 : SELECTION CLIENT & ABONNEMENT */}
-                  <div style={{ background: 'var(--bg-app)', padding: '0.85rem', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Users size={15} color="var(--primary)" /> Client Destinataire
-                      </label>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '0.2rem 0.55rem', fontSize: '0.7rem', borderRadius: '8px', fontWeight: 700 }}
-                        onClick={() => setShowNewCustomerModal(true)}
-                      >
-                        + Nouveau Client
-                      </button>
-                    </div>
-
-                    <CustomSelect
-                      className="input-control"
-                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.82rem', borderRadius: '8px', fontWeight: 600 }}
-                      value={selectedCustomerId}
-                      onChange={(e) => setSelectedCustomerId(e.target.value)}
-                      required
-                    >
-                      <option value="">-- Sélectionner un client dans la base --</option>
-                      {customers.map(c => (
-                        <option key={c.id} value={c.id}>{c.prenom} {c.nom} ({c.telephone})</option>
-                      ))}
-                    </CustomSelect>
-
-                    {activeCustomer && (
-                      <div style={{ padding: '0.65rem 0.75rem', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>Préférence pliage : <strong>{activeCustomer.preferences_pliage || 'Non spécifié'}</strong></span>
-                          <span style={{ color: 'var(--primary)', fontWeight: 800, background: 'var(--primary-light)', padding: '0.12rem 0.45rem', borderRadius: '6px' }}>
-                            ⭐ {activeCustomer.points_fidelite} pts fidélité
-                          </span>
-                        </div>
-
-                        {activeCustomer.solde_dette > 0 && (
-                          <div style={{ color: 'var(--accent)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'var(--accent-light)', padding: '0.3rem 0.55rem', borderRadius: '6px', marginTop: '0.1rem' }}>
-                            <TriangleAlert size={13} /> Solde débiteur encours : {activeCustomer.solde_dette.toLocaleString()} FCFA
-                          </div>
-                        )}
-
-                        {/* Zone d'abonnement dynamique */}
-                        {activeCustomer.active_subscription ? (
-                          <div style={{ marginTop: '0.25rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: subscribePlanId ? 'not-allowed' : 'pointer', fontWeight: 800, color: 'var(--primary)' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={payWithSubscription}
-                                  disabled={!!subscribePlanId}
-                                  onChange={(e) => setPayWithSubscription(e.target.checked)}
-                                />
-                                Utiliser le forfait d'abonnement actif
-                              </label>
-                              <span style={{ fontWeight: 800, color: 'var(--success)' }}>
-                                ({activeCustomer.active_subscription.remaining_clothes} vêt. restants)
-                              </span>
-                            </div>
-
-                            {payWithSubscription && !subscribePlanId && getTotalClothesCount() > activeCustomer.active_subscription.remaining_clothes && (
-                              <div style={{ color: 'var(--accent)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.1rem' }}>
-                                <AlertCircle size={13} /> Solde insuffisant ({getTotalClothesCount()} vêt. requis)
-                              </div>
-                            )}
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.15rem' }}>
-                              <span style={{ fontWeight: 600, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Changer / Renouveler l'abonnement :</span>
-                              <CustomSelect
-                                className="input-control"
-                                style={{ padding: '0.3rem 0.55rem', fontSize: '0.75rem', borderRadius: '6px', width: '100%', background: 'var(--bg-app)' }}
-                                value={subscribePlanId}
-                                onChange={(e) => setSubscribePlanId(e.target.value)}
-                              >
-                                <option value="">-- Conserver le forfait actuel --</option>
-                                {catalog.filter(c => c.categorie === 'abonnement').map(p => (
-                                  <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
-                                ))}
-                              </CustomSelect>
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{ marginTop: '0.25rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                            <span style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.72rem' }}>Souscrire immédiatement à une formule d'abonnement :</span>
-                            <CustomSelect
-                              className="input-control"
-                              style={{ padding: '0.3rem 0.55rem', fontSize: '0.75rem', borderRadius: '6px', width: '100%', background: 'var(--bg-app)' }}
-                              value={subscribePlanId}
-                              onChange={(e) => setSubscribePlanId(e.target.value)}
-                            >
-                              <option value="">-- Pas d'abonnement pour cette commande --</option>
-                              {catalog.filter(c => c.categorie === 'abonnement').map(p => (
-                                <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString()} F)</option>
-                              ))}
-                            </CustomSelect>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 👔 SECTION 2 : ARTICLES & SERVICES DU PANIER */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Shirt size={15} color="var(--primary)" /> Composition du Panier de Linge
-                      </label>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.55rem', borderRadius: '20px' }}>
-                        {getTotalClothesCount()} article{getTotalClothesCount() > 1 ? 's' : ''} au total
-                      </span>
-                    </div>
-
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: '0.55rem',
-                      maxHeight: '180px',
-                      overflowY: 'auto',
-                      paddingRight: '4px'
-                    }}>
-                      {catalogClothes.map(cloth => {
-                        const qty = articleQuantities[cloth] || 0;
-                        const selectedSvc = articleServices[cloth] || 'lavage_simple';
-                        const isSelected = qty > 0;
-
-                        const servicesForCloth = catalog.filter(c => c.categorie !== 'abonnement' && c.article === cloth && c.service !== 'nettoyage_a_sec');
-                        const activeServices = servicesForCloth.length > 0 ? servicesForCloth : [
-                          { service: 'lavage_simple', prix: 1500 },
-                          { service: 'repassage', prix: 1000 }
-                        ];
-                        const activeServiceObj = activeServices.find(s => s.service === selectedSvc) || activeServices[0];
-                        const unitPrice = activeServiceObj ? activeServiceObj.prix : 1500;
-                        const svcIcons = { lavage_simple: '🫧', nettoyage_a_sec: '✨', repassage: '♨️' };
-
-                        return (
-                          <div key={cloth} style={{
-                            gridColumn: isSelected ? 'span 3' : 'span 1',
-                            display: 'flex',
-                            flexDirection: isSelected ? 'row' : 'column',
-                            alignItems: isSelected ? 'center' : 'stretch',
-                            padding: isSelected ? '0.75rem 0.95rem' : '0.75rem 0.6rem',
-                            background: isSelected ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-app)',
-                            borderRadius: '14px',
-                            border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            gap: isSelected ? '0.85rem' : '0.4rem',
-                            boxShadow: isSelected ? '0 4px 12px rgba(59, 130, 246, 0.12)' : 'none',
-                          }}>
-
-                            {/* Quantity controls */}
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: isSelected ? '0.6rem' : '0',
-                              flexDirection: isSelected ? 'row' : 'column',
-                              flexShrink: 0
-                            }}>
-                              {!isSelected && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateQty(cloth, 1)}
-                                  style={{
-                                    width: '38px', height: '38px',
-                                    borderRadius: '50%',
-                                    border: '1.5px solid var(--border-color)',
-                                    background: 'var(--bg-card)',
-                                    color: 'var(--primary)',
-                                    fontSize: '1.2rem', fontWeight: 800,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease',
-                                    margin: 'auto'
-                                  }}
-                                >
-                                  +
-                                </button>
-                              )}
-
-                              {isSelected && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateQty(cloth, -1)}
-                                    style={{
-                                      width: '28px', height: '28px', borderRadius: '50%',
-                                      border: '1.5px solid var(--border-color)',
-                                      background: 'var(--bg-card)', color: 'var(--text-secondary)',
-                                      fontSize: '1rem', fontWeight: 800,
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                      cursor: 'pointer',
-                                    }}
-                                  >−</button>
-                                  <span style={{
-                                    minWidth: '30px', textAlign: 'center',
-                                    fontSize: '0.95rem', fontWeight: 800,
-                                    color: 'var(--primary)',
-                                    background: 'var(--bg-card)',
-                                    borderRadius: '8px',
-                                    padding: '0.15rem 0.4rem',
-                                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                                  }}>{qty}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateQty(cloth, 1)}
-                                    style={{
-                                      width: '28px', height: '28px', borderRadius: '50%',
-                                      border: 'none',
-                                      background: 'var(--primary)', color: '#ffffff',
-                                      fontSize: '1rem', fontWeight: 800,
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                      cursor: 'pointer',
-                                    }}
-                                  >+</button>
-                                </div>
-                              )}
-
-                              <span style={{
-                                fontSize: isSelected ? '0.88rem' : '0.74rem',
-                                fontWeight: isSelected ? 800 : 700,
-                                color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
-                                textAlign: 'center',
-                                lineHeight: 1.2,
-                              }}>{cloth}</span>
-                            </div>
-
-                            {/* Service Pills */}
-                            {isSelected && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flex: 1, flexWrap: 'wrap' }}>
-                                {activeServices.map(s => {
-                                  const isActiveSvc = selectedSvc === s.service;
-                                  return (
-                                    <button
-                                      key={s.service}
-                                      type="button"
-                                      onClick={() => handleUpdateService(cloth, s.service)}
-                                      style={{
-                                        padding: '0.3rem 0.7rem',
-                                        borderRadius: '20px',
-                                        border: isActiveSvc ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
-                                        background: isActiveSvc ? 'var(--primary)' : 'var(--bg-card)',
-                                        color: isActiveSvc ? '#ffffff' : 'var(--text-secondary)',
-                                        fontSize: '0.72rem',
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        transition: 'all 0.15s ease',
-                                        whiteSpace: 'nowrap',
-                                      }}
-                                    >
-                                      {svcIcons[s.service] || ''} {serviceLabels[s.service] || s.service}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* Subtotal */}
-                            {isSelected && (
-                              <span style={{
-                                fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary)',
-                                whiteSpace: 'nowrap', marginLeft: 'auto', flexShrink: 0,
-                              }}>
-                                {(unitPrice * qty).toLocaleString()} F
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* ⚡ SECTION 3 : PARAMÈTRES RÈGLEMENT, URGENCE & REMISE */}
-                  <div style={{ background: 'var(--bg-app)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      {(() => {
-                        const activeCust = customers.find(c => c.id === selectedCustomerId);
-                        const isSubMode = (payWithSubscription && activeCust && activeCust.active_subscription) || !!subscribePlanId;
-
-                        return (
-                          <div className="form-group" style={{ marginBottom: 0, gap: '0.35rem' }}>
-                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>Niveau d'Urgence</label>
-                            <CustomSelect
-                              className="input-control"
-                              disabled={isSubMode}
-                              style={{
-                                padding: '0.55rem',
-                                fontSize: '0.82rem',
-                                borderRadius: '10px',
-                                fontWeight: 700
-                              }}
-                              value={isSubMode ? 'Normal' : niveauUrgence}
-                              onChange={(e) => setNiveauUrgence(e.target.value)}
-                            >
-                              <option value="Normal">🟢 Normal (Standard)</option>
-                              {!isSubMode && <option value="Express">⚡ Express (+50% Majoré)</option>}
-                            </CustomSelect>
-                          </div>
-                        );
-                      })()}
-
-                      <div className="form-group" style={{ marginBottom: 0, gap: '0.35rem' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>Mode de Règlement</label>
-                        <CustomSelect
-                          className="input-control"
-                          style={{ padding: '0.55rem', fontSize: '0.82rem', borderRadius: '10px', fontWeight: 700 }}
-                          value={(payWithSubscription && !subscribePlanId) ? 'abonnement' : modeReglement}
-                          disabled={payWithSubscription && !subscribePlanId}
-                          onChange={(e) => setModeReglement(e.target.value)}
-                        >
-                          {(payWithSubscription && !subscribePlanId) ? (
-                            <option value="abonnement">⭐ Forfait Abonnement</option>
-                          ) : (
-                            <>
-                              <option value="especes">💵 Espèces</option>
-                              <option value="mobile_money">📱 Mobile Money</option>
-                              <option value="avance_solde">🤝 Avance / Crédit</option>
-                            </>
-                          )}
-                        </CustomSelect>
-                      </div>
-                    </div>
-
-                    {(() => {
-                      const activeCust = customers.find(c => c.id === selectedCustomerId);
-                      const isSubMode = (payWithSubscription && activeCust && activeCust.active_subscription) || !!subscribePlanId;
-
-                      return (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                          <div className="form-group" style={{ marginBottom: 0, gap: '0.35rem' }}>
-                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                              Acompte Versé (FCFA)
-                            </label>
-                            <input
-                              type="number"
-                              className="input-control"
-                              disabled={isSubMode}
-                              style={{
-                                padding: '0.55rem',
-                                fontSize: '0.82rem',
-                                borderRadius: '10px',
-                                fontWeight: 700
-                              }}
-                              placeholder="Ex: 2000"
-                              value={isSubMode ? '0' : avancePayee}
-                              onChange={(e) => setAvancePayee(e.target.value)}
-                            />
-                          </div>
-
-                          <div className="form-group" style={{ marginBottom: 0, gap: '0.35rem' }}>
-                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                              Remise Commerciale (%)
-                            </label>
-                            <input
-                              type="number"
-                              className="input-control"
-                              disabled={isSubMode}
-                              style={{
-                                padding: '0.55rem',
-                                fontSize: '0.82rem',
-                                borderRadius: '10px',
-                                fontWeight: 700
-                              }}
-                              placeholder="Ex: 10"
-                              min="0"
-                              max="100"
-                              value={isSubMode ? '0' : remisePourcentage}
-                              onChange={(e) => setRemisePourcentage(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Subscriptions Deduction Recap */}
-                    {(() => {
-                      if (subscribePlanId) {
-                        const subPlan = catalog.find(c => c.id === subscribePlanId && c.categorie === 'abonnement');
-                        const totalClothes = getTotalClothesCount();
-                        const quota = subPlan ? (subPlan.nombre_vetements || 0) : 0;
-                        const remainingAfterOrder = Math.max(0, quota - totalClothes);
-
-                        return (
-                          <div style={{
-                            background: 'rgba(37, 99, 235, 0.08)',
-                            border: '1px solid rgba(37, 99, 235, 0.25)',
-                            borderRadius: '12px',
-                            padding: '0.75rem 0.95rem',
-                            fontSize: '0.78rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.35rem'
-                          }}>
-                            <div style={{ fontWeight: 800, color: 'var(--primary)', borderBottom: '1px solid rgba(37, 99, 235, 0.15)', paddingBottom: '0.3rem', display: 'flex', justifyContent: 'space-between' }}>
-                              <span>Souscription NOUVEAU FORFAIT</span>
-                              <span>{subPlan ? subPlan.article : ''} ({quota} vêt.)</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontWeight: 800 }}>
-                              <span>Déduction automatique panier :</span>
-                              <span>-{totalClothes} vêt. (0 FCFA)</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-primary)', fontWeight: 800 }}>
-                              <span>Solde restant disponible après commande :</span>
-                              <span style={{ color: '#10b981' }}>{remainingAfterOrder} / {quota} vêt.</span>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      if (payWithSubscription && activeCustomer && activeCustomer.active_subscription) {
-                        const totalClothes = getTotalClothesCount();
-                        const remaining = activeCustomer.active_subscription.remaining_clothes;
-                        const remainingAfterOrder = remaining - totalClothes;
-                        return (
-                          <div style={{
-                            background: 'rgba(16, 185, 129, 0.08)',
-                            border: '1px solid rgba(16, 185, 129, 0.25)',
-                            borderRadius: '12px',
-                            padding: '0.75rem 0.95rem',
-                            fontSize: '0.78rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.35rem'
-                          }}>
-                            <div style={{ fontWeight: 800, color: '#10b981', borderBottom: '1px solid rgba(16, 185, 129, 0.15)', paddingBottom: '0.3rem', display: 'flex', justifyContent: 'space-between' }}>
-                              <span>Déduction Forfait Actif</span>
-                              <span>{activeCustomer.active_subscription.name}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-primary)', fontWeight: 800 }}>
-                              <span>Solde après commande :</span>
-                              <span style={{ color: remainingAfterOrder >= 0 ? '#10b981' : 'var(--danger)' }}>{remainingAfterOrder} vêt.</span>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return null;
-                    })()}
-
-                  </div>
-
-                  {/* 💰 RÉCAPITULATIF FINANCIER & VALIDER */}
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.25rem' }}>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Total Commande Caisse</span>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.65rem' }}>
-                        <div style={{ fontFamily: 'var(--font-title)', fontSize: '1.45rem', fontWeight: 800, color: 'var(--primary)' }}>
-                          {getCalculatedPrice().toLocaleString()} FCFA
-                        </div>
-                        {Number(remisePourcentage) > 0 && (
-                          <div style={{ fontSize: '0.78rem', display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                            <span style={{ textDecoration: 'line-through', color: 'var(--danger)', fontWeight: 700 }}>
-                              {getBasePrice().toLocaleString()} F
-                            </span>
-                            <span style={{ color: '#10b981', fontWeight: 800 }}>
-                              (-{remisePourcentage}%)
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.65rem' }}>
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={handleCancelOrderRegistration}
-                        style={{ padding: '0.6rem 1.1rem', fontSize: '0.82rem', borderRadius: '12px', fontWeight: 700 }}
-                      >
-                        Annuler
-                      </button>
-                      <button
-                        type="submit"
-                        className="btn btn-primary"
-                        style={{ padding: '0.6rem 1.35rem', fontSize: '0.82rem', borderRadius: '12px', fontWeight: 800, boxShadow: '0 4px 15px rgba(0, 44, 247, 0.3)' }}
-                      >
-                        ⚡ Valider Commande
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </ModalPortal>
-        )}
+          <OrderFormModal
+            visible={showOrderRegistrationModal}
+            onClose={() => setShowOrderRegistrationModal(false)}
+            onShowSuccess={(msg) => alert(msg)}
+            refreshAdminData={refreshAdminData}
+          />
 
       {/* ========================================================
          MODAL : CRÉATION CLIENT (Nouveau Client CRM)

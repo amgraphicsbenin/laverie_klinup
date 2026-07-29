@@ -17,6 +17,8 @@ try {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
       priority: Notifications.AndroidNotificationPriority.MAX,
@@ -60,7 +62,7 @@ export function getOrderStatusLabel(statut) {
 export async function initSystemNotifications() {
   try {
     if (Platform.OS === 'android') {
-      // Canal principal pour les commandes (priorité MAX = sonnerie + vibration garantis)
+      // Canal principal pour les commandes (priorité MAX = sonnerie + heads-up banner garantis sur Pixel)
       await Notifications.setNotificationChannelAsync('orders', {
         name: 'Commandes KLIN UP',
         description: 'Notifications de suivi des commandes',
@@ -69,9 +71,14 @@ export async function initSystemNotifications() {
         lightColor: '#002cf7',
         sound: 'default',
         enableVibrate: true,
+        enableLights: true,
         showBadge: true,
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         bypassDnd: false,
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.NOTIFICATION,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        },
       });
 
       // Canal secondaire pour les alertes générales
@@ -83,10 +90,11 @@ export async function initSystemNotifications() {
         sound: 'default',
         enableVibrate: true,
         showBadge: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
     }
 
-    // Demander les permissions (Android 13+ et iOS)
+    // Demander les permissions (Android 13+ POST_NOTIFICATIONS et iOS)
     if (Platform.OS === 'android' || Platform.OS === 'ios') {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
@@ -100,6 +108,7 @@ export async function initSystemNotifications() {
             allowCriticalAlerts: false,
             provideAppNotificationSettings: false,
           },
+          android: {},
         });
         finalStatus = status;
       }

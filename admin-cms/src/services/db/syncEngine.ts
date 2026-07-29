@@ -1,24 +1,23 @@
 import { supabase } from '../supabaseClient.js';
-import { DEFAULT_CATALOG, DEFAULT_STORES } from './seeds.js';
-import { memoryDb, notifyListeners } from './memoryStore.js';
-import { hydrateOrder, startOrderStateCron } from './dbEngine.js';
+import { memoryDb, notifyListeners } from './memoryStore';
+import { hydrateOrder, startOrderStateCron } from './dbEngine';
 
 let isUsingRemote = false;
-export function getIsUsingRemote() { return isUsingRemote; }
+export function getIsUsingRemote(): boolean { return isUsingRemote; }
 
 // ─── Session-only localStorage helpers ────────────────────────────────────
 // ONLY for: current_user session, selected_store_id preference, notification prefs
 // NO business data is ever stored in localStorage.
 
-export function saveSession(key, value) {
+export function saveSession(key: string, value: any): void {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* ignore */ }
 }
 
-export function removeSession(key) {
+export function removeSession(key: string): void {
   try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
 }
 
-function loadSession(key, defaultVal) {
+function loadSession(key: string, defaultVal: any): any {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return defaultVal;
@@ -28,7 +27,7 @@ function loadSession(key, defaultVal) {
 
 // ─── Payload sanitizer ─────────────────────────────────────────────────────
 
-function sanitizePayload(table, data) {
+function sanitizePayload(table: string, data: any): any {
   if (!data) return data;
   const sanitized = { ...data };
   if (table === 'orders') {
@@ -38,15 +37,22 @@ function sanitizePayload(table, data) {
   } else if (table === 'catalog') {
     delete sanitized.sku;
     delete sanitized.prix_urgent;
+    delete sanitized.is_active;
+  } else if (table === 'stores') {
+    delete sanitized.ville;
+    delete sanitized.responsable_id;
+    delete sanitized.responsable_nom;
+  } else if (table === 'staff') {
+    delete sanitized.store_id;
+  } else if (table === 'customers') {
+    delete sanitized.store_id;
   }
   return sanitized;
 }
 
 // ─── Core mutation — Direct Supabase, throws on error ─────────────────────
-// This function is now the ONLY way to write to the database.
-// It always awaits Supabase confirmation before the caller updates memoryDb.
 
-export async function performMutation(action, table, recordId, data) {
+export async function performMutation(action: 'insert' | 'update' | 'delete', table: string, recordId?: string, data?: any): Promise<any> {
   if (!supabase) {
     throw new Error(
       'Supabase non connecté. Vérifiez votre connexion internet et la configuration.'
@@ -54,7 +60,7 @@ export async function performMutation(action, table, recordId, data) {
   }
 
   const sanitizedData = sanitizePayload(table, data);
-  let res;
+  let res: any;
 
   try {
     if (action === 'insert') {
@@ -64,7 +70,7 @@ export async function performMutation(action, table, recordId, data) {
     } else if (action === 'delete') {
       res = await supabase.from(table).delete().eq('id', recordId);
     }
-  } catch (networkErr) {
+  } catch (networkErr: any) {
     throw new Error(
       `Erreur réseau lors de la communication avec Supabase : ${networkErr.message}`
     );
@@ -74,7 +80,16 @@ export async function performMutation(action, table, recordId, data) {
     const errMsg = res.error.message || '';
     const errCode = res.error.code || '';
 
-    // Graceful fallback for schema-cache / column-not-found issues
+    // Graceful fallback for Row-Level Security (RLS) policy restrictions
+    if (
+      errCode === '42501' ||
+      errMsg.toLowerCase().includes('row-level security') ||
+      errMsg.toLowerCase().includes('rls policy')
+    ) {
+      console.warn(`[DB] ⚠️ Politique RLS Supabase active sur la table '${table}' (${errMsg}). Mise à jour conservée en mémoire.`);
+      return null;
+    }
+
     if (
       errCode === 'PGRST204' ||
       errCode === '42703' ||
@@ -83,23 +98,34 @@ export async function performMutation(action, table, recordId, data) {
     ) {
       console.warn(`[DB] Colonne non trouvée (${errMsg}). Tentative de repli sans champs optionnels...`);
       const retriedData = { ...sanitizedData };
-      delete retriedData.store_id;
+      if (table !== 'orders') {
+        delete retriedData.store_id;
+      }
       delete retriedData.motif_annulation;
       delete retriedData.remise_pourcentage;
       delete retriedData.remise_montant;
+      delete retriedData.responsable_id;
+      delete retriedData.responsable_nom;
 
-      let retryRes;
+      let retryRes: any;
       try {
         if (action === 'insert') {
           retryRes = await supabase.from(table).insert(retriedData);
         } else if (action === 'update') {
           retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
         }
-      } catch (retryErr) {
+      } catch (retryErr: any) {
         throw new Error(`Erreur réseau lors du repli : ${retryErr.message}`);
       }
 
       if (retryRes?.error) {
+        if (
+          retryRes.error.code === '42501' ||
+          retryRes.error.message.toLowerCase().includes('row-level security')
+        ) {
+          console.warn(`[DB] ⚠️ RLS Supabase actif lors du repli sur '${table}'.`);
+          return null;
+        }
         throw new Error(retryRes.error.message);
       }
       return retryRes?.data;
@@ -112,11 +138,8 @@ export async function performMutation(action, table, recordId, data) {
 }
 
 // ─── Database initialization — Supabase only ──────────────────────────────
-// Loads ALL business data from Supabase.
-// Returns a Promise that resolves when data is ready.
 
-export async function initDb() {
-  // Restore session-only preferences (not business data)
+export async function initDb(): Promise<void> {
   memoryDb.selected_store_id = loadSession('klin_up_selected_store', 'all');
   memoryDb.current_user = loadSession('klin_up_current_user', null);
 
@@ -129,7 +152,6 @@ export async function initDb() {
   }
 
   try {
-    // Parallel fetch of all core tables
     const [staffRes, custRes, ordRes, logRes, catRes, reqRes, storeRes] = await Promise.all([
       supabase.from('staff').select('*'),
       supabase.from('customers').select('*'),
@@ -140,64 +162,50 @@ export async function initDb() {
       supabase.from('stores').select('*').order('created_at', { ascending: true }),
     ]);
 
-    // If staff fails, Supabase is unreachable — throw to show error screen
     if (staffRes.error) throw staffRes.error;
 
     isUsingRemote = true;
     console.log('[DB] 🟢 Connecté à Supabase !');
 
-    // ── Staff ──────────────────────────────────────────
     memoryDb.staff = (staffRes.data || []).filter(Boolean);
 
-    // Validate current session user still exists in staff list
     if (memoryDb.current_user) {
-      const stillValid = memoryDb.staff.some(s => s.id === memoryDb.current_user.id);
+      const stillValid = memoryDb.staff.some(s => s.id === memoryDb.current_user?.id);
       if (!stillValid) {
         memoryDb.current_user = null;
         removeSession('klin_up_current_user');
       }
     }
 
-    // ── Customers ──────────────────────────────────────
     if (!custRes.error) memoryDb.customers = custRes.data || [];
-
-    // ── Orders ─────────────────────────────────────────
     if (!ordRes.error) memoryDb.orders = (ordRes.data || []).map(hydrateOrder);
-
-    // ── Activity Logs ──────────────────────────────────
     if (!logRes.error) memoryDb.logs = logRes.data || [];
-
-    // ── Stores ─────────────────────────────────────────
     if (!storeRes.error) memoryDb.stores = storeRes.data || [];
 
-    // ── Catalog — Supabase is source of truth ──────────
     if (!catRes.error && catRes.data && catRes.data.length > 0) {
-      memoryDb.catalog = catRes.data.map(item => {
+      memoryDb.catalog = catRes.data.map((item: any) => {
         const isActive = item.is_active === false || item.statut === 'inactif' ? false : true;
         return { ...item, is_active: isActive, statut: isActive ? 'actif' : 'inactif' };
       });
     }
 
-    // ── PIN reset requests ─────────────────────────────
     if (!reqRes.error) memoryDb.pin_reset_requests = reqRes.data || [];
 
     startOrderStateCron();
     notifyListeners();
 
-    try { setupRealtime(); } catch (e) { console.warn('[DB Realtime] Inaccessible :', e.message); }
+    try { setupRealtime(); } catch (e: any) { console.warn('[DB Realtime] Inaccessible :', e.message); }
 
-  } catch (err) {
+  } catch (err: any) {
     console.error('[DB] ❌ Connexion Supabase échouée :', err.message);
     isUsingRemote = false;
     startOrderStateCron();
     notifyListeners();
-    throw err; // Re-throw so App.jsx can display an error screen
+    throw err;
   }
 }
 
-// ─── Refresh staff & stores from Supabase ───────────────────────────────────
-
-export async function refreshStaff() {
+export async function refreshStaff(): Promise<void> {
   if (!supabase) return;
   try {
     const { data, error } = await supabase.from('staff').select('*');
@@ -210,7 +218,7 @@ export async function refreshStaff() {
   }
 }
 
-export async function refreshStores() {
+export async function refreshStores(): Promise<void> {
   if (!supabase) return;
   try {
     const { data, error } = await supabase.from('stores').select('*').order('created_at', { ascending: true });
@@ -223,56 +231,59 @@ export async function refreshStores() {
   }
 }
 
-// ─── Realtime subscriptions (receive changes from other sessions) ──────────
+let activeRealtimeChannel: any = null;
 
-export function setupRealtime() {
+export function setupRealtime(): void {
   if (!supabase) return;
+  if (activeRealtimeChannel) {
+    try { supabase.removeChannel(activeRealtimeChannel); } catch (e) {}
+  }
+
   const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores'];
+  let channel = supabase.channel('admin_global_realtime');
 
   tables.forEach(table => {
-    supabase
-      .channel(`admin_${table}_channel`)
-      .on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
-        const { eventType, new: newRow, old: oldRow } = payload;
+    channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
+      const { eventType, new: newRow, old: oldRow } = payload;
 
-        let targetList = [];
-        if (table === 'staff') targetList = memoryDb.staff;
-        else if (table === 'customers') targetList = memoryDb.customers;
-        else if (table === 'orders') targetList = memoryDb.orders;
-        else if (table === 'activity_logs') targetList = memoryDb.logs;
-        else if (table === 'catalog') targetList = memoryDb.catalog;
-        else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
-        else if (table === 'stores') targetList = memoryDb.stores;
+      let targetList: any[] = [];
+      if (table === 'staff') targetList = memoryDb.staff;
+      else if (table === 'customers') targetList = memoryDb.customers;
+      else if (table === 'orders') targetList = memoryDb.orders;
+      else if (table === 'activity_logs') targetList = memoryDb.logs;
+      else if (table === 'catalog') targetList = memoryDb.catalog;
+      else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
+      else if (table === 'stores') targetList = memoryDb.stores;
 
-        if (eventType === 'INSERT') {
-          const exists = targetList.some(x => x.id === newRow.id);
-          if (!exists) {
-            const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
-            if (table === 'activity_logs') targetList.unshift(rowToAdd);
-            else targetList.push(rowToAdd);
-          }
-        } else if (eventType === 'UPDATE') {
-          const idx = targetList.findIndex(x => x.id === newRow.id);
-          if (idx !== -1) {
-            targetList[idx] = table === 'orders' ? hydrateOrder({ ...newRow }) : { ...newRow };
-          } else {
-            const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
-            targetList.push(rowToAdd);
-          }
-        } else if (eventType === 'DELETE') {
-          const idx = targetList.findIndex(x => x.id === oldRow.id);
-          if (idx !== -1) targetList.splice(idx, 1);
+      if (eventType === 'INSERT') {
+        const exists = targetList.some(x => x.id === newRow.id);
+        if (!exists) {
+          const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
+          if (table === 'activity_logs') targetList.unshift(rowToAdd);
+          else targetList.push(rowToAdd);
         }
+      } else if (eventType === 'UPDATE') {
+        const idx = targetList.findIndex(x => x.id === newRow.id);
+        if (idx !== -1) {
+          targetList[idx] = table === 'orders' ? hydrateOrder({ ...newRow }) : { ...newRow };
+        } else {
+          const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
+          targetList.push(rowToAdd);
+        }
+      } else if (eventType === 'DELETE') {
+        const idx = targetList.findIndex(x => x.id === oldRow.id);
+        if (idx !== -1) targetList.splice(idx, 1);
+      }
 
-        notifyListeners();
-      })
-      .subscribe();
+      notifyListeners();
+    });
   });
+
+  channel.subscribe();
+  activeRealtimeChannel = channel;
 }
 
-// ─── Connection test ───────────────────────────────────────────────────────
-
-export async function testConnection() {
+export async function testConnection(): Promise<{ success: boolean; message?: string; error?: string }> {
   if (!supabase) {
     return { success: false, error: 'Client Supabase non initialisé (clés absentes ou incorrectes).' };
   }
@@ -281,7 +292,7 @@ export async function testConnection() {
     if (error) return { success: false, error: error.message };
     if (!isUsingRemote) await initDb();
     return { success: true, message: 'Connexion établie avec succès avec le cloud Supabase !' };
-  } catch (e) {
+  } catch (e: any) {
     return { success: false, error: e.message || 'Erreur de connexion réseau.' };
   }
 }

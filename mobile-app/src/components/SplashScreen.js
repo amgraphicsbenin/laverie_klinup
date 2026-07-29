@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Image, Animated, Easing, Platform } from 'react-native';
+import { StyleSheet, View, Text, Image, Animated, Easing, Platform, StatusBar as RNStatusBar } from 'react-native';
 
 export default function SplashScreen({ isReady, onAnimationFinish }) {
   const isWeb = Platform.OS === 'web';
@@ -109,6 +109,9 @@ export default function SplashScreen({ isReady, onAnimationFinish }) {
 
   return (
     <Animated.View style={[styles.container, { opacity: containerOpacity }]}>
+      {Platform.OS === 'android' && (
+        <RNStatusBar backgroundColor="#002cf7" barStyle="light-content" translucent />
+      )}
       <View style={styles.centerContent}>
         
         {/* Pulsing Aura Ring */}
@@ -163,8 +166,14 @@ export default function SplashScreen({ isReady, onAnimationFinish }) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 99999,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 999999,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#002cf7', // Solid unified blue background

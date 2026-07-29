@@ -336,12 +336,11 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   };
 
   const getDisplayTicketId = (order) => {
-    if (order.ticket_numero && /^\d+$/.test(order.ticket_numero)) return order.ticket_numero;
-    if (/^\d+$/.test(order.id)) return order.id;
-    const allOrders = db.getOrders();
-    const sortedOrders = [...allOrders].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-    const index = sortedOrders.findIndex(o => o.id === order.id);
-    return index !== -1 ? String(1001 + index) : '1001';
+    if (!order) return 'KLIN-0';
+    if (order.identifiant_unique_marquage) return order.identifiant_unique_marquage;
+    if (order.ticket_numero) return order.ticket_numero;
+    if (order.id && String(order.id).startsWith('KLIN-')) return order.id;
+    return order.id || 'KLIN-0';
   };
 
   const kpiThemes = {

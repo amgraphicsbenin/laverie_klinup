@@ -363,10 +363,10 @@ export default function App() {
   const pillTranslateX = (activeSlotIndex * slotWidth) + (slotWidth - pillWidth) / 2;
 
   const appContent = (
-    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000000' : '#ffffff' }}>
+    <View style={{ flex: 1, backgroundColor: showSplash ? '#002cf7' : (isDarkMode ? '#000000' : '#ffffff') }}>
       <ExpoStatusBar 
-        style={isDarkMode ? 'light' : 'dark'} 
-        backgroundColor={isDarkMode ? '#000000' : '#ffffff'}
+        style={showSplash ? 'light' : (isDarkMode ? 'light' : 'dark')} 
+        backgroundColor={showSplash ? '#002cf7' : (isDarkMode ? '#000000' : '#ffffff')}
         translucent={Platform.OS === 'android'}
       />
       {!dbReady ? (

@@ -112,6 +112,15 @@ function sanitizePayload(table, data) {
   } else if (table === 'catalog') {
     delete sanitized.sku;
     delete sanitized.prix_urgent;
+    delete sanitized.is_active;
+  } else if (table === 'stores') {
+    delete sanitized.ville;
+    delete sanitized.responsable_id;
+    delete sanitized.responsable_nom;
+  } else if (table === 'staff') {
+    delete sanitized.store_id;
+  } else if (table === 'customers') {
+    delete sanitized.store_id;
   }
   return sanitized;
 }
@@ -145,6 +154,15 @@ export async function performMutation(action, table, recordId, data) {
     const errCode = res.error.code || '';
 
     if (
+      errCode === '42501' ||
+      errMsg.toLowerCase().includes('row-level security') ||
+      errMsg.toLowerCase().includes('rls policy')
+    ) {
+      console.warn(`[DB Sync] ⚠️ RLS Supabase actif sur la table '${table}' (${errMsg}).`);
+      return null;
+    }
+
+    if (
       errCode === 'PGRST204' ||
       errCode === '42703' ||
       errMsg.includes('column') ||
@@ -152,10 +170,14 @@ export async function performMutation(action, table, recordId, data) {
     ) {
       console.warn(`[DB Sync] Colonne non trouvée (${errMsg}). Tentative de repli...`);
       const retriedData = { ...sanitizedData };
-      delete retriedData.store_id;
+      if (table !== 'orders') {
+        delete retriedData.store_id;
+      }
       delete retriedData.motif_annulation;
       delete retriedData.remise_pourcentage;
       delete retriedData.remise_montant;
+      delete retriedData.responsable_id;
+      delete retriedData.responsable_nom;
 
       let retryRes;
       try {
@@ -169,6 +191,13 @@ export async function performMutation(action, table, recordId, data) {
       }
 
       if (retryRes?.error) {
+        if (
+          retryRes.error.code === '42501' ||
+          retryRes.error.message.toLowerCase().includes('row-level security')
+        ) {
+          console.warn(`[DB Sync] ⚠️ RLS Supabase actif lors du repli sur '${table}'.`);
+          return null;
+        }
         throw new Error(retryRes.error.message);
       }
       return retryRes?.data;

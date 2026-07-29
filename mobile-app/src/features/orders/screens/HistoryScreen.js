@@ -144,13 +144,11 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   };
 
   const getDisplayTicketId = (order) => {
-    if (!order) return '1001';
-    if (order.ticket_numero && /^\d+$/.test(String(order.ticket_numero))) return String(order.ticket_numero);
-    if (order.id != null && /^\d+$/.test(String(order.id))) return String(order.id);
-    const allOrders = db.getOrders().filter(Boolean);
-    const sortedOrders = [...allOrders].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-    const index = sortedOrders.findIndex(o => o.id === order.id);
-    return index !== -1 ? String(1001 + index) : '1001';
+    if (!order) return 'KLIN-0';
+    if (order.identifiant_unique_marquage) return order.identifiant_unique_marquage;
+    if (order.ticket_numero) return order.ticket_numero;
+    if (order.id && String(order.id).startsWith('KLIN-')) return order.id;
+    return order.id || 'KLIN-0';
   };
 
   const getStatusColor = (statut) => {
@@ -411,17 +409,12 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 </View>
               </View>
 
-              {/* Ticket & Article summary */}
+              {/* Ticket Badge */}
               <View style={styles.ticketSummaryRow}>
                 <View style={styles.ticketBadge}>
                   <Tag size={11} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 4 }} />
                   <Text style={styles.ticketNoText}>Ticket #{getDisplayTicketId(item)}</Text>
                 </View>
-                {item.type_article ? (
-                  <Text style={styles.articleSummaryText} numberOfLines={1}>
-                    {item.type_article} {item.type_service ? `• ${String(item.type_service).replace(/_/g, ' ')}` : ''}
-                  </Text>
-                ) : null}
               </View>
 
               {hasSub && (

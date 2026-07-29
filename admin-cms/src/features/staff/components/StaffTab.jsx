@@ -364,10 +364,13 @@ export default function StaffTab({
     }
   };
 
-  const handleDeleteStaffBatch = () => {
+  const handleDeleteStaffBatch = async () => {
     if (selectedStaffIds.length === 0) return;
-    if (window.confirm(`Voulez-vous vraiment supprimer les ${selectedStaffIds.length} utilisateurs sélectionnés ?`)) {
-      selectedStaffIds.forEach(id => db.deleteStaff(id));
+    const confirmed = await window.confirm(`Voulez-vous vraiment supprimer les ${selectedStaffIds.length} utilisateurs sélectionnés ?`);
+    if (confirmed) {
+      for (const id of selectedStaffIds) {
+        await db.deleteStaff(id);
+      }
       setSelectedStaffIds([]);
       refreshAdminData();
     }

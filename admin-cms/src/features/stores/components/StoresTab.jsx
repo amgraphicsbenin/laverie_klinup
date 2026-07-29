@@ -63,9 +63,8 @@ export default function StoresTab({ onShowSuccess }) {
     }
 
     if (editingStore && editingStore.statut === 'actif' && formStatut === 'inactif') {
-      if (!window.confirm(`⚠️ CONFIRMATION DE DÉSACTIVATION :\n\nVoulez-vous vraiment désactiver le point de laverie "${formNom}" ? Ce point ne sera plus disponible pour l'accueil des clients ni les opérations quotidiennes.`)) {
-        return;
-      }
+      const confirmed = await window.confirm(`⚠️ CONFIRMATION DE DÉSACTIVATION :\n\nVoulez-vous vraiment désactiver le point de laverie "${formNom}" ? Ce point ne sera plus disponible pour l'accueil des clients ni les opérations quotidiennes.`);
+      if (!confirmed) return;
     }
 
     const selectedStaff = staff.find(s => s.id === formResponsableId);
@@ -82,6 +81,7 @@ export default function StoresTab({ onShowSuccess }) {
 
     setIsSubmitting(true);
     try {
+      setShowModal(false);
       if (editingStore) {
         await db.updateStore(editingStore.id, storePayload);
         if (onShowSuccess) onShowSuccess(`Point de laverie "${formNom}" mis à jour avec succès dans la base de données.`);
@@ -91,7 +91,6 @@ export default function StoresTab({ onShowSuccess }) {
         if (onShowSuccess) onShowSuccess(`Point de laverie "${formNom}" créé avec succès dans la base de données.`);
         else alert(`Point de laverie "${formNom}" créé avec succès dans la base de données.`);
       }
-      setShowModal(false);
     } catch (err) {
       alert("Erreur lors de l'enregistrement du point de laverie : " + err.message);
     } finally {
@@ -102,13 +101,11 @@ export default function StoresTab({ onShowSuccess }) {
   const handleToggleStoreStatus = async (store) => {
     const nextStatut = store.statut === 'actif' ? 'inactif' : 'actif';
     if (nextStatut === 'inactif') {
-      if (!window.confirm(`⚠️ CONFIRMATION DE DÉSACTIVATION :\n\nVoulez-vous vraiment désactiver le point de laverie "${store.nom}" ? Ce point ne sera plus actif pour les opérations.`)) {
-        return;
-      }
+      const confirmed = await window.confirm(`⚠️ CONFIRMATION DE DÉSACTIVATION :\n\nVoulez-vous vraiment désactiver le point de laverie "${store.nom}" ? Ce point ne sera plus actif pour les opérations.`);
+      if (!confirmed) return;
     } else {
-      if (!window.confirm(`Voulez-vous réactiver le point de laverie "${store.nom}" ?`)) {
-        return;
-      }
+      const confirmed = await window.confirm(`Voulez-vous réactiver le point de laverie "${store.nom}" ?`);
+      if (!confirmed) return;
     }
 
     setIsSubmitting(true);
@@ -123,16 +120,17 @@ export default function StoresTab({ onShowSuccess }) {
   };
 
   const handleDeleteStore = async (store) => {
-    if (window.confirm(`⚠️ ATTENTION : SUPPRESSION DÉFINITIVE !\n\nVoulez-vous vraiment supprimer définitivement le point de laverie "${store.nom}" (${store.code}) ? Cette action est irréversible.`)) {
-      setIsSubmitting(true);
-      try {
-        await db.deleteStore(store.id);
-        if (onShowSuccess) onShowSuccess(`Point de laverie "${store.nom}" supprimé avec succès de la base de données.`);
-      } catch (err) {
-        alert("Erreur lors de la suppression : " + err.message);
-      } finally {
-        setIsSubmitting(false);
-      }
+    const confirmed = await window.confirm(`⚠️ ATTENTION : SUPPRESSION DÉFINITIVE !\n\nVoulez-vous vraiment supprimer définitivement le point de laverie "${store.nom}" (${store.code}) ? Cette action est irréversible.`);
+    if (!confirmed) return;
+
+    setIsSubmitting(true);
+    try {
+      await db.deleteStore(store.id);
+      if (onShowSuccess) onShowSuccess(`Point de laverie "${store.nom}" supprimé avec succès de la base de données.`);
+    } catch (err) {
+      alert("Erreur lors de la suppression : " + err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

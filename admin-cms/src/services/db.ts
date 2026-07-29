@@ -14,7 +14,7 @@ import {
  */
 export const db = {
   // Gestion des écouteurs de changements React
-  subscribe: (listener) => {
+  subscribe: (listener: () => void) => {
     listeners.add(listener);
     return () => listeners.delete(listener);
   },
@@ -33,3 +33,4 @@ export const db = {
 
 export { hydrateOrder } from './db/dbEngine';
 export { performMutation } from './db/syncEngine';
+export * from '../types';

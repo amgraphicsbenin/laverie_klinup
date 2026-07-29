@@ -597,7 +597,7 @@ export const db = {
       customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
     }
 
-    const codeMarquage = 'KLIN-' + Math.floor(100000 + Math.random() * 900000).toString();
+    const codeMarquage = orderData.identifiant_unique_marquage || ('KLIN-' + (memoryDb.orders ? memoryDb.orders.length : 0));
     
     const expressHoursItem = memoryDb.catalog.find(c => c.id === 'setting_express_hours');
     const expressHours = expressHoursItem ? Number(expressHoursItem.prix) : 6;
@@ -613,9 +613,15 @@ export const db = {
     const modeReglementVal = orderData.mode_reglement || orderData.mode_paiement || 'Espèces';
     const initialStatus = orderData.statut === 'attente' ? 'en_attente' : (orderData.statut || 'en_attente');
 
+    const currentStoreId = orderData.store_id || 
+      (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) || 
+      (currentUser && currentUser.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : null) || 
+      'store_central';
+
     const newOrder = {
       id: orderData.id || ('o_' + Math.random().toString(36).substr(2, 9)),
       customer_id: orderData.customer_id,
+      store_id: currentStoreId,
       statut: initialStatus,
       type_article: orderData.type_article || (inputItems[0] ? inputItems[0].article : 'Divers'),
       type_service: orderData.type_service || (inputItems[0] ? inputItems[0].service : 'lavage_simple'),
