@@ -244,12 +244,12 @@ export async function sendSystemNotification(title, body, data = {}) {
       if (window.Notification.permission === 'granted') {
         new window.Notification(title || 'KLIN UP', {
           body: body || 'Nouvelle notification',
-          icon: '/assets/Logo Notification.png',
+          icon: '/assets/notification_icon.png',
         });
       } else if (window.Notification.permission === 'default') {
         const perm = await window.Notification.requestPermission();
         if (perm === 'granted') {
-          new window.Notification(title || 'KLIN UP', { body: body || 'Nouvelle notification', icon: '/assets/Logo Notification.png' });
+          new window.Notification(title || 'KLIN UP', { body: body || 'Nouvelle notification', icon: '/assets/notification_icon.png' });
         }
       }
     }
