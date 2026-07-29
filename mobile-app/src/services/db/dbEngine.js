@@ -14,7 +14,7 @@ import {
 } from './seeds';
 import { performMutation, initDb, persist } from './syncEngine';
 import { supabase } from '../supabaseClient';
-import { sendSystemNotification } from '../notificationService';
+import { sendSystemNotification, getOrderStatusLabel } from '../notificationService';
 
 // Base de données locale en mémoire (chargée en direct depuis Supabase)
 export const memoryDb = {
@@ -755,7 +755,7 @@ export const db = {
       }
     }
 
-    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${newStatus}'`);
+    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} : ${getOrderStatusLabel(oldStatus)} → ${getOrderStatusLabel(newStatus)}`);
 
     const updateData = {
       statut: order.statut,
@@ -832,7 +832,7 @@ export const db = {
       'PAIEMENT_FINAL', 
       `Livraison commande ${order.identifiant_unique_marquage || order.id}. Paiement reçu : ${cleanAmountPaid} FCFA (Méthode: ${paymentMethod})` + (referencePaiement ? ` (Réf: ${referencePaiement})` : '')
     );
-    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${normalizedFinalStatus}'`);
+    db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} : ${getOrderStatusLabel(oldStatus)} → ${getOrderStatusLabel(normalizedFinalStatus)}`);
 
     const updateData = {
       statut: order.statut,
