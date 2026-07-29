@@ -6,6 +6,7 @@
  */
 
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from './supabaseClient';
 
@@ -163,10 +164,9 @@ export async function getExpoPushToken() {
       return null;
     }
 
-    // Récupérer le token Expo Push
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      // projectId: 'your-project-id', // Décommenter en production EAS
-    });
+    // Récupérer le token Expo Push avec le projectId EAS
+    const projectId = Constants?.expoConfig?.extra?.eas?.projectId || 'd135428c-fc03-49fe-92c9-fb0a9a86d7a2';
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
 
     _cachedPushToken = tokenData.data;
     console.log('[Notifications] ✅ Push Token obtenu:', _cachedPushToken);
@@ -319,10 +319,24 @@ export async function sendOrderNotification(eventType, order, oldStatus = null) 
     return;
   }
 
+  // 1. Notification locale / foreground immédiate
   await sendSystemNotification(title, body, {
     orderId: order.id,
     statut: newStatus,
     ref,
     screen: 'gestion',
   });
+
+  // 2. Notification push distante via Edge Function Supabase pour les appareils fermés/en arrière-plan
+  if (supabase && typeof supabase.functions?.invoke === 'function') {
+    supabase.functions.invoke('send-push-notification', {
+      body: {
+        type: eventType,
+        record: order,
+        old_record: oldStatus ? { statut: oldStatus } : null
+      }
+    }).catch(err => {
+      console.warn('[Push Notification] Info Edge Function:', err?.message || err);
+    });
+  }
 }

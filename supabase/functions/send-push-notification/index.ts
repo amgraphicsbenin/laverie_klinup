@@ -20,16 +20,30 @@ const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
 
 const STATUS_LABELS: Record<string, string> = {
   en_attente: 'En attente',
+  attente: 'En attente',
   traitement: 'En cours de traitement',
-  en_cours_lavage: 'En cours de lavage',
-  en_cours_repassage: 'En cours de repassage',
+  en_cours_lavage: 'Lavage en cours',
+  lavage: 'Lavage en cours',
+  en_cours_repassage: 'Repassage en cours',
+  repassage: 'Repassage en cours',
   pret: 'Prête',
   a_livrer: 'Prête à livrer',
   a_recuperer: 'À récupérer',
   en_cours_livraison: 'En cours de livraison',
-  restitue: 'Restituée / Livrée',
+  restitue: 'Livrée / Restituée',
+  livre: 'Livrée / Restituée',
   annule: 'Annulée',
 };
+
+function getStatusText(statut: string): string {
+  if (!statut) return 'Mise à jour';
+  const cleanKey = String(statut).trim().toLowerCase().replace(/['']/g, '');
+  if (STATUS_LABELS[cleanKey]) {
+    return STATUS_LABELS[cleanKey];
+  }
+  const sanitized = String(statut).replace(/['']/g, '').replace(/_/g, ' ').trim();
+  return sanitized ? sanitized.charAt(0).toUpperCase() + sanitized.slice(1) : 'Mise à jour';
+}
 
 serve(async (req) => {
   // CORS preflight
@@ -92,16 +106,31 @@ serve(async (req) => {
     // Construire le message de notification
     const ref = order.identifiant_unique_marquage || order.id || 'N/A';
     const newStatus = order.statut || order.status || '';
-    const statusLabel = STATUS_LABELS[newStatus] || newStatus;
+    const newStatusLabel = getStatusText(newStatus);
+    const oldStatusLabel = oldOrder ? getStatusText(oldOrder.statut || oldOrder.status) : null;
 
     let title = '';
     let body = '';
     if (eventType === 'INSERT') {
-      title = '🧺 Nouvelle commande reçue';
-      body = `Commande ${ref} — ${statusLabel}`;
+      title = '🧺 Nouvelle commande enregistrée';
+      body = `La commande ${ref} a été enregistrée (${newStatusLabel}).`;
     } else {
-      title = '📦 Statut mis à jour';
-      body = `Commande ${ref} → ${statusLabel}`;
+      if (newStatus === 'pret' || newStatus === 'a_livrer' || newStatus === 'a_recuperer') {
+        title = '✅ Commande prête !';
+        body = `La commande ${ref} est prête (${newStatusLabel}).`;
+      } else if (newStatus === 'en_cours_livraison') {
+        title = '🛵 Livraison en cours';
+        body = `La commande ${ref} est en cours de livraison.`;
+      } else if (newStatus === 'restitue' || newStatus === 'livre') {
+        title = '🎉 Commande livrée';
+        body = `La commande ${ref} a été restituée au client.`;
+      } else if (newStatus === 'annule') {
+        title = '⚠️ Commande annulée';
+        body = `La commande ${ref} a été annulée.`;
+      } else {
+        title = '📦 Statut mis à jour';
+        body = `Commande ${ref} : ${oldStatusLabel || ''} → ${newStatusLabel}`;
+      }
     }
 
     // Envoyer les push notifications via l'API Expo

@@ -234,10 +234,14 @@ export default function App() {
     }
   };
 
-  // Adapt tabs automatically for specific roles
+  // Adapt tabs automatically for specific roles and save push token for remote notifications
   useEffect(() => {
-    if (currentUser?.role === 'agent_lavage_repassage') {
-      switchTab('accueil');
+    if (currentUser) {
+      if (currentUser.role === 'agent_lavage_repassage') {
+        switchTab('accueil');
+      }
+      // Save push token to Supabase so remote push notifications reach all staff when app is closed/in background
+      savePushTokenToSupabase(currentUser.id).catch(() => {});
     }
   }, [currentUser]);
 
