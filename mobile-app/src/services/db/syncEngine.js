@@ -552,18 +552,10 @@ export function setupRealtime() {
           }
         }
 
-        // ── Notification en temps réel pour les événements commandes ──
-        // Déclenché seulement quand la mise à jour vient d'une source EXTERNE
-        // (admin web, autre appareil) — pas pour les mutations locales.
+        // ── Notification en temps réel pour tous les appareils connectés ──
         if (table === 'orders' && newRow && (eventType === 'INSERT' || eventType === 'UPDATE')) {
           const hydratedNewOrder = hydrateOrder(newRow);
-          const currentUserId = memoryDb.current_user ? memoryDb.current_user.id : null;
-          const isLocalMutation = currentUserId && newRow.created_by_id === currentUserId && eventType === 'INSERT';
-          
-          // Notifier uniquement pour les événements externes (pas les propres actions de l'utilisateur)
-          if (!isLocalMutation) {
-            sendOrderNotification(eventType, hydratedNewOrder, oldOrderStatus).catch(() => {});
-          }
+          sendOrderNotification(eventType, hydratedNewOrder, oldOrderStatus).catch(() => {});
         }
 
         // Éviction automatique immédiate si l'utilisateur actuellement connecté est désactivé ou supprimé

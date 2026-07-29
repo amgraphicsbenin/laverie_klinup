@@ -325,7 +325,9 @@ export const db = {
         read: false
       });
 
-      sendSystemNotification(newLog.action, newLog.details);
+      if (!action.includes('COMMANDE') && !action.includes('STATUT')) {
+        sendSystemNotification(newLog.action, newLog.details);
+      }
     }
     persist();
     db.notify();
