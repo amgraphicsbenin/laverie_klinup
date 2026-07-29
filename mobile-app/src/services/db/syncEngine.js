@@ -483,12 +483,23 @@ export async function startPeriodicSync() {
   }, 3000);
 }
 
+let realtimeChannels = [];
+
 // Abonnements en temps réel
 export function setupRealtime() {
+  if (realtimeChannels.length > 0) {
+    realtimeChannels.forEach(ch => {
+      try {
+        supabase.removeChannel(ch);
+      } catch (e) {}
+    });
+    realtimeChannels = [];
+  }
+
   const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores'];
   
   tables.forEach(table => {
-    supabase
+    const ch = supabase
       .channel(`${table}_channel`)
       .on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
         const { eventType, new: newRow, old: oldRow } = payload;
@@ -575,6 +586,8 @@ export function setupRealtime() {
         db.notify();
       })
       .subscribe();
+
+    realtimeChannels.push(ch);
   });
 }
 

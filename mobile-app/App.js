@@ -246,6 +246,12 @@ export default function App() {
     if (Platform.OS === 'web' || !currentUser) return;
 
     const backAction = () => {
+      // 0. If custom alert is open, dismiss it
+      if (customAlertState && customAlertState.visible) {
+        setCustomAlertState(prev => ({ ...prev, visible: false }));
+        return true;
+      }
+
       // 1. If order form is visible, close it
       if (orderFormVisible) {
         setOrderFormVisible(false);
@@ -257,8 +263,14 @@ export default function App() {
         setSelectedOrder(null);
         return true;
       }
+
+      // 3. If any local modal is open, close it
+      if (localModalOpen) {
+        setCloseModalsTrigger(prev => prev + 1);
+        return true;
+      }
       
-      // 3. If we are not on the main tab, go back to the main tab
+      // 4. If we are not on the main tab, go back to the main tab
       if (activeTab !== 'accueil') {
         switchTab('accueil');
         return true;
@@ -274,7 +286,7 @@ export default function App() {
     );
 
     return () => backHandler.remove();
-  }, [currentUser, activeTab, selectedOrder, orderFormVisible]);
+  }, [currentUser, activeTab, selectedOrder, orderFormVisible, customAlertState?.visible, localModalOpen]);
 
 
 

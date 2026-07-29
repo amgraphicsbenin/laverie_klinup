@@ -197,6 +197,8 @@ export async function savePushTokenToSupabase(userId) {
 // NOTIFICATION LOCALE IMMÉDIATE (Foreground + Background quand app ouverte)
 // ─────────────────────────────────────────────────────────────────────────────
 
+const recentNotifications = new Map();
+
 /**
  * Déclenche une notification locale immédiate avec sonnerie système.
  * Fonctionne en foreground ET quand l'app est en arrière-plan.
@@ -206,6 +208,20 @@ export async function savePushTokenToSupabase(userId) {
  * @param {object} data - Données supplémentaires (pour navigation au tap).
  */
 export async function sendSystemNotification(title, body, data = {}) {
+  // Dédupliquer les notifications identiques envoyées à moins de 5 secondes d'intervalle
+  const notifKey = `${title}_${body}_${data.orderId || ''}`;
+  const now = Date.now();
+  const lastSent = recentNotifications.get(notifKey);
+  if (lastSent && (now - lastSent) < 5000) {
+    console.log('[Notifications] ⏭ Notification dédupliquée (déjà envoyée):', title);
+    return;
+  }
+  recentNotifications.set(notifKey, now);
+
+  if (recentNotifications.size > 50) {
+    recentNotifications.clear();
+  }
+
   try {
     if (Platform.OS === 'android' || Platform.OS === 'ios') {
       await Notifications.scheduleNotificationAsync({
