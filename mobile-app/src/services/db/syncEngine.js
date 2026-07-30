@@ -496,7 +496,7 @@ export function setupRealtime() {
     realtimeChannels = [];
   }
 
-  const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores'];
+  const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores', 'order_notifications'];
   
   tables.forEach(table => {
     const ch = supabase
@@ -512,6 +512,40 @@ export function setupRealtime() {
         else if (table === 'catalog') targetList = memoryDb.catalog;
         else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
         else if (table === 'stores') targetList = memoryDb.stores;
+
+        // ── Notifications centralisées en base de données (order_notifications) ──
+        if (table === 'order_notifications' && eventType === 'INSERT' && newRow) {
+          const currentUser = memoryDb.current_user;
+          if (currentUser) {
+            const notifStoreId = newRow.store_id || 'store_central';
+            const userStoreId = currentUser.store_id || 'store_central';
+            const isSuperAdmin = currentUser.role === 'super_admin' || userStoreId === 'all';
+
+            if (isSuperAdmin || userStoreId === notifStoreId) {
+              // 1. Déclencher l'alerte sonore et visuelle immédiate sur l'appareil
+              const sendSystemNotification = require('../notificationService').sendSystemNotification;
+              sendSystemNotification(newRow.titre, newRow.message, {
+                orderId: newRow.order_id,
+                statut: newRow.metadata?.statut,
+                screen: 'gestion'
+              });
+
+              // 2. Ajouter l'entrée dans la liste locale des notifications
+              if (!memoryDb.notifications) memoryDb.notifications = [];
+              const notifExists = memoryDb.notifications.some(n => n.id === newRow.id);
+              if (!notifExists) {
+                memoryDb.notifications.unshift({
+                  id: newRow.id,
+                  action: newRow.titre,
+                  details: newRow.message,
+                  timestamp: newRow.created_at || new Date().toISOString(),
+                  read: false,
+                  type: 'order'
+                });
+              }
+            }
+          }
+        }
 
         // ── Capture de l'ancien statut pour détecter les vrais changements ──
         let oldOrderStatus = null;

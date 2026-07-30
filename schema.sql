@@ -576,3 +576,107 @@ ALTER TABLE public.staff_devices ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Acces public et authentifie staff_devices" ON public.staff_devices
   FOR ALL USING (true) WITH CHECK (true);
+
+-- 8. Table dédiée de notifications de commande par point de laverie
+CREATE TABLE IF NOT EXISTS public.order_notifications (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  order_id TEXT NOT NULL,
+  store_id TEXT NOT NULL DEFAULT 'store_central',
+  type_action TEXT NOT NULL,
+  titre TEXT NOT NULL,
+  message TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_notifications_store ON public.order_notifications(store_id);
+CREATE INDEX IF NOT EXISTS idx_order_notifications_order ON public.order_notifications(order_id);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE public.order_notifications;
+ALTER TABLE public.order_notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Acces public et authentifie order_notifications" ON public.order_notifications
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- Trigger automatique pour générer une notification dès qu'une action est effectuée sur une commande
+CREATE OR REPLACE FUNCTION public.fn_process_order_action_notification()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_ref TEXT;
+  v_new_statut TEXT;
+  v_old_statut TEXT;
+  v_store_id TEXT;
+  v_titre TEXT := '';
+  v_message TEXT := '';
+  v_statut_label TEXT := '';
+  v_type_action TEXT := TG_OP;
+BEGIN
+  v_ref := COALESCE(NEW.identifiant_unique_marquage, NEW.id, 'N/A');
+  v_new_statut := COALESCE(NEW.statut, NEW.status, '');
+  v_old_statut := CASE WHEN TG_OP = 'UPDATE' THEN COALESCE(OLD.statut, OLD.status, '') ELSE NULL END;
+  v_store_id := COALESCE(NEW.store_id, 'store_central');
+
+  -- Ne créer une notification sur UPDATE que s'il y a un vrai changement de statut
+  IF TG_OP = 'UPDATE' AND v_new_statut = v_old_statut THEN
+    RETURN NEW;
+  END IF;
+
+  -- Libellé lisible du statut
+  IF v_new_statut = 'en_attente' OR v_new_statut = 'attente' THEN v_statut_label := 'En attente';
+  ELSIF v_new_statut = 'traitement' OR v_new_statut = 'lavage' OR v_new_statut = 'en_cours_lavage' THEN v_statut_label := 'Lavage en cours';
+  ELSIF v_new_statut = 'repassage' OR v_new_statut = 'en_cours_repassage' THEN v_statut_label := 'Repassage en cours';
+  ELSIF v_new_statut = 'pret' OR v_new_statut = 'a_livrer' OR v_new_statut = 'a_recuperer' THEN v_statut_label := 'Prête';
+  ELSIF v_new_statut = 'en_cours_livraison' THEN v_statut_label := 'En cours de livraison';
+  ELSIF v_new_statut = 'restitue' OR v_new_statut = 'livre' THEN v_statut_label := 'Livrée / Restituée';
+  ELSIF v_new_statut = 'annule' THEN v_statut_label := 'Annulée';
+  ELSE v_statut_label := v_new_statut;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    v_titre := '🧺 Nouvelle commande enregistrée';
+    v_message := 'La commande ' || v_ref || ' a été enregistrée (' || v_statut_label || ').';
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF v_new_statut = 'pret' OR v_new_statut = 'a_livrer' OR v_new_statut = 'a_recuperer' THEN
+      v_titre := '✅ Commande prête !';
+      v_message := 'La commande ' || v_ref || ' est prête (' || v_statut_label || ').';
+    ELSIF v_new_statut = 'en_cours_livraison' THEN
+      v_titre := '🛵 Livraison en cours';
+      v_message := 'La commande ' || v_ref || ' est en cours de livraison.';
+    ELSIF v_new_statut = 'restitue' OR v_new_statut = 'livre' THEN
+      v_titre := '🎉 Commande livrée';
+      v_message := 'La commande ' || v_ref || ' a été restituée au client.';
+    ELSIF v_new_statut = 'annule' THEN
+      v_titre := '⚠️ Commande annulée';
+      v_message := 'La commande ' || v_ref || ' a été annulée.';
+    ELSE
+      v_titre := '📦 Statut mis à jour';
+      v_message := 'Commande ' || v_ref || ' : statut ' || v_statut_label;
+    END IF;
+  END IF;
+
+  -- Insertion automatique dans la table order_notifications
+  INSERT INTO public.order_notifications (
+    order_id,
+    store_id,
+    type_action,
+    titre,
+    message,
+    metadata
+  ) VALUES (
+    NEW.id,
+    v_store_id,
+    v_type_action,
+    v_titre,
+    v_message,
+    row_to_json(NEW)::jsonb
+  );
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_order_action ON public.orders;
+CREATE TRIGGER trg_notify_order_action
+AFTER INSERT OR UPDATE ON public.orders
+FOR EACH ROW EXECUTE FUNCTION public.fn_process_order_action_notification();
+

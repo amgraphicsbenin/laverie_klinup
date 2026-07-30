@@ -123,33 +123,41 @@ serve(async (req) => {
       return new Response(JSON.stringify({ sent: 0, reason: `Aucun token disponible pour le store ${orderStoreId}` }), { status: 200 });
     }
 
-    // Construire le message de notification
-    const ref = order.identifiant_unique_marquage || order.id || 'N/A';
-    const newStatus = order.statut || order.status || '';
-    const newStatusLabel = getStatusText(newStatus);
-    const oldStatusLabel = oldOrder ? getStatusText(oldOrder.statut || oldOrder.status) : null;
-
+    // Si la payload provient directement de la table order_notifications
     let title = '';
     let body = '';
-    if (eventType === 'INSERT') {
-      title = '🧺 Nouvelle commande enregistrée';
-      body = `La commande ${ref} a été enregistrée (${newStatusLabel}).`;
+    let orderId = order.id;
+
+    if (order.titre && order.message) {
+      title = order.titre;
+      body = order.message;
+      orderId = order.order_id || order.id;
     } else {
-      if (newStatus === 'pret' || newStatus === 'a_livrer' || newStatus === 'a_recuperer') {
-        title = '✅ Commande prête !';
-        body = `La commande ${ref} est prête (${newStatusLabel}).`;
-      } else if (newStatus === 'en_cours_livraison') {
-        title = '🛵 Livraison en cours';
-        body = `La commande ${ref} est en cours de livraison.`;
-      } else if (newStatus === 'restitue' || newStatus === 'livre') {
-        title = '🎉 Commande livrée';
-        body = `La commande ${ref} a été restituée au client.`;
-      } else if (newStatus === 'annule') {
-        title = '⚠️ Commande annulée';
-        body = `La commande ${ref} a été annulée.`;
+      const ref = order.identifiant_unique_marquage || order.id || 'N/A';
+      const newStatus = order.statut || order.status || '';
+      const newStatusLabel = getStatusText(newStatus);
+      const oldStatusLabel = oldOrder ? getStatusText(oldOrder.statut || oldOrder.status) : null;
+
+      if (eventType === 'INSERT') {
+        title = '🧺 Nouvelle commande enregistrée';
+        body = `La commande ${ref} a été enregistrée (${newStatusLabel}).`;
       } else {
-        title = '📦 Statut mis à jour';
-        body = `Commande ${ref} : ${oldStatusLabel || ''} → ${newStatusLabel}`;
+        if (newStatus === 'pret' || newStatus === 'a_livrer' || newStatus === 'a_recuperer') {
+          title = '✅ Commande prête !';
+          body = `La commande ${ref} est prête (${newStatusLabel}).`;
+        } else if (newStatus === 'en_cours_livraison') {
+          title = '🛵 Livraison en cours';
+          body = `La commande ${ref} est en cours de livraison.`;
+        } else if (newStatus === 'restitue' || newStatus === 'livre') {
+          title = '🎉 Commande livrée';
+          body = `La commande ${ref} a été restituée au client.`;
+        } else if (newStatus === 'annule') {
+          title = '⚠️ Commande annulée';
+          body = `La commande ${ref} a été annulée.`;
+        } else {
+          title = '📦 Statut mis à jour';
+          body = `Commande ${ref} : ${oldStatusLabel || ''} → ${newStatusLabel}`;
+        }
       }
     }
 
