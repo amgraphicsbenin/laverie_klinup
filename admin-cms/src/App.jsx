@@ -647,40 +647,38 @@ function App() {
               ))}
             </div>
 
-            <div className="keypad-grid">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                <button 
-                  key={num} 
-                  type="button" 
-                  className="keypad-btn"
-                  onClick={() => handleKeypadPress(num.toString())}
-                >
-                  {num}
-                </button>
-              ))}
-              <button 
-                type="button" 
-                className="keypad-btn action-btn"
-                onClick={() => setSelectedLoginUser(null)}
-              >
-                Annuler
-              </button>
-              <button 
-                type="button" 
-                className="keypad-btn"
-                onClick={() => handleKeypadPress('0')}
-              >
-                0
-              </button>
-              <button 
-                type="button" 
-                className="keypad-btn action-btn"
-                style={{ fontSize: '0.85rem' }}
-                onClick={() => handleKeypadPress('delete')}
-              >
-                Effacer
-              </button>
-            </div>
+            <p style={{ 
+              color: 'rgba(255, 255, 255, 0.65)', 
+              fontSize: '0.85rem', 
+              textAlign: 'center', 
+              marginTop: '1.5rem',
+              marginBottom: '1rem',
+              lineHeight: 1.4
+            }}>
+              Saisissez votre code PIN à 6 chiffres à l'aide de votre clavier physique.
+            </p>
+
+            <button 
+              type="button"
+              onClick={() => setSelectedLoginUser(null)}
+              style={{
+                width: '100%',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: 'rgba(255, 255, 255, 0.8)',
+                padding: '0.75rem 1rem',
+                borderRadius: '12px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                marginTop: '0.5rem'
+              }}
+              onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.15)'}
+              onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.08)'}
+            >
+              Annuler / Changer de compte
+            </button>
           </div>
         )}
 

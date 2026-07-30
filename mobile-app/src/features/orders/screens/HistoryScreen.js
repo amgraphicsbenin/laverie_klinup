@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert, RefreshControl, FlatList } from 'react-native';
-import { Search, Calendar, X, Receipt, Trash2, User, Ban, ChevronRight, Tag, ArrowLeft } from 'lucide-react-native';
+import { Search, Calendar, X, Receipt, Trash2, User, Ban, ChevronRight, Tag, ArrowLeft, Download, Printer } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { MotiView } from '../../../components/SafeView';
 import { useDbState } from '../../../hooks/useDbState';
@@ -265,10 +267,267 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   };
 
   const handleShowInvoice = (item, e) => {
-    e.stopPropagation();
+    if (e && e.stopPropagation) e.stopPropagation();
     setInvoiceOrder(item);
     setShowInvoiceModal(true);
   };
+
+  const generateInvoiceHtml = (order) => {
+    if (!order) return '';
+    const client = customers.find(c => c.id === order.customer_id) || { prenom: 'Client', nom: 'Inconnu' };
+    const dateStr = order.created_at ? new Date(order.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
+    const displayTicketId = getDisplayTicketId(order);
+    
+    const itemsList = order.items || order.articles || [];
+    const articlesHtml = itemsList.map(art => `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px;">
+        <div style="flex: 1.8; text-align: left;">
+          <div style="font-weight: bold; color: #000;">${art.article}</div>
+          <div style="font-size: 11px; color: #666; text-transform: uppercase;">${(art.service || '').replace(/_/g, ' ')}</div>
+        </div>
+        <div style="width: 40px; text-align: center;">x${art.quantite || art.quantity || 1}</div>
+        <div style="width: 100px; text-align: right; font-weight: bold;">${formatPrice((art.prix || art.price || 0) * (art.quantite || art.quantity || 1))}</div>
+      </div>
+    `).join('');
+
+    const isExpress = order.niveau_urgence === 'Express';
+    const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
+    const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+    
+    let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+    if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
+      const catalogItem = db.getCatalog().find(c => c.article === order.type_article && c.service === order.type_service);
+      itemsSum = catalogItem ? catalogItem.prix : 1500;
+    }
+    
+    const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+    const netPrice = order.prix_total || order.total || 0;
+    
+    const displayBrut = order.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
+    const displayRemiseMontant = order.remise_montant || Math.max(0, displayBrut - netPrice);
+    const displayRemisePourcent = order.remise_pourcentage || (displayBrut > 0 ? Math.round((displayRemiseMontant / displayBrut) * 100) : 0);
+    const hasDiscount = displayRemiseMontant > 0;
+    
+    const avance = order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0);
+    const reste = order.reste !== undefined ? order.reste : Math.max(0, netPrice - avance);
+
+    const remiseHtml = hasDiscount ? `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px;">
+        <div style="font-weight: bold; color: #ff3b30;">REMISE (${displayRemisePourcent}%)</div>
+        <div style="color: #ff3b30; font-weight: bold;">-${formatPrice(displayRemiseMontant)}</div>
+      </div>
+    ` : '';
+
+    return `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+          <style>
+            @media print {
+              @page {
+                size: auto;
+                margin: 0mm;
+              }
+              body {
+                padding: 12px !important;
+                margin: 0 !important;
+                background-color: #ffffff !important;
+              }
+              .no-print, button, input, select, textarea, [role="button"],
+              .invoiceDownloadBtn, .invoicePrintBtn, .invoiceCloseBtn {
+                display: none !important;
+                visibility: hidden !important;
+              }
+            }
+            body {
+              font-family: 'Courier New', Courier, monospace, sans-serif;
+              color: #000000;
+              margin: 0;
+              padding: 24px;
+              background-color: #ffffff;
+            }
+            .container {
+              max-width: 380px;
+              margin: 0 auto;
+              padding: 10px;
+            }
+            .brand {
+              font-size: 24px;
+              font-weight: 900;
+              text-align: center;
+              margin-bottom: 2px;
+              letter-spacing: 2px;
+            }
+            .brand-sub {
+              font-size: 10px;
+              font-weight: bold;
+              text-align: center;
+              margin-bottom: 8px;
+              color: #333;
+            }
+            .text-muted {
+              font-size: 11px;
+              text-align: center;
+              color: #555;
+              margin: 2px 0;
+            }
+            .divider {
+              border-top: 1px dashed #000;
+              margin: 12px 0;
+            }
+            .meta-row {
+              display: flex;
+              justify-content: space-between;
+              font-size: 13px;
+              margin-bottom: 4px;
+            }
+            .meta-label {
+              font-weight: bold;
+              color: #333;
+            }
+            .meta-value {
+              text-align: right;
+            }
+            .section-title {
+              font-size: 12px;
+              font-weight: bold;
+              margin-bottom: 10px;
+              text-align: center;
+              letter-spacing: 1px;
+            }
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              font-size: 13px;
+              margin-bottom: 4px;
+            }
+            .total-bold {
+              font-size: 16px;
+              font-weight: 900;
+              margin-top: 6px;
+            }
+            .footer-msg {
+              font-size: 12px;
+              font-weight: bold;
+              text-align: center;
+              margin-top: 16px;
+            }
+            .barcode {
+              text-align: center;
+              font-size: 16px;
+              font-weight: bold;
+              letter-spacing: 4px;
+              margin: 12px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="brand">KLIN UP</div>
+            <div class="brand-sub">LAVERIE & PRESSING PREMIUM</div>
+            <div class="text-muted">Tél: +229 XX XX XX XX</div>
+            <div class="text-muted">Cotonou, Bénin</div>
+            
+            <div class="divider"></div>
+            
+            <div class="meta-row">
+              <span class="meta-label">Ticket N° :</span>
+              <span class="meta-value">#${displayTicketId}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Code :</span>
+              <span class="meta-value">${order.identifiant_unique_marquage || order.id}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Date :</span>
+              <span class="meta-value">${dateStr}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Client :</span>
+              <span class="meta-value">${client.prenom} ${client.nom}</span>
+            </div>
+            
+            <div class="divider"></div>
+            <div class="section-title">- ARTICLES -</div>
+            
+            ${articlesHtml}
+            
+            <div class="divider"></div>
+            
+            <div class="total-row">
+              <span>Total Brut</span>
+              <span>${formatPrice(displayBrut)}</span>
+            </div>
+            
+            ${remiseHtml}
+            
+            <div class="total-row total-bold">
+              <span>Net à payer</span>
+              <span>${formatPrice(netPrice)}</span>
+            </div>
+            
+            <div class="total-row">
+              <span>Avance réglée</span>
+              <span>${formatPrice(avance)}</span>
+            </div>
+            
+            <div class="total-row total-bold" style="color: ${reste > 0 ? '#ff3b30' : '#28a745'};">
+              <span>Solde dû</span>
+              <span>${formatPrice(reste)}</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="footer-msg">MERCI DE VOTRE CONFIANCE !</div>
+            
+            <div class="barcode">* ${order.identifiant_unique_marquage || order.id} *</div>
+            
+            <div class="text-muted" style="text-align: center;">Rejoignez KLIN UP pour un service premium</div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  const handlePrintInvoice = async (order) => {
+    if (!order) return;
+    try {
+      const html = generateInvoiceHtml(order);
+      await Print.printAsync({ html });
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible d'imprimer la facture.");
+      console.error(error);
+    }
+  };
+
+  const handleDownloadInvoice = async (order) => {
+    if (!order) return;
+    try {
+      const html = generateInvoiceHtml(order);
+      const { uri } = await Print.printToFileAsync({ html });
+      
+      if (Platform.OS === 'web') {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `facture_${order.identifiant_unique_marquage || order.id || 'KLIN'}.pdf`;
+        link.click();
+      } else {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Télécharger la facture',
+          UTI: 'com.adobe.pdf'
+        });
+      }
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible de télécharger la facture.");
+      console.error(error);
+    }
+  };
+
+  const handleSharePdf = handleDownloadInvoice;
 
   const historyOrders = orders.filter(Boolean);
 
@@ -762,8 +1021,10 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                     </View>
 
                     {/* Print/Download controls */}
-                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                    <View className="no-print" dataSet={{ print: 'no' }} style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
                       <TouchableOpacity
+                        className="no-print"
+                        dataSet={{ print: 'no' }}
                         onPress={() => handleSharePdf(invoiceOrder)}
                         style={styles.invoiceDownloadBtn}
                         activeOpacity={0.8}
@@ -773,6 +1034,8 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                       </TouchableOpacity>
 
                       <TouchableOpacity
+                        className="no-print"
+                        dataSet={{ print: 'no' }}
                         onPress={() => handlePrintInvoice(invoiceOrder)}
                         style={styles.invoicePrintBtn}
                         activeOpacity={0.8}
@@ -783,6 +1046,8 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                     </View>
 
                     <TouchableOpacity
+                      className="no-print"
+                      dataSet={{ print: 'no' }}
                       onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
                       style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
                     >

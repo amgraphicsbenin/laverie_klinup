@@ -498,7 +498,8 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                   }
 
                   return uniqueArticles.map(articleName => {
-                    const items = catalog.filter(c =>
+                    const ALLOWED_SERVICES = ['lavage_simple', 'traitement', 'repassage'];
+                    const rawItems = catalog.filter(c =>
                       c.article &&
                       c.article.trim().toLowerCase() === articleName.toLowerCase() &&
                       c.categorie !== 'system_setting' &&
@@ -507,8 +508,24 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                       c.service !== 'abonnement' &&
                       !c.id?.startsWith('setting_') &&
                       c.is_active !== false &&
-                      (c.service === 'lavage_simple' || c.service === 'repassage' || c.service === 'traitement')
+                      ALLOWED_SERVICES.includes(c.service)
                     );
+
+                    const canonicalMap = new Map();
+                    rawItems
+                      .filter(item => item.service === 'repassage')
+                      .forEach(item => canonicalMap.set('repassage', { ...item }));
+                    rawItems
+                      .filter(item => item.service === 'traitement')
+                      .forEach(item => { if (!canonicalMap.has('lavage_simple')) canonicalMap.set('lavage_simple', { ...item, service: 'lavage_simple' }); });
+                    rawItems
+                      .filter(item => item.service === 'lavage_simple')
+                      .forEach(item => canonicalMap.set('lavage_simple', { ...item, service: 'lavage_simple' }));
+
+                    const serviceOrder = ['lavage_simple', 'repassage'];
+                    const items = serviceOrder
+                      .filter(k => canonicalMap.has(k))
+                      .map(k => canonicalMap.get(k));
 
                     const isExpanded = isArticleExpanded(articleName, items);
                     const getQtyInCart = (itemId) => {

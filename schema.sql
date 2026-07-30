@@ -554,5 +554,25 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.verify_staff_login(TEXT) TO anon, authenticated;
 
+-- 7. Table pour la gestion multi-appareils des Push Tokens par Point de Laverie
+CREATE TABLE IF NOT EXISTS public.staff_devices (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  staff_id TEXT REFERENCES public.staff(id) ON DELETE CASCADE,
+  store_id TEXT NOT NULL DEFAULT 'store_central',
+  push_token TEXT NOT NULL,
+  platform TEXT DEFAULT 'mobile',
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT unique_staff_push_token UNIQUE (staff_id, push_token)
+);
 
+-- Index pour des performances optimales lors du filtrage par store_id
+CREATE INDEX IF NOT EXISTS idx_staff_devices_store ON public.staff_devices(store_id);
 
+-- Publication Realtime Supabase
+ALTER PUBLICATION supabase_realtime ADD TABLE public.staff_devices;
+
+-- Activation RLS
+ALTER TABLE public.staff_devices ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Acces public et authentifie staff_devices" ON public.staff_devices
+  FOR ALL USING (true) WITH CHECK (true);

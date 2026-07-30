@@ -241,7 +241,7 @@ export default function App() {
         switchTab('accueil');
       }
       // Save push token to Supabase so remote push notifications reach all staff when app is closed/in background
-      savePushTokenToSupabase(currentUser.id).catch(() => {});
+      savePushTokenToSupabase(currentUser.id, currentUser.store_id || 'store_central').catch(() => {});
     }
   }, [currentUser]);
 
@@ -357,9 +357,10 @@ export default function App() {
 
   const isAtelier = currentUser?.role === 'agent_lavage_repassage';
   const totalSlots = isAtelier ? 2 : 5;
-  const tabBarInnerWidth = Math.max(100, containerWidth - 28 - 8);
+  const tabBarInnerWidth = Math.max(100, containerWidth - 8);
   const slotWidth = tabBarInnerWidth / totalSlots;
-  const pillWidth = Math.min(64, slotWidth - 4);
+  const pillWidth = Math.min(48, slotWidth - 8);
+  const pillHeight = 32;
   
   const getActiveSlotIndex = (tab) => {
     if (isAtelier) {
@@ -377,6 +378,11 @@ export default function App() {
 
   const activeSlotIndex = getActiveSlotIndex(activeTab);
   const pillTranslateX = (activeSlotIndex * slotWidth) + (slotWidth - pillWidth) / 2;
+
+  const isNavBarHidden = 
+    selectedOrder !== null || 
+    localModalOpen || 
+    orderFormVisible;
 
   const appContent = (
     <View style={{ flex: 1, backgroundColor: showSplash ? '#002cf7' : (isDarkMode ? '#000000' : '#ffffff') }}>
@@ -431,9 +437,9 @@ export default function App() {
       <View style={[
         styles.tabBar,
         {
-          bottom: Math.max(18, insets.bottom + 12),
-          backgroundColor: isDarkMode ? '#121212' : '#f3f4f8',
-          borderColor: isDarkMode ? '#27272a' : 'rgba(0, 44, 247, 0.25)',
+          paddingBottom: Math.max(6, insets.bottom),
+          backgroundColor: '#002cf7',
+          display: isNavBarHidden ? 'none' : 'flex',
         }
       ]}>
         {/* Sliding Active Pill Background Indicator */}
@@ -451,16 +457,11 @@ export default function App() {
           style={{
             position: 'absolute',
             left: 4,
-            top: 6,
+            top: 10,
             width: pillWidth,
-            height: 62,
+            height: pillHeight,
             borderRadius: 9999,
-            backgroundColor: isDarkMode ? '#1d4ed8' : '#2563eb',
-            shadowColor: 'transparent',
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0,
-            shadowRadius: 0,
-            elevation: 0,
+            backgroundColor: '#ffffff',
             transform: [{ translateX: pillTranslateX }],
             zIndex: 0,
           }}
@@ -475,12 +476,12 @@ export default function App() {
             <FlaticonIcon
               name="accueil"
               active={activeTab === 'accueil'}
-              size={22}
-              color={activeTab === 'accueil' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
+              size={20}
+              color={activeTab === 'accueil' ? '#002cf7' : '#ffffff'}
             />
             <Text style={[
               styles.tabLabel, 
-              { color: activeTab === 'accueil' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
+              { color: '#ffffff' },
               activeTab === 'accueil' && styles.tabLabelActive
             ]}>
               Accueil
@@ -498,12 +499,12 @@ export default function App() {
               <FlaticonIcon
                 name="gestion"
                 active={activeTab === 'gestion'}
-                size={22}
-                color={activeTab === 'gestion' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
+                size={20}
+                color={activeTab === 'gestion' ? '#002cf7' : '#ffffff'}
               />
               <Text style={[
                 styles.tabLabel, 
-                { color: activeTab === 'gestion' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
+                { color: '#ffffff' },
                 activeTab === 'gestion' && styles.tabLabelActive
               ]}>
                 Gestion
@@ -523,12 +524,12 @@ export default function App() {
               <FlaticonIcon
                 name="ajouter"
                 active={activeTab === 'creer_commande'}
-                size={22}
-                color={activeTab === 'creer_commande' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
+                size={20}
+                color={activeTab === 'creer_commande' ? '#002cf7' : '#ffffff'}
               />
               <Text style={[
                 styles.tabLabel, 
-                { color: activeTab === 'creer_commande' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
+                { color: '#ffffff' },
                 activeTab === 'creer_commande' && styles.tabLabelActive
               ]}>
                 Ajouter
@@ -547,12 +548,12 @@ export default function App() {
               <FlaticonIcon
                 name="historique"
                 active={activeTab === 'historique'}
-                size={22}
-                color={activeTab === 'historique' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
+                size={20}
+                color={activeTab === 'historique' ? '#002cf7' : '#ffffff'}
               />
               <Text style={[
                 styles.tabLabel, 
-                { color: activeTab === 'historique' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
+                { color: '#ffffff' },
                 activeTab === 'historique' && styles.tabLabelActive
               ]}>
                 Historique
@@ -570,12 +571,12 @@ export default function App() {
               <FlaticonIcon
                 name="profile"
                 active={activeTab === 'profile'}
-                size={22}
-                color={activeTab === 'profile' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
+                size={20}
+                color={activeTab === 'profile' ? '#002cf7' : '#ffffff'}
               />
               <Text style={[
                 styles.tabLabel, 
-                { color: activeTab === 'profile' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') },
+                { color: '#ffffff' },
                 activeTab === 'profile' && styles.tabLabelActive
               ]}>
                 Profil
@@ -829,28 +830,19 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     position: 'absolute',
-    left: 14,
-    right: 14,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 10000,
     flexDirection: 'row',
-    backgroundColor: '#f3f4f8',
-    borderRadius: 9999,
+    backgroundColor: '#002cf7',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 4,
-    paddingVertical: 4,
-    height: 74,
-    borderWidth: 1.2,
-    borderColor: 'rgba(0, 44, 247, 0.25)',
-    // Shadows for floating rounded card look
-    shadowColor: 'transparent',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    paddingTop: 6,
+    borderWidth: 0,
   },
   tabItem: {
     alignItems: 'center',
@@ -860,16 +852,16 @@ const styles = StyleSheet.create({
   tabItemInner: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 9999,
     width: '100%',
-    height: 62,
+    height: 56,
   },
   centerTabItem: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    height: 62,
+    height: 56,
   },
   scanButtonCircle: {
     width: 44,
@@ -885,11 +877,12 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   tabLabel: {
-    fontSize: 9.5,
-    color: '#64748b',
-    marginTop: 2,
+    fontSize: 9,
+    color: '#ffffff',
+    marginTop: 7,
     fontWeight: '600',
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+    letterSpacing: 0.2,
   },
   tabLabelActive: {
     color: '#ffffff',

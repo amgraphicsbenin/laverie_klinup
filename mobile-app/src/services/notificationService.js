@@ -180,26 +180,45 @@ export async function getExpoPushToken() {
 
 /**
  * Sauvegarde le push token de l'utilisateur dans Supabase.
- * Permet à l'Edge Function d'envoyer des push à cet appareil.
+ * Enregistre le token dans la table `staff` ET dans `staff_devices` pour supporter le multi-appareils.
  * @param {string} userId - L'ID de l'utilisateur staff.
+ * @param {string} [storeId] - L'ID du point de laverie rattaché.
  */
-export async function savePushTokenToSupabase(userId) {
+export async function savePushTokenToSupabase(userId, storeId = 'store_central') {
   if (!userId || !supabase) return;
 
   try {
     const token = await getExpoPushToken();
     if (!token) return;
 
-    const { error } = await supabase
+    // 1. Sauvegarde rétrocompatible sur la table staff
+    const { error: staffErr } = await supabase
       .from('staff')
       .update({ push_token: token, push_token_updated_at: new Date().toISOString() })
       .eq('id', userId);
 
-    if (error) {
-      // La colonne push_token peut ne pas exister — ignoré silencieusement
-      console.warn('[Notifications] push_token non sauvegardé (colonne peut-être absente):', error.message);
+    if (staffErr) {
+      console.warn('[Notifications] push_token non sauvegardé sur staff:', staffErr.message);
+    }
+
+    // 2. Sauvegarde multi-appareils dans staff_devices
+    const { error: deviceErr } = await supabase
+      .from('staff_devices')
+      .upsert(
+        {
+          staff_id: userId,
+          store_id: storeId || 'store_central',
+          push_token: token,
+          platform: Platform.OS || 'mobile',
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'staff_id,push_token' }
+      );
+
+    if (deviceErr) {
+      console.warn('[Notifications] Jeton non enregistré dans staff_devices:', deviceErr.message);
     } else {
-      console.log('[Notifications] ✅ push_token sauvegardé pour l\'utilisateur', userId);
+      console.log('[Notifications] ✅ Jeton Push multi-appareils enregistré pour', userId, '(store:', storeId, ')');
     }
   } catch (err) {
     console.warn('[Notifications] Erreur lors de la sauvegarde du push token:', err);

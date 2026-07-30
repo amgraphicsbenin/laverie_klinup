@@ -14,6 +14,6 @@ echo Ouverture de l'application dans votre navigateur (http://localhost:5174)...
 start http://localhost:5174
 
 echo Lancement du serveur de developpement Vite (Port 5174)...
-call npm run dev -- --port 5174 --strictPort
+call npm run dev -- --host --port 5174 --strictPort
 
 pause

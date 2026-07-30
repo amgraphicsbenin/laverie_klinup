@@ -83,6 +83,8 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const orderStoreId = order.store_id || 'store_central';
+
     // Récupérer le staff actif rattaché au point de laverie de la commande
     const { data: staffList, error: staffError } = await supabase
       .from('staff')
@@ -92,24 +94,33 @@ serve(async (req) => {
 
     if (staffError) {
       console.error('[send-push] Erreur récupération staff:', staffError.message);
-      return new Response(JSON.stringify({ error: staffError.message }), { status: 500 });
     }
 
-    const orderStoreId = order.store_id || 'store_central';
+    // Récupérer également les appareils additionnels enregistrés dans staff_devices
+    const { data: deviceList } = await supabase
+      .from('staff_devices')
+      .select('push_token, store_id')
+      .not('push_token', 'is', null);
 
-    // Filtrer les utilisateurs rattachés au MEME point de laverie (ou les super_admin)
-    const targetStaff = (staffList || []).filter((s: { role?: string; store_id?: string }) => {
+    // Filtrer les utilisateurs du staff rattachés au MEME point de laverie (ou super_admin)
+    const targetStaffTokens = (staffList || []).filter((s: { role?: string; store_id?: string }) => {
       const userStoreId = s.store_id || 'store_central';
       const isSuperAdmin = s.role === 'super_admin' || userStoreId === 'all';
       return isSuperAdmin || userStoreId === orderStoreId;
-    });
+    }).map((s: { push_token?: string }) => s.push_token);
 
-    const tokens: string[] = targetStaff
-      .map((s: { push_token?: string }) => s.push_token)
-      .filter((t): t is string => !!t && t.startsWith('ExponentPushToken['));
+    const deviceTokens = (deviceList || []).filter((d: { store_id?: string }) => {
+      const devStoreId = d.store_id || 'store_central';
+      return devStoreId === orderStoreId || devStoreId === 'all';
+    }).map((d: { push_token?: string }) => d.push_token);
+
+    // Combiner et dédupliquer les jetons d'appareils pour le store
+    const allRawTokens = [...targetStaffTokens, ...deviceTokens];
+    const tokens: string[] = Array.from(new Set(allRawTokens))
+      .filter((t): t is string => !!t && typeof t === 'string' && t.startsWith('ExponentPushToken['));
 
     if (tokens.length === 0) {
-      return new Response(JSON.stringify({ sent: 0, reason: `Aucun token pour le store ${orderStoreId}` }), { status: 200 });
+      return new Response(JSON.stringify({ sent: 0, reason: `Aucun token disponible pour le store ${orderStoreId}` }), { status: 200 });
     }
 
     // Construire le message de notification

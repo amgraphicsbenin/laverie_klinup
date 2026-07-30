@@ -720,6 +720,22 @@ export default function GestionScreen({
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
           <style>
+            @media print {
+              @page {
+                size: auto;
+                margin: 0mm;
+              }
+              body {
+                padding: 12px !important;
+                margin: 0 !important;
+                background-color: #ffffff !important;
+              }
+              .no-print, button, input, select, textarea, [role="button"],
+              .invoiceDownloadBtn, .invoicePrintBtn, .invoiceCloseBtn {
+                display: none !important;
+                visibility: hidden !important;
+              }
+            }
             body {
               font-family: 'Courier New', Courier, monospace, sans-serif;
               color: #000000;
@@ -903,6 +919,8 @@ export default function GestionScreen({
       console.error(error);
     }
   };
+
+  const handleSharePdf = handleDownloadInvoice;
 
   // Filters
   const filteredOrders = orders.filter(o => {
@@ -1959,8 +1977,10 @@ export default function GestionScreen({
                     </View>
 
                     {/* Print/Download controls */}
-                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                    <View className="no-print" dataSet={{ print: 'no' }} style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
                       <TouchableOpacity
+                        className="no-print"
+                        dataSet={{ print: 'no' }}
                         onPress={() => handleSharePdf(invoiceOrder)}
                         style={styles.invoiceDownloadBtn}
                         activeOpacity={0.8}
@@ -1970,6 +1990,8 @@ export default function GestionScreen({
                       </TouchableOpacity>
 
                       <TouchableOpacity
+                        className="no-print"
+                        dataSet={{ print: 'no' }}
                         onPress={() => handlePrintInvoice(invoiceOrder)}
                         style={styles.invoicePrintBtn}
                         activeOpacity={0.8}
@@ -1980,6 +2002,8 @@ export default function GestionScreen({
                     </View>
 
                     <TouchableOpacity
+                      className="no-print"
+                      dataSet={{ print: 'no' }}
                       onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
                       style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
                     >

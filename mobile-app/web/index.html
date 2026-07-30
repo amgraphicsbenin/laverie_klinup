@@ -43,6 +43,26 @@
         -moz-osx-font-smoothing: grayscale;
       }
 
+      @media print {
+        body {
+          background: #ffffff !important;
+          color: #000000 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        .preview-label, .phone-frame, .phone-notch, .home-bar, .side-btn,
+        .compactModalHeader, .compactModalTitle {
+          box-shadow: none !important;
+          border: none !important;
+          background: transparent !important;
+        }
+        .no-print, button, [role="button"],
+        .invoiceDownloadBtn, .invoicePrintBtn, .invoiceCloseBtn {
+          display: none !important;
+          visibility: hidden !important;
+        }
+      }
+
       html, body {
         width: 100%;
         height: 100%;
