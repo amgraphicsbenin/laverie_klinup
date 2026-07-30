@@ -354,8 +354,47 @@ export async function sendOrderNotification(eventType, order, oldStatus = null) 
         record: order,
         old_record: oldStatus ? { statut: oldStatus } : null
       }
+    }).then(res => {
+      if (res?.data) {
+        console.log('[Push Notification] ✅ Résultat Edge Function:', res.data);
+      }
     }).catch(err => {
       console.warn('[Push Notification] Info Edge Function:', err?.message || err);
     });
+  }
+}
+
+/**
+ * Fonction de test diagnostic pour déclencher et vérifier l'envoi des Push Notifications Expo.
+ */
+export async function testSendPushNotification(userId, storeId = 'store_central') {
+  try {
+    const token = await getExpoPushToken();
+    console.log('[Push Test] Token local:', token);
+    
+    if (userId) {
+      await savePushTokenToSupabase(userId, storeId);
+    }
+
+    if (supabase && typeof supabase.functions?.invoke === 'function') {
+      const res = await supabase.functions.invoke('send-push-notification', {
+        body: {
+          type: 'INSERT',
+          record: {
+            id: 'TEST-' + Date.now(),
+            identifiant_unique_marquage: 'CMD-TEST-001',
+            statut: 'en_attente',
+            store_id: storeId,
+            titre: '🧪 Test Push KLIN UP',
+            message: 'Ceci est une notification push de test reçue en temps réel !'
+          }
+        }
+      });
+      console.log('[Push Test] ✅ Réponse Edge Function:', res);
+      return res;
+    }
+  } catch (e) {
+    console.error('[Push Test] Erreur:', e);
+    throw e;
   }
 }

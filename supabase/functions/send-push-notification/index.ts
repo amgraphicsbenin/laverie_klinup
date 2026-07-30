@@ -161,25 +161,34 @@ serve(async (req) => {
       }
     }
 
-    // Envoyer les push notifications via l'API Expo
+    const ref = order.identifiant_unique_marquage || order.id || 'N/A';
+    const newStatus = order.statut || order.status || '';
+
+    // Envoyer les push notifications via l'API Expo avec le payload complet recommandé
     const messages = tokens.map(token => ({
       to: token,
       sound: 'default',
       title,
       body,
+      badge: 1,
+      priority: 'high',
+      channelId: 'orders',
+      ttl: 86400,
       data: {
-        orderId: order.id,
+        orderId,
         statut: newStatus,
         ref,
         screen: 'gestion',
+        _displayInForeground: true,
       },
-      priority: 'high',
-      channelId: 'orders',
     }));
 
     // Expo accepte des batches de 100 messages max
     const batchSize = 100;
     let totalSent = 0;
+    let totalFailed = 0;
+    const ticketResults: any[] = [];
+    const deadTokens: string[] = [];
 
     for (let i = 0; i < messages.length; i += batchSize) {
       const batch = messages.slice(i, i + batchSize);
@@ -195,17 +204,52 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error('[send-push] Erreur Expo API:', errText);
+        console.error('[send-push] Erreur HTTP Expo API:', response.status, errText);
+        totalFailed += batch.length;
       } else {
-        totalSent += batch.length;
+        const resData = await response.json();
+        const tickets = resData?.data || [];
+
+        tickets.forEach((ticket: any, idx: number) => {
+          const recipientToken = batch[idx]?.to;
+          if (ticket.status === 'ok') {
+            totalSent++;
+            ticketResults.push({ token: recipientToken, status: 'ok', id: ticket.id });
+          } else {
+            totalFailed++;
+            const errType = ticket.details?.error || ticket.message || 'UnknownError';
+            console.warn(`[send-push] ⚠️ Échec ticket pour ${recipientToken}:`, errType);
+            ticketResults.push({ token: recipientToken, status: 'error', error: errType });
+
+            // Si le jeton est révoqué / non enregistré, le marquer pour suppression
+            if (errType === 'DeviceNotRegistered' && recipientToken) {
+              deadTokens.push(recipientToken);
+            }
+          }
+        });
       }
     }
 
-    console.log(`[send-push] ✅ ${totalSent} notification(s) envoyée(s) pour commande ${ref}`);
+    // Nettoyage automatique des jetons d'appareils expirés
+    if (deadTokens.length > 0) {
+      console.log(`[send-push] 🧹 Nettoyage de ${deadTokens.length} jeton(s) expiré(s)...`);
+      await Promise.allSettled([
+        supabase.from('staff_devices').delete().in('push_token', deadTokens),
+        supabase.from('staff').update({ push_token: null }).in('push_token', deadTokens)
+      ]);
+    }
 
-    return new Response(JSON.stringify({ sent: totalSent, title, body }), {
+    console.log(`[send-push] ✅ Bilan: ${totalSent} envoyé(s), ${totalFailed} échoué(s) pour la commande ${ref}`);
+
+    return new Response(JSON.stringify({
+      success: true,
+      sent: totalSent,
+      failed: totalFailed,
+      store_id: orderStoreId,
+      tickets: ticketResults
+    }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
 
   } catch (err) {
