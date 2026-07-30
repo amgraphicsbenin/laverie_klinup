@@ -305,8 +305,16 @@ export default function GestionScreen({
   useEffect(() => {
     if (selectedOrder) {
       setShowOrderDetails(true);
+    } else {
+      setShowOrderDetails(false);
     }
   }, [selectedOrder]);
+
+  useEffect(() => {
+    if (!showOrderDetails && selectedOrder !== null) {
+      if (setSelectedOrder) setSelectedOrder(null);
+    }
+  }, [showOrderDetails, selectedOrder, setSelectedOrder]);
 
   useEffect(() => {
     if (initialSelectedClient) {
@@ -1559,7 +1567,7 @@ export default function GestionScreen({
                     onPress={() => {
                       const client = customers.find(c => c.id === selectedOrder.customer_id);
                       if (client) {
-                        setShowOrderDetails(false);
+                        handleCloseOrderDetails();
                         setSelectedClient(client);
                       }
                     }}

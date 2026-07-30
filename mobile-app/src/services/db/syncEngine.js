@@ -390,7 +390,7 @@ export function startAutoReconnect() {
   }, 30000);
 }
 
-// Sync périodique continue haute fréquence (toutes les 3s)
+// Cron de synchronisation périodique ultra-rapide (toutes les 2s pour rafraîchir le statut des commandes du point de laverie)
 let syncInterval = null;
 export async function startPeriodicSync() {
   if (syncInterval) return;
@@ -480,7 +480,7 @@ export async function startPeriodicSync() {
     } catch (e) {
       // Sync silencieuse
     }
-  }, 3000);
+  }, 2000);
 }
 
 let realtimeChannels = [];

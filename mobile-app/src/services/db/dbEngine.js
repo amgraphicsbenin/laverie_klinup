@@ -147,7 +147,7 @@ export function reconcileOrderStates() {
 
 let orderCronTimer = null;
 /**
- * Lance le cron continu d'assainissement des états de commandes (intervalle: 5 secondes).
+ * Lance le cron continu d'assainissement et de réconciliation locale des états de commandes (intervalle: 200 ms).
  */
 export function startOrderStateCron() {
   if (orderCronTimer) return;
@@ -162,9 +162,9 @@ export function startOrderStateCron() {
         notifyListeners();
       }
     } catch (e) {
-      console.warn('[Order Cron] Silent error during reconciliation:', e);
+      console.warn('[Order Cron 200ms] Silent error during reconciliation:', e);
     }
-  }, 5000);
+  }, 200);
 }
 
 // Interface publique de la base de données (l'objet db original)
