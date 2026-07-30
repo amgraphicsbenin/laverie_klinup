@@ -680,11 +680,74 @@ CREATE TRIGGER trg_notify_order_action
 AFTER INSERT OR UPDATE ON public.orders
 FOR EACH ROW EXECUTE FUNCTION public.fn_process_order_action_notification();
 
--- 9. Trigger d'envoi automatique Push Notification FCM via Database Webhook
+-- ============================================================
+-- 9. Chien de Garde Serveur : Trigger → pg_net → Edge Function
+-- ============================================================
+-- Prérequis :
+--   1. Activer pg_net : Dashboard → Database → Extensions → pg_net → Enable
+--   2. Stocker les secrets UNE SEULE FOIS dans le SQL Editor Supabase :
+--
+--      SELECT vault.create_secret(
+--        'https://<your-project-ref>.supabase.co',
+--        'klin_up_project_url',
+--        'URL du projet Supabase KLIN UP'
+--      );
+--      SELECT vault.create_secret(
+--        '<your-service-role-key>',
+--        'klin_up_service_role_key',
+--        'Service role key pour appels internes Edge Function'
+--      );
+--
+--   (Remplacer <your-project-ref> et <your-service-role-key> par vos vraies valeurs)
+--   (Disponibles dans : Dashboard → Settings → API)
+
 CREATE OR REPLACE FUNCTION public.fn_dispatch_push_on_notification()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_url  TEXT;
+  v_key  TEXT;
+  v_body TEXT;
 BEGIN
-  -- Cette fonction permet au Webhook Database Supabase ou à l'Edge Function d'intercepter la création de notification
+  -- Récupérer les secrets depuis Supabase Vault
+  -- (pas de ALTER DATABASE requis — compatible Supabase Cloud)
+  BEGIN
+    SELECT decrypted_secret INTO v_url
+      FROM vault.decrypted_secrets
+      WHERE name = 'klin_up_project_url'
+      LIMIT 1;
+
+    SELECT decrypted_secret INTO v_key
+      FROM vault.decrypted_secrets
+      WHERE name = 'klin_up_service_role_key'
+      LIMIT 1;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING '[fn_dispatch_push] Impossible de lire les secrets Vault : %. Configurer via vault.create_secret().', SQLERRM;
+    RETURN NEW;
+  END;
+
+  IF v_url IS NULL OR v_url = '' OR v_key IS NULL OR v_key = '' THEN
+    RAISE WARNING '[fn_dispatch_push] Secrets Vault vides (klin_up_project_url / klin_up_service_role_key). Vérifier la configuration.';
+    RETURN NEW;
+  END IF;
+
+  -- Construire le body JSON de la notification à envoyer
+  v_body := row_to_json(NEW)::text;
+
+  -- Appel HTTP asynchrone vers l'Edge Function send-push-notification
+  -- pg_net effectue l'appel en arrière-plan sans bloquer la transaction
+  PERFORM net.http_post(
+    url     := v_url || '/functions/v1/send-push-notification',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer ' || v_key
+    ),
+    body    := v_body
+  );
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- Ne jamais bloquer la transaction principale en cas d'erreur réseau
+  RAISE WARNING '[fn_dispatch_push] Erreur lors de l''appel Edge Function : %', SQLERRM;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -693,5 +756,15 @@ DROP TRIGGER IF EXISTS trg_dispatch_push ON public.order_notifications;
 CREATE TRIGGER trg_dispatch_push
 AFTER INSERT ON public.order_notifications
 FOR EACH ROW EXECUTE FUNCTION public.fn_dispatch_push_on_notification();
+
+-- ============================================================
+-- FALLBACK si pg_net ou Vault ne sont pas disponibles sur votre plan :
+-- Utiliser le Database Webhook Supabase (aucun SQL requis) :
+--   Dashboard → Database → Webhooks → New Webhook
+--   Table    : order_notifications
+--   Event    : INSERT
+--   URL      : https://<project-ref>.supabase.co/functions/v1/send-push-notification
+--   Header   : Authorization: Bearer <service_role_key>
+-- ============================================================
 
 

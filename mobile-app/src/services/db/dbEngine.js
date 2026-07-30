@@ -147,7 +147,12 @@ export function reconcileOrderStates() {
 
 let orderCronTimer = null;
 /**
- * Lance le cron continu d'assainissement et de réconciliation locale des états de commandes (intervalle: 200 ms).
+ * Cron local de réconciliation des états de commandes en mémoire vive (intervalle: 2000 ms).
+ * RÔLE : normalisation locale uniquement (correction de statuts, calcul des retards).
+ * La synchronisation réseau et la diffusion aux autres appareils sont gérées par :
+ *   - Le trigger PostgreSQL `trg_notify_order_action` (chien de garde serveur instantané)
+ *   - Le Supabase Realtime WebSocket (diffusion temps réel aux appareils)
+ *   - `startPeriodicSync()` (fallback poll orders-only toutes les 5s)
  */
 export function startOrderStateCron() {
   if (orderCronTimer) return;
@@ -162,9 +167,9 @@ export function startOrderStateCron() {
         notifyListeners();
       }
     } catch (e) {
-      console.warn('[Order Cron 200ms] Silent error during reconciliation:', e);
+      console.warn('[Order Cron Local 2s] Erreur silencieuse:', e);
     }
-  }, 200);
+  }, 2000);
 }
 
 // Interface publique de la base de données (l'objet db original)

@@ -390,97 +390,49 @@ export function startAutoReconnect() {
   }, 30000);
 }
 
-// Cron de synchronisation périodique ultra-rapide (toutes les 2s pour rafraîchir le statut des commandes du point de laverie)
+// Cron de synchronisation de fallback (toutes les 5s — uniquement si le Realtime WebSocket est défaillant)
+// La voie PRINCIPALE est le Supabase Realtime (WebSocket instantané).
+// Ce cron est un filet de sécurité : il ne fetch que les commandes du point de laverie courant.
 let syncInterval = null;
 export async function startPeriodicSync() {
   if (syncInterval) return;
   syncInterval = setInterval(async () => {
     if (!supabase) return;
     try {
-      const [staffRes, custRes, orderRes, logsRes, reqsRes, catRes, storeRes] = await Promise.allSettled([
-        withTimeout(supabase.from('staff').select('*'), 5000, 'sync-staff'),
-        withTimeout(supabase.from('customers').select('*'), 5000, 'sync-customers'),
-        withTimeout(supabase.from('orders').select('*'), 5000, 'sync-orders'),
-        withTimeout(supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }), 5000, 'sync-logs'),
-        withTimeout(supabase.from('pin_reset_requests').select('*'), 5000, 'sync-reqs'),
-        withTimeout(supabase.from('catalog').select('*'), 5000, 'sync-catalog'),
-        withTimeout(supabase.from('stores').select('*'), 5000, 'sync-stores'),
-      ]);
-      let changed = false;
-      if (staffRes.status === 'fulfilled' && !staffRes.value?.error && staffRes.value?.data?.length > 0) {
-        const remoteStaff = staffRes.value.data || [];
-        const mergedStaff = [...remoteStaff];
-        (memoryDb.staff || []).forEach(localItem => {
-          if (localItem && localItem.id && !mergedStaff.some(r => r.id === localItem.id)) {
-            mergedStaff.push(localItem);
-          }
-        });
-        if (JSON.stringify(memoryDb.staff) !== JSON.stringify(mergedStaff)) {
-          memoryDb.staff = mergedStaff;
-          changed = true;
+      const { data: remoteOrders, error } = await supabase
+        .from('orders')
+        .select('*');
+
+      if (error || !remoteOrders) return;
+
+      const mergedOrders = remoteOrders.map(ro => {
+        const localOrder = (memoryDb.orders || []).find(lo => lo && lo.id === ro.id);
+        let merged = { ...ro };
+        if (localOrder && localOrder.motif_annulation && !merged.motif_annulation) {
+          merged.motif_annulation = localOrder.motif_annulation;
         }
-      }
-      if (custRes.status === 'fulfilled' && !custRes.value?.error) {
-        const newCust = custRes.value.data || [];
-        if (JSON.stringify(memoryDb.customers) !== JSON.stringify(newCust)) {
-          memoryDb.customers = newCust;
-          changed = true;
+        return hydrateOrder(merged);
+      });
+
+      // Conserver les commandes créées localement non encore synchronisées
+      const pendingOfflineOrderIds = (memoryDb.sync_queue || [])
+        .filter(q => q.table === 'orders' && q.action === 'insert')
+        .map(q => q.recordId);
+      (memoryDb.orders || []).forEach(localOrder => {
+        if (localOrder && localOrder.id && pendingOfflineOrderIds.includes(localOrder.id) && !mergedOrders.some(r => r.id === localOrder.id)) {
+          mergedOrders.push(hydrateOrder(localOrder));
         }
-      }
-      if (orderRes.status === 'fulfilled' && !orderRes.value?.error) {
-        const remoteOrders = orderRes.value.data || [];
-        const mergedOrders = remoteOrders.map(ro => {
-          const localOrder = (memoryDb.orders || []).find(lo => lo && lo.id === ro.id);
-          let merged = { ...ro };
-          if (localOrder && localOrder.motif_annulation && !ro.motif_annulation) {
-            merged.motif_annulation = localOrder.motif_annulation;
-          }
-          return hydrateOrder(merged);
-        });
-        if (JSON.stringify(memoryDb.orders) !== JSON.stringify(mergedOrders)) {
-          memoryDb.orders = mergedOrders;
-          changed = true;
-        }
-      }
-      if (logsRes.status === 'fulfilled' && !logsRes.value?.error) {
-        const newLogs = logsRes.value.data || [];
-        if (JSON.stringify(memoryDb.logs) !== JSON.stringify(newLogs)) {
-          memoryDb.logs = newLogs;
-          changed = true;
-        }
-      }
-      if (reqsRes.status === 'fulfilled' && !reqsRes.value?.error) {
-        const newReqs = reqsRes.value.data || [];
-        if (JSON.stringify(memoryDb.pin_reset_requests) !== JSON.stringify(newReqs)) {
-          memoryDb.pin_reset_requests = newReqs;
-          changed = true;
-        }
-      }
-      if (catRes.status === 'fulfilled' && !catRes.value?.error && catRes.value?.data) {
-        const newCat = catRes.value.data.map(item => {
-          const isActive = item.is_active === false || item.statut === 'inactif' ? false : true;
-          return { ...item, is_active: isActive, statut: isActive ? 'actif' : 'inactif' };
-        });
-        if (JSON.stringify(memoryDb.catalog) !== JSON.stringify(newCat)) {
-          memoryDb.catalog = newCat;
-          changed = true;
-        }
-      }
-      if (storeRes.status === 'fulfilled' && !storeRes.value?.error) {
-        const newStores = storeRes.value.data || [];
-        if (JSON.stringify(memoryDb.stores) !== JSON.stringify(newStores)) {
-          memoryDb.stores = newStores;
-          changed = true;
-        }
-      }
-      if (changed) { 
-        await persist(); 
-        db.notify(); 
+      });
+
+      if (JSON.stringify(memoryDb.orders) !== JSON.stringify(mergedOrders)) {
+        memoryDb.orders = mergedOrders;
+        await persist();
+        db.notify();
       }
     } catch (e) {
-      // Sync silencieuse
+      // Sync silencieuse — le Realtime WebSocket prend le relais
     }
-  }, 2000);
+  }, 5000);
 }
 
 let realtimeChannels = [];
