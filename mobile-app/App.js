@@ -437,7 +437,8 @@ export default function App() {
       <View style={[
         styles.tabBar,
         {
-          paddingBottom: Math.max(6, insets.bottom),
+          paddingTop: 10,
+          paddingBottom: Math.max(10, insets.bottom),
           backgroundColor: '#002cf7',
           display: isNavBarHidden ? 'none' : 'flex',
         }
@@ -841,7 +842,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 4,
-    paddingTop: 6,
+    paddingTop: 10,
+    paddingBottom: 10,
     borderWidth: 0,
   },
   tabItem: {

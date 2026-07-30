@@ -639,6 +639,7 @@ export const db = {
       due_date: dueDate,
       acompte_paid_at: advancePaid > 0 ? nowStr : null,
       solde_paid_at: unpaidBalance <= 0 ? nowStr : null,
+      reference_paiement: orderData.reference_paiement || orderData.momo_ref || orderData.momo_ref_number || null,
       items: inputItems,
       created_by_id: currentUser ? currentUser.id : null,
       created_by_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : null

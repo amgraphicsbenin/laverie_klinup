@@ -30,7 +30,7 @@ export default function GestionScreen({
   onClearInitialSelectedClient,
   onShowSuccess
 }) {
-  const { isDarkMode } = useDbState();
+  const { orders, customers, catalog, currentUser, isDarkMode } = useDbState();
   const styles = getStyles(isDarkMode);
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
@@ -194,11 +194,7 @@ export default function GestionScreen({
     }
   }, [gestionFilter]);
   
-  // Database states
-  const currentUser = db.getCurrentUser();
-  const orders = db.getOrders();
-  const customers = db.getCustomers();
-  const catalog = db.getCatalog();
+
 
   const isTransitionAllowed = (status, targetStatus) => {
     if (!currentUser) return false;

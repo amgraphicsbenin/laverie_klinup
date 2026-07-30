@@ -23,6 +23,8 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
   const [orderUrgency, setOrderUrgency] = useState('Normal');
   const [expandedArticles, setExpandedArticles] = useState([]);
   const [clothingSearchQuery, setClothingSearchQuery] = useState('');
+  const [momoRefNumber, setMomoRefNumber] = useState('');
+  const [momoRefError, setMomoRefError] = useState('');
 
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
@@ -58,6 +60,8 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     setPayWithSubscription(false);
     setSubscribePlanId('');
     setClothingSearchQuery('');
+    setMomoRefNumber('');
+    setMomoRefError('');
   };
 
   const handleCancelOrder = () => {
@@ -155,6 +159,12 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     const finalModeReglement = isSubscriptionActive ? (isImmediateSub ? orderPaymentMethod : 'abonnement') : orderPaymentMethod;
     const finalAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
 
+    if (finalModeReglement === 'Mobile Money' && !momoRefNumber.trim()) {
+      setMomoRefError("Numéro de référence Mobile Money requis.");
+      alert("Confirmation Mobile Money requise : Veuillez saisir le numéro de référence de la transaction Mobile Money avant de valider la création de la commande.");
+      return;
+    }
+
     try {
       const currentUser = db.getCurrentUser();
       const newOrder = {
@@ -182,7 +192,8 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         remise_pourcentage: discountPercent,
         created_by_id: currentUser ? currentUser.id : 'u1',
         pay_with_subscription: payWithSubscription,
-        subscribe_plan_id: subscribePlanId
+        subscribe_plan_id: subscribePlanId,
+        reference_paiement: finalModeReglement === 'Mobile Money' ? momoRefNumber.trim() : null
       };
 
       await db.createOrder(newOrder);
@@ -766,6 +777,42 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                 <option value="Mobile Money">Mobile Money</option>
               </select>
             </div>
+
+            {/* Champ Référence Mobile Money Obligatoire */}
+            {orderPaymentMethod === 'Mobile Money' && (
+              <div style={{ marginTop: '12px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#002cf7', marginBottom: '4px', display: 'block' }}>
+                  N° Référence Transaction Mobile Money <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: MP240730.1945.A12345"
+                  value={momoRefNumber}
+                  onChange={(e) => {
+                    setMomoRefNumber(e.target.value);
+                    if (momoRefError) setMomoRefError('');
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    backgroundColor: '#ffffff',
+                    border: momoRefError ? '1.5px solid #ef4444' : '1.5px solid #002cf7',
+                    borderRadius: '12px',
+                    padding: '0 12px',
+                    fontSize: '13px',
+                    color: '#09090b',
+                    fontWeight: 500,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                {momoRefError && (
+                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px', fontWeight: 600 }}>
+                    {momoRefError}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <label style={{ fontSize: '11px', fontWeight: 600, color: isSubscriptionMode ? '#94a3b8' : '#475569', marginBottom: '4px', display: 'block' }}>

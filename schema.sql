@@ -680,3 +680,18 @@ CREATE TRIGGER trg_notify_order_action
 AFTER INSERT OR UPDATE ON public.orders
 FOR EACH ROW EXECUTE FUNCTION public.fn_process_order_action_notification();
 
+-- 9. Trigger d'envoi automatique Push Notification FCM via Database Webhook
+CREATE OR REPLACE FUNCTION public.fn_dispatch_push_on_notification()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Cette fonction permet au Webhook Database Supabase ou à l'Edge Function d'intercepter la création de notification
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_dispatch_push ON public.order_notifications;
+CREATE TRIGGER trg_dispatch_push
+AFTER INSERT ON public.order_notifications
+FOR EACH ROW EXECUTE FUNCTION public.fn_dispatch_push_on_notification();
+
+
