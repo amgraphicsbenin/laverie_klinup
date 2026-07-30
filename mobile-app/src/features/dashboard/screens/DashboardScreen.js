@@ -850,11 +850,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         {/* 2X2 GRID STATS (DESIGN FIRST MODEL WITH ICON-MATCHED BACKGROUNDS) */}
         <View style={styles.gridRow}>
           {/* Card 1: En Cours (Fond Bleu) */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setActiveKpiDetail('en_cours')}
-            style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
-          >
+          <View style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}>
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
@@ -876,14 +872,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               <Text style={[styles.newCardBigValue, { color: isDarkMode ? '#ffffff' : '#0369a1' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{activeOrders.length}</Text>
               <Text style={[styles.newCardSub, { color: isDarkMode ? '#38bdf8' : '#0284c7' }]}>Lavage & Repassage</Text>
             </MotiView>
-          </TouchableOpacity>
+          </View>
 
           {/* Card 2: Commandes Prêtes (Fond Vert) */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setActiveKpiDetail('pretes')}
-            style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
-          >
+          <View style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}>
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
@@ -905,16 +897,12 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               <Text style={[styles.newCardBigValue, { color: isDarkMode ? '#ffffff' : '#047857' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{readyOrders.length}</Text>
               <Text style={[styles.newCardSub, { color: isDarkMode ? '#34d399' : '#10b981' }]}>À récupérer</Text>
             </MotiView>
-          </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.gridRow}>
           {/* Card 3: Retards / Urgences (Fond Rouge) */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setActiveKpiDetail('retards')}
-            style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
-          >
+          <View style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}>
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
@@ -938,14 +926,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               </Text>
               <Text style={[styles.newCardSub, { color: isDarkMode ? '#fca5a5' : '#ef4444' }]}>Livraison alerte</Text>
             </MotiView>
-          </TouchableOpacity>
+          </View>
 
           {/* Card 4: Commandes du Jour (Fond Indigo/Violet) */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setActiveKpiDetail('volume_jour')}
-            style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
-          >
+          <View style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}>
             <MotiView
               from={{ opacity: 0, translateY: 4 }}
               animate={{ opacity: 1, translateY: 0 }}
@@ -967,7 +951,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               <Text style={[styles.newCardBigValue, { color: isDarkMode ? '#ffffff' : '#4338ca' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{todayOrders.length}</Text>
               <Text style={[styles.newCardSub, { color: isDarkMode ? '#818cf8' : '#6366f1' }]}>Flux quotidien</Text>
             </MotiView>
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* ACTIVE ORDERS FEED */}
@@ -1102,6 +1086,8 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           </MotiView>
         </View>
       )}
+
+      {renderKpiDetails()}
     </View>
   );
 }

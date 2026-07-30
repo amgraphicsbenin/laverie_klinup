@@ -433,16 +433,29 @@ export default function App() {
             </ScrollView>
           </View>
 
-      {/* BOTTOM TAB BAR */}
-      <View style={[
-        styles.tabBar,
-        {
-          paddingTop: 10,
-          paddingBottom: Math.max(10, insets.bottom),
-          backgroundColor: '#002cf7',
-          display: isNavBarHidden ? 'none' : 'flex',
-        }
-      ]}>
+      {/* BOTTOM TAB BAR WITH SMOOTH ANIMATED TRANSITION */}
+      <MotiView
+        pointerEvents={isNavBarHidden ? 'none' : 'auto'}
+        animate={{
+          translateY: isNavBarHidden ? 110 : 0,
+          opacity: isNavBarHidden ? 0 : 1,
+          scale: isNavBarHidden ? 0.95 : 1,
+        }}
+        transition={{
+          type: 'spring',
+          damping: 22,
+          stiffness: 180,
+          mass: 0.7,
+        }}
+        style={[
+          styles.tabBar,
+          {
+            paddingTop: 10,
+            paddingBottom: Math.max(10, insets.bottom),
+            backgroundColor: '#002cf7',
+          }
+        ]}
+      >
         {/* Sliding Active Pill Background Indicator */}
         <MotiView
           animate={{
@@ -584,7 +597,7 @@ export default function App() {
               </Text>
             </View>
         </TouchableOpacity>
-      </View>
+      </MotiView>
       <OrderFormModal key={orderFormKey} visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
 
         </View>

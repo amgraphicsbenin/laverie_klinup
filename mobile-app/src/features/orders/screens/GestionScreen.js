@@ -311,12 +311,6 @@ export default function GestionScreen({
   }, [selectedOrder]);
 
   useEffect(() => {
-    if (!showOrderDetails && selectedOrder !== null) {
-      if (setSelectedOrder) setSelectedOrder(null);
-    }
-  }, [showOrderDetails, selectedOrder, setSelectedOrder]);
-
-  useEffect(() => {
     if (initialSelectedClient) {
       setSelectedClient(initialSelectedClient);
       if (onClearInitialSelectedClient) {
@@ -1533,8 +1527,12 @@ export default function GestionScreen({
       {/* MODAL 1 : DETAIL COMMANDE (FULL SCREEN PAGE) */}
       <MotiView
         pointerEvents={showOrderDetails && selectedOrder !== null ? 'auto' : 'none'}
-        animate={{ opacity: showOrderDetails && selectedOrder !== null ? 1 : 0 }}
-        transition={{ type: 'timing', duration: 180 }}
+        animate={{
+          opacity: showOrderDetails && selectedOrder !== null ? 1 : 0,
+          scale: showOrderDetails && selectedOrder !== null ? 1 : 0.96,
+          translateY: showOrderDetails && selectedOrder !== null ? 0 : 30,
+        }}
+        transition={{ type: 'spring', damping: 22, stiffness: 180, mass: 0.8 }}
         style={[
           StyleSheet.absoluteFill,
           { zIndex: 9000, backgroundColor: isDarkMode ? '#000000' : '#ffffff' }
