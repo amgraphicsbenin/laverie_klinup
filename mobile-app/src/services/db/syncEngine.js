@@ -7,14 +7,14 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../supabaseClient';
-import { memoryDb, db, hydrateOrder, startOrderStateCron } from './dbEngine';
-import { 
-  DEFAULT_STAFF, 
-  DEFAULT_CUSTOMERS, 
-  DEFAULT_ORDERS, 
-  DEFAULT_LOGS, 
+import { memoryDb, db, hydrateOrder, startOrderStateCron, isPendingOrderUpdate, removePendingOrderUpdate } from './dbEngine';
+import {
+  DEFAULT_STAFF,
+  DEFAULT_CUSTOMERS,
+  DEFAULT_ORDERS,
+  DEFAULT_LOGS,
   DEFAULT_CATALOG,
-  STORAGE_KEYS 
+  STORAGE_KEYS
 } from './seeds';
 import { sendOrderNotification } from '../notificationService';
 
@@ -178,6 +178,14 @@ export async function performMutation(action, table, recordId, data) {
       delete retriedData.remise_montant;
       delete retriedData.responsable_id;
       delete retriedData.responsable_nom;
+      delete retriedData.solde_paid_at;
+      delete retriedData.subscription_details;
+      delete retriedData.reference_paiement;
+      delete retriedData.reference_momo;
+      delete retriedData.acompte_paid_at;
+      delete retriedData.is_subscription_order;
+      delete retriedData.created_by_id;
+      delete retriedData.created_by_name;
 
       let retryRes;
       try {
@@ -276,7 +284,7 @@ export async function initDb(isRetry = false) {
         const pendingOfflineOrderIds = (memoryDb.sync_queue || [])
           .filter(q => q.table === 'orders' && q.action === 'insert')
           .map(q => q.recordId);
-        
+
         const mergedOrders = remoteOrders.map(ro => {
           const localOrder = (memoryDb.orders || []).find(lo => lo && lo.id === ro.id);
           let merged = { ...ro };
@@ -407,6 +415,10 @@ export async function startPeriodicSync() {
 
       const mergedOrders = remoteOrders.map(ro => {
         const localOrder = (memoryDb.orders || []).find(lo => lo && lo.id === ro.id);
+        // ── Préserver les modifications locales en attente (anti-écrasement par sync périodique) ──
+        if (localOrder && isPendingOrderUpdate(ro.id)) {
+          return hydrateOrder(localOrder);
+        }
         let merged = { ...ro };
         if (localOrder && localOrder.motif_annulation && !merged.motif_annulation) {
           merged.motif_annulation = localOrder.motif_annulation;
@@ -443,19 +455,19 @@ export function setupRealtime() {
     realtimeChannels.forEach(ch => {
       try {
         supabase.removeChannel(ch);
-      } catch (e) {}
+      } catch (e) { }
     });
     realtimeChannels = [];
   }
 
   const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores', 'order_notifications'];
-  
+
   tables.forEach(table => {
     const ch = supabase
       .channel(`${table}_channel`)
       .on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
         const { eventType, new: newRow, old: oldRow } = payload;
-        
+
         let targetList = [];
         if (table === 'staff') targetList = memoryDb.staff;
         else if (table === 'customers') targetList = memoryDb.customers;
@@ -517,6 +529,10 @@ export function setupRealtime() {
             }
           }
         } else if (eventType === 'UPDATE') {
+          // ── Libérer le verrou "pending" : l'événement Realtime confirme que la mutation a réussi côté Supabase ──
+          if (table === 'orders' && newRow?.id) {
+            removePendingOrderUpdate(newRow.id);
+          }
           const idx = targetList.findIndex(x => x.id === newRow.id);
           if (idx !== -1) {
             let mergedRow = { ...newRow };
@@ -542,7 +558,7 @@ export function setupRealtime() {
         if (table === 'orders' && newRow && (eventType === 'INSERT' || eventType === 'UPDATE')) {
           const hydratedNewOrder = hydrateOrder(newRow);
           const currentUser = memoryDb.current_user;
-          
+
           if (currentUser) {
             const orderStoreId = hydratedNewOrder.store_id || 'store_central';
             const userStoreId = currentUser.store_id || 'store_central';
@@ -550,7 +566,7 @@ export function setupRealtime() {
 
             // Seuls les utilisateurs rattachés au même point de laverie (ou super_admin) reçoivent la notification
             if (isSuperAdmin || userStoreId === orderStoreId) {
-              sendOrderNotification(eventType, hydratedNewOrder, oldOrderStatus).catch(() => {});
+              sendOrderNotification(eventType, hydratedNewOrder, oldOrderStatus).catch(() => { });
             }
           }
         }
@@ -559,7 +575,7 @@ export function setupRealtime() {
         if (table === 'staff' && memoryDb.current_user) {
           const currentId = memoryDb.current_user.id;
           const currentEmail = (memoryDb.current_user.email || '').toLowerCase();
-          
+
           if (eventType === 'DELETE' && oldRow && (oldRow.id === currentId || (oldRow.email && oldRow.email.toLowerCase() === currentEmail))) {
             console.warn("[Auth Realtime] Compte supprimé à distance. Déconnexion immédiate de l'application mobile !");
             memoryDb.current_user = null;
@@ -587,9 +603,9 @@ export function checkAndEvictDisabledCurrentUser() {
   if (!memoryDb.current_user || !memoryDb.staff) return false;
   const currentId = memoryDb.current_user.id;
   const currentEmail = (memoryDb.current_user.email || '').toLowerCase();
-  
-  const foundInStaff = memoryDb.staff.find(s => 
-    (s.id && s.id === currentId) || 
+
+  const foundInStaff = memoryDb.staff.find(s =>
+    (s.id && s.id === currentId) ||
     (s.email && s.email.toLowerCase() === currentEmail)
   );
 

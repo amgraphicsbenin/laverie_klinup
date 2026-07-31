@@ -106,6 +106,14 @@ export async function performMutation(action: 'insert' | 'update' | 'delete', ta
       delete retriedData.remise_montant;
       delete retriedData.responsable_id;
       delete retriedData.responsable_nom;
+      delete retriedData.solde_paid_at;
+      delete retriedData.subscription_details;
+      delete retriedData.reference_paiement;
+      delete retriedData.reference_momo;
+      delete retriedData.acompte_paid_at;
+      delete retriedData.is_subscription_order;
+      delete retriedData.created_by_id;
+      delete retriedData.created_by_name;
 
       let retryRes: any;
       try {

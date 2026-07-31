@@ -5,11 +5,11 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  DEFAULT_STAFF, 
-  DEFAULT_CUSTOMERS, 
-  DEFAULT_ORDERS, 
-  DEFAULT_LOGS, 
+import {
+  DEFAULT_STAFF,
+  DEFAULT_CUSTOMERS,
+  DEFAULT_ORDERS,
+  DEFAULT_LOGS,
   DEFAULT_CATALOG
 } from './seeds';
 import { performMutation, initDb, persist } from './syncEngine';
@@ -32,6 +32,22 @@ export const memoryDb = {
 
 // Ensemble d'écouteurs de changement d'état (Pattern Observateur)
 export const listeners = new Set();
+
+// ── File des commandes en cours de mutation locale (anti-écrasement par sync périodique) ──
+// Quand une commande est en cours de mise à jour (updateOrderStatus, deliverOrderWithPayment, cancelOrder),
+// son ID est ajouté ici pour empêcher le startPeriodicSync (toutes les 5s) et le Realtime
+// d'écraser la modification locale avant que performMutation n'ait terminé.
+const pendingOrderUpdates = new Set();
+
+export function addPendingOrderUpdate(orderId) {
+  if (orderId) pendingOrderUpdates.add(orderId);
+}
+export function removePendingOrderUpdate(orderId) {
+  if (orderId) pendingOrderUpdates.delete(orderId);
+}
+export function isPendingOrderUpdate(orderId) {
+  return orderId ? pendingOrderUpdates.has(orderId) : false;
+}
 
 /**
  * Notifie tous les écouteurs qu'un changement a eu lieu dans memoryDb.
@@ -71,7 +87,7 @@ export function normalizeOrderStatus(rawStatus) {
 export function hydrateOrder(order) {
   if (!order) return order;
   const hydrated = { ...order };
-  
+
   hydrated.statut = normalizeOrderStatus(order.statut || order.status);
 
   const isCompleted = hydrated.statut === 'restitue' || hydrated.statut === 'annule';
@@ -465,7 +481,7 @@ export const db = {
       const oldName = item.article;
       const oldPrice = item.prix;
       const oldDesc = item.description || '';
-      
+
       const updateData = {
         article: updatedFields.article !== undefined ? updatedFields.article : item.article,
         prix: updatedFields.prix !== undefined ? Number(updatedFields.prix) : item.prix,
@@ -475,7 +491,7 @@ export const db = {
       await performMutation('update', 'catalog', id, updateData);
       Object.assign(item, updateData);
       db.logAction(
-        'MODIFICATION_TARIF', 
+        'MODIFICATION_TARIF',
         `Item ${oldName} modifié : Formule(${oldName} -> ${item.article}), Prix(${oldPrice} -> ${item.prix} F), Description(${oldDesc} -> ${item.description})`
       );
       db.notify();
@@ -506,7 +522,7 @@ export const db = {
    */
   createOrder: async (orderData) => {
     const customer = memoryDb.customers.find(c => c.id === orderData.customer_id);
-    
+
     let subscribedPlan = null;
     if (orderData.subscribe_plan_id && customer) {
       subscribedPlan = memoryDb.catalog.find(c => c.id === orderData.subscribe_plan_id && c.service === 'abonnement');
@@ -534,7 +550,7 @@ export const db = {
     }
 
     const isSubscriptionOrder = (!!orderData.pay_with_subscription || !!orderData.subscribe_plan_id) && customer && !!customer.active_subscription;
-    
+
     let totalPrice = 0;
     let totalClothes = 0;
 
@@ -605,14 +621,14 @@ export const db = {
     }
 
     const codeMarquage = orderData.identifiant_unique_marquage || ('KLIN-' + (memoryDb.orders ? memoryDb.orders.length : 0));
-    
+
     const expressHoursItem = memoryDb.catalog.find(c => c.id === 'setting_express_hours');
     const expressHours = expressHoursItem ? Number(expressHoursItem.prix) : 6;
     const normalHoursItem = memoryDb.catalog.find(c => c.id === 'setting_normal_hours');
     const normalHours = normalHoursItem ? Number(normalHoursItem.prix) : 48;
     const urgencyVal = orderData.niveau_urgence || 'Normal';
     const hoursToAdd = urgencyVal === 'Express' ? expressHours : normalHours;
-    
+
     const dueDate = orderData.due_date || (orderData.date_retrait_prevue ? new Date(orderData.date_retrait_prevue).toISOString() : new Date(Date.now() + 3600000 * hoursToAdd).toISOString());
     const nowStr = new Date().toISOString();
 
@@ -620,9 +636,9 @@ export const db = {
     const modeReglementVal = orderData.mode_reglement || orderData.mode_paiement || 'Espèces';
     const initialStatus = orderData.statut === 'attente' ? 'en_attente' : (orderData.statut || 'en_attente');
 
-    const currentStoreId = orderData.store_id || 
-      (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) || 
-      (currentUser && currentUser.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : null) || 
+    const currentStoreId = orderData.store_id ||
+      (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
+      (currentUser && currentUser.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : null) ||
       'store_central';
 
     const newOrder = {
@@ -674,8 +690,8 @@ export const db = {
       prix_base_avant_remise: basePriceBeforeRemise
     };
 
-    await performMutation('insert', 'orders', newOrder.id, newOrder);
     memoryDb.orders.push(newOrder);
+    await performMutation('insert', 'orders', newOrder.id, newOrder).catch(e => console.warn('[DB] Order remote insert error:', e));
 
     if (isSubscriptionOrder) {
       if (subscribedPlan) {
@@ -717,7 +733,16 @@ export const db = {
 
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
 
+    // ── Sauvegarde de l'état ancien pour rollback en cas d'échec réseau ──
     const oldStatus = order.statut;
+    const oldSoldePaidAt = order.solde_paid_at;
+    const oldSubscriptionDetails = order.subscription_details ? { ...order.subscription_details } : undefined;
+    const oldCustomerDette = customer ? Number(customer.solde_dette) : null;
+    const oldCustomerPoints = customer ? Number(customer.points_fidelite) : null;
+
+    // ── Marquer la commande comme "en cours de mutation" pour empêcher le startPeriodicSync d'écraser la modif locale ──
+    addPendingOrderUpdate(orderId);
+
     order.statut = normalizedStatus;
 
     let typeLivraison = order.subscription_details?.type_livraison;
@@ -740,7 +765,7 @@ export const db = {
       };
     }
 
-    if (normalizedStatus === 'restitue' || normalizedStatus === 'a_livrer' || normalizedStatus === 'a_recuperer') {
+    if (normalizedStatus === 'restitue') {
       order.solde_paid_at = new Date().toISOString();
       if (customer) {
         const totalVal = Number(order.prix_total || order.total || 0);
@@ -752,7 +777,7 @@ export const db = {
           const newPoints = Math.floor(remainingToPay / 1000) * 1;
           customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
           db.logAction('PAIEMENT_FINAL', `Règlement du solde restant (${remainingToPay} FCFA) par le client ${customer.prenom} ${customer.nom} lors de la restitution`);
-          
+
           await performMutation('update', 'customers', customer.id, {
             solde_dette: customer.solde_dette,
             points_fidelite: customer.points_fidelite
@@ -764,12 +789,23 @@ export const db = {
     db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} : ${getOrderStatusLabel(oldStatus)} → ${getOrderStatusLabel(newStatus)}`);
 
     const updateData = {
-      statut: order.statut,
-      solde_paid_at: order.solde_paid_at,
-      subscription_details: order.subscription_details
+      statut: order.statut
     };
+    if (order.solde_paid_at !== undefined) {
+      updateData.solde_paid_at = order.solde_paid_at;
+    }
+    if (order.subscription_details !== undefined) {
+      updateData.subscription_details = order.subscription_details;
+    }
 
-    await performMutation('update', 'orders', orderId, updateData);
+    try {
+      await performMutation('update', 'orders', orderId, updateData);
+    } catch (e) {
+      console.warn('[DB Sync] Erreur lors de la mise à jour distante du statut de la commande :', e);
+    } finally {
+      // ── Libérer la commande : le startPeriodicSync et le Realtime peuvent à nouveau la synchroniser ──
+      removePendingOrderUpdate(orderId);
+    }
     db.notify();
     return order;
   },
@@ -788,7 +824,19 @@ export const db = {
 
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
 
+    // ── Sauvegarde de l'état ancien pour rollback en cas d'échec réseau ──
     const oldStatus = order.statut;
+    const oldModeReglement = order.mode_reglement;
+    const oldAvancePayee = order.avance_payee;
+    const oldSoldePaidAt = order.solde_paid_at;
+    const oldSubscriptionDetails = order.subscription_details ? { ...order.subscription_details } : undefined;
+    const oldReferenceMomo = order.reference_momo;
+    const oldReferencePaiement = order.reference_paiement;
+    const oldCustomerDette = customer ? Number(customer.solde_dette) : null;
+    const oldCustomerPoints = customer ? Number(customer.points_fidelite) : null;
+
+    // ── Marquer la commande comme "en cours de mutation" ──
+    addPendingOrderUpdate(orderId);
 
     const totalVal = Number(order.prix_total || order.total || 0);
     const avanceVal = Number(order.avance_payee || order.avance || 0);
@@ -800,7 +848,7 @@ export const db = {
       order.reference_momo = referencePaiement;
       order.reference_paiement = referencePaiement;
     }
-    
+
     order.avance_payee = avanceVal + cleanAmountPaid;
     order.prix_total = totalVal;
     order.total = totalVal;
@@ -827,7 +875,7 @@ export const db = {
       customer.solde_dette = Math.max(0, currentDette - cleanAmountPaid);
       const newPoints = Math.floor(cleanAmountPaid / 1000) * 1;
       customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
-      
+
       await performMutation('update', 'customers', customer.id, {
         solde_dette: customer.solde_dette,
         points_fidelite: customer.points_fidelite
@@ -835,7 +883,7 @@ export const db = {
     }
 
     db.logAction(
-      'PAIEMENT_FINAL', 
+      'PAIEMENT_FINAL',
       `Livraison commande ${order.identifiant_unique_marquage || order.id}. Paiement reçu : ${cleanAmountPaid} FCFA (Méthode: ${paymentMethod})` + (referencePaiement ? ` (Réf: ${referencePaiement})` : '')
     );
     db.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} : ${getOrderStatusLabel(oldStatus)} → ${getOrderStatusLabel(normalizedFinalStatus)}`);
@@ -850,7 +898,26 @@ export const db = {
       reference_paiement: order.reference_paiement
     };
 
-    await performMutation('update', 'orders', orderId, updateData);
+    try {
+      await performMutation('update', 'orders', orderId, updateData);
+    } catch (e) {
+      // ── Rollback : restaurer l'état local antérieur en cas d'échec réseau ──
+      order.statut = oldStatus;
+      order.mode_reglement = oldModeReglement;
+      order.avance_payee = oldAvancePayee;
+      order.solde_paid_at = oldSoldePaidAt;
+      order.subscription_details = oldSubscriptionDetails;
+      order.reference_momo = oldReferenceMomo;
+      order.reference_paiement = oldReferencePaiement;
+      if (customer && oldCustomerDette !== null) {
+        customer.solde_dette = oldCustomerDette;
+        customer.points_fidelite = oldCustomerPoints;
+      }
+      db.notify();
+      throw e;
+    } finally {
+      removePendingOrderUpdate(orderId);
+    }
     db.notify();
     return order;
   },
@@ -864,6 +931,14 @@ export const db = {
 
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
 
+    // ── Sauvegarde de l'état ancien pour rollback en cas d'échec réseau ──
+    const oldStatus = order.statut;
+    const oldMotifAnnulation = order.motif_annulation;
+    const oldCustomerDette = customer ? Number(customer.solde_dette) : null;
+
+    // ── Marquer la commande comme "en cours de mutation" ──
+    addPendingOrderUpdate(orderId);
+
     order.statut = 'annule';
     order.motif_annulation = reason;
 
@@ -874,7 +949,21 @@ export const db = {
     }
 
     db.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage} annulée. Motif : ${reason}`);
-    await performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason });
+
+    try {
+      await performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason });
+    } catch (e) {
+      // ── Rollback : restaurer l'état local antérieur en cas d'échec réseau ──
+      order.statut = oldStatus;
+      order.motif_annulation = oldMotifAnnulation;
+      if (customer && oldCustomerDette !== null) {
+        customer.solde_dette = oldCustomerDette;
+      }
+      db.notify();
+      throw e;
+    } finally {
+      removePendingOrderUpdate(orderId);
+    }
     db.notify();
     return order;
   },
@@ -1112,12 +1201,12 @@ export const db = {
     try {
       const { getIsUsingRemote } = require('./syncEngine');
       return getIsUsingRemote();
-    } catch(e) {
+    } catch (e) {
       console.warn("Could not load connection state from syncEngine:", e);
       return false;
     }
   },
-  
+
   getSyncQueue: () => [...memoryDb.sync_queue],
   updateStaffPin: (userId, newPin) => db.resetStaffPin(userId, newPin),
 

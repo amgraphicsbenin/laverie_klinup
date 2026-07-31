@@ -450,8 +450,8 @@ export default function App() {
         style={[
           styles.tabBar,
           {
-            paddingTop: 10,
-            paddingBottom: Math.max(10, insets.bottom),
+            paddingTop: 6,
+            paddingBottom: Math.max(8, insets.bottom),
             backgroundColor: '#002cf7',
           }
         ]}
@@ -471,7 +471,7 @@ export default function App() {
           style={{
             position: 'absolute',
             left: 4,
-            top: 10,
+            top: 6,
             width: pillWidth,
             height: pillHeight,
             borderRadius: 9999,
@@ -487,12 +487,14 @@ export default function App() {
           activeOpacity={0.8}
         >
           <View style={styles.tabItemInner}>
-            <FlaticonIcon
-              name="accueil"
-              active={activeTab === 'accueil'}
-              size={20}
-              color={activeTab === 'accueil' ? '#002cf7' : '#ffffff'}
-            />
+            <View style={styles.tabIconWrapper}>
+              <FlaticonIcon
+                name="accueil"
+                active={activeTab === 'accueil'}
+                size={20}
+                color={activeTab === 'accueil' ? '#002cf7' : '#ffffff'}
+              />
+            </View>
             <Text style={[
               styles.tabLabel, 
               { color: '#ffffff' },
@@ -510,12 +512,14 @@ export default function App() {
             activeOpacity={0.8}
           >
             <View style={styles.tabItemInner}>
-              <FlaticonIcon
-                name="gestion"
-                active={activeTab === 'gestion'}
-                size={20}
-                color={activeTab === 'gestion' ? '#002cf7' : '#ffffff'}
-              />
+              <View style={styles.tabIconWrapper}>
+                <FlaticonIcon
+                  name="gestion"
+                  active={activeTab === 'gestion'}
+                  size={20}
+                  color={activeTab === 'gestion' ? '#002cf7' : '#ffffff'}
+                />
+              </View>
               <Text style={[
                 styles.tabLabel, 
                 { color: '#ffffff' },
@@ -535,12 +539,14 @@ export default function App() {
             activeOpacity={0.8}
           >
             <View style={styles.tabItemInner}>
-              <FlaticonIcon
-                name="ajouter"
-                active={activeTab === 'creer_commande'}
-                size={20}
-                color={activeTab === 'creer_commande' ? '#002cf7' : '#ffffff'}
-              />
+              <View style={styles.tabIconWrapper}>
+                <FlaticonIcon
+                  name="ajouter"
+                  active={activeTab === 'creer_commande'}
+                  size={20}
+                  color={activeTab === 'creer_commande' ? '#002cf7' : '#ffffff'}
+                />
+              </View>
               <Text style={[
                 styles.tabLabel, 
                 { color: '#ffffff' },
@@ -559,12 +565,14 @@ export default function App() {
             activeOpacity={0.8}
           >
             <View style={styles.tabItemInner}>
-              <FlaticonIcon
-                name="historique"
-                active={activeTab === 'historique'}
-                size={20}
-                color={activeTab === 'historique' ? '#002cf7' : '#ffffff'}
-              />
+              <View style={styles.tabIconWrapper}>
+                <FlaticonIcon
+                  name="historique"
+                  active={activeTab === 'historique'}
+                  size={20}
+                  color={activeTab === 'historique' ? '#002cf7' : '#ffffff'}
+                />
+              </View>
               <Text style={[
                 styles.tabLabel, 
                 { color: '#ffffff' },
@@ -582,12 +590,14 @@ export default function App() {
           activeOpacity={0.8}
         >
             <View style={styles.tabItemInner}>
-              <FlaticonIcon
-                name="profile"
-                active={activeTab === 'profile'}
-                size={20}
-                color={activeTab === 'profile' ? '#002cf7' : '#ffffff'}
-              />
+              <View style={styles.tabIconWrapper}>
+                <FlaticonIcon
+                  name="profile"
+                  active={activeTab === 'profile'}
+                  size={20}
+                  color={activeTab === 'profile' ? '#002cf7' : '#ffffff'}
+                />
+              </View>
               <Text style={[
                 styles.tabLabel, 
                 { color: '#ffffff' },
@@ -852,31 +862,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#002cf7',
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-around',
     paddingHorizontal: 4,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingTop: 6,
+    paddingBottom: 6,
     borderWidth: 0,
   },
   tabItem: {
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     flex: 1,
   },
   tabItemInner: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-    borderRadius: 9999,
+    justifyContent: 'flex-start',
     width: '100%',
-    height: 56,
+    height: 52,
+  },
+  tabIconWrapper: {
+    height: 32,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   centerTabItem: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    height: 56,
+    height: 52,
   },
   scanButtonCircle: {
     width: 44,
@@ -894,8 +908,9 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 9,
     color: '#ffffff',
-    marginTop: 7,
+    marginTop: 2,
     fontWeight: '600',
+    textAlign: 'center',
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
     letterSpacing: 0.2,
   },
