@@ -592,6 +592,12 @@ CREATE TABLE IF NOT EXISTS public.order_notifications (
 CREATE INDEX IF NOT EXISTS idx_order_notifications_store ON public.order_notifications(store_id);
 CREATE INDEX IF NOT EXISTS idx_order_notifications_order ON public.order_notifications(order_id);
 
+-- Colonnes d'idempotence pour le dispatch push (évite les envois multiples)
+ALTER TABLE public.order_notifications ADD COLUMN IF NOT EXISTS push_sent BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.order_notifications ADD COLUMN IF NOT EXISTS push_sent_at TIMESTAMP WITH TIME ZONE;
+
+CREATE INDEX IF NOT EXISTS idx_order_notifications_push_sent ON public.order_notifications(push_sent);
+
 ALTER PUBLICATION supabase_realtime ADD TABLE public.order_notifications;
 ALTER TABLE public.order_notifications ENABLE ROW LEVEL SECURITY;
 

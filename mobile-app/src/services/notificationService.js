@@ -313,26 +313,31 @@ export async function sendOrderNotification(eventType, order, oldStatus = null) 
     title = '🧺 Nouvelle commande enregistrée';
     body = `La commande ${ref} a été enregistrée (${newStatusLabel}).`;
   } else if (eventType === 'UPDATE') {
-    if (oldStatus && oldStatus !== newStatus) {
-      if (newStatus === 'pret' || newStatus === 'a_livrer' || newStatus === 'a_recuperer') {
-        title = '✅ Commande prête !';
-        body = `La commande ${ref} est prête (${newStatusLabel}).`;
-      } else if (newStatus === 'en_cours_livraison') {
-        title = '🛵 Livraison en cours';
-        body = `La commande ${ref} est en cours de livraison.`;
-      } else if (newStatus === 'restitue' || newStatus === 'livre') {
-        title = '🎉 Commande livrée';
-        body = `La commande ${ref} a été restituée au client.`;
-      } else if (newStatus === 'annule') {
-        title = '⚠️ Commande annulée';
-        body = `La commande ${ref} a été annulée.`;
-      } else {
-        title = '📦 Statut mis à jour';
-        body = `Commande ${ref} : ${oldStatusLabel} → ${newStatusLabel}`;
-      }
-    } else {
+    // Si oldStatus est null (commande pas encore en mémoire locale), on ne peut pas
+    // comparer les statuts. Le trigger serveur a déjà déterminé qu'il y a un changement,
+    // donc on affiche quand même la notification (le dédoublonnage de sendSystemNotification
+    // évite les doublons avec le handler order_notifications).
+    if (oldStatus && oldStatus === newStatus) {
       // Pas de changement de statut réel, on ignore
       return;
+    }
+    if (newStatus === 'pret' || newStatus === 'a_livrer' || newStatus === 'a_recuperer') {
+      title = '✅ Commande prête !';
+      body = `La commande ${ref} est prête (${newStatusLabel}).`;
+    } else if (newStatus === 'en_cours_livraison') {
+      title = '🛵 Livraison en cours';
+      body = `La commande ${ref} est en cours de livraison.`;
+    } else if (newStatus === 'restitue' || newStatus === 'livre') {
+      title = '🎉 Commande livrée';
+      body = `La commande ${ref} a été restituée au client.`;
+    } else if (newStatus === 'annule') {
+      title = '⚠️ Commande annulée';
+      body = `La commande ${ref} a été annulée.`;
+    } else {
+      title = '📦 Statut mis à jour';
+      body = oldStatusLabel
+        ? `Commande ${ref} : ${oldStatusLabel} → ${newStatusLabel}`
+        : `Commande ${ref} : ${newStatusLabel}`;
     }
   } else {
     return;
@@ -346,22 +351,12 @@ export async function sendOrderNotification(eventType, order, oldStatus = null) 
     screen: 'gestion',
   });
 
-  // 2. Notification push distante via Edge Function Supabase pour les appareils fermés/en arrière-plan
-  if (supabase && typeof supabase.functions?.invoke === 'function') {
-    supabase.functions.invoke('send-push-notification', {
-      body: {
-        type: eventType,
-        record: order,
-        old_record: oldStatus ? { statut: oldStatus } : null
-      }
-    }).then(res => {
-      if (res?.data) {
-        console.log('[Push Notification] ✅ Résultat Edge Function:', res.data);
-      }
-    }).catch(err => {
-      console.warn('[Push Notification] Info Edge Function:', err?.message || err);
-    });
-  }
+  // ⚠️ NOTE : Les notifications push distantes (Edge Function) sont désormais gérées
+  // UNIQUEMENT par le trigger serveur `trg_dispatch_push` (schema.sql) qui invoque
+  // l'Edge Function `send-push-notification` via pg_net après insertion dans
+  // `order_notifications`. L'invocation côté client était redondante et causait
+  // des envois multiples (1 par appareil connecté + 1 serveur), ce qui provoquait
+  // des notifications non simultanées et des doublons sur les appareils.
 }
 
 /**

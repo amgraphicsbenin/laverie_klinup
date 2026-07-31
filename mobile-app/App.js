@@ -173,11 +173,9 @@ export default function App() {
   }, []);
 
   // ── Sauvegarder le push token quand l'utilisateur se connecte ──
-  useEffect(() => {
-    if (currentUser && currentUser.id) {
-      savePushTokenToSupabase(currentUser.id).catch(() => {});
-    }
-  }, [currentUser?.id]);
+  // NOTE : Le store_id est passé dans le useEffect ci-dessous (currentUser),
+  // ne pas appeler savePushTokenToSupabase sans store_id ici pour éviter
+  // d'écraser le store_id correct avec la valeur par défaut 'store_central'.
 
   // ── Listener foreground : notification reçue quand l'app est ouverte ──
   const notificationListener = useRef();

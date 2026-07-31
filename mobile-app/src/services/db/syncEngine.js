@@ -507,6 +507,38 @@ export function setupRealtime() {
                   type: 'order'
                 });
               }
+
+              // 3. Fallback : invoquer l'Edge Function pour les push distants
+              // Le trigger serveur `trg_dispatch_push` (pg_net) devrait déjà l'avoir fait,
+              // mais si pg_net/Vault n'est pas configuré, on s'assure que les appareils
+              // fermés/en arrière-plan reçoivent quand même la notification.
+              // L'Edge Function est idempotente (colonne push_sent) : pas de doublons.
+              if (supabase && typeof supabase.functions?.invoke === 'function') {
+                setTimeout(() => {
+                  supabase.functions.invoke('send-push-notification', {
+                    body: {
+                      type: newRow.type_action || 'INSERT',
+                      record: {
+                        id: newRow.id,
+                        order_id: newRow.order_id,
+                        store_id: newRow.store_id,
+                        titre: newRow.titre,
+                        message: newRow.message,
+                        metadata: newRow.metadata,
+                        ...newRow.metadata
+                      }
+                    }
+                  }).then(res => {
+                    if (res?.data?.skipped) {
+                      console.log('[Push Fallback] ⏭ Déjà envoyé par le trigger serveur (idempotence OK)');
+                    } else if (res?.data) {
+                      console.log('[Push Fallback] ✅ Push envoyé (fallback client):', res.data.sent, 'appareil(s)');
+                    }
+                  }).catch(err => {
+                    console.warn('[Push Fallback] Edge Function indisponible:', err?.message || err);
+                  });
+                }, 2000); // Délai de 2s pour laisser le trigger serveur agir en premier
+              }
             }
           }
         }

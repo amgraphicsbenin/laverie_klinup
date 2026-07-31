@@ -83,6 +83,42 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // ── Idempotence : éviter les envois multiples pour la même notification ──
+    // Le trigger serveur `trg_dispatch_push` ET le fallback client peuvent tous deux
+    // invoquer cette Edge Function. On utilise la colonne `push_sent` de
+    // `order_notifications` pour garantir que les push ne sont envoyés qu'une seule fois.
+    const notificationId = order.id || order.notification_id || null;
+    if (notificationId) {
+      try {
+        const { data: claimData, error: claimError } = await supabase
+          .from('order_notifications')
+          .update({ push_sent: true, push_sent_at: new Date().toISOString() })
+          .eq('id', notificationId)
+          .eq('push_sent', false)
+          .select('id');
+
+        if (claimError) {
+          // La colonne push_sent n'existe peut-être pas encore (migration non appliquée)
+          // On continue sans idempotence dans ce cas
+          console.warn('[send-push] Idempotence indisponible (colonne push_sent absente ?):', claimError.message);
+        } else if (!claimData || claimData.length === 0) {
+          // Une autre instance a déjà envoyé les push pour cette notification
+          return new Response(JSON.stringify({
+            success: true,
+            sent: 0,
+            skipped: true,
+            reason: 'Push déjà envoyé pour cette notification (idempotence)'
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+          });
+        }
+      } catch (idempErr) {
+        // En cas d'erreur, on continue sans idempotence (meilleur effort)
+        console.warn('[send-push] Contrôle idempotence ignoré:', idempErr.message);
+      }
+    }
+
     const orderStoreId = order.store_id || 'store_central';
 
     // Récupérer le staff actif rattaché au point de laverie de la commande
