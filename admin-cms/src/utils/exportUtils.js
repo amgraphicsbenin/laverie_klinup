@@ -1,5 +1,5 @@
 /**
- * Utilitaires d'exportation de données au format CSV
+ * Utilitaires d'exportation de données au format CSV (Optimisé MS Excel France)
  */
 
 export function exportToCSV(filename, headers, rows) {
@@ -14,12 +14,13 @@ export function exportToCSV(filename, headers, rows) {
     return `"${stringified}"`;
   };
 
-  const headerLine = headers.map(h => escapeCSV(h.label)).join(',');
+  // Séparateur point-virgule (;) obligatoire pour ouverture propre dans MS Excel en Français
+  const headerLine = headers.map(h => escapeCSV(h.label)).join(';');
   const rowLines = rows.map(row => {
     return headers.map(h => {
       const val = typeof h.accessor === 'function' ? h.accessor(row) : row[h.accessor];
       return escapeCSV(val);
-    }).join(',');
+    }).join(';');
   });
 
   const csvContent = '\uFEFF' + [headerLine, ...rowLines].join('\r\n'); // \uFEFF pour l'encodage UTF-8 Excel BOM
@@ -34,54 +35,143 @@ export function exportToCSV(filename, headers, rows) {
   URL.revokeObjectURL(url);
 }
 
-export function exportOrdersCSV(orders) {
+export function exportOrdersCSV(orders, customersList = []) {
+  const getClientObj = (r) => {
+    if (Array.isArray(customersList) && customersList.length > 0) {
+      const cid = r.client_id || r.customer_id;
+      if (cid) {
+        const found = customersList.find(c => String(c.id) === String(cid));
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const getClientName = (r) => {
+    if (r.client_prenom || r.client_nom) {
+      const p = r.client_prenom || '';
+      const n = r.client_nom || '';
+      const full = `${p} ${n}`.trim();
+      if (full) return full;
+    }
+    if (r.client_name) return r.client_name;
+    if (r.customer_name) return r.customer_name;
+    const c = getClientObj(r);
+    if (c) return `${c.prenom || ''} ${c.nom || ''}`.trim();
+    return 'Client Anonyme';
+  };
+
+  const getClientPhone = (r) => {
+    if (r.client_telephone) return r.client_telephone;
+    if (r.client_phone) return r.client_phone;
+    const c = getClientObj(r);
+    if (c) return c.telephone || c.phone || 'N/A';
+    return 'N/A';
+  };
+
+  const getStatusLabel = (s) => {
+    const labels = {
+      en_attente: 'En attente',
+      traitement: 'Traitement',
+      en_cours_lavage: 'Lavage',
+      en_cours_repassage: 'Repassage',
+      pret: 'Prêt',
+      a_livrer: 'À livrer',
+      a_recuperer: 'À récupérer',
+      en_cours_livraison: 'En livraison',
+      restitue: 'Livré / Récupéré',
+      annule: 'Annulée'
+    };
+    return labels[s] || s || 'Nouveau';
+  };
+
+  const getPaymentStatus = (r) => {
+    if (r.statut_paiement === 'paye' || r.est_paye === true || r.est_paye === 'true') return 'Payé';
+    if (r.statut_paiement === 'acompte' || (r.acompte_montant && r.acompte_montant > 0) || (r.avance_payee && r.avance_payee > 0)) return 'Acompte Versé';
+    return 'Non Payé';
+  };
+
   const headers = [
-    { label: 'ID Commande', accessor: 'id' },
-    { label: 'Client', accessor: r => `${r.client_prenom || ''} ${r.client_nom || ''}`.trim() },
-    { label: 'Téléphone Client', accessor: 'client_telephone' },
-    { label: 'Statut Commande', accessor: 'statut' },
-    { label: 'Total TTC (FCFA)', accessor: r => r.prix_total || r.total_ttc || 0 },
-    { label: 'Acompte Versé (FCFA)', accessor: r => r.acompte_montant || 0 },
-    { label: 'Reste à Payer (FCFA)', accessor: r => r.reste_a_payer !== undefined ? r.reste_a_payer : ((r.prix_total || 0) - (r.acompte_montant || 0)) },
-    { label: 'Statut Paiement', accessor: 'est_paye' },
-    { label: 'Urgence', accessor: 'niveau_urgence' },
-    { label: 'Date Création', accessor: 'created_at' },
-    { label: 'Date Livraison Prévue', accessor: 'due_date' }
+    { label: 'Code Commande', accessor: r => r.identifiant_unique_marquage || r.code_commande || r.id },
+    { label: 'Client', accessor: getClientName },
+    { label: 'Téléphone Client', accessor: getClientPhone },
+    { label: 'Article', accessor: r => r.type_article || 'Non renseigné' },
+    { label: 'Service', accessor: r => r.type_service || 'Standard' },
+    { label: 'Statut Commande', accessor: r => getStatusLabel(r.statut) },
+    { label: 'Total (FCFA)', accessor: r => r.prix_total || r.total || r.total_ttc || 0 },
+    { label: 'Acompte Versé (FCFA)', accessor: r => r.acompte_montant || r.avance_payee || 0 },
+    { label: 'Reste à Payer (FCFA)', accessor: r => r.reste_a_payer !== undefined ? r.reste_a_payer : Math.max(0, (r.prix_total || r.total || 0) - (r.acompte_montant || r.avance_payee || 0)) },
+    { label: 'Statut Paiement', accessor: getPaymentStatus },
+    { label: 'Urgence', accessor: r => r.niveau_urgence || 'Normale' },
+    { label: 'Date Création', accessor: r => r.created_at ? new Date(r.created_at).toLocaleString('fr-FR') : '' },
+    { label: 'Date Livraison Prévue', accessor: r => r.date_livraison_prevue || r.due_date || '' }
   ];
+
   exportToCSV(`Commandes_KlinUp_${new Date().toISOString().slice(0, 10)}.csv`, headers, orders);
 }
 
 export function exportCustomersCSV(customers) {
   const headers = [
     { label: 'ID Client', accessor: 'id' },
-    { label: 'Prénom', accessor: 'prenom' },
-    { label: 'Nom', accessor: 'nom' },
-    { label: 'Téléphone', accessor: 'telephone' },
-    { label: 'Adresse', accessor: 'adresse' },
-    { label: 'Solde Dette (FCFA)', accessor: 'solde_dette' },
-    { label: 'Points Fidélité', accessor: 'points_fidelite' },
-    { label: 'Abonnement Actif', accessor: r => r.active_subscription ? r.active_subscription.name : 'Aucun' },
-    { label: 'Articles Restants Abn.', accessor: r => r.active_subscription ? r.active_subscription.remaining_clothes : 0 }
+    { label: 'Prénom', accessor: r => r.prenom || '' },
+    { label: 'Nom', accessor: r => r.nom || '' },
+    { label: 'Téléphone', accessor: r => r.telephone || r.phone || '' },
+    { label: 'Adresse', accessor: r => r.adresse || r.address || 'Non renseignée' },
+    { label: 'Solde Dette (FCFA)', accessor: r => r.solde_dette || 0 },
+    { label: 'Points Fidélité', accessor: r => r.points_fidelite || 0 },
+    { label: 'Abonnement Actif', accessor: r => r.active_subscription ? r.active_subscription.name : (r.abonnement_actif || 'Aucun') },
+    { label: 'Articles Restants Abn.', accessor: r => r.active_subscription ? r.active_subscription.remaining_clothes : (r.articles_restants || 0) }
   ];
+
   exportToCSV(`Clients_KlinUp_${new Date().toISOString().slice(0, 10)}.csv`, headers, customers);
 }
 
 export function exportLogsCSV(logs, staffList = []) {
+  const actionLabels = {
+    CONNEXION: 'Connexion Utilisateur',
+    DECONNEXION: 'Déconnexion Session',
+    CREATION_COMMANDE: 'Nouvelle Commande',
+    ANNULATION_COMMANDE: 'Annulation Commande',
+    MISE_A_JOUR_STATUT: 'Changement Statut Commande',
+    PAIEMENT_FINAL: 'Règlement Commande',
+    COMMANDE_ABONNEMENT: 'Débit Abonnement Commande',
+    CREATION_CLIENT: 'Nouveau Client',
+    MODIFICATION_CLIENT: 'Mise à Jour Client',
+    SUPPRESSION_CLIENT: 'Suppression Client',
+    SOUSCRIPTION_ABONNEMENT: 'Souscription Abonnement',
+    DESABONNEMENT: 'Résiliation Abonnement',
+    MAJ_SOLDE_FINANCIER: 'Ajustement Dette Client',
+    CHANGEMENT_POINT_LAVERIE: 'Gestion Point de Laverie',
+    CREATION_POINT_LAVERIE: 'Création Point de Laverie',
+    MODIFICATION_POINT_LAVERIE: 'Modification Point de Laverie',
+    SUPPRESSION_POINT_LAVERIE: 'Suppression Point de Laverie',
+    AJOUT_CATALOGUE: 'Ajout Article Catalogue',
+    MODIFICATION_TARIF: 'Modification Tarif Catalogue',
+    SUPPRESSION_CATALOGUE: 'Suppression Article Catalogue'
+  };
+
   const headers = [
     { label: 'ID Trace', accessor: 'id' },
-    { label: 'Horodatage (ISO)', accessor: 'timestamp' },
-    { label: 'Date & Heure Formatées', accessor: r => new Date(r.timestamp).toLocaleString() },
+    { label: 'Horodatage (ISO)', accessor: r => r.timestamp || r.created_at || '' },
+    { label: 'Date & Heure', accessor: r => (r.timestamp || r.created_at) ? new Date(r.timestamp || r.created_at).toLocaleString('fr-FR') : '' },
     { label: 'Opérateur / Utilisateur', accessor: r => {
-      const u = staffList.find(s => s.id === r.user_id);
-      return u ? `${u.prenom} ${u.nom}` : 'Automate / Système';
+      if (r.user_id) {
+        const u = staffList.find(s => String(s.id) === String(r.user_id));
+        if (u) return `${u.prenom || ''} ${u.nom || ''}`.trim();
+      }
+      return r.user_name || r.user_label || 'Automate / Système';
     }},
     { label: 'Rôle Utilisateur', accessor: r => {
-      const u = staffList.find(s => s.id === r.user_id);
-      return u ? u.role : 'Système';
+      if (r.user_id) {
+        const u = staffList.find(s => String(s.id) === String(r.user_id));
+        if (u) return u.role || 'Agent';
+      }
+      return r.user_role || 'Système';
     }},
-    { label: 'Point de Laverie (Store ID)', accessor: r => r.store_id || 'store_central' },
-    { label: 'Code Action', accessor: 'action' },
-    { label: 'Détails & Motif de l\'Opération', accessor: 'details' }
+    { label: 'Point de Laverie', accessor: r => r.store_name || r.store_id || 'Point Central' },
+    { label: 'Action Exécutée', accessor: r => actionLabels[r.action] || r.action || 'Action Système' },
+    { label: 'Détails & Motif de l\'Opération', accessor: r => r.details || r.description || '' }
   ];
+
   exportToCSV(`Audit_Logs_KlinUp_${new Date().toISOString().slice(0, 10)}.csv`, headers, logs);
 }

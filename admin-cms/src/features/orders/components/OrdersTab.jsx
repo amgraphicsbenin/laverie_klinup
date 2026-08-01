@@ -258,7 +258,7 @@ export default function OrdersTab({
               <button
                 type="button"
                 className="btn btn-outline"
-                onClick={() => exportOrdersCSV(orders)}
+                onClick={() => exportOrdersCSV(orders, customers)}
                 style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                 title="Exporter toutes les commandes en CSV"
               >

@@ -599,43 +599,26 @@ export default function LogsTab({
         const motifText = extractMotif(selectedLog.details);
 
         return createPortal(
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              width: '100vw',
-              height: '100vh',
-              backgroundColor: 'rgba(15, 23, 42, 0.18)',
-              zIndex: 99999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '1rem',
-              boxSizing: 'border-box'
-            }}
-            onClick={() => setSelectedLog(null)}
-          >
+          <div className="modal-backdrop" onClick={() => setSelectedLog(null)}>
             <div
+              className="card modal-dialog-card"
+              onClick={(e) => e.stopPropagation()}
               style={{
                 maxWidth: '620px',
                 width: '100%',
-                maxHeight: '90vh',
+                maxHeight: '88vh',
                 overflowY: 'auto',
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                borderRadius: '20px',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                color: 'var(--text-primary, #0f172a)',
+                borderRadius: '24px',
                 padding: '1.75rem',
-                boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.35)',
-                border: '1px solid #e2e8f0',
+                boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)',
+                border: '1px solid var(--border-color, rgba(0,0,0,0.08))',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '1.25rem',
                 margin: 'auto'
               }}
-              onClick={(e) => e.stopPropagation()}
             >
               {/* En-tête Modale */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>

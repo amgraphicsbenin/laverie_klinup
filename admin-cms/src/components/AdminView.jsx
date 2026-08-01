@@ -674,16 +674,17 @@ export default function AdminView({ activeTab, onManageStaff }) {
         ['--- Transactions (période filtrée) ---'],
         ['Date', 'Code', 'Client', 'Article', 'Service', 'Total (F)', 'Avance (F)', 'Mode Règlement'],
         ...filteredForExport.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map(o => {
-          const c = customers.find(x => x.id === o.customer_id);
+          const c = customers.find(x => String(x.id) === String(o.customer_id || o.client_id));
+          const clientName = c ? `${c.prenom || ''} ${c.nom || ''}`.trim() : (o.client_nom || o.client_name || 'Client');
           return [
-            new Date(o.created_at).toLocaleDateString('fr-FR'),
-            o.identifiant_unique_marquage,
-            c ? `${c.prenom} ${c.nom}` : 'Client B2B',
-            o.type_article,
-            serviceLabels[o.type_service] || o.type_service,
-            o.prix_total,
-            o.avance_payee,
-            o.mode_reglement
+            o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : '',
+            o.identifiant_unique_marquage || o.code_commande || o.id,
+            clientName,
+            o.type_article || '',
+            serviceLabels[o.type_service] || o.type_service || '',
+            o.prix_total || o.total || 0,
+            o.acompte_montant || o.avance_payee || 0,
+            o.mode_reglement || 'Espèces'
           ];
         })
       ];
@@ -695,17 +696,19 @@ export default function AdminView({ activeTab, onManageStaff }) {
       const completedOrders = filteredForExport.filter(o => o.statut === 'restitue');
       headers = ['Code', 'Client', 'Téléphone', 'Article', 'Service', 'Urgence', 'Montant (F CFA)', 'Avance (F CFA)', 'Date Dépôt'];
       rows = completedOrders.map(o => {
-        const c = customers.find(x => x.id === o.customer_id);
+        const c = customers.find(x => String(x.id) === String(o.customer_id || o.client_id));
+        const clientName = c ? `${c.prenom || ''} ${c.nom || ''}`.trim() : (o.client_nom || o.client_name || 'Client');
+        const phone = c ? (c.telephone || c.phone) : (o.client_telephone || '');
         return [
-          o.identifiant_unique_marquage,
-          c ? `${c.prenom} ${c.nom}` : 'Client B2B',
-          c ? c.telephone : '',
-          o.type_article,
-          serviceLabels[o.type_service] || o.type_service,
+          o.identifiant_unique_marquage || o.code_commande || o.id,
+          clientName,
+          phone,
+          o.type_article || '',
+          serviceLabels[o.type_service] || o.type_service || '',
           o.niveau_urgence || 'Normal',
-          o.prix_total,
-          o.avance_payee,
-          new Date(o.created_at).toLocaleDateString('fr-FR')
+          o.prix_total || o.total || 0,
+          o.acompte_montant || o.avance_payee || 0,
+          o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : ''
         ];
       });
 
@@ -714,18 +717,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
       const activeOrders = filteredForExport.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
       headers = ['Code', 'Client', 'Téléphone', 'Article', 'Service', 'Urgence', 'Statut', 'Montant (F CFA)', 'Avance (F CFA)', 'Date Dépôt'];
       rows = activeOrders.map(o => {
-        const c = customers.find(x => x.id === o.customer_id);
+        const c = customers.find(x => String(x.id) === String(o.customer_id || o.client_id));
+        const clientName = c ? `${c.prenom || ''} ${c.nom || ''}`.trim() : (o.client_nom || o.client_name || 'Client');
+        const phone = c ? (c.telephone || c.phone) : (o.client_telephone || '');
         return [
-          o.identifiant_unique_marquage,
-          c ? `${c.prenom} ${c.nom}` : 'Client B2B',
-          c ? c.telephone : '',
-          o.type_article,
-          serviceLabels[o.type_service] || o.type_service,
+          o.identifiant_unique_marquage || o.code_commande || o.id,
+          clientName,
+          phone,
+          o.type_article || '',
+          serviceLabels[o.type_service] || o.type_service || '',
           o.niveau_urgence || 'Normal',
           getOrderStatusLabel(o),
-          o.prix_total,
-          o.avance_payee,
-          new Date(o.created_at).toLocaleDateString('fr-FR')
+          o.prix_total || o.total || 0,
+          o.acompte_montant || o.avance_payee || 0,
+          o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : ''
         ];
       });
 
@@ -734,16 +739,18 @@ export default function AdminView({ activeTab, onManageStaff }) {
       const pendingOrders = filteredForExport.filter(o => o.statut === 'en_attente');
       headers = ['Code', 'Client', 'Téléphone', 'Article', 'Service', 'Urgence', 'Montant (F CFA)', 'Date Dépôt'];
       rows = pendingOrders.map(o => {
-        const c = customers.find(x => x.id === o.customer_id);
+        const c = customers.find(x => String(x.id) === String(o.customer_id || o.client_id));
+        const clientName = c ? `${c.prenom || ''} ${c.nom || ''}`.trim() : (o.client_nom || o.client_name || 'Client');
+        const phone = c ? (c.telephone || c.phone) : (o.client_telephone || '');
         return [
-          o.identifiant_unique_marquage,
-          c ? `${c.prenom} ${c.nom}` : 'Client B2B',
-          c ? c.telephone : '',
-          o.type_article,
-          serviceLabels[o.type_service] || o.type_service,
+          o.identifiant_unique_marquage || o.code_commande || o.id,
+          clientName,
+          phone,
+          o.type_article || '',
+          serviceLabels[o.type_service] || o.type_service || '',
           o.niveau_urgence || 'Normal',
-          o.prix_total,
-          new Date(o.created_at).toLocaleDateString('fr-FR')
+          o.prix_total || o.total || 0,
+          o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : ''
         ];
       });
     }
@@ -751,10 +758,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
     // Build CSV content with UTF-8 BOM (for correct Excel French accent rendering)
     const escape = (val) => {
       const s = String(val ?? '');
-      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+      return s.includes(';') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const csvRows = [headers, ...rows].map(r => Array.isArray(r) ? r.map(escape).join(',') : escape(r));
-    const csvContent = '\uFEFF' + csvRows.join('\n');
+    const csvRows = [headers, ...rows].map(r => Array.isArray(r) ? r.map(escape).join(';') : escape(r));
+    const csvContent = '\uFEFF' + csvRows.join('\r\n');
 
     // Trigger download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -3146,8 +3153,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
          ======================================================== */}
       {showNewCustomerModal && (
         <ModalPortal>
-          <div className="modal-backdrop">
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
+          <div className="modal-backdrop" onClick={() => setShowNewCustomerModal(false)}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
               <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                 Nouveau Client
               </h3>
@@ -3242,525 +3249,535 @@ export default function AdminView({ activeTab, onManageStaff }) {
          MODAL : RÈGLEMENT DETTE CLIENT (CRM)
          ======================================================== */}
       {showDebtPaymentModal && selectedCrmCustomer && (
-        <div className="modal-backdrop">
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
-            <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              Règlement Dette
-            </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Client: <strong>{selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}</strong>
-            </p>
-            <div style={{ background: 'var(--primary-light)', padding: '0.5rem', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Dette totale :</span>
-              <strong>{selectedCrmCustomer.solde_dette.toLocaleString()} F</strong>
-            </div>
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => setShowDebtPaymentModal(false)}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
+              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                Règlement Dette
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                Client: <strong>{selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}</strong>
+              </p>
+              <div style={{ background: 'var(--primary-light)', padding: '0.5rem', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Dette totale :</span>
+                <strong>{selectedCrmCustomer.solde_dette.toLocaleString()} F</strong>
+              </div>
 
-            {(() => {
-              const activeUnpaidOrders = orders.filter(
-                o => o.customer_id === selectedCrmCustomer.id &&
-                     o.statut !== 'restitue' &&
-                     o.statut !== 'annule' &&
-                     (o.prix_total - o.avance_payee) > 0
-              );
-              if (activeUnpaidOrders.length === 0) return null;
-              
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.2rem' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Commandes en cours liées à la dette :
-                  </span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
-                    {activeUnpaidOrders.map(o => {
-                      const rest = o.prix_total - o.avance_payee;
-                      return (
-                        <div key={o.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.75rem', background: 'var(--bg-app)', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 700 }}>{o.identifiant_unique_marquage}</span>
-                            <span className={`badge badge-${o.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
-                              {getOrderStatusLabel(o)}
-                            </span>
+              {(() => {
+                const activeUnpaidOrders = orders.filter(
+                  o => o.customer_id === selectedCrmCustomer.id &&
+                       o.statut !== 'restitue' &&
+                       o.statut !== 'annule' &&
+                       (o.prix_total - o.avance_payee) > 0
+                );
+                if (activeUnpaidOrders.length === 0) return null;
+                
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.2rem' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Commandes en cours liées à la dette :
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
+                      {activeUnpaidOrders.map(o => {
+                        const rest = o.prix_total - o.avance_payee;
+                        return (
+                          <div key={o.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.75rem', background: 'var(--bg-app)', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 700 }}>{o.identifiant_unique_marquage}</span>
+                              <span className={`badge badge-${o.statut}`} style={{ fontSize: '0.6rem', padding: '0.1rem 0.35rem' }}>
+                                {getOrderStatusLabel(o)}
+                              </span>
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>
+                              {o.type_article}
+                            </div>
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                              Service: {serviceLabels[o.type_service] || o.type_service}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.3rem', marginTop: '0.1rem', fontSize: '0.72rem' }}>
+                              <span>Total : <strong>{o.prix_total.toLocaleString()} F</strong></span>
+                              <span>Reste : <strong style={{ color: 'var(--accent)' }}>{rest.toLocaleString()} F</strong></span>
+                            </div>
                           </div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>
-                            {o.type_article}
-                          </div>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                            Service: {serviceLabels[o.type_service] || o.type_service}
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.3rem', marginTop: '0.1rem', fontSize: '0.72rem' }}>
-                            <span>Total : <strong>{o.prix_total.toLocaleString()} F</strong></span>
-                            <span>Reste : <strong style={{ color: 'var(--accent)' }}>{rest.toLocaleString()} F</strong></span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
+                );
+              })()}
+
+              <form onSubmit={handlePayDebt} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label>Montant payé (FCFA)</label>
+                  <input
+                    type="number"
+                    className="input-control"
+                    max={selectedCrmCustomer.solde_dette}
+                    required
+                    value={debtPaymentAmount}
+                    onChange={(e) => setDebtPaymentAmount(e.target.value)}
+                  />
                 </div>
-              );
-            })()}
 
-            <form onSubmit={handlePayDebt} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className="form-group">
-                <label>Montant payé (FCFA)</label>
-                <input
-                  type="number"
-                  className="input-control"
-                  max={selectedCrmCustomer.solde_dette}
-                  required
-                  value={debtPaymentAmount}
-                  onChange={(e) => setDebtPaymentAmount(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Confirmer</button>
-                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowDebtPaymentModal(false)}>Annuler</button>
-              </div>
-            </form>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Confirmer</button>
+                  <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowDebtPaymentModal(false)}>Annuler</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================
          MODAL : CONFIRMATION LIVRAISON & RÈGLEMENT D'ACCOMPTE
          ======================================================== */}
       {showDeliveryPaymentModal && delivOrder && (
-        <div className="modal-backdrop">
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
-            <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              Livrer & Encaisser
-            </h3>
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); }}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
+              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                Livrer & Encaisser
+              </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '10px' }}>
-              <div>Code: <strong>{delivOrder.identifiant_unique_marquage}</strong></div>
-              <div>Prix Total: <strong>{delivOrder.prix_total} F</strong></div>
-              <div>Acompte déjà payé: <strong style={{ color: 'var(--success)' }}>{delivOrder.avance_payee} F</strong></div>
-              <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                <span>Reste à payer:</span>
-                <strong style={{ color: 'var(--accent)' }}>{delivOrder.prix_total - delivOrder.avance_payee} FCFA</strong>
-              </div>
-            </div>
-
-            <form onSubmit={handleConfirmDelivery} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className="form-group">
-                <label>Mode de Règlement</label>
-                <CustomSelect
-                  className="input-control"
-                  value={delivPaymentMethod}
-                  onChange={(e) => setDelivPaymentMethod(e.target.value)}
-                >
-                  <option value="especes">Espèces</option>
-                  <option value="mobile_money">Mobile Money</option>
-                </CustomSelect>
-              </div>
-
-              <div className="form-group">
-                <label>Montant encaissé (FCFA)</label>
-                <input
-                  type="number"
-                  className="input-control"
-                  max={delivOrder.prix_total - delivOrder.avance_payee}
-                  required
-                  value={delivAmountPaid}
-                  onChange={(e) => setDelivAmountPaid(e.target.value)}
-                />
-              </div>
-
-              {delivPaymentMethod === 'mobile_money' && (
-                <div className="form-group">
-                  <label>Numéro de Référence <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input
-                    type="text"
-                    className="input-control"
-                    placeholder="Ex: TXN12345678"
-                    required
-                    style={{ borderColor: momoRefError ? '#ef4444' : 'var(--border-color)' }}
-                    value={momoRefNumber}
-                    onChange={(e) => {
-                      setMomoRefNumber(e.target.value);
-                      if (e.target.value.trim()) setMomoRefError('');
-                    }}
-                  />
-                  {momoRefError && (
-                    <span style={{ fontSize: '0.7rem', color: '#ef4444', display: 'block', marginTop: '0.2rem' }}>{momoRefError}</span>
-                  )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '10px' }}>
+                <div>Code: <strong>{delivOrder.identifiant_unique_marquage}</strong></div>
+                <div>Prix Total: <strong>{delivOrder.prix_total} F</strong></div>
+                <div>Acompte déjà payé: <strong style={{ color: 'var(--success)' }}>{delivOrder.avance_payee} F</strong></div>
+                <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span>Reste à payer:</span>
+                  <strong style={{ color: 'var(--accent)' }}>{delivOrder.prix_total - delivOrder.avance_payee} FCFA</strong>
                 </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--success)', border: 'none' }}>Confirmer la Livraison</button>
-                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); }}>Annuler</button>
               </div>
-            </form>
+
+              <form onSubmit={handleConfirmDelivery} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label>Mode de Règlement</label>
+                  <CustomSelect
+                    className="input-control"
+                    value={delivPaymentMethod}
+                    onChange={(e) => setDelivPaymentMethod(e.target.value)}
+                  >
+                    <option value="especes">Espèces</option>
+                    <option value="mobile_money">Mobile Money</option>
+                  </CustomSelect>
+                </div>
+
+                <div className="form-group">
+                  <label>Montant encaissé (FCFA)</label>
+                  <input
+                    type="number"
+                    className="input-control"
+                    max={delivOrder.prix_total - delivOrder.avance_payee}
+                    required
+                    value={delivAmountPaid}
+                    onChange={(e) => setDelivAmountPaid(e.target.value)}
+                  />
+                </div>
+
+                {delivPaymentMethod === 'mobile_money' && (
+                  <div className="form-group">
+                    <label>Numéro de Référence <span style={{ color: '#ef4444' }}>*</span></label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      placeholder="Ex: TXN12345678"
+                      required
+                      style={{ borderColor: momoRefError ? '#ef4444' : 'var(--border-color)' }}
+                      value={momoRefNumber}
+                      onChange={(e) => {
+                        setMomoRefNumber(e.target.value);
+                        if (e.target.value.trim()) setMomoRefError('');
+                      }}
+                    />
+                    {momoRefError && (
+                      <span style={{ fontSize: '0.7rem', color: '#ef4444', display: 'block', marginTop: '0.2rem' }}>{momoRefError}</span>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--success)', border: 'none' }}>Confirmer la Livraison</button>
+                  <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); }}>Annuler</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================
          MODAL : ANNULATION DE COMMANDE AVEC MOTIF
          ======================================================== */}
       {showCancelModal && orderToCancel && (
-        <div className="modal-backdrop">
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
-            <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', color: 'var(--danger)' }}>
-              Annuler la Commande
-            </h3>
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => { setShowCancelModal(false); setOrderToCancel(null); }}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
+              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', color: 'var(--danger)' }}>
+                Annuler la Commande
+              </h3>
 
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Voulez-vous vraiment annuler la commande <strong>{orderToCancel.identifiant_unique_marquage}</strong> ? Cette opération va recréditer la dette du client si elle n'est pas encore soldée.
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                Voulez-vous vraiment annuler la commande <strong>{orderToCancel.identifiant_unique_marquage}</strong> ? Cette opération va recréditer la dette du client si elle n'est pas encore soldée.
+              </div>
+
+              <form onSubmit={handleConfirmCancelOrder} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Motif de l'annulation <span style={{ color: '#ef4444' }}>*</span></label>
+                  <textarea
+                    className="input-control"
+                    style={{ width: '100%', height: '80px', borderRadius: '8px', padding: '0.5rem', fontSize: '0.85rem', resize: 'none', border: cancelReasonError ? '1px solid #ef4444' : '1px solid var(--border-color)' }}
+                    placeholder="Expliquez la raison de l'annulation..."
+                    required
+                    value={cancelReason}
+                    onChange={(e) => {
+                      setCancelReason(e.target.value);
+                      if (e.target.value.trim()) setCancelReasonError('');
+                    }}
+                  />
+                  {cancelReasonError && (
+                    <span style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '0.2rem' }}>{cancelReasonError}</span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none', color: '#fff' }}>Annuler la commande</button>
+                  <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowCancelModal(false); setOrderToCancel(null); }}>Fermer</button>
+                </div>
+              </form>
             </div>
-
-            <form onSubmit={handleConfirmCancelOrder} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Motif de l'annulation <span style={{ color: '#ef4444' }}>*</span></label>
-                <textarea
-                  className="input-control"
-                  style={{ width: '100%', height: '80px', borderRadius: '8px', padding: '0.5rem', fontSize: '0.85rem', resize: 'none', border: cancelReasonError ? '1px solid #ef4444' : '1px solid var(--border-color)' }}
-                  placeholder="Expliquez la raison de l'annulation..."
-                  required
-                  value={cancelReason}
-                  onChange={(e) => {
-                    setCancelReason(e.target.value);
-                    if (e.target.value.trim()) setCancelReasonError('');
-                  }}
-                />
-                {cancelReasonError && (
-                  <span style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '0.2rem' }}>{cancelReasonError}</span>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none', color: '#fff' }}>Annuler la commande</button>
-                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowCancelModal(false); setOrderToCancel(null); }}>Fermer</button>
-              </div>
-            </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================
          MODAL : TICKET DE DÉPÔT / REÇU CLIENT (TICKET POPUP)
          ======================================================== */}
       {createdOrder && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.12)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', cursor: 'default' }}>
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '340px', background: '#fff', color: '#000', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '16px', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => setCreatedOrder(null)}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '360px', background: '#fff', color: '#000', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '24px', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
 
-            <div id="receipt-print-area-admin" style={{
-              background: '#ffffff',
-              padding: '24px 20px',
-              borderRadius: '8px',
-              fontFamily: 'Arial, Helvetica, sans-serif',
-              color: '#1a1a1a',
-              width: '100%',
-              boxSizing: 'border-box'
-            }}>
-              {/* ---- EN-TÊTE ---- */}
-              <div style={{ textAlign: 'center', paddingBottom: '16px', marginBottom: '16px', borderBottom: '2px dashed #cccccc' }}>
-                <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#000000', letterSpacing: '1px', fontFamily: 'Arial, Helvetica, sans-serif' }}>KLIN UP</h1>
-                <p style={{ margin: '4px 0 12px', fontSize: '12px', color: '#f59e0b', fontWeight: '600' }}>Ticket de Dépôt Client</p>
-                <div style={{
-                  display: 'inline-block',
-                  background: '#000000',
-                  color: '#ffffff',
-                  padding: '6px 16px',
-                  borderRadius: '6px',
-                  fontWeight: '800',
-                  fontSize: '16px',
-                  letterSpacing: '2px'
-                }}>
-                  {createdOrder.identifiant_unique_marquage}
-                </div>
-              </div>
-
-              {/* ---- DÉTAILS ---- */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', fontSize: '12px', paddingBottom: '14px', marginBottom: '14px', borderBottom: '1px solid #e5e5e5' }}>
-                <div><span style={{ fontWeight: '700' }}>Client :</span> {customers.find(c => c.id === createdOrder.customer_id)?.prenom} {customers.find(c => c.id === createdOrder.customer_id)?.nom}</div>
-                <div>
-                  <span style={{ fontWeight: '700' }}>Linge :</span>{' '}
-                  <span style={{ color: '#f59e0b', fontWeight: '600' }}>{createdOrder.type_article} ({serviceLabels[createdOrder.type_service] || createdOrder.type_service})</span>
-                </div>
-                <div><span style={{ fontWeight: '700' }}>Urgence :</span> {createdOrder.niveau_urgence}</div>
-                <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement === 'mobile_money' ? 'Mobile Money' : createdOrder.mode_reglement === 'especes' ? 'Espèces' : createdOrder.mode_reglement}</div>
-                {createdOrder.reference_momo && (
-                  <div><span style={{ fontWeight: '700' }}>Réf. Paiement :</span> <strong style={{ color: 'var(--primary)' }}>{createdOrder.reference_momo}</strong></div>
-                )}
-                <div><span style={{ fontWeight: '700' }}>Dépôt :</span> {formatDateTime(createdOrder.created_at)}</div>
-                <div><span style={{ fontWeight: '700' }}>Échéance :</span> {formatDateTime(createdOrder.due_date)}</div>
-                {createdOrder.acompte_paid_at && (
-                  <div><span style={{ fontWeight: '700' }}>Règlement Acompte :</span> {formatDateTime(createdOrder.acompte_paid_at)}</div>
-                )}
-                {createdOrder.solde_paid_at && (
-                  <div><span style={{ fontWeight: '700' }}>Règlement Solde :</span> {formatDateTime(createdOrder.solde_paid_at)}</div>
-                )}
-                {createdOrder.statut === 'annule' && (
-                  <div style={{ marginTop: '4px', padding: '6px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626' }}>
-                    <span style={{ fontWeight: '700' }}>Motif Annulation :</span> {createdOrder.motif_annulation || 'Non spécifié'}
+              <div id="receipt-print-area-admin" style={{
+                background: '#ffffff',
+                padding: '24px 20px',
+                borderRadius: '8px',
+                fontFamily: 'Arial, Helvetica, sans-serif',
+                color: '#1a1a1a',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}>
+                {/* ---- EN-TÊTE ---- */}
+                <div style={{ textAlign: 'center', paddingBottom: '16px', marginBottom: '16px', borderBottom: '2px dashed #cccccc' }}>
+                  <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#000000', letterSpacing: '1px', fontFamily: 'Arial, Helvetica, sans-serif' }}>KLIN UP</h1>
+                  <p style={{ margin: '4px 0 12px', fontSize: '12px', color: '#f59e0b', fontWeight: '600' }}>Ticket de Dépôt Client</p>
+                  <div style={{
+                    display: 'inline-block',
+                    background: '#000000',
+                    color: '#ffffff',
+                    padding: '6px 16px',
+                    borderRadius: '6px',
+                    fontWeight: '800',
+                    fontSize: '16px',
+                    letterSpacing: '2px'
+                  }}>
+                    {createdOrder.identifiant_unique_marquage}
                   </div>
-                )}
-              </div>
+                </div>
 
-              {createdOrder.is_subscription_order && createdOrder.subscription_details && (
-                <div style={{ padding: '8px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
-                  <div style={{ fontWeight: '800', color: '#16a34a', borderBottom: '1px dashed #bbf7d0', paddingBottom: '3px', marginBottom: '2px' }}>
-                    Suivi Solde Abonnement
+                {/* ---- DÉTAILS ---- */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', fontSize: '12px', paddingBottom: '14px', marginBottom: '14px', borderBottom: '1px solid #e5e5e5' }}>
+                  <div><span style={{ fontWeight: '700' }}>Client :</span> {customers.find(c => c.id === createdOrder.customer_id)?.prenom} {customers.find(c => c.id === createdOrder.customer_id)?.nom}</div>
+                  <div>
+                    <span style={{ fontWeight: '700' }}>Linge :</span>{' '}
+                    <span style={{ color: '#f59e0b', fontWeight: '600' }}>{createdOrder.type_article} ({serviceLabels[createdOrder.type_service] || createdOrder.type_service})</span>
                   </div>
-                  {createdOrder.subscription_details.immediate_subscription && (
-                    <div style={{ fontWeight: '800', color: '#b45309', borderBottom: '1px dashed #fbd38d', paddingBottom: '3px', marginBottom: '4px' }}>
-                      Abonnement souscrit : {createdOrder.subscription_details.immediate_subscription.name}
+                  <div><span style={{ fontWeight: '700' }}>Urgence :</span> {createdOrder.niveau_urgence}</div>
+                  <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement === 'mobile_money' ? 'Mobile Money' : createdOrder.mode_reglement === 'especes' ? 'Espèces' : createdOrder.mode_reglement}</div>
+                  {createdOrder.reference_momo && (
+                    <div><span style={{ fontWeight: '700' }}>Réf. Paiement :</span> <strong style={{ color: 'var(--primary)' }}>{createdOrder.reference_momo}</strong></div>
+                  )}
+                  <div><span style={{ fontWeight: '700' }}>Dépôt :</span> {formatDateTime(createdOrder.created_at)}</div>
+                  <div><span style={{ fontWeight: '700' }}>Échéance :</span> {formatDateTime(createdOrder.due_date)}</div>
+                  {createdOrder.acompte_paid_at && (
+                    <div><span style={{ fontWeight: '700' }}>Règlement Acompte :</span> {formatDateTime(createdOrder.acompte_paid_at)}</div>
+                  )}
+                  {createdOrder.solde_paid_at && (
+                    <div><span style={{ fontWeight: '700' }}>Règlement Solde :</span> {formatDateTime(createdOrder.solde_paid_at)}</div>
+                  )}
+                  {createdOrder.statut === 'annule' && (
+                    <div style={{ marginTop: '4px', padding: '6px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626' }}>
+                      <span style={{ fontWeight: '700' }}>Motif Annulation :</span> {createdOrder.motif_annulation || 'Non spécifié'}
                     </div>
                   )}
-                  <div>Forfait : <strong>{createdOrder.subscription_details.name}</strong></div>
-                  <div>Vêtements retirés : <strong>-{createdOrder.subscription_details.clothes_deducted}</strong></div>
-                  {!createdOrder.subscription_details.immediate_subscription && (
-                    <div>Solde précédent : <strong>{createdOrder.subscription_details.previous_balance} vêt.</strong></div>
-                  )}
-                  <div style={{ borderTop: '1px dashed #bbf7d0', paddingTop: '3px', marginTop: '2px', fontWeight: '800', color: '#16a34a' }}>
-                    Nouveau solde : {createdOrder.subscription_details.new_balance} vêtements restants
-                  </div>
                 </div>
-              )}
 
-              {/* ---- TOTAUX ---- */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
-                {createdOrder.remise_pourcentage > 0 && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#555555' }}>Prix de base :</span>
-                      <span style={{ fontWeight: '600', color: '#555555', textDecoration: 'line-through' }}>
-                        {(createdOrder.prix_base_avant_remise || 0).toLocaleString()} FCFA
-                      </span>
+                {createdOrder.is_subscription_order && createdOrder.subscription_details && (
+                  <div style={{ padding: '8px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
+                    <div style={{ fontWeight: '800', color: '#16a34a', borderBottom: '1px dashed #bbf7d0', paddingBottom: '3px', marginBottom: '2px' }}>
+                      Suivi Solde Abonnement
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#16a34a' }}>
-                      <span style={{ fontWeight: '600' }}>Réduction ({createdOrder.remise_pourcentage}%) :</span>
-                      <span style={{ fontWeight: '700' }}>
-                        -{(createdOrder.remise_montant || 0).toLocaleString()} FCFA
-                      </span>
+                    {createdOrder.subscription_details.immediate_subscription && (
+                      <div style={{ fontWeight: '800', color: '#b45309', borderBottom: '1px dashed #fbd38d', paddingBottom: '3px', marginBottom: '4px' }}>
+                        Abonnement souscrit : {createdOrder.subscription_details.immediate_subscription.name}
+                      </div>
+                    )}
+                    <div>Forfait : <strong>{createdOrder.subscription_details.name}</strong></div>
+                    <div>Vêtements retirés : <strong>-{createdOrder.subscription_details.clothes_deducted}</strong></div>
+                    {!createdOrder.subscription_details.immediate_subscription && (
+                      <div>Solde précédent : <strong>{createdOrder.subscription_details.previous_balance} vêt.</strong></div>
+                    )}
+                    <div style={{ borderTop: '1px dashed #bbf7d0', paddingTop: '3px', marginTop: '2px', fontWeight: '800', color: '#16a34a' }}>
+                      Nouveau solde : {createdOrder.subscription_details.new_balance} vêtements restants
                     </div>
-                  </>
+                  </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#555555', fontWeight: createdOrder.remise_pourcentage > 0 ? '700' : 'normal' }}>Total Commande :</span>
-                  <span style={{ fontWeight: '700', color: '#000000' }}>
-                    {createdOrder.is_subscription_order
-                      ? (createdOrder.subscription_details.immediate_subscription
-                        ? `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`
-                        : '0 FCFA (Abonnement)')
-                      : `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`}
-                  </span>
-                </div>
-                {(!createdOrder.is_subscription_order || !!createdOrder.subscription_details.immediate_subscription) ? (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#555555' }}>Acompte Payé :</span>
-                      <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
-                      <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
-                      <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
-                        {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
-                    <span style={{ color: '#16a34a', fontWeight: '800' }}>Reste à payer :</span>
-                    <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a' }}>
-                      0 FCFA
+
+                {/* ---- TOTAUX ---- */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+                  {createdOrder.remise_pourcentage > 0 && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#555555' }}>Prix de base :</span>
+                        <span style={{ fontWeight: '600', color: '#555555', textDecoration: 'line-through' }}>
+                          {(createdOrder.prix_base_avant_remise || 0).toLocaleString()} FCFA
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#16a34a' }}>
+                        <span style={{ fontWeight: '600' }}>Réduction ({createdOrder.remise_pourcentage}%) :</span>
+                        <span style={{ fontWeight: '700' }}>
+                          -{(createdOrder.remise_montant || 0).toLocaleString()} FCFA
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#555555', fontWeight: createdOrder.remise_pourcentage > 0 ? '700' : 'normal' }}>Total Commande :</span>
+                    <span style={{ fontWeight: '700', color: '#000000' }}>
+                      {createdOrder.is_subscription_order
+                        ? (createdOrder.subscription_details.immediate_subscription
+                          ? `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`
+                          : '0 FCFA (Abonnement)')
+                        : `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`}
                     </span>
                   </div>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                  onClick={() => alert("Impression du reçu en cours !")}
-                >
-                  <Printer size={12} /> Imprimer
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                  onClick={() => {
-                    const element = document.getElementById('receipt-print-area-admin');
-                    if (element && window.html2pdf) {
-                      const opt = {
-                        margin: 0.3,
-                        filename: `Facture_${createdOrder.identifiant_unique_marquage}.pdf`,
-                        image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 2, useCORS: true, logging: false },
-                        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-                      };
-                      window.html2pdf().set(opt).from(element).save();
-                    } else {
-                      alert("Le module PDF est en cours de chargement. Veuillez réessayer.");
-                    }
-                  }}
-                >
-                  ↓ Télécharger
-                </button>
+                  {(!createdOrder.is_subscription_order || !!createdOrder.subscription_details.immediate_subscription) ? (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#555555' }}>Acompte Payé :</span>
+                        <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
+                        <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
+                        <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
+                          {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
+                      <span style={{ color: '#16a34a', fontWeight: '800' }}>Reste à payer :</span>
+                      <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a' }}>
+                        0 FCFA
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ width: '100%', background: '#000', color: '#fff', border: 'none', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                onClick={() => setCreatedOrder(null)}
-              >
-                Fermer
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                    onClick={() => alert("Impression du reçu en cours !")}
+                  >
+                    <Printer size={12} /> Imprimer
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                    onClick={() => {
+                      const element = document.getElementById('receipt-print-area-admin');
+                      if (element && window.html2pdf) {
+                        const opt = {
+                          margin: 0.3,
+                          filename: `Facture_${createdOrder.identifiant_unique_marquage}.pdf`,
+                          image: { type: 'jpeg', quality: 0.98 },
+                          html2canvas: { scale: 2, useCORS: true, logging: false },
+                          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                        };
+                        window.html2pdf().set(opt).from(element).save();
+                      } else {
+                        alert("Le module PDF est en cours de chargement. Veuillez réessayer.");
+                      }
+                    }}
+                  >
+                    ↓ Télécharger
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ width: '100%', background: '#000', color: '#fff', border: 'none', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  onClick={() => setCreatedOrder(null)}
+                >
+                  Fermer
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {activeDetailsCard && (
-        <div className="modal-backdrop">
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '750px', maxHeight: '90vh', overflow: 'hidden', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {activeDetailsCard === 'ca' && <TrendingUp size={20} className="text-primary" />}
-                {activeDetailsCard === 'completed' && <CheckCircle size={20} style={{ color: 'var(--status-ready)' }} />}
-                {activeDetailsCard === 'active' && <Clock size={20} style={{ color: 'var(--primary)' }} />}
-                {activeDetailsCard === 'pending' && <AlertCircle size={20} style={{ color: 'var(--status-pending)' }} />}
-                {activeDetailsCard === 'ca' && "Détails Financiers (Chiffre d'Affaires)"}
-                {activeDetailsCard === 'completed' && "Détails des Commandes Livrées"}
-                {activeDetailsCard === 'active' && "Détails des Commandes Actives"}
-                {activeDetailsCard === 'pending' && "Détails des Commandes en Attente"}
-              </h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={exportKpiToExcel}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.4rem',
-                    padding: '0.35rem 0.8rem',
-                    borderRadius: '8px',
-                    border: '1.5px solid #16a34a',
-                    background: 'rgba(22, 163, 74, 0.08)',
-                    color: '#16a34a',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    whiteSpace: 'nowrap',
-                  }}
-                  onMouseOver={e => { e.currentTarget.style.background = '#16a34a'; e.currentTarget.style.color = 'white'; }}
-                  onMouseOut={e => { e.currentTarget.style.background = 'rgba(22, 163, 74, 0.08)'; e.currentTarget.style.color = '#16a34a'; }}
-                >
-                  <Download size={14} />
-                  Exporter Excel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  style={{ padding: '0.25rem', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  onClick={() => setActiveDetailsCard(null)}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-
-            {/* Date Filter Bar */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap',
-              padding: '0.6rem 0.8rem',
-              background: 'var(--bg-app)',
-              borderRadius: '12px',
-              border: '1px solid var(--border-color)',
-            }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>📅 Filtrer par date :</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <input
-                  type="date"
-                  className="input-control"
-                  style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', borderRadius: '8px', width: '135px' }}
-                  value={tempKpiDateFrom}
-                  onChange={e => setTempKpiDateFrom(e.target.value)}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>au</span>
-                <input
-                  type="date"
-                  className="input-control"
-                  style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', borderRadius: '8px', width: '135px' }}
-                  value={tempKpiDateTo}
-                  onChange={e => setTempKpiDateTo(e.target.value)}
-                />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: 'auto' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setKpiDateFrom(tempKpiDateFrom);
-                    setKpiDateTo(tempKpiDateTo);
-                  }}
-                  style={{
-                    padding: '0.35rem 0.95rem',
-                    borderRadius: '8px',
-                    border: '1.5px solid var(--primary)',
-                    background: 'var(--primary)',
-                    color: 'white',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    whiteSpace: 'nowrap',
-                  }}
-                  onMouseOver={e => { e.currentTarget.style.background = 'var(--primary-dark)'; }}
-                  onMouseOut={e => { e.currentTarget.style.background = 'var(--primary)'; }}
-                >
-                  Appliquer
-                </button>
-                {(tempKpiDateFrom || tempKpiDateTo || kpiDateFrom || kpiDateTo) && (
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => setActiveDetailsCard(null)}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '780px', maxHeight: '88vh', overflow: 'hidden', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default', margin: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {activeDetailsCard === 'ca' && <TrendingUp size={20} className="text-primary" />}
+                  {activeDetailsCard === 'completed' && <CheckCircle size={20} style={{ color: 'var(--status-ready)' }} />}
+                  {activeDetailsCard === 'active' && <Clock size={20} style={{ color: 'var(--primary)' }} />}
+                  {activeDetailsCard === 'pending' && <AlertCircle size={20} style={{ color: 'var(--status-pending)' }} />}
+                  {activeDetailsCard === 'ca' && "Détails Financiers (Chiffre d'Affaires)"}
+                  {activeDetailsCard === 'completed' && "Détails des Commandes Livrées"}
+                  {activeDetailsCard === 'active' && "Détails des Commandes Actives"}
+                  {activeDetailsCard === 'pending' && "Détails des Commandes en Attente"}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setTempKpiDateFrom('');
-                      setTempKpiDateTo('');
-                      setKpiDateFrom('');
-                      setKpiDateTo('');
-                    }}
+                    onClick={exportKpiToExcel}
                     style={{
-                      padding: '0.35rem 0.95rem',
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.35rem 0.8rem',
                       borderRadius: '8px',
-                      border: '1.5px solid #ef4444',
-                      background: 'rgba(239, 68, 68, 0.08)',
-                      color: '#ef4444',
+                      border: '1.5px solid #16a34a',
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      color: '#16a34a',
                       fontSize: '0.75rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
                       whiteSpace: 'nowrap',
                     }}
-                    onMouseOver={e => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = 'white'; }}
-                    onMouseOut={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'; e.currentTarget.style.color = '#ef4444'; }}
+                    onMouseOver={e => { e.currentTarget.style.background = '#16a34a'; e.currentTarget.style.color = 'white'; }}
+                    onMouseOut={e => { e.currentTarget.style.background = 'rgba(22, 163, 74, 0.08)'; e.currentTarget.style.color = '#16a34a'; }}
                   >
-                    Réinitialiser
+                    <Download size={14} />
+                    Exporter Excel
                   </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ padding: '0.25rem', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => setActiveDetailsCard(null)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Date Filter Bar */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap',
+                padding: '0.6rem 0.8rem',
+                background: 'var(--bg-app)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)',
+              }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>📅 Filtrer par date :</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <input
+                    type="date"
+                    className="input-control"
+                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', borderRadius: '8px', width: '135px' }}
+                    value={tempKpiDateFrom}
+                    onChange={e => setTempKpiDateFrom(e.target.value)}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>au</span>
+                  <input
+                    type="date"
+                    className="input-control"
+                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', borderRadius: '8px', width: '135px' }}
+                    value={tempKpiDateTo}
+                    onChange={e => setTempKpiDateTo(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: 'auto' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKpiDateFrom(tempKpiDateFrom);
+                      setKpiDateTo(tempKpiDateTo);
+                    }}
+                    style={{
+                      padding: '0.35rem 0.95rem',
+                      borderRadius: '8px',
+                      border: '1.5px solid var(--primary)',
+                      background: 'var(--primary)',
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.background = 'var(--primary-dark)'; }}
+                    onMouseOut={e => { e.currentTarget.style.background = 'var(--primary)'; }}
+                  >
+                    Appliquer
+                  </button>
+                  {(tempKpiDateFrom || tempKpiDateTo || kpiDateFrom || kpiDateTo) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempKpiDateFrom('');
+                        setTempKpiDateTo('');
+                        setKpiDateFrom('');
+                        setKpiDateTo('');
+                      }}
+                      style={{
+                        padding: '0.35rem 0.95rem',
+                        borderRadius: '8px',
+                        border: '1.5px solid #ef4444',
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        color: '#ef4444',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseOver={e => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = 'white'; }}
+                      onMouseOut={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'; e.currentTarget.style.color = '#ef4444'; }}
+                    >
+                      Réinitialiser
+                    </button>
+                  )}
+                </div>
+                {(kpiDateFrom || kpiDateTo) && (
+                  <span style={{ fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 700, background: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>
+                    {filterOrdersByKpiDate(orders).length} résultat(s)
+                  </span>
                 )}
               </div>
-              {(kpiDateFrom || kpiDateTo) && (
-                <span style={{ fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 700, background: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>
-                  {filterOrdersByKpiDate(orders).length} résultat(s)
-                </span>
-              )}
-            </div>
 
-            <div style={{ overflowY: 'auto', flexGrow: 1, paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {(() => { const fo = filterOrdersByKpiDate(orders); return (<>
-                {activeDetailsCard === 'ca' && renderCAReport(fo)}
-                {activeDetailsCard === 'completed' && renderCompletedOrdersList(fo)}
-                {activeDetailsCard === 'active' && renderActiveOrdersList(fo)}
-                {activeDetailsCard === 'pending' && renderPendingOrdersList(fo)}
-              </>); })()}
+              <div style={{ overflowY: 'auto', flexGrow: 1, paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {(() => { const fo = filterOrdersByKpiDate(orders); return (<>
+                  {activeDetailsCard === 'ca' && renderCAReport(fo)}
+                  {activeDetailsCard === 'completed' && renderCompletedOrdersList(fo)}
+                  {activeDetailsCard === 'active' && renderActiveOrdersList(fo)}
+                  {activeDetailsCard === 'pending' && renderPendingOrdersList(fo)}
+                </>); })()}
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
     </div>

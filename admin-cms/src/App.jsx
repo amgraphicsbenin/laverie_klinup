@@ -795,129 +795,153 @@ function App() {
               />
             </div>
 
-            {/* Bouton de réduction de la barre latérale */}
-            <button
-              className="sidebar-collapse-btn"
-              onClick={() => setSidebarCollapsed(prev => !prev)}
-              title={sidebarCollapsed ? "Agrandir le menu" : "Réduire le menu"}
-            >
-              <MIcon name={sidebarCollapsed ? "chevron_right" : "chevron_left"} size={20} />
-              <span className="sidebar-collapse-btn-label">Réduire le menu</span>
-            </button>
-            
-            <div className="menu-section-title">MENU</div>
             <ul className="menu-list">
-              <li 
-                className={`menu-item ${adminMenu === 'dashboard' ? 'active' : ''}`}
-                onClick={() => setAdminMenu('dashboard')}
-                data-tooltip="Vue d'Ensemble"
-              >
-                <MIcon name="dashboard" size={20} />
-                <span className="menu-item-label">Vue d'Ensemble</span>
-              </li>
-              <li 
-                className={`menu-item ${adminMenu === 'orders_management' ? 'active' : ''}`}
-                onClick={() => setAdminMenu('orders_management')}
-                data-tooltip="Gestion Commandes"
-              >
-                <MIcon name="shopping_bag" size={20} />
-                <span className="menu-item-label">Gestion Commandes</span>
-              </li>
-              <li 
-                className={`menu-item ${adminMenu === 'crm_management' ? 'active' : ''}`}
-                onClick={() => setAdminMenu('crm_management')}
-                data-tooltip="Clients CRM"
-              >
-                <MIcon name="group" size={20} />
-                <span className="menu-item-label">Clients CRM</span>
-              </li>
-              <li 
-                className={`menu-item ${adminMenu === 'catalog' ? 'active' : ''}`}
-                onClick={() => setAdminMenu('catalog')}
-                data-tooltip="Catalogue Tarifs"
-              >
-                <MIcon name="price_change" size={20} />
-                <span className="menu-item-label">Catalogue Tarifs</span>
-              </li>
-              <li 
-                className={`menu-item ${adminMenu === 'laundry_points' ? 'active' : ''}`}
-                onClick={() => setAdminMenu('laundry_points')}
-                data-tooltip="Points de Laverie"
-              >
-                <MIcon name="store" size={20} />
-                <span className="menu-item-label">Points de Laverie</span>
-              </li>
+              <div className={`menu-group-block ${adminMenu === 'dashboard' ? 'active-block' : ''}`}>
+                <li 
+                  className={`menu-item ${adminMenu === 'dashboard' ? 'active' : ''}`}
+                  onClick={() => setAdminMenu('dashboard')}
+                  data-tooltip="Vue d'Ensemble"
+                >
+                  <div className="menu-item-left">
+                    <MIcon name="dashboard" size={20} />
+                    <span className="menu-item-label">Vue d'Ensemble</span>
+                  </div>
+                </li>
+              </div>
+
+              <div className={`menu-group-block ${adminMenu === 'orders_management' ? 'active-block' : ''}`}>
+                <li 
+                  className={`menu-item ${adminMenu === 'orders_management' ? 'active' : ''}`}
+                  onClick={() => setAdminMenu('orders_management')}
+                  data-tooltip="Gestion Commandes"
+                >
+                  <div className="menu-item-left">
+                    <MIcon name="shopping_bag" size={20} />
+                    <span className="menu-item-label">Gestion Commandes</span>
+                  </div>
+                </li>
+              </div>
+
+              <div className={`menu-group-block ${adminMenu === 'crm_management' ? 'active-block' : ''}`}>
+                <li 
+                  className={`menu-item ${adminMenu === 'crm_management' ? 'active' : ''}`}
+                  onClick={() => setAdminMenu('crm_management')}
+                  data-tooltip="Clients CRM"
+                >
+                  <div className="menu-item-left">
+                    <MIcon name="group" size={20} />
+                    <span className="menu-item-label">Clients CRM</span>
+                  </div>
+                </li>
+              </div>
+
+              <div className={`menu-group-block ${adminMenu === 'catalog' ? 'active-block' : ''}`}>
+                <li 
+                  className={`menu-item ${adminMenu === 'catalog' ? 'active' : ''}`}
+                  onClick={() => setAdminMenu('catalog')}
+                  data-tooltip="Catalogue Tarifs"
+                >
+                  <div className="menu-item-left">
+                    <MIcon name="price_change" size={20} />
+                    <span className="menu-item-label">Catalogue Tarifs</span>
+                  </div>
+                </li>
+              </div>
+
               {isSuperAdmin && (
                 <>
-                  <li 
-                    className={`menu-item ${['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) ? 'active' : ''}`}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                    onClick={() => setOpenSubmenus(prev => ({ ...prev, staff: !prev.staff }))}
-                    data-tooltip="Gestion des Accès"
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                      <MIcon name="admin_panel_settings" size={20} />
-                      <span className="menu-item-label">Gestion des Accès</span>
-                    </div>
-                    <MIcon 
-                      name="expand_more" 
-                      size={18} 
-                      className="menu-item-expand-icon"
-                      style={{ 
-                        transition: 'transform 0.25s ease', 
-                        transform: openSubmenus?.staff ? 'rotate(180deg)' : 'rotate(0deg)',
-                        opacity: 0.7
-                      }} 
-                    />
-                  </li>
-                  {openSubmenus?.staff && (
-                    <div className="submenu-container">
-                      <div 
-                        className={`submenu-item ${(adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'active' : ''}`}
-                        onClick={() => setAdminMenu('staff_users')}
-                      >
-                        <MIcon name="group" size={16} />
-                        <span className="menu-item-label">1. Gestion Utilisateurs</span>
+                  <div className={`menu-group-block ${adminMenu === 'laundry_points' ? 'active-block' : ''}`}>
+                    <li 
+                      className={`menu-item ${adminMenu === 'laundry_points' ? 'active' : ''}`}
+                      onClick={() => setAdminMenu('laundry_points')}
+                      data-tooltip="Points de Laverie"
+                    >
+                      <div className="menu-item-left">
+                        <MIcon name="store" size={20} />
+                        <span className="menu-item-label">Points de Laverie</span>
                       </div>
-                      <div 
-                        className={`submenu-item ${adminMenu === 'staff_roles' ? 'active' : ''}`}
-                        onClick={() => setAdminMenu('staff_roles')}
-                      >
-                        <MIcon name="verified_user" size={16} />
-                        <span className="menu-item-label">2. Config. des Rôles</span>
+                    </li>
+                  </div>
+                  <div className={`menu-group-block ${openSubmenus?.staff ? 'expanded' : ''} ${['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) ? 'active-block' : ''}`}>
+                    <li 
+                      className={`menu-item ${['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) ? 'active' : ''}`}
+                      onClick={() => setOpenSubmenus(prev => ({ ...prev, staff: !prev.staff }))}
+                      data-tooltip="Gestion des Accès"
+                    >
+                      <div className="menu-item-left">
+                        <MIcon name="admin_panel_settings" size={20} />
+                        <span className="menu-item-label">Gestion des Accès</span>
                       </div>
-                    </div>
-                  )}
-                  <li 
-                    className={`menu-item ${adminMenu === 'logs' ? 'active' : ''}`}
-                    onClick={() => setAdminMenu('logs')}
-                    data-tooltip="Journal d'Audit"
-                  >
-                    <MIcon name="history" size={20} />
-                    <span className="menu-item-label">Journal d'Audit</span>
-                  </li>
+                      <span className="expand-symbol">{openSubmenus?.staff ? '−' : '+'}</span>
+                    </li>
+                    {openSubmenus?.staff && (
+                      <div className="submenu-container">
+                        <div 
+                          className={`submenu-item ${(adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'active' : ''}`}
+                          onClick={() => setAdminMenu('staff_users')}
+                        >
+                          {(adminMenu === 'staff_users' || adminMenu === 'staff_management') && <span className="sub-bullet">•</span>}
+                          <span className="menu-item-label">Gestion Utilisateurs</span>
+                        </div>
+                        <div 
+                          className={`submenu-item ${adminMenu === 'staff_roles' ? 'active' : ''}`}
+                          onClick={() => setAdminMenu('staff_roles')}
+                        >
+                          {adminMenu === 'staff_roles' && <span className="sub-bullet">•</span>}
+                          <span className="menu-item-label">Config. des Rôles</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={`menu-group-block ${adminMenu === 'logs' ? 'active-block' : ''}`}>
+                    <li 
+                      className={`menu-item ${adminMenu === 'logs' ? 'active' : ''}`}
+                      onClick={() => setAdminMenu('logs')}
+                      data-tooltip="Journal d'Audit"
+                    >
+                      <div className="menu-item-left">
+                        <MIcon name="history" size={20} />
+                        <span className="menu-item-label">Journal d'Audit</span>
+                      </div>
+                    </li>
+                  </div>
                 </>
               )}
             </ul>
 
             <div className="menu-section-title">GÉNÉRAL</div>
             <ul className="menu-list">
-              <li 
-                className={`menu-item ${adminMenu === 'settings' ? 'active' : ''}`}
-                onClick={() => setAdminMenu('settings')}
-                data-tooltip="Paramètres"
-              >
-                <MIcon name="settings" size={20} />
-                <span className="menu-item-label">Paramètres</span>
-              </li>
-              <li className="menu-item" onClick={() => alert('Support KLIN UP : contact@klinup.com | Tél : +229 01 97 97 97 97\n\nHeures d\'ouverture : Lun-Sam, 8h-18h.')} data-tooltip="Aide">
-                <MIcon name="help" size={20} />
-                <span className="menu-item-label">Aide</span>
-              </li>
-              <li className="menu-item" onClick={() => setShowLogoutConfirm(true)} data-tooltip="Déconnexion">
-                <MIcon name="logout" size={20} />
-                <span className="menu-item-label">Déconnexion</span>
-              </li>
+              <div className={`menu-group-block ${adminMenu === 'settings' ? 'active-block' : ''}`}>
+                <li 
+                  className={`menu-item ${adminMenu === 'settings' ? 'active' : ''}`}
+                  onClick={() => setAdminMenu('settings')}
+                  data-tooltip="Paramètres"
+                >
+                  <div className="menu-item-left">
+                    <MIcon name="settings" size={20} />
+                    <span className="menu-item-label">Paramètres</span>
+                  </div>
+                </li>
+              </div>
+
+              <div className="menu-group-block">
+                <li className="menu-item" onClick={() => alert('Support KLIN UP : contact@klinup.com | Tél : +229 01 97 97 97 97\n\nHeures d\'ouverture : Lun-Sam, 8h-18h.')} data-tooltip="Aide">
+                  <div className="menu-item-left">
+                    <MIcon name="help" size={20} />
+                    <span className="menu-item-label">Aide</span>
+                  </div>
+                </li>
+              </div>
+
+              <div className="menu-group-block">
+                <li className="menu-item" onClick={() => setShowLogoutConfirm(true)} data-tooltip="Déconnexion">
+                  <div className="menu-item-left">
+                    <MIcon name="logout" size={20} />
+                    <span className="menu-item-label">Déconnexion</span>
+                  </div>
+                </li>
+              </div>
             </ul>
           </div>
 
@@ -968,33 +992,46 @@ function App() {
 
           {hasAdminAccess && (
             <div className="topbar-actions">
-              {/* Sélecteur de Point de Laverie (Store Switcher) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.35rem 0.65rem', borderRadius: '10px' }}>
-                <MIcon name="storefront" size={18} style={{ color: 'var(--primary)' }} />
-                <select
-                  value={selectedStoreId}
-                  onChange={(e) => {
-                    db.setSelectedStoreId(e.target.value);
-                    setSelectedStoreIdState(e.target.value);
-                  }}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--text-primary)',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="all">Tous les points (Vue Globale)</option>
-                  {db.getStores().map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.nom} ({s.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Sélecteur de Point de Laverie (Seul le Super Admin peut naviguer entre les laveries et voir la Vue Globale) */}
+              {isSuperAdmin ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.35rem 0.65rem', borderRadius: '10px' }}>
+                  <MIcon name="storefront" size={18} style={{ color: 'var(--primary)' }} />
+                  <select
+                    value={selectedStoreId}
+                    onChange={(e) => {
+                      db.setSelectedStoreId(e.target.value);
+                      setSelectedStoreIdState(e.target.value);
+                    }}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-primary)',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">Tous les points (Vue Globale)</option>
+                    {db.getStores().map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.nom} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(79, 70, 229, 0.08)', border: '1px solid rgba(79, 70, 229, 0.2)', padding: '0.35rem 0.75rem', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary)' }}>
+                  <MIcon name="storefront" size={18} style={{ color: 'var(--primary)' }} />
+                  <span>
+                    {(() => {
+                      const userStoreId = currentUser?.store_id || currentUser?.laverie_id || 'store_central';
+                      const currentStore = db.getStores().find(s => s.id === userStoreId || s.code === userStoreId);
+                      return currentStore ? `${currentStore.nom} (${currentStore.code})` : 'Mon Point de Laverie';
+                    })()}
+                  </span>
+                </div>
+              )}
               {/* Raccourcis Icônes */}
               <div style={{ position: 'relative' }}>
                 <div 

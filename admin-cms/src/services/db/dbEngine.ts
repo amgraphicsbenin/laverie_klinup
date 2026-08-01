@@ -93,11 +93,29 @@ export const dbEngine = {
   // ── Getters (synchronous) ──────────────────────────────────────────────
 
   getStores: (): Store[] => memoryDb.stores ? [...memoryDb.stores] : [],
-  getSelectedStoreId: (): string => memoryDb.selected_store_id || 'all',
+  getSelectedStoreId: (): string => {
+    const user = memoryDb.current_user;
+    if (user && user.role !== 'super_admin') {
+      const userStore = user.store_id || (user as any).laverie_id || (user as any).laverie || 'store_central';
+      return userStore;
+    }
+    return memoryDb.selected_store_id || 'all';
+  },
 
-  getAllStaff: (): Staff[] => [...memoryDb.staff],
+  getAllStaff: (): Staff[] => {
+    const user = memoryDb.current_user;
+    if (user && user.role !== 'super_admin') {
+      return dbEngine.getStaff();
+    }
+    return [...memoryDb.staff];
+  },
   getStaff: (): Staff[] => {
-    const sid = memoryDb.selected_store_id || 'all';
+    const user = memoryDb.current_user;
+    const isSuperAdmin = user?.role === 'super_admin';
+    const sid = (!isSuperAdmin && user)
+      ? (user.store_id || (user as any).laverie_id || (user as any).laverie || 'store_central')
+      : (memoryDb.selected_store_id || 'all');
+
     if (sid === 'all') return [...memoryDb.staff];
     const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
     const storeCode = targetStore?.code;
@@ -109,9 +127,20 @@ export const dbEngine = {
     );
   },
 
-  getAllCustomers: (): Customer[] => [...memoryDb.customers],
+  getAllCustomers: (): Customer[] => {
+    const user = memoryDb.current_user;
+    if (user && user.role !== 'super_admin') {
+      return dbEngine.getCustomers();
+    }
+    return [...memoryDb.customers];
+  },
   getCustomers: (): Customer[] => {
-    const sid = memoryDb.selected_store_id || 'all';
+    const user = memoryDb.current_user;
+    const isSuperAdmin = user?.role === 'super_admin';
+    const sid = (!isSuperAdmin && user)
+      ? (user.store_id || (user as any).laverie_id || (user as any).laverie || 'store_central')
+      : (memoryDb.selected_store_id || 'all');
+
     if (sid === 'all') return [...memoryDb.customers];
 
     const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
@@ -124,7 +153,6 @@ export const dbEngine = {
     );
 
     return memoryDb.customers.filter((c: any) => {
-      if (c.store_id === 'all') return true;
       if (c.store_id === sid) return true;
       if (c.store_id === storeId) return true;
       if (storeCode && c.store_id === storeCode) return true;
@@ -133,9 +161,20 @@ export const dbEngine = {
     });
   },
 
-  getAllOrders: (): Order[] => [...memoryDb.orders],
+  getAllOrders: (): Order[] => {
+    const user = memoryDb.current_user;
+    if (user && user.role !== 'super_admin') {
+      return dbEngine.getOrders();
+    }
+    return [...memoryDb.orders];
+  },
   getOrders: (): Order[] => {
-    const sid = memoryDb.selected_store_id || 'all';
+    const user = memoryDb.current_user;
+    const isSuperAdmin = user?.role === 'super_admin';
+    const sid = (!isSuperAdmin && user)
+      ? (user.store_id || (user as any).laverie_id || (user as any).laverie || 'store_central')
+      : (memoryDb.selected_store_id || 'all');
+
     if (sid === 'all') return [...memoryDb.orders];
     const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
     const storeCode = targetStore?.code;
@@ -147,9 +186,20 @@ export const dbEngine = {
     });
   },
 
-  getAllLogs: (): ActivityLog[] => [...memoryDb.logs],
+  getAllLogs: (): ActivityLog[] => {
+    const user = memoryDb.current_user;
+    if (user && user.role !== 'super_admin') {
+      return dbEngine.getLogs();
+    }
+    return [...memoryDb.logs];
+  },
   getLogs: (): ActivityLog[] => {
-    const sid = memoryDb.selected_store_id || 'all';
+    const user = memoryDb.current_user;
+    const isSuperAdmin = user?.role === 'super_admin';
+    const sid = (!isSuperAdmin && user)
+      ? (user.store_id || (user as any).laverie_id || (user as any).laverie || 'store_central')
+      : (memoryDb.selected_store_id || 'all');
+
     if (sid === 'all') return [...memoryDb.logs];
     const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
     const storeCode = targetStore?.code;
@@ -169,8 +219,32 @@ export const dbEngine = {
     receipt_header: 'KLIN UP - Laverie & Pressing Premium',
     receipt_footer: 'Merci de votre confiance ! A bientot chez KLIN UP.'
   },
-  getCashClosures: () => memoryDb.cash_closures ? [...memoryDb.cash_closures] : [],
-  getDebtPayments: () => memoryDb.debt_payments ? [...memoryDb.debt_payments] : [],
+  getCashClosures: () => {
+    const closures = memoryDb.cash_closures ? [...memoryDb.cash_closures] : [];
+    const user = memoryDb.current_user;
+    const isSuperAdmin = user?.role === 'super_admin';
+    const sid = (!isSuperAdmin && user)
+      ? (user.store_id || (user as any).laverie_id || (user as any).laverie || 'store_central')
+      : (memoryDb.selected_store_id || 'all');
+
+    if (sid === 'all') return closures;
+    const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
+    const storeCode = targetStore?.code;
+    return closures.filter((c: any) => c.store_id === sid || (storeCode && c.store_id === storeCode));
+  },
+  getDebtPayments: () => {
+    const debtPayments = memoryDb.debt_payments ? [...memoryDb.debt_payments] : [];
+    const user = memoryDb.current_user;
+    const isSuperAdmin = user?.role === 'super_admin';
+    const sid = (!isSuperAdmin && user)
+      ? (user.store_id || (user as any).laverie_id || (user as any).laverie || 'store_central')
+      : (memoryDb.selected_store_id || 'all');
+
+    if (sid === 'all') return debtPayments;
+    const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
+    const storeCode = targetStore?.code;
+    return debtPayments.filter((d: any) => d.store_id === sid || (storeCode && d.store_id === storeCode));
+  },
   getPinResetRequests: () => memoryDb.pin_reset_requests ? [...memoryDb.pin_reset_requests] : [],
 
   canUserViewCA: (user: Staff | null): boolean => !!(user && (user.role === 'super_admin' || user.role === 'manager')),
@@ -186,6 +260,11 @@ export const dbEngine = {
     memoryDb.current_user = user;
     if (user) {
       saveSession('klin_up_current_user', user);
+      if (user.role !== 'super_admin') {
+        const userStore = user.store_id || (user as any).laverie_id || (user as any).laverie || 'store_central';
+        memoryDb.selected_store_id = userStore;
+        saveSession('klin_up_selected_store', userStore);
+      }
       dbEngine.logAction('CONNEXION', `Connexion de ${user.prenom} ${user.nom} (${user.role})`);
     } else {
       removeSession('klin_up_current_user');
@@ -195,6 +274,11 @@ export const dbEngine = {
   },
 
   setSelectedStoreId: (storeId: string): void => {
+    const user = memoryDb.current_user;
+    if (user && user.role !== 'super_admin') {
+      // Les managers et agents ne peuvent pas changer de laverie ni accéder aux données globales
+      return;
+    }
     memoryDb.selected_store_id = storeId;
     saveSession('klin_up_selected_store', storeId);
     const store = memoryDb.stores?.find(s => s.id === storeId);

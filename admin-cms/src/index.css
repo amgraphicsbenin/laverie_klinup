@@ -263,18 +263,17 @@ button, input, select, textarea {
   overflow: hidden;
 }
 
-/* Sidebar Donezo Style */
+/* Sidebar Ajustes Reference Style */
 .sidebar {
   width: 260px;
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border-color);
-  padding: 0.75rem 1.25rem 2rem;
+  background: var(--bg-sidebar, #ffffff);
+  border-right: 1px solid var(--border-color, #e2e8f0);
+  padding: 1.25rem 0.5rem 2rem 0.85rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   flex-shrink: 0;
   transition: all 0.3s ease;
-  z-index: 100;
 }
 
 .sidebar-logo {
@@ -289,101 +288,129 @@ button, input, select, textarea {
   padding-left: 0.5rem;
 }
 
-.sidebar-logo-icon {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sidebar-logo-text {
-  font-family: var(--font-title);
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
+.sidebar-title-heading {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
+  padding: 0.25rem 0.75rem 1rem 0.75rem;
+  letter-spacing: -0.6px;
 }
 
 .menu-section-title {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--text-muted);
+  color: var(--text-muted, #94a3b8);
   margin-bottom: 0.5rem;
   padding-left: 0.75rem;
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
 }
 
 .menu-list {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.3rem;
+}
+
+.menu-group-block {
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.menu-group-block.expanded,
+.menu-group-block.active-block {
+  background: rgba(99, 102, 241, 0.075);
+  border-right: 3.5px solid #4f46e5;
+  border-radius: 12px 0 0 12px;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  padding: 0.75rem 1rem 0.75rem 1.25rem;
-  color: var(--text-secondary);
+  justify-content: space-between;
+  padding: 0.7rem 0.85rem;
+  color: var(--text-secondary, #64748b);
   font-weight: 500;
-  font-size: 0.925rem;
+  font-size: 0.93rem;
   cursor: pointer;
-  border-left: 3px solid transparent;
-  transition: all 0.3s var(--ease-spring-soft);
+  border-radius: 12px;
+  transition: all 0.2s ease;
   position: relative;
+  border-right: 3.5px solid transparent;
+}
+
+.menu-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
 }
 
 .menu-item:hover {
-  color: var(--text-primary);
-  font-weight: 600;
-  background: rgba(59, 130, 246, 0.03);
+  color: var(--text-primary, #0f172a);
+  background: rgba(99, 102, 241, 0.04);
 }
 
 .menu-item.active {
-  color: var(--primary);
-  border-left: 3px solid var(--primary);
+  color: #4f46e5;
   font-weight: 700;
-  background: rgba(59, 130, 246, 0.06);
+  background: rgba(99, 102, 241, 0.085);
+  border-right: 3.5px solid #4f46e5;
+  border-radius: 12px 0 0 12px;
+}
+
+.menu-item.active .menu-item-left .material-icons,
+.menu-item.active .menu-item-left svg {
+  color: #4f46e5 !important;
+}
+
+.expand-symbol {
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: #818cf8;
+  line-height: 1;
+  transition: transform 0.2s ease;
+  user-select: none;
 }
 
 .submenu-container {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding-left: 0.75rem;
-  margin: 0.25rem 0 0.5rem 1.25rem;
-  border-left: 2px solid rgba(0, 44, 247, 0.15);
-  max-height: 500px;
-  overflow: hidden;
-  transition: max-height 0.3s var(--ease-emphasized-decelerate), opacity 0.25s ease;
+  gap: 0.35rem;
+  padding: 0.2rem 0.75rem 0.85rem 2.8rem;
   animation: fadeIn 0.2s ease-out;
 }
 
 .submenu-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.75rem;
+  gap: 0.6rem;
+  padding: 0.45rem 0.5rem;
   border-radius: 8px;
-  font-size: 0.82rem;
+  font-size: 0.86rem;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: #64748b;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .submenu-item:hover {
-  color: var(--primary);
-  background: rgba(0, 44, 247, 0.05);
+  color: #4f46e5;
 }
 
 .submenu-item.active {
-  color: var(--primary);
-  background: rgba(0, 44, 247, 0.1);
+  color: #4f46e5;
   font-weight: 700;
+}
+
+.sub-bullet {
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #4f46e5;
+  margin-right: 2px;
 }
 
 .sidebar-footer {
@@ -778,10 +805,13 @@ button, input, select, textarea {
   bottom: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 1200;
-  background: rgba(15, 23, 42, 0.12);
-  display: grid;
-  place-items: center;
+  z-index: 99999;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 1.25rem;
   box-sizing: border-box;
   overflow-y: auto;
@@ -789,10 +819,10 @@ button, input, select, textarea {
 }
 
 .modal-dialog-card {
-  background: var(--bg-card);
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08)) !important;
   box-shadow: 0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12) !important;
-  border-radius: 24px;
+  border-radius: 24px !important;
   max-height: 85vh !important;
   display: flex;
   flex-direction: column;

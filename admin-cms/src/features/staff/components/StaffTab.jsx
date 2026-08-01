@@ -1568,22 +1568,7 @@ export default function StaffTab({
          MODALE D'ÉDITION DU PROFIL ET ACCÈS D'UN UTILISATEUR
          ========================================================================= */}
       {showEditUserModal && selectedMember && createPortal(
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(15, 23, 42, 0.18)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '1rem',
-          boxSizing: 'border-box'
-        }} onClick={() => setShowEditUserModal(false)}>
+        <div className="modal-backdrop" onClick={() => setShowEditUserModal(false)}>
           <div
             className="card modal-dialog-card"
             onClick={(e) => e.stopPropagation()}
@@ -1595,8 +1580,8 @@ export default function StaffTab({
               flexDirection: 'column',
               gap: '1.25rem',
               color: 'var(--text-primary)',
-              boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.3)',
-              border: '1px solid var(--border-color)',
+              boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)',
+              border: '1px solid var(--border-color, rgba(0,0,0,0.08))',
               borderRadius: '24px',
               overflow: 'hidden'
             }}
@@ -1890,23 +1875,8 @@ export default function StaffTab({
          MODALE : CRÉATION D'UN NOUVEAU RÔLE
          ========================================================================= */}
       {showNewRoleModal && createPortal(
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(15, 23, 42, 0.18)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '1rem',
-          boxSizing: 'border-box'
-        }} onClick={() => setShowNewRoleModal(false)}>
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '480px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25)', border: '1px solid var(--border-color)', borderRadius: '20px' }}>
+        <div className="modal-backdrop" onClick={() => setShowNewRoleModal(false)}>
+          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '480px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

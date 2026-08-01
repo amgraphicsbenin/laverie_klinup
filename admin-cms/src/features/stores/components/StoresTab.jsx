@@ -15,6 +15,22 @@ export default function StoresTab({ onShowSuccess }) {
   const orders = db.getOrders();
   const isSuperAdmin = db.getCurrentUser()?.role === 'super_admin';
 
+  if (!isSuperAdmin) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', width: '100%' }}>
+        <div className="card modal-dialog-card" style={{ maxWidth: '440px', padding: '2.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', borderRadius: '24px' }}>
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--danger)' }}>
+            <span className="material-symbols-rounded" style={{ fontSize: '36px' }}>gpp_bad</span>
+          </div>
+          <h3 style={{ fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Accès Réservé</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', margin: 0 }}>
+            Seuls les Super Administrateurs disposent des privilèges requis pour administrer les points de laverie et basculer entre les établissements.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('tous'); // tous, actif, inactif
 
@@ -458,23 +474,8 @@ export default function StoresTab({ onShowSuccess }) {
 
       {/* CREATE / EDIT MODAL (PORTAL) */}
       {showModal && createPortal(
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(15, 23, 42, 0.18)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '1rem',
-          boxSizing: 'border-box'
-        }} onClick={() => setShowModal(false)}>
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', margin: 'auto' }}>
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', borderRadius: '24px', margin: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span className="material-symbols-rounded">store</span>
