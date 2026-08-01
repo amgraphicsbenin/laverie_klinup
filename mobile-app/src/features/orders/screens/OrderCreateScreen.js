@@ -5,6 +5,7 @@ import { CustomSelect } from '../../../components/CustomSelect';
 import { db } from '../../../services/db';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
+import { t } from '../../../services/i18n';
 
 export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
   const { isDarkMode, customers, catalog, currentUser } = useDbState();

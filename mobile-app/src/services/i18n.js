@@ -89,6 +89,15 @@ const translations = {
       livre: 'Livré',
       activite_recente: 'Activité Récente',
       aucune_commande: 'Aucune commande aujourd\'hui',
+      evolution_jour: 'évolution jour',
+      vs_sem_passee: 'vs sem. passée',
+      vs_mois_passe: 'vs mois passé',
+      vs_an_passe: 'vs an passé',
+      cette_annee: 'Cette Année',
+      personnalise: 'Personnalisé',
+      date_debut: 'Date début',
+      date_fin: 'Date fin',
+      appliquer: 'Appliquer',
     },
     // ── Gestion des Commandes ──
     orders: {
@@ -179,6 +188,14 @@ const translations = {
       activite_session: 'Activité de la Session (Aujourd\'hui)',
       commandes_crees: 'Commandes créées',
       volume_encaisse: 'Volume encaissé',
+      mes_performances: 'Mes performances',
+      activite_aujourdhui: "Activité d'aujourd'hui",
+      performance_mois: 'Performance du Mois',
+      bilan_global: 'Bilan Global Agent',
+      total_commandes_agent: 'Commandes gérées',
+      ca_cumule: 'Chiffre d\'affaires généré',
+      express_gerees: 'Commandes Express',
+      commandes_livrees: 'Commandes finalisées',
       preferences: 'Préférences Caisse',
       mode_sombre: 'Mode Sombre',
       notifications: 'Notifications en temps réel',
@@ -1147,7 +1164,10 @@ export function subscribeToLangChange(listener) {
  * @param {object} [params] - Paramètres dynamiques à injecter dans la traduction
  * @returns {string} Texte traduit
  */
-export function t(key, params = {}) {
+export function t(key, params = {}, fallbackText = '') {
+  const defaultFallback = typeof params === 'string' ? params : (fallbackText || key);
+  const paramObj = typeof params === 'object' && params !== null ? params : {};
+
   const keys = key.split('.');
   let value = translations[_currentLang] || translations.fr;
 
@@ -1161,7 +1181,7 @@ export function t(key, params = {}) {
         if (fallback && typeof fallback === 'object' && fk in fallback) {
           fallback = fallback[fk];
         } else {
-          return key; // Retourne la clé si introuvable
+          return defaultFallback;
         }
       }
       value = fallback;
@@ -1170,13 +1190,13 @@ export function t(key, params = {}) {
   }
 
   if (typeof value !== 'string') {
-    return key;
+    return defaultFallback;
   }
 
   // Injection des paramètres dynamiques (ex: {name: "Jean"} → "Bonjour Jean")
-  if (params && Object.keys(params).length > 0) {
+  if (paramObj && Object.keys(paramObj).length > 0) {
     let result = value;
-    for (const [paramKey, paramValue] of Object.entries(params)) {
+    for (const [paramKey, paramValue] of Object.entries(paramObj)) {
       result = result.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramValue));
     }
     return result;

@@ -11,6 +11,7 @@ const BlurView = SafeBlurView;
 import { useScrollPaddingBottom } from "../../../hooks/useTabBarHeight";
 import { CustomSelect } from "../../../components/CustomSelect";
 import { useDbState } from "../../../hooks/useDbState";
+import { t } from "../../../services/i18n";
 
 export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess }) {
   const { currentUser, isDarkMode } = useDbState();

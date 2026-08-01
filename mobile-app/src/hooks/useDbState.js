@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../services/db';
 import { sendSystemNotification } from '../services/notificationService';
+import { getCurrentLang, subscribeToLangChange } from '../services/i18n';
 
 export function useDbState() {
   const [customers, setCustomers] = useState(() => db.getCustomers() || []);
@@ -10,6 +11,7 @@ export function useDbState() {
   const [currentUser, setCurrentUser] = useState(() => db.getCurrentUser() || null);
   const [isRemote, setIsRemote] = useState(() => (typeof db.isRemote === 'function' ? db.isRemote() : false));
   const [isDarkMode, setIsDarkMode] = useState(() => (typeof db.isDarkMode === 'function' ? db.isDarkMode() : false));
+  const [currentLang, setCurrentLang] = useState(() => getCurrentLang());
 
   const prevUnreadCountRef = useRef((typeof db.getNotifications === 'function' ? db.getNotifications() : []).filter(n => !n.read).length);
   const isInitialMount = useRef(true);
@@ -25,6 +27,7 @@ export function useDbState() {
     setCurrentUser(db.getCurrentUser() || null);
     setIsRemote(typeof db.isRemote === 'function' ? db.isRemote() : false);
     setIsDarkMode(typeof db.isDarkMode === 'function' ? db.isDarkMode() : false);
+    setCurrentLang(getCurrentLang());
 
     const unsubscribe = db.subscribe(() => {
       setCustomers(db.getCustomers() || []);
@@ -46,10 +49,19 @@ export function useDbState() {
       setCurrentUser(db.getCurrentUser() || null);
       setIsRemote(typeof db.isRemote === 'function' ? db.isRemote() : false);
       setIsDarkMode(typeof db.isDarkMode === 'function' ? db.isDarkMode() : false);
+      setCurrentLang(getCurrentLang());
     });
+
+    const unsubLang = subscribeToLangChange((newLang) => {
+      setCurrentLang(newLang);
+    });
+
     return () => {
       if (typeof unsubscribe === 'function') {
         unsubscribe();
+      }
+      if (typeof unsubLang === 'function') {
+        unsubLang();
       }
     };
   }, []);

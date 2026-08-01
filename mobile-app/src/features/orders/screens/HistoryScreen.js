@@ -10,6 +10,7 @@ import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { MotiView } from '../../../components/SafeView';
 import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
+import { t } from '../../../services/i18n';
 
 export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { orders, customers, currentUser, isDarkMode } = useDbState();
@@ -176,7 +177,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(99, 102, 241, 0.18)' : '#e0e7ff', 
           text: isDarkMode ? '#818cf8' : '#4338ca', 
           border: isDarkMode ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe', 
-          label: 'À livrer', 
+          label: t('status_labels.a_livrer', {}, 'À livrer'), 
           accent: '#6366f1' 
         };
       case 'en_cours_livraison':
@@ -184,7 +185,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(99, 102, 241, 0.18)' : '#e0e7ff', 
           text: isDarkMode ? '#818cf8' : '#4338ca', 
           border: isDarkMode ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe', 
-          label: 'En livraison', 
+          label: t('status_labels.en_cours_livraison', {}, 'En livraison'), 
           accent: '#6366f1' 
         };
       case 'restitue':
@@ -192,7 +193,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#e6f4ea', 
           text: isDarkMode ? '#34d399' : '#137333', 
           border: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : '#a8dab5', 
-          label: 'Récupéré', 
+          label: t('status_labels.restitue', {}, 'Restituée'), 
           accent: '#10b981' 
         };
       case 'livre':
@@ -200,7 +201,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#e6f4ea', 
           text: isDarkMode ? '#34d399' : '#137333', 
           border: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : '#a8dab5', 
-          label: 'Livré', 
+          label: t('status_labels.livre', {}, 'Livrée'), 
           accent: '#10b981' 
         };
       case 'lavage_cours':
@@ -209,7 +210,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(59, 130, 246, 0.18)' : '#dbeafe', 
           text: isDarkMode ? '#60a5fa' : '#1d4ed8', 
           border: isDarkMode ? 'rgba(59, 130, 246, 0.4)' : '#bfdbfe', 
-          label: 'Lavage', 
+          label: t('status_labels.lavage', {}, 'Lavage'), 
           accent: '#2563eb' 
         };
       case 'repassage_cours':
@@ -218,7 +219,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(13, 148, 136, 0.18)' : '#ccfbf1', 
           text: isDarkMode ? '#2dd4bf' : '#0f766e', 
           border: isDarkMode ? 'rgba(13, 148, 136, 0.4)' : '#99f6e4', 
-          label: 'Repassage', 
+          label: t('status_labels.repassage', {}, 'Repassage'), 
           accent: '#0d9488' 
         };
       case 'traitement':
@@ -226,7 +227,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(124, 58, 237, 0.18)' : '#f3e8ff', 
           text: isDarkMode ? '#c084fc' : '#6b21a8', 
           border: isDarkMode ? 'rgba(124, 58, 237, 0.4)' : '#e9d5ff', 
-          label: 'Traitement', 
+          label: t('status_labels.traitement', {}, 'Traitement'), 
           accent: '#7c3aed' 
         };
       case 'attente':
@@ -235,7 +236,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(217, 119, 6, 0.18)' : '#fff7ed', 
           text: isDarkMode ? '#fbbf24' : '#c2410c', 
           border: isDarkMode ? 'rgba(217, 119, 6, 0.4)' : '#ffedd5', 
-          label: 'En attente', 
+          label: t('status_labels.en_attente', {}, 'En attente'), 
           accent: '#d97706' 
         };
       case 'annule':
@@ -243,7 +244,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(220, 38, 38, 0.18)' : '#ffe4e6', 
           text: isDarkMode ? '#f87171' : '#be123c', 
           border: isDarkMode ? 'rgba(220, 38, 38, 0.4)' : '#fecdd3', 
-          label: 'Annulée', 
+          label: t('status_labels.annule', {}, 'Annulée'), 
           accent: '#dc2626' 
         };
       default:
@@ -251,7 +252,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(217, 119, 6, 0.18)' : '#fff7ed', 
           text: isDarkMode ? '#fbbf24' : '#c2410c', 
           border: isDarkMode ? 'rgba(217, 119, 6, 0.4)' : '#ffedd5', 
-          label: 'En attente', 
+          label: t('status_labels.en_attente', {}, 'En attente'), 
           accent: '#d97706' 
         };
     }

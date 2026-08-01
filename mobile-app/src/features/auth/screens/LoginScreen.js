@@ -3,8 +3,11 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, KeyboardAvo
 import { Mail, ChevronLeft } from 'lucide-react-native';
 import { db, memoryDb } from '../../../services/db';
 import { supabase } from '../../../services/supabaseClient';
+import { t } from '../../../services/i18n';
+import { useDbState } from '../../../hooks/useDbState';
 
 export default function LoginScreen() {
+  const { currentLang } = useDbState();
   const isDarkMode = db.isDarkMode ? db.isDarkMode() : false;
   const styles = getStyles(isDarkMode);
   const [email, setEmail] = useState('');
@@ -50,16 +53,21 @@ export default function LoginScreen() {
     // 1. Essai RPC verify_staff_login sécurisé sur Supabase
     if (!found && supabase) {
       try {
-        const { data: rpcData, error: rpcErr } = await supabase.rpc('verify_staff_login', { p_email: targetEmail });
-        if (rpcData && !rpcErr) {
-          found = rpcData;
+        const { data: rpcUser, error: rpcErr } = await supabase.rpc('verify_staff_login', {
+          user_email: targetEmail
+        });
+        if (!rpcErr && rpcUser) {
+          const fetchedUser = Array.isArray(rpcUser) ? rpcUser[0] : rpcUser;
+          if (fetchedUser && fetchedUser.id) {
+            found = fetchedUser;
+          }
         }
       } catch (e) {
-        // RPC fallback silencieux
+        console.warn("[Login] RPC failed, fallback to direct query:", e);
       }
     }
 
-    // 2. Requête directe de secours Supabase si non trouvé dans le cache local
+    // 2. Repli query directe Supabase
     if (!found && supabase) {
       try {
         const { data, error } = await supabase
@@ -68,34 +76,26 @@ export default function LoginScreen() {
           .ilike('email', targetEmail)
           .maybeSingle();
 
-        if (data && !error) {
+        if (!error && data) {
           found = data;
         }
-      } catch (err) {
-        console.warn("[Login] Recherche directe Supabase échouée :", err);
+      } catch (e) {
+        console.warn("[Login] Direct query failed:", e);
       }
-    }
-
-    // 3. Garantir la présence de l'utilisateur dans memoryDb.staff pour la vérification PIN
-    if (found && memoryDb && memoryDb.staff) {
-      const idx = memoryDb.staff.findIndex(s => s.id === found.id || (s.email && s.email.trim().toLowerCase() === targetEmail));
-      if (idx === -1) {
-        memoryDb.staff.push(found);
-      } else {
-        memoryDb.staff[idx] = { ...memoryDb.staff[idx], ...found };
-      }
-      if (db.notify) db.notify();
     }
 
     setLoading(false);
+
     if (found) {
-      if (found.statut === 'inactif' || found.statut === 'suspendu') {
-        alert("Ce compte utilisateur est inactif ou suspendu. Veuillez contacter votre administrateur.");
+      if (found.statut === 'suspendu' || found.statut === 'inactif') {
+        alert(t('auth.error_inactive'));
         return;
       }
       setSelectedUser(found);
+      setPin('');
+      setPinError(false);
     } else {
-      alert("Email introuvable. Veuillez vérifier vos identifiants.");
+      alert(t('auth.error_email_not_found'));
     }
   };
 
@@ -121,13 +121,7 @@ export default function LoginScreen() {
   };
 
   const getRoleLabel = (role) => {
-    switch (role) {
-      case 'super_admin': return 'Super Administrateur';
-      case 'manager': return 'Gestionnaire';
-      case 'livreur': return 'Livreur';
-      case 'agent_lavage_repassage': return 'Atelier Lavage & Repassage';
-      default: return "Agent d'accueil";
-    }
+    return t(`roles.${role || 'agent_accueil'}`, {}, 'Agent');
   };
 
   return (
@@ -149,17 +143,17 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <Text style={styles.title}>Connexion KLIN UP</Text>
+            <Text style={styles.title}>{t('auth.login_title')}</Text>
             <Text style={styles.subtitle}>
-              Connectez-vous pour accéder à la plateforme de caisse & atelier.
+              {t('auth.login_subtitle')}
             </Text>
 
             <View style={styles.inputWrapper}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>{t('auth.email_label')}</Text>
               <View style={styles.inputContainer}>
                 <Mail size={16} color="#71717a" style={styles.inputIcon} />
                 <TextInput
-                  placeholder="Entrez votre adresse email"
+                  placeholder={t('auth.email_placeholder')}
                   placeholderTextColor="#a1a1aa"
                   value={email}
                   onChangeText={setEmail}
@@ -180,7 +174,7 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator color="#ffffff" />
               ) : (
-                <Text style={styles.buttonText}>Se connecter</Text>
+                <Text style={styles.buttonText}>{t('auth.login_button')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -203,7 +197,7 @@ export default function LoginScreen() {
                 }
               ]}>
                 <Text style={styles.avatarText}>
-                  {selectedUser.prenom[0].toUpperCase()}{selectedUser.nom[0].toUpperCase()}
+                  {selectedUser.prenom ? selectedUser.prenom[0].toUpperCase() : ''}{selectedUser.nom ? selectedUser.nom[0].toUpperCase() : ''}
                 </Text>
               </View>
             </View>
@@ -211,9 +205,9 @@ export default function LoginScreen() {
             <Text style={styles.userName}>{selectedUser.prenom} {selectedUser.nom}</Text>
             <Text style={styles.userRole}>{getRoleLabel(selectedUser.role)}</Text>
 
-            <Text style={styles.pinTitle}>Vérifiez votre identité</Text>
+            <Text style={styles.pinTitle}>{t('auth.pin_title')}</Text>
             <Text style={styles.pinSubtitle}>
-              Entrez votre code PIN à 6 chiffres pour accéder à l'espace de travail.
+              {t('auth.pin_subtitle')}
             </Text>
 
             <View style={styles.pinContainer}>
@@ -247,7 +241,7 @@ export default function LoginScreen() {
             </View>
 
             {pinError && (
-              <Text style={styles.errorText}>Code PIN incorrect. Veuillez réessayer.</Text>
+              <Text style={styles.errorText}>{t('auth.error_wrong_pin')}</Text>
             )}
           </View>
         )}

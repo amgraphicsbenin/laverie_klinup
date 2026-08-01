@@ -13,6 +13,7 @@ import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import ClientsScreen from '../../clients/screens/ClientsScreen';
 import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
+import { t } from '../../../services/i18n';
 
 export default function GestionScreen({ 
   selectedOrder, 
@@ -244,28 +245,28 @@ export default function GestionScreen({
       case 'retard':
       case 'en_retard':
       case 'late':
-        return { bg: '#7c3aed', text: '#ffffff', label: 'Passer au traitement' };
+        return { bg: '#7c3aed', text: '#ffffff', label: t('orders.passer_traitement', {}, 'Passer au traitement') };
       case 'traitement':
       case 'processing':
-        return { bg: '#002cf7', text: '#ffffff', label: 'Lancer le lavage' };
+        return { bg: '#002cf7', text: '#ffffff', label: t('orders.lancer_lavage', {}, 'Lancer le lavage') };
       case 'lavage_cours':
       case 'en_cours_lavage':
       case 'washing':
-        return { bg: '#0d9488', text: '#ffffff', label: 'Passer au repassage' };
+        return { bg: '#0d9488', text: '#ffffff', label: t('orders.passer_repassage', {}, 'Passer au repassage') };
       case 'repassage_cours':
       case 'en_cours_repassage':
       case 'ironing':
-        return { bg: '#059669', text: '#ffffff', label: 'Prêt' };
+        return { bg: '#059669', text: '#ffffff', label: t('orders.statut_pret', {}, 'Prêt') };
       case 'a_livrer':
-        return { bg: '#4f46e5', text: '#ffffff', label: 'Démarrer la livraison' };
+        return { bg: '#2563eb', text: '#ffffff', label: t('orders.statut_livraison', {}, 'Lancer la livraison') };
       case 'en_cours_livraison':
       case 'in_delivery':
       case 'delivering':
-        return { bg: '#09090b', text: '#ffffff', label: 'Terminer la livraison' };
+        return { bg: '#059669', text: '#ffffff', label: t('orders.statut_restitue', {}, 'Livrer la commande') };
       case 'a_recuperer':
-        return { bg: '#d97706', text: '#ffffff', label: 'Marquer comme récupéré' };
+        return { bg: '#059669', text: '#ffffff', label: t('orders.statut_restitue', {}, 'Restituer au client') };
       default:
-        return { bg: '#7c3aed', text: '#ffffff', label: 'Passer au traitement' };
+        return { bg: '#002cf7', text: '#ffffff', label: t('orders.statut_maj', {}, 'Mise à jour') };
     }
   };
   const [selectedCategory, setSelectedCategory] = useState('Tous');

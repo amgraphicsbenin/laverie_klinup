@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl, Modal } from 'react-native';
-import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check } from 'lucide-react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl, Modal, TextInput } from 'react-native';
+import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { MotiView } from '../../../components/SafeView';
 import Svg, { Rect, Path, Circle } from 'react-native-svg';
@@ -10,15 +10,42 @@ import { useScrollPaddingBottom, useTabBarHeight } from '../../../hooks/useTabBa
 import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
 import NotificationModal from '../../../components/NotificationModal';
+import { t } from '../../../services/i18n';
 
 export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { orders, customers, notifications, currentUser, isDarkMode } = useDbState();
   const [refreshing, setRefreshing] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
-  const [revenuePeriod, setRevenuePeriod] = useState('today'); // 'today' | 'week' | 'month' | 'year'
+  const [revenuePeriod, setRevenuePeriod] = useState('today'); // 'today' | 'week' | 'month' | 'year' | 'custom'
   const [periodPickerVisible, setPeriodPickerVisible] = useState(false);
+  const [customModalVisible, setCustomModalVisible] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [customStartInput, setCustomStartInput] = useState('');
+  const [customEndInput, setCustomEndInput] = useState('');
+  const [activeCalendarField, setActiveCalendarField] = useState(null); // 'start' | 'end' | null
+  const [calMonth, setCalMonth] = useState(new Date().getMonth());
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
   const filterPillRef = useRef(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 275, right: 24 });
+
+  const monthNamesFr = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  ];
+
+  const handleSelectDayTile = (dayNumber) => {
+    const formattedMonth = String(calMonth + 1).padStart(2, '0');
+    const formattedDay = String(dayNumber).padStart(2, '0');
+    const dateStr = `${calYear}-${formattedMonth}-${formattedDay}`;
+
+    if (activeCalendarField === 'start') {
+      setCustomStartInput(dateStr);
+    } else if (activeCalendarField === 'end') {
+      setCustomEndInput(dateStr);
+    }
+    setActiveCalendarField(null);
+  };
 
   const handleFilterPillPress = () => {
     if (periodPickerVisible) {
@@ -162,16 +189,24 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
       const growth = yRev > 0 ? Math.round(((todayRev - yRev) / yRev) * 100) : (todayRev > 0 ? 100 : 0);
 
       return {
-        label: "Aujourd'hui",
+        label: t('orders.filtre_aujourdhui', {}, "Aujourd'hui"),
         totalRevenue: todayRev,
-        growthText: `${growth >= 0 ? '+' : ''}${growth}% (évolution jour)`,
+        growthText: `${growth >= 0 ? '+' : ''}${growth}% (${t('dashboard.evolution_jour', {}, 'évolution jour')})`,
         isPositive: growth >= 0,
         chartData: chart,
       };
     }
 
     if (revenuePeriod === 'week') {
-      const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+      const days = [
+        t('days.dimanche', {}, 'Dim'),
+        t('days.lundi', {}, 'Lun'),
+        t('days.mardi', {}, 'Mar'),
+        t('days.mercredi', {}, 'Mer'),
+        t('days.jeudi', {}, 'Jeu'),
+        t('days.vendredi', {}, 'Ven'),
+        t('days.samedi', {}, 'Sam')
+      ];
       const chart = [];
       let total = 0;
       for (let i = 6; i >= 0; i--) {
@@ -195,9 +230,9 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
       const growth = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : (total > 0 ? 100 : 0);
 
       return {
-        label: "Cette Semaine",
+        label: t('orders.filtre_semaine', {}, "Cette Semaine"),
         totalRevenue: total,
-        growthText: `${growth >= 0 ? '+' : ''}${growth}% (vs sem. passée)`,
+        growthText: `${growth >= 0 ? '+' : ''}${growth}% (${t('dashboard.vs_sem_passee', {}, 'vs sem. passée')})`,
         isPositive: growth >= 0,
         chartData: chart,
       };
@@ -281,15 +316,57 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
       const growth = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : (total > 0 ? 100 : 0);
 
       return {
-        label: "Cette Année",
+        label: t('dashboard.cette_annee', {}, "Cette Année"),
         totalRevenue: total,
-        growthText: `${growth >= 0 ? '+' : ''}${growth}% (vs an passé)`,
+        growthText: `${growth >= 0 ? '+' : ''}${growth}% (${t('dashboard.vs_an_passe', {}, 'vs an passé')})`,
         isPositive: growth >= 0,
         chartData: chart,
       };
     }
 
-    return { label: "Aujourd'hui", totalRevenue: 0, growthText: "0%", isPositive: true, chartData: [] };
+    if (revenuePeriod === 'custom') {
+      const startDateObj = customStartDate ? new Date(customStartDate + 'T00:00:00') : null;
+      const endDateObj = customEndDate ? new Date(customEndDate + 'T23:59:59') : null;
+
+      const filteredOrders = orders.filter(o => {
+        if (!o.created_at) return false;
+        const d = new Date(o.created_at);
+        if (startDateObj && d < startDateObj) return false;
+        if (endDateObj && d > endDateObj) return false;
+        return true;
+      });
+
+      const total = filteredOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+
+      const chart = [
+        { label: 'P1', revenue: 0, isActive: false },
+        { label: 'P2', revenue: 0, isActive: false },
+        { label: 'P3', revenue: 0, isActive: false },
+        { label: 'P4', revenue: 0, isActive: true },
+      ];
+
+      if (filteredOrders.length > 0) {
+        const quarter = Math.ceil(filteredOrders.length / 4);
+        filteredOrders.forEach((o, i) => {
+          const idx = Math.min(3, Math.floor(i / quarter));
+          chart[idx].revenue += (o.prix_total || o.total || 0);
+        });
+      }
+
+      const displayLabel = (customStartDate && customEndDate)
+        ? `${customStartDate.slice(5)} - ${customEndDate.slice(5)}`
+        : t('dashboard.personnalise', {}, 'Personnalisé');
+
+      return {
+        label: displayLabel,
+        totalRevenue: total,
+        growthText: `${filteredOrders.length} cmd(s)`,
+        isPositive: true,
+        chartData: chart,
+      };
+    }
+
+    return { label: t('orders.filtre_aujourdhui', {}, "Aujourd'hui"), totalRevenue: 0, growthText: "0%", isPositive: true, chartData: [] };
   };
 
   const revenuePeriodData = getRevenuePeriodData();
@@ -1052,10 +1129,11 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             ]}
           >
             {[
-              { key: 'today', label: "Aujourd'hui" },
-              { key: 'week', label: "Cette Semaine" },
-              { key: 'month', label: "Ce Mois" },
-              { key: 'year', label: "Cette Année" },
+              { key: 'today', label: t('orders.filtre_aujourdhui', {}, "Aujourd'hui") },
+              { key: 'week', label: t('orders.filtre_semaine', {}, "Cette Semaine") },
+              { key: 'month', label: t('orders.filtre_mois', {}, "Ce Mois") },
+              { key: 'year', label: t('dashboard.cette_annee', {}, "Cette Année") },
+              { key: 'custom', label: t('dashboard.personnalise', {}, "Personnalisé") },
             ].map(opt => {
               const isSelected = revenuePeriod === opt.key;
               return (
@@ -1063,8 +1141,12 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                   key={opt.key}
                   activeOpacity={0.7}
                   onPress={() => {
-                    setRevenuePeriod(opt.key);
                     setPeriodPickerVisible(false);
+                    if (opt.key === 'custom') {
+                      setCustomModalVisible(true);
+                    } else {
+                      setRevenuePeriod(opt.key);
+                    }
                   }}
                   style={[
                     styles.dropdownItem,
@@ -1086,6 +1168,275 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           </MotiView>
         </View>
       )}
+
+      {/* MODAL FILTRE PERSONNALISÉ */}
+      <Modal
+        visible={customModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setActiveCalendarField(null);
+          setCustomModalVisible(false);
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.65)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <MotiView
+            from={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={{
+              width: '100%',
+              maxWidth: 380,
+              backgroundColor: isDarkMode ? '#18181b' : '#ffffff',
+              borderRadius: 24,
+              padding: 20,
+              borderWidth: 1,
+              borderColor: isDarkMode ? '#27272a' : '#e4e4e7',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.25,
+              shadowRadius: 20,
+              elevation: 10,
+            }}
+          >
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#09090b' }}>
+                {t('dashboard.personnalise', {}, 'Période Personnalisée')}
+              </Text>
+              <TouchableOpacity onPress={() => {
+                setActiveCalendarField(null);
+                setCustomModalVisible(false);
+              }}>
+                <X size={20} color={isDarkMode ? '#a1a1aa' : '#71717a'} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Presets */}
+            <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#71717a', marginBottom: 8 }}>
+              Raccourcis rapides
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  const now = new Date();
+                  const todayStr = now.toISOString().split('T')[0];
+                  setCustomStartInput(todayStr);
+                  setCustomEndInput(todayStr);
+                  setActiveCalendarField(null);
+                }}
+                style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5' }}
+              >
+                <Text style={{ fontSize: 12, color: isDarkMode ? '#d4d4d8' : '#3f3f46', fontWeight: '500' }}>Aujourd'hui</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const now = new Date();
+                  const start = new Date();
+                  start.setDate(now.getDate() - 7);
+                  setCustomStartInput(start.toISOString().split('T')[0]);
+                  setCustomEndInput(now.toISOString().split('T')[0]);
+                  setActiveCalendarField(null);
+                }}
+                style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5' }}
+              >
+                <Text style={{ fontSize: 12, color: isDarkMode ? '#d4d4d8' : '#3f3f46', fontWeight: '500' }}>7 derniers jours</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const now = new Date();
+                  const start = new Date();
+                  start.setDate(now.getDate() - 30);
+                  setCustomStartInput(start.toISOString().split('T')[0]);
+                  setCustomEndInput(now.toISOString().split('T')[0]);
+                  setActiveCalendarField(null);
+                }}
+                style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5' }}
+              >
+                <Text style={{ fontSize: 12, color: isDarkMode ? '#d4d4d8' : '#3f3f46', fontWeight: '500' }}>30 derniers jours</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Date Pickers Visual Buttons */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#3f3f46', marginBottom: 6 }}>
+                {t('dashboard.date_debut', {}, 'Date de début')}
+              </Text>
+              
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setActiveCalendarField(activeCalendarField === 'start' ? null : 'start')}
+                style={{
+                  height: 44,
+                  borderWidth: 1.5,
+                  borderColor: activeCalendarField === 'start' ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: isDarkMode ? '#09090b' : '#fafafa',
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: customStartInput ? '600' : '400', color: customStartInput ? (isDarkMode ? '#ffffff' : '#09090b') : (isDarkMode ? '#52525b' : '#a1a1aa') }}>
+                  {customStartInput || 'Sélectionner la date de début'}
+                </Text>
+                <Calendar size={18} color={activeCalendarField === 'start' ? '#002cf7' : (isDarkMode ? '#a1a1aa' : '#71717a')} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#3f3f46', marginBottom: 6 }}>
+                {t('dashboard.date_fin', {}, 'Date de fin')}
+              </Text>
+              
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setActiveCalendarField(activeCalendarField === 'end' ? null : 'end')}
+                style={{
+                  height: 44,
+                  borderWidth: 1.5,
+                  borderColor: activeCalendarField === 'end' ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: isDarkMode ? '#09090b' : '#fafafa',
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: customEndInput ? '600' : '400', color: customEndInput ? (isDarkMode ? '#ffffff' : '#09090b') : (isDarkMode ? '#52525b' : '#a1a1aa') }}>
+                  {customEndInput || 'Sélectionner la date de fin'}
+                </Text>
+                <Calendar size={18} color={activeCalendarField === 'end' ? '#002cf7' : (isDarkMode ? '#a1a1aa' : '#71717a')} />
+              </TouchableOpacity>
+            </View>
+
+            {/* INTERACTIVE VISUAL CALENDAR GRID */}
+            {activeCalendarField !== null && (
+              <View style={{
+                marginBottom: 16,
+                padding: 12,
+                borderRadius: 16,
+                backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#27272a' : '#e2e8f0'
+              }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (calMonth === 0) {
+                        setCalMonth(11);
+                        setCalYear(calYear - 1);
+                      } else {
+                        setCalMonth(calMonth - 1);
+                      }
+                    }}
+                    style={{ padding: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0' }}
+                  >
+                    <ChevronLeft size={16} color={isDarkMode ? '#ffffff' : '#09090b'} />
+                  </TouchableOpacity>
+
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#09090b' }}>
+                    {monthNamesFr[calMonth]} {calYear} ({activeCalendarField === 'start' ? 'Début' : 'Fin'})
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (calMonth === 11) {
+                        setCalMonth(0);
+                        setCalYear(calYear + 1);
+                      } else {
+                        setCalMonth(calMonth + 1);
+                      }
+                    }}
+                    style={{ padding: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0' }}
+                  >
+                    <ChevronRight size={16} color={isDarkMode ? '#ffffff' : '#09090b'} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Day Headers */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 6 }}>
+                  {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, idx) => (
+                    <Text key={idx} style={{ width: 32, textAlign: 'center', fontSize: 11, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#64748b' }}>
+                      {d}
+                    </Text>
+                  ))}
+                </View>
+
+                {/* Days Grid */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  {Array.from({ length: (new Date(calYear, calMonth, 1).getDay() + 6) % 7 }).map((_, i) => (
+                    <View key={`empty-${i}`} style={{ width: '14.28%', height: 32 }} />
+                  ))}
+
+                  {Array.from({ length: new Date(calYear, calMonth + 1, 0).getDate() }).map((_, i) => {
+                    const dayNum = i + 1;
+                    const formattedMonth = String(calMonth + 1).padStart(2, '0');
+                    const formattedDay = String(dayNum).padStart(2, '0');
+                    const dateStr = `${calYear}-${formattedMonth}-${formattedDay}`;
+
+                    const isSelected = activeCalendarField === 'start'
+                      ? customStartInput === dateStr
+                      : customEndInput === dateStr;
+
+                    return (
+                      <TouchableOpacity
+                        key={`day-${dayNum}`}
+                        onPress={() => handleSelectDayTile(dayNum)}
+                        style={{
+                          width: '14.28%',
+                          height: 32,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          borderRadius: 16,
+                          backgroundColor: isSelected ? '#002cf7' : 'transparent'
+                        }}
+                      >
+                        <Text style={{
+                          fontSize: 12,
+                          fontWeight: isSelected ? '700' : '500',
+                          color: isSelected ? '#ffffff' : (isDarkMode ? '#e4e4e7' : '#18181b')
+                        }}>
+                          {dayNum}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* Modal Actions */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setActiveCalendarField(null);
+                  setCustomModalVisible(false);
+                }}
+                style={{ flex: 1, height: 44, borderRadius: 12, borderWidth: 1, borderColor: isDarkMode ? '#3f3f46' : '#e4e4e7', justifyContent: 'center', alignItems: 'center' }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#71717a' }}>{t('app.cancel', {}, 'Annuler')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setCustomStartDate(customStartInput.trim());
+                  setCustomEndDate(customEndInput.trim());
+                  setRevenuePeriod('custom');
+                  setActiveCalendarField(null);
+                  setCustomModalVisible(false);
+                }}
+                style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: '#002cf7', justifyContent: 'center', alignItems: 'center' }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#ffffff' }}>{t('dashboard.appliquer', {}, 'Appliquer')}</Text>
+              </TouchableOpacity>
+            </View>
+          </MotiView>
+        </View>
+      </Modal>
 
       {renderKpiDetails()}
     </View>

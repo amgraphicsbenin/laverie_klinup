@@ -8,9 +8,10 @@ import { CustomSelect } from './CustomSelect';
 import { db } from '../services/db';
 import { useTabBarHeight } from '../hooks/useTabBarHeight';
 import { useDbState } from '../hooks/useDbState';
+import { t } from '../services/i18n';
 
 export function OrderFormModal({ visible, onClose, onShowSuccess }) {
-  const { isDarkMode } = useDbState();
+  const { isDarkMode, currentLang } = useDbState();
   const customers = db.getCustomers();
   const catalog = db.getCatalog();
   const tabBarHeight = useTabBarHeight();

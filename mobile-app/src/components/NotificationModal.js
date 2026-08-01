@@ -29,8 +29,11 @@ import {
 import SafeBlurView from './SafeBlurView';
 import SafeView from './SafeView';
 import { db } from '../services/db';
+import { useDbState } from '../hooks/useDbState';
+import { t } from '../services/i18n';
 
 export function NotificationModal({ visible, onClose, notifications = [], isDarkMode = false }) {
+  const { currentLang } = useDbState();
   const [isRendered, setIsRendered] = useState(visible);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.92)).current;

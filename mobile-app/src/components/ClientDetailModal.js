@@ -7,6 +7,7 @@ import { MotiView } from './SafeView';
 import { db } from '../services/db';
 import { useDbState } from '../hooks/useDbState';
 import { CustomSelect } from './CustomSelect';
+import { t } from '../services/i18n';
 
 export default function ClientDetailModal({
   visible,

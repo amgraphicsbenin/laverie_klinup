@@ -368,8 +368,8 @@ export default function App() {
   const totalSlots = isAtelier ? 2 : 5;
   const tabBarInnerWidth = Math.max(100, containerWidth - 8);
   const slotWidth = tabBarInnerWidth / totalSlots;
-  const pillWidth = Math.min(48, slotWidth - 8);
-  const pillHeight = 32;
+  const pillWidth = Math.min(46, slotWidth - 8);
+  const pillHeight = 28;
   
   const getActiveSlotIndex = (tab) => {
     if (isAtelier) {
@@ -459,8 +459,8 @@ export default function App() {
         style={[
           styles.tabBar,
           {
-            paddingTop: 6,
-            paddingBottom: Math.max(8, insets.bottom),
+            paddingTop: 8,
+            paddingBottom: Math.max(10, insets.bottom),
             backgroundColor: '#002cf7',
           }
         ]}
@@ -480,7 +480,7 @@ export default function App() {
           style={{
             position: 'absolute',
             left: 4,
-            top: 6,
+            top: 11,
             width: pillWidth,
             height: pillHeight,
             borderRadius: 9999,
@@ -874,8 +874,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-around',
     paddingHorizontal: 4,
-    paddingTop: 6,
-    paddingBottom: 6,
+    paddingTop: 8,
+    paddingBottom: 8,
     borderWidth: 0,
   },
   tabItem: {
@@ -887,10 +887,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     width: '100%',
-    height: 52,
+    height: 58,
   },
   tabIconWrapper: {
-    height: 32,
+    height: 34,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',

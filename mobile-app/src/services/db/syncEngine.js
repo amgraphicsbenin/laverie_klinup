@@ -596,14 +596,19 @@ export function setupRealtime() {
           const currentId = memoryDb.current_user.id;
           const currentEmail = (memoryDb.current_user.email || '').toLowerCase();
 
-          if (eventType === 'DELETE' && oldRow && (oldRow.id === currentId || (oldRow.email && oldRow.email.toLowerCase() === currentEmail))) {
-            console.warn("[Auth Realtime] Compte supprimé à distance. Déconnexion immédiate de l'application mobile !");
+          const isDeleted = eventType === 'DELETE' && (
+            (oldRow && (oldRow.id === currentId || (oldRow.email && oldRow.email.toLowerCase() === currentEmail))) ||
+            !memoryDb.staff.some(s => s.id === currentId || (s.email && s.email.toLowerCase() === currentEmail))
+          );
+
+          const isUpdatedDisabled = eventType === 'UPDATE' && newRow && (
+            (newRow.id === currentId || (newRow.email && newRow.email.toLowerCase() === currentEmail)) &&
+            (newRow.statut === 'suspendu' || newRow.statut === 'inactif')
+          );
+
+          if (isDeleted || isUpdatedDisabled) {
+            console.warn("[Auth Realtime] Compte personnel supprimé ou désactivé à distance. Déconnexion immédiate !");
             memoryDb.current_user = null;
-          } else if (eventType === 'UPDATE' && newRow && (newRow.id === currentId || (newRow.email && newRow.email.toLowerCase() === currentEmail))) {
-            if (newRow.statut === 'suspendu' || newRow.statut === 'inactif') {
-              console.warn("[Auth Realtime] Compte désactivé/suspendu à distance. Déconnexion immédiate de l'application mobile !");
-              memoryDb.current_user = null;
-            }
           }
         }
 
@@ -617,7 +622,7 @@ export function setupRealtime() {
 }
 
 /**
- * Vérifie si l'utilisateur actuellement connecté a été désactivé ou suspendu, et le déconnecte le cas échéant.
+ * Vérifie si l'utilisateur actuellement connecté a été supprimé, désactivé ou suspendu, et le déconnecte le cas échéant.
  */
 export function checkAndEvictDisabledCurrentUser() {
   if (!memoryDb.current_user || !memoryDb.staff) return false;
@@ -629,8 +634,9 @@ export function checkAndEvictDisabledCurrentUser() {
     (s.email && s.email.toLowerCase() === currentEmail)
   );
 
-  if (foundInStaff && (foundInStaff.statut === 'suspendu' || foundInStaff.statut === 'inactif')) {
-    console.warn("[Auth] Détection d'un compte suspendu ou inactif. Déconnexion forcée !");
+  // Si le compte est absent de la liste du personnel (supprimé) OU si son statut est inactif/suspendu
+  if (!foundInStaff || foundInStaff.statut === 'suspendu' || foundInStaff.statut === 'inactif') {
+    console.warn("[Auth] Détection d'un compte supprimé, suspendu ou inactif. Déconnexion forcée !");
     memoryDb.current_user = null;
     persist();
     db.notify();
@@ -646,21 +652,31 @@ function startSecurityHeartbeat() {
   securityHeartbeatInterval = setInterval(async () => {
     if (memoryDb.current_user && supabase) {
       try {
+        const id = memoryDb.current_user.id;
         const email = memoryDb.current_user.email;
-        if (email) {
-          const { data } = await supabase.from('staff').select('id, statut').ilike('email', email.trim()).maybeSingle();
-          if (data && (data.statut === 'suspendu' || data.statut === 'inactif')) {
-            console.warn(`[Security Heartbeat] Compte mobile désactivé (${data.statut}). Déconnexion forcée immédiate !`);
-            memoryDb.current_user = null;
-            await persist();
-            db.notify();
-          }
+        if (!id && !email) return;
+
+        let query = supabase.from('staff').select('id, statut');
+        if (id) {
+          query = query.eq('id', id);
+        } else if (email) {
+          query = query.ilike('email', email.trim());
+        }
+
+        const { data } = await query.maybeSingle();
+
+        // Si la ligne n'existe plus en base (supprimée) OU si le statut est inactif/suspendu
+        if (!data || data.statut === 'suspendu' || data.statut === 'inactif') {
+          console.warn(`[Security Heartbeat] Compte mobile supprimé ou désactivé (statut: ${data?.statut || 'SUPPRIME'}). Déconnexion forcée immédiate !`);
+          memoryDb.current_user = null;
+          await persist();
+          db.notify();
         }
       } catch (e) {
         // Erreurs réseau temporaires ignorées
       }
     }
-  }, 10000);
+  }, 3000);
 }
 
 /**

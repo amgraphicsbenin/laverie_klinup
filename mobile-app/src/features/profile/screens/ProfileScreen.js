@@ -1,49 +1,76 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler, Switch } from 'react-native';
-import { Key, LogOut, X, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle, ArrowLeft, Check } from 'lucide-react-native';
+import { Key, LogOut, X, Bell, Moon, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle, ArrowLeft, Check, BarChart2, Award, DollarSign, Package, Zap, CheckCircle2, Calendar } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
 import { MotiView } from '../../../components/SafeView';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
-import { t, LANGUAGES, setLanguage as setAppLanguage, getCurrentLang, getCurrentLangLabel, subscribeToLangChange } from '../../../services/i18n';
+import { t } from '../../../services/i18n';
 
 export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigger, onShowSuccess }) {
-  const { currentUser, isDarkMode } = useDbState();
+  const { currentUser, isDarkMode, currentLang = 'fr' } = useDbState();
 
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
-  const [showLangModal, setShowLangModal] = useState(false);
   
   // Interactive app preferences
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [currentLang, setCurrentLangState] = useState(getCurrentLang());
-  const [langLabel, setLangLabel] = useState(getCurrentLangLabel());
-
-  // Statistics calculated dynamically from database
-  const [todayOrdersCount, setTodayOrdersCount] = useState(0);
-  const [todayRevenueSum, setTodayRevenueSum] = useState(0);
 
   const scrollPaddingBottom = useScrollPaddingBottom();
   const styles = getStyles(isDarkMode);
 
-  // Subscribe to language changes
-  useEffect(() => {
-    const unsub = subscribeToLangChange((newLang) => {
-      setCurrentLangState(newLang);
-      setLangLabel(getCurrentLangLabel());
-      // Force re-render when language changes
-      db.notify();
+  // Compute performance metrics for this active user
+  const userPerformance = useMemo(() => {
+    if (!currentUser) return null;
+
+    const orders = db.getOrders() || [];
+    const todayStr = new Date().toDateString();
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const userOrders = orders.filter(o => 
+      o.created_by_id === currentUser.id || 
+      o.user_id === currentUser.id || 
+      o.staff_id === currentUser.id
+    );
+
+    const todayOrders = userOrders.filter(o => o.created_at && new Date(o.created_at).toDateString() === todayStr);
+    const todayRevenue = todayOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+
+    const monthOrders = userOrders.filter(o => {
+      if (!o.created_at) return false;
+      const d = new Date(o.created_at);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
-    return unsub;
-  }, []);
+    const monthRevenue = monthOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+
+    const totalOrders = userOrders.length;
+    const totalRevenue = userOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
+    const expressCount = userOrders.filter(o => o.niveau_urgence === 'Express').length;
+    const completedCount = userOrders.filter(o => o.statut === 'livre' || o.statut === 'restitue' || o.statut === 'pret').length;
+
+    return {
+      todayCount: todayOrders.length,
+      todayRevenue,
+      monthCount: monthOrders.length,
+      monthRevenue,
+      totalOrders,
+      totalRevenue,
+      expressCount,
+      completedCount,
+    };
+  }, [currentUser, db.getOrders()]);
 
   // Close PIN modal when trigger increments
   useEffect(() => {
     if (closeAllModalsTrigger > 0) {
       setShowPinModal(false);
+      setShowPerformanceModal(false);
       setCurrentPin('');
       setNewPin('');
     }
@@ -52,17 +79,17 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
   // Notify parent of modal visibility
   useEffect(() => {
     if (onModalStateChange) {
-      onModalStateChange(showPinModal || showLangModal);
+      onModalStateChange(showPinModal || showPerformanceModal);
     }
-  }, [showPinModal, showLangModal]);
+  }, [showPinModal, showPerformanceModal]);
 
-  // Handle Android back button/gesture to close the PIN modal
+  // Handle Android back button/gesture to close modals
   useEffect(() => {
-    if (Platform.OS === 'web' || (!showPinModal && !showLangModal)) return;
+    if (Platform.OS === 'web' || (!showPinModal && !showPerformanceModal)) return;
 
     const backAction = () => {
-      if (showLangModal) {
-        setShowLangModal(false);
+      if (showPerformanceModal) {
+        setShowPerformanceModal(false);
         return true;
       }
       setShowPinModal(false);
@@ -77,24 +104,9 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
     );
 
     return () => backHandler.remove();
-  }, [showPinModal, showLangModal]);
+  }, [showPinModal, showPerformanceModal]);
 
-  // Compute daily stats for this cashier/employee shift
-  useEffect(() => {
-    if (!currentUser) return;
-    const orders = db.getOrders();
-    const todayStr = new Date().toDateString();
-    
-    const todayOrders = orders.filter(o => {
-      const isCreator = o.created_by_id === currentUser.id;
-      const isToday = new Date(o.created_at).toDateString() === todayStr;
-      return isCreator && isToday;
-    });
-    
-    setTodayOrdersCount(todayOrders.length);
-    const rev = todayOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-    setTodayRevenueSum(rev);
-  }, [currentUser]);
+
 
   const getRoleLabel = (role) => {
     return t(`roles.${role || 'agent_accueil'}`, {}, t('roles.agent_accueil'));
@@ -104,7 +116,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
     if (currentUser && (currentUser.role === 'livreur' || currentUser.role === 'agent_lavage_repassage')) {
       return '******';
     }
-    return `${(price || 0).toLocaleString(currentLang === 'fr' ? 'fr-FR' : currentLang === 'pt' ? 'pt-PT' : currentLang === 'es' ? 'es-ES' : 'en-US')} FCFA`;
+    return `${(price || 0).toLocaleString('fr-FR')} FCFA`;
   };
 
   const handleLogout = () => {
@@ -151,11 +163,6 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
     }
   };
 
-  const handleLangSelect = async (langCode) => {
-    await setAppLanguage(langCode);
-    setShowLangModal(false);
-  };
-
   const handleSupportPress = () => {
     Alert.alert(
       t('profile.support_title'),
@@ -182,9 +189,9 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
         
         {/* HERO PROFILE CARD */}
         <MotiView 
-          from={{ opacity: 0, translateY: 15 }}
+          from={{ opacity: 0, translateY: 10 }}
           animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 200 }}
+          transition={{ type: 'timing', duration: 150 }}
           style={styles.heroProfileCard}
         >
           {/* Avatar with Status Badge */}
@@ -216,28 +223,27 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
           </View>
         </MotiView>
 
-        {/* SHIFT ACTIVITY STATS */}
-        <Text style={styles.sectionTitle}>{t('profile.activite_session')}</Text>
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <View style={[styles.statIconBadge, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)' }]}>
-              <TrendingUp size={18} color={isDarkMode ? "#38bdf8" : "#002cf7"} />
+        {/* MES PERFORMANCES MENU ITEM */}
+        <Text style={styles.sectionTitle}>{t('profile.mes_performances', {}, 'Mes performances')}</Text>
+        <View style={styles.groupedCard}>
+          <TouchableOpacity 
+            onPress={() => setShowPerformanceModal(true)}
+            style={styles.settingsRow}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingIconBox, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0, 44, 247, 0.08)' }]}>
+                <BarChart2 size={16} color={isDarkMode ? "#38bdf8" : "#002cf7"} />
+              </View>
+              <View style={{ marginLeft: 4 }}>
+                <Text style={styles.settingsLabel}>{t('profile.mes_performances', {}, 'Mes performances')}</Text>
+                <Text style={{ fontSize: 11, color: isDarkMode ? '#a1a1aa' : '#64748b', marginTop: 1 }}>
+                  {userPerformance ? `${userPerformance.todayCount} cmd aujourd'hui • ${userPerformance.totalOrders} au total` : 'Statistiques & Bilan'}
+                </Text>
+              </View>
             </View>
-            <View style={styles.statInfo}>
-              <Text style={styles.statValue}>{todayOrdersCount}</Text>
-              <Text style={styles.statLabel}>{t('profile.commandes_crees')}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.statCard}>
-            <View style={[styles.statIconBadge, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
-              <Sparkles size={18} color="#16a34a" />
-            </View>
-            <View style={styles.statInfo}>
-              <Text style={[styles.statValue, { color: '#16a34a' }]}>{formatPrice(todayRevenueSum)}</Text>
-              <Text style={styles.statLabel}>{t('profile.volume_encaisse')}</Text>
-            </View>
-          </View>
+            <ChevronRight size={16} color={isDarkMode ? "#94a3b8" : "#94a3b8"} />
+          </TouchableOpacity>
         </View>
 
         {/* APP PREFERENCES GROUP */}
@@ -276,22 +282,6 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
               thumbColor={notificationsEnabled ? "#002cf7" : "#f1f5f9"}
             />
           </View>
-
-          <View style={styles.divider} />
-
-          {/* Language Selector */}
-          <TouchableOpacity style={styles.settingsRow} onPress={() => setShowLangModal(true)} activeOpacity={0.7}>
-            <View style={styles.settingsLeft}>
-              <View style={[styles.settingIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
-                <Globe size={16} color="#6366f1" />
-              </View>
-              <Text style={styles.settingsLabel}>{t('profile.langue')}</Text>
-            </View>
-            <View style={styles.settingsRight}>
-              <Text style={styles.settingsValueText}>{langLabel}</Text>
-              <ChevronRight size={16} color={isDarkMode ? "#94a3b8" : "#94a3b8"} />
-            </View>
-          </TouchableOpacity>
         </View>
 
         {/* SECURITY & ACCOUNT ACTIONS */}
@@ -339,51 +329,151 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
           </TouchableOpacity>
         </View>
 
-        {/* LANGUAGE SELECTION MODAL */}
+        {/* MODAL : MES PERFORMANCES (FULL SCREEN PAGE) */}
         <Modal
-          visible={showLangModal}
+          visible={showPerformanceModal}
           animationType="slide"
           presentationStyle="fullScreen"
-          onRequestClose={() => setShowLangModal(false)}
+          onRequestClose={() => setShowPerformanceModal(false)}
         >
           <View style={styles.fullPageContainer}>
             {/* HEADER BACK BUTTON */}
             <View style={styles.fullPageHeader}>
-              <TouchableOpacity onPress={() => setShowLangModal(false)} style={styles.backBtnHeader} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => setShowPerformanceModal(false)} style={styles.backBtnHeader} activeOpacity={0.7}>
                 <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-                <Text style={styles.backBtnText}>{t('profile.back')}</Text>
+                <Text style={styles.backBtnText}>{t('profile.back', {}, 'Retour')}</Text>
               </TouchableOpacity>
 
-              <Text style={styles.fullPageTitle} numberOfLines={1}>{t('profile.langue')}</Text>
+              <Text style={styles.fullPageTitle} numberOfLines={1}>{t('profile.mes_performances', {}, 'Mes performances')}</Text>
               <View style={{ width: 70 }} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.fullPageScroll} bounces={false}>
-              <View style={{ gap: 4 }}>
-                {LANGUAGES.map((lang) => (
-                  <TouchableOpacity
-                    key={lang.code}
-                    onPress={() => handleLangSelect(lang.code)}
-                    style={[
-                      styles.langItem,
-                      currentLang === lang.code && styles.langItemActive
-                    ]}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.langItemLeft}>
-                      <Text style={[
-                        styles.langItemLabel,
-                        currentLang === lang.code && styles.langItemLabelActive
-                      ]}>
-                        {lang.nativeLabel}
-                      </Text>
-                      <Text style={styles.langItemSubLabel}>{lang.label}</Text>
+            <ScrollView contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
+              {/* AGENT SUMMARY HERO CARD */}
+              <MotiView 
+                from={{ opacity: 0, translateY: 10 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                style={[styles.perfHeroCard, { backgroundColor: isDarkMode ? '#18181b' : '#ffffff' }]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View style={[styles.perfAvatarBox, { backgroundColor: isDarkMode ? '#002cf7' : '#002cf7' }]}>
+                    <Award size={24} color="#ffffff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#09090b' }}>
+                      {currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Agent KLIN UP'}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: isDarkMode ? '#38bdf8' : '#002cf7', fontWeight: '600', marginTop: 2 }}>
+                      {currentUser ? getRoleLabel(currentUser.role) : ''}
+                    </Text>
+                  </View>
+                </View>
+              </MotiView>
+
+              {/* SECTION 1: AUJOURD'HUI */}
+              <Text style={styles.perfSectionTitle}>{t('profile.activite_aujourdhui', {}, "Activité d'aujourd'hui")}</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                  <View style={[styles.statIconBadge, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)' }]}>
+                    <TrendingUp size={18} color={isDarkMode ? "#38bdf8" : "#002cf7"} />
+                  </View>
+                  <View style={styles.statInfo}>
+                    <Text style={styles.statValue}>{userPerformance?.todayCount || 0}</Text>
+                    <Text style={styles.statLabel}>{t('profile.commandes_crees', {}, 'Commandes créées')}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.statCard}>
+                  <View style={[styles.statIconBadge, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
+                    <Sparkles size={18} color="#16a34a" />
+                  </View>
+                  <View style={styles.statInfo}>
+                    <Text style={[styles.statValue, { color: '#16a34a' }]}>{formatPrice(userPerformance?.todayRevenue || 0)}</Text>
+                    <Text style={styles.statLabel}>{t('profile.volume_encaisse', {}, 'Volume encaissé')}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* SECTION 2: CE MOIS */}
+              <Text style={styles.perfSectionTitle}>{t('profile.performance_mois', {}, 'Performance du Mois')}</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                  <View style={[styles.statIconBadge, { backgroundColor: 'rgba(124, 58, 237, 0.1)' }]}>
+                    <Calendar size={18} color="#7c3aed" />
+                  </View>
+                  <View style={styles.statInfo}>
+                    <Text style={[styles.statValue, { color: '#7c3aed' }]}>{userPerformance?.monthCount || 0}</Text>
+                    <Text style={styles.statLabel}>Commandes du Mois</Text>
+                  </View>
+                </View>
+
+                <View style={styles.statCard}>
+                  <View style={[styles.statIconBadge, { backgroundColor: 'rgba(14, 165, 233, 0.1)' }]}>
+                    <DollarSign size={18} color="#0ea5e9" />
+                  </View>
+                  <View style={styles.statInfo}>
+                    <Text style={[styles.statValue, { color: '#0ea5e9' }]}>{formatPrice(userPerformance?.monthRevenue || 0)}</Text>
+                    <Text style={styles.statLabel}>CA du Mois</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* SECTION 3: BILAN GLOBAL */}
+              <Text style={styles.perfSectionTitle}>{t('profile.bilan_global', {}, 'Bilan Global Agent')}</Text>
+              <View style={styles.groupedCard}>
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLeft}>
+                    <View style={[styles.settingIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
+                      <Package size={16} color="#6366f1" />
                     </View>
-                    {currentLang === lang.code && (
-                      <Check size={20} color="#002cf7" />
-                    )}
-                  </TouchableOpacity>
-                ))}
+                    <Text style={styles.settingsLabel}>{t('profile.total_commandes_agent', {}, 'Total commandes gérées')}</Text>
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#09090b' }}>
+                    {userPerformance?.totalOrders || 0}
+                  </Text>
+                </View>
+
+                <View style={styles.divider} />
+
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLeft}>
+                    <View style={[styles.settingIconBox, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
+                      <Sparkles size={16} color="#16a34a" />
+                    </View>
+                    <Text style={styles.settingsLabel}>{t('profile.ca_cumule', {}, 'Chiffre d\'affaires total')}</Text>
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#16a34a' }}>
+                    {formatPrice(userPerformance?.totalRevenue || 0)}
+                  </Text>
+                </View>
+
+                <View style={styles.divider} />
+
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLeft}>
+                    <View style={[styles.settingIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+                      <Zap size={16} color="#f59e0b" />
+                    </View>
+                    <Text style={styles.settingsLabel}>{t('profile.express_gerees', {}, 'Commandes Express')}</Text>
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#09090b' }}>
+                    {userPerformance?.expressCount || 0}
+                  </Text>
+                </View>
+
+                <View style={styles.divider} />
+
+                <View style={styles.settingsRow}>
+                  <View style={styles.settingsLeft}>
+                    <View style={[styles.settingIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                      <CheckCircle2 size={16} color="#10b981" />
+                    </View>
+                    <Text style={styles.settingsLabel}>{t('profile.commandes_livrees', {}, 'Commandes finalisées')}</Text>
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#10b981' }}>
+                    {userPerformance?.completedCount || 0}
+                  </Text>
+                </View>
               </View>
             </ScrollView>
           </View>
@@ -557,6 +647,35 @@ function getStyles(isDarkMode) {
       color: isDarkMode ? '#a1a1aa' : '#64748b',
       marginBottom: 10,
       marginTop: 6,
+      marginLeft: 4,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+    },
+    perfHeroCard: {
+      padding: 16,
+      borderRadius: 18,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#f1f5f9',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    perfAvatarBox: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    perfSectionTitle: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
+      marginBottom: 10,
+      marginTop: 14,
       marginLeft: 4,
       textTransform: 'uppercase',
       letterSpacing: 0.8,
