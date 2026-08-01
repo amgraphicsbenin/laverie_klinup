@@ -231,11 +231,93 @@ export const db = {
     db.notify();
   },
 
-  // --- LECTURE DES DONNÉES LOCALES (GETTERS) ---
-  getStaff: () => [...memoryDb.staff],
-  getCustomers: () => [...memoryDb.customers],
-  getOrders: () => [...memoryDb.orders],
-  getLogs: () => [...memoryDb.logs],
+  // --- LECTURE DES DONNÉES LOCALES ET ISOLATION PAR BOUTIQUE (GETTERS) ---
+  getEffectiveStore: () => {
+    const user = memoryDb.current_user;
+    if (user && user.role === 'super_admin') {
+      const selected = memoryDb.selected_store_id;
+      if (selected && selected !== 'all') return selected;
+      return 'all';
+    }
+    if (user && user.store_id && user.store_id !== 'all') {
+      return user.store_id;
+    }
+    if (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all') {
+      return memoryDb.selected_store_id;
+    }
+    return 'all';
+  },
+
+  getAllStaff: () => [...(memoryDb.staff || [])],
+  getStaff: () => {
+    const effectiveStore = db.getEffectiveStore();
+    if (effectiveStore === 'all') {
+      return [...(memoryDb.staff || [])];
+    }
+    const targetStore = (memoryDb.stores || []).find(st => st.id === effectiveStore || st.code === effectiveStore);
+    const targetStoreId = targetStore ? targetStore.id : effectiveStore;
+    const targetStoreCode = targetStore ? targetStore.code : null;
+
+    return (memoryDb.staff || []).filter(s =>
+      s.role === 'super_admin' ||
+      s.store_id === 'all' ||
+      s.store_id === targetStoreId ||
+      (targetStoreCode && s.store_id === targetStoreCode)
+    );
+  },
+
+  getAllCustomers: () => [...(memoryDb.customers || [])],
+  getCustomers: () => {
+    const effectiveStore = db.getEffectiveStore();
+    if (effectiveStore === 'all') {
+      return [...(memoryDb.customers || [])];
+    }
+
+    const targetStore = (memoryDb.stores || []).find(st => st.id === effectiveStore || st.code === effectiveStore);
+    const targetStoreId = targetStore ? targetStore.id : effectiveStore;
+    const targetStoreCode = targetStore ? targetStore.code : null;
+
+    const storeStaffIds = new Set(
+      (memoryDb.staff || [])
+        .filter(s => s.store_id === targetStoreId || (targetStoreCode && s.store_id === targetStoreCode))
+        .map(s => s.id)
+    );
+
+    return (memoryDb.customers || []).filter(c => {
+      if (!c) return false;
+      if (c.store_id === 'all') return true;
+      if (c.store_id === targetStoreId || (targetStoreCode && c.store_id === targetStoreCode)) return true;
+      if (c.created_by_id && storeStaffIds.has(c.created_by_id)) return true;
+      return false;
+    });
+  },
+
+  getAllOrders: () => [...(memoryDb.orders || [])],
+  getOrders: () => {
+    const effectiveStore = db.getEffectiveStore();
+    if (effectiveStore === 'all') {
+      return [...(memoryDb.orders || [])];
+    }
+
+    const targetStore = (memoryDb.stores || []).find(st => st.id === effectiveStore || st.code === effectiveStore);
+    const targetStoreId = targetStore ? targetStore.id : effectiveStore;
+    const targetStoreCode = targetStore ? targetStore.code : null;
+
+    const storeStaffIds = new Set(
+      (memoryDb.staff || [])
+        .filter(s => s.store_id === targetStoreId || (targetStoreCode && s.store_id === targetStoreCode))
+        .map(s => s.id)
+    );
+
+    return (memoryDb.orders || []).filter(o => {
+      if (!o) return false;
+      if (o.store_id === targetStoreId || (targetStoreCode && o.store_id === targetStoreCode)) return true;
+      if (o.created_by_id && storeStaffIds.has(o.created_by_id)) return true;
+      return false;
+    });
+  },
+
+  getLogs: () => [...(memoryDb.logs || [])],
   getNotifications: () => {
     if (!memoryDb.notifications_initialized) {
       memoryDb.notifications_initialized = true;
@@ -285,7 +367,17 @@ export const db = {
     db.notify();
   },
   getCatalog: () => [...memoryDb.catalog],
-  getCurrentUser: () => memoryDb.current_user ? { ...memoryDb.current_user } : null,
+  getCurrentUser: () => {
+    if (!memoryDb.current_user) return null;
+    const user = { ...memoryDb.current_user };
+    if (!user.store_id && memoryDb.staff) {
+      const staffMatch = memoryDb.staff.find(s => s.id === user.id || (s.email && user.email && s.email.toLowerCase() === user.email.toLowerCase()));
+      if (staffMatch && staffMatch.store_id) {
+        user.store_id = staffMatch.store_id;
+      }
+    }
+    return user;
+  },
 
   /**
    * Met à jour la liste des employés depuis Supabase.
@@ -309,10 +401,16 @@ export const db = {
    * @param {Object|null} user - Données de l'utilisateur ou null pour déconnecter.
    */
   setCurrentUser: (user) => {
-    memoryDb.current_user = user;
     if (user) {
-      db.logAction('CONNEXION', `Connexion de ${user.prenom} ${user.nom} (${user.role})`);
+      const staffMatch = memoryDb.staff?.find(s => s.id === user.id || (s.email && user.email && s.email.toLowerCase() === user.email.toLowerCase()));
+      const mergedUser = {
+        ...user,
+        store_id: user.store_id || (staffMatch ? staffMatch.store_id : null)
+      };
+      memoryDb.current_user = mergedUser;
+      db.logAction('CONNEXION', `Connexion de ${mergedUser.prenom} ${mergedUser.nom} (${mergedUser.role}) - Point ${mergedUser.store_id || 'Global'}`);
     } else {
+      memoryDb.current_user = null;
       db.logAction('DECONNEXION', `Déconnexion de l'utilisateur`);
     }
     persist();
@@ -326,10 +424,15 @@ export const db = {
    * @returns {Object} Le journal d'activité créé.
    */
   logAction: (action, details) => {
-    const currentUser = db.getCurrentUser();
+    const currentUser = memoryDb.current_user;
+    const currentStoreId = (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
+      (currentUser && currentUser.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : null) ||
+      (memoryDb.stores?.[0]?.id || '');
+
     const newLog = {
       id: 'l_' + Math.random().toString(36).substring(2, 11),
       user_id: currentUser ? currentUser.id : null,
+      store_id: currentStoreId,
       action,
       details,
       timestamp: new Date().toISOString()
@@ -365,26 +468,41 @@ export const db = {
    * @returns {Object} Le client créé.
    */
   addCustomer: async (customer) => {
-    const cleanPhone = customer.telephone.trim();
-    const phoneExists = memoryDb.customers.some(c => c.telephone.trim() === cleanPhone);
+    const cleanPhone = customer.telephone ? customer.telephone.trim() : '';
+    if (!cleanPhone) {
+      throw new Error("Téléphone obligatoire.");
+    }
+    const phoneExists = memoryDb.customers.some(c => c.telephone && c.telephone.trim() === cleanPhone);
     if (phoneExists) {
       throw new Error("Ce numéro de téléphone est déjà associé à un autre client actif.");
     }
+    const currentUser = db.getCurrentUser() || memoryDb.current_user;
+    const staffMatch = currentUser ? memoryDb.staff?.find(s => s.id === currentUser.id || (s.email && currentUser.email && s.email.toLowerCase() === currentUser.email.toLowerCase())) : null;
+    const userStoreId = (currentUser && currentUser.store_id && currentUser.store_id !== 'all') ? currentUser.store_id : (staffMatch && staffMatch.store_id && staffMatch.store_id !== 'all' ? staffMatch.store_id : null);
+
+    const currentStoreId = customer.store_id ||
+      userStoreId ||
+      (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
+      (memoryDb.stores?.[0]?.id || '');
+
     const newCustomer = {
       id: 'c_' + Math.random().toString(36).substring(2, 11),
-      nom: customer.nom,
-      prenom: customer.prenom,
+      nom: customer.nom || '',
+      prenom: customer.prenom || '',
       telephone: cleanPhone,
       adresse: customer.adresse || '',
       indicatif: customer.indicatif || '229',
       preferences_pliage: customer.preferences_pliage || 'Plié',
       points_fidelite: 0,
       solde_dette: 0.00,
+      store_id: currentStoreId,
+      created_by_id: currentUser ? currentUser.id : null,
+      created_by_name: currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : null,
       created_at: new Date().toISOString()
     };
     await performMutation('insert', 'customers', newCustomer.id, newCustomer);
     memoryDb.customers.push(newCustomer);
-    db.logAction('CREATION_CLIENT', `Client ${newCustomer.prenom} ${newCustomer.nom} ajouté (Tel: ${newCustomer.telephone})`);
+    db.logAction('CREATION_CLIENT', `Client ${newCustomer.prenom} ${newCustomer.nom} créé pour le point ${currentStoreId}`);
     db.notify();
     return newCustomer;
   },
@@ -636,10 +754,17 @@ export const db = {
     const modeReglementVal = orderData.mode_reglement || orderData.mode_paiement || 'Espèces';
     const initialStatus = orderData.statut === 'attente' ? 'en_attente' : (orderData.statut || 'en_attente');
 
-    const currentStoreId = orderData.store_id ||
+    let currentStoreId = orderData.store_id ||
       (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
       (currentUser && currentUser.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : null) ||
-      'store_central';
+      (memoryDb.stores?.[0]?.id || '');
+
+    if (!currentStoreId || currentStoreId === 'all') {
+      const validStore = (memoryDb.stores || []).find(s => s && s.id && s.id !== 'all');
+      if (validStore) {
+        currentStoreId = validStore.id;
+      }
+    }
 
     const newOrder = {
       id: orderData.id || ('o_' + Math.random().toString(36).substr(2, 9)),
@@ -663,7 +788,7 @@ export const db = {
       reference_paiement: orderData.reference_paiement || orderData.momo_ref || orderData.momo_ref_number || null,
       items: inputItems,
       created_by_id: currentUser ? currentUser.id : null,
-      created_by_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : null
+      created_by_name: currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : null
     };
 
     if (isSubscriptionOrder) {
@@ -690,8 +815,9 @@ export const db = {
       prix_base_avant_remise: basePriceBeforeRemise
     };
 
+    // ── Supabase mutation d'abord (lève une exception si rejeté) ──
+    await performMutation('insert', 'orders', newOrder.id, newOrder);
     memoryDb.orders.push(newOrder);
-    await performMutation('insert', 'orders', newOrder.id, newOrder).catch(e => console.warn('[DB] Order remote insert error:', e));
 
     if (isSubscriptionOrder) {
       if (subscribedPlan) {

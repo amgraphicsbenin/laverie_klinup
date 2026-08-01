@@ -20,6 +20,7 @@ export interface Store {
   ville?: string;
   telephone?: string;
   responsable_id?: string;
+  responsable_nom?: string;
   statut: 'actif' | 'inactif';
   created_at?: string;
 }
@@ -66,6 +67,9 @@ export interface Customer {
   preferences_pliage?: string;
   points_fidelite?: number;
   solde_dette?: number;
+  store_id?: string;
+  created_by_id?: string;
+  created_by_name?: string;
   active_subscription?: ActiveSubscription | null;
   created_at?: string;
 }

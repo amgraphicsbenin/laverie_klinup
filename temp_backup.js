@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView, StatusBar as RNStatusBar, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
@@ -20,7 +20,6 @@ import { registerAlertHandler } from './src/services/alert';
 import SplashScreen from './src/components/SplashScreen';
 import FlaticonIcon from './src/components/FlaticonIcon';
 import { initSystemNotifications, savePushTokenToSupabase } from './src/services/notificationService';
-import { initLanguage, t, subscribeToLangChange } from './src/services/i18n';
 import * as Notifications from 'expo-notifications';
 
 class ErrorBoundary extends React.Component {
@@ -45,7 +44,7 @@ class ErrorBoundary extends React.Component {
           </Text>
           <ScrollView style={{ flex: 1, width: '100%', backgroundColor: '#f3f4f6', borderRadius: 8, padding: 12 }}>
             <Text style={{ fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#dc2626' }}>
-              {this.state.error?.stack || t('app.no_stack_trace')}
+              {this.state.error?.stack || 'Pas de trace d\'empilement disponible'}
             </Text>
             {this.state.errorInfo?.componentStack && (
               <Text style={{ fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#4b5563', marginTop: 10 }}>
@@ -81,7 +80,6 @@ export default function App() {
   const [initSelectedClient, setInitSelectedClient] = useState(null);
   const [successToast, setSuccessToast] = useState({ visible: false, message: '' });
   const [customAlertState, setCustomAlertState] = useState({ visible: false, title: '', message: '', buttons: [] });
-  const [, forceUpdate] = useState(0);
 
   const scrollViewRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(393);
@@ -126,9 +124,9 @@ export default function App() {
     registerAlertHandler(({ title, message, buttons }) => {
       setCustomAlertState({
         visible: true,
-        title: title || t('app.information'),
+        title: title || 'Information',
         message: message || '',
-        buttons: buttons && buttons.length > 0 ? buttons : [{ text: t('app.ok') }]
+        buttons: buttons && buttons.length > 0 ? buttons : [{ text: 'OK' }]
       });
     });
   }, []);
@@ -159,21 +157,12 @@ export default function App() {
     setCloseModalsTrigger(prev => prev + 1);
   };
 
-  // Re-render on language change
-  useEffect(() => {
-    const unsub = subscribeToLangChange(() => {
-      forceUpdate(n => n + 1);
-    });
-    return unsub;
-  }, []);
-
   // Load database on mount
   useEffect(() => {
     async function setup() {
       try {
         await initializeDatabase();
         await initSystemNotifications();
-        await initLanguage();
       } catch (err) {
         console.error("DB Initialization error", err);
       } finally {
@@ -404,7 +393,7 @@ export default function App() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#000000' : '#ffffff' }}>
           <ActivityIndicator size="large" color="#002cf7" />
           <Text style={{ marginTop: 14, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
-            {t('app.loading')}
+            Chargement de KLIN UP...
           </Text>
         </View>
       ) : !currentUser ? (
@@ -509,7 +498,7 @@ export default function App() {
               { color: '#ffffff' },
               activeTab === 'accueil' && styles.tabLabelActive
             ]}>
-              {t('nav.accueil')}
+              Accueil
             </Text>
           </View>
         </TouchableOpacity>
@@ -534,7 +523,7 @@ export default function App() {
                 { color: '#ffffff' },
                 activeTab === 'gestion' && styles.tabLabelActive
               ]}>
-                {t('nav.gestion')}
+                Gestion
               </Text>
             </View>
           </TouchableOpacity>
@@ -561,7 +550,7 @@ export default function App() {
                 { color: '#ffffff' },
                 activeTab === 'creer_commande' && styles.tabLabelActive
               ]}>
-                {t('nav.ajouter')}
+                Ajouter
               </Text>
             </View>
           </TouchableOpacity>
@@ -587,7 +576,7 @@ export default function App() {
                 { color: '#ffffff' },
                 activeTab === 'historique' && styles.tabLabelActive
               ]}>
-                {t('nav.historique')}
+                Historique
               </Text>
             </View>
           </TouchableOpacity>
@@ -612,7 +601,7 @@ export default function App() {
                 { color: '#ffffff' },
                 activeTab === 'profile' && styles.tabLabelActive
               ]}>
-                {t('nav.profil')}
+                Profil
               </Text>
             </View>
         </TouchableOpacity>
@@ -644,7 +633,7 @@ export default function App() {
               <MaterialCommunityIcons name="check-bold" size={16} color="#ffffff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.toastTitle, { color: isDarkMode ? '#4ade80' : '#15803d' }]}>{t('app.success')}</Text>
+              <Text style={[styles.toastTitle, { color: isDarkMode ? '#4ade80' : '#15803d' }]}>SuccÃ¨s</Text>
               <Text style={[styles.toastMessage, { color: isDarkMode ? '#e4e4e7' : '#475569' }]}>{successToast.message}</Text>
             </View>
           </View>
@@ -968,4 +957,5 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
 });
+
 

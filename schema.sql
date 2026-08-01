@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS public.customers (
   points_fidelite INT DEFAULT 0,
   solde_dette NUMERIC DEFAULT 0.00,
   active_subscription JSONB,
+  store_id TEXT,
+  created_by_id TEXT,
+  created_by_name TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -349,6 +352,13 @@ DO $$ BEGIN
     FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- 7. Politiques pour la table "stores" (Points de Laverie)
+ALTER TABLE public.stores ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  CREATE POLICY "Gestion des points de laverie" ON public.stores
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- ========================================================
 -- MIGRATION : Rattachement Obligatoire aux Points de Laverie (stores / store_id)
 -- ========================================================
@@ -361,36 +371,98 @@ CREATE TABLE IF NOT EXISTS public.stores (
   nom TEXT NOT NULL,
   code TEXT UNIQUE NOT NULL,
   adresse TEXT,
+  ville TEXT DEFAULT 'Cotonou',
   telephone TEXT,
+  responsable_id TEXT,
+  responsable_nom TEXT,
   statut TEXT DEFAULT 'actif',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insertion du point de laverie par défaut (idempotent)
-INSERT INTO public.stores (id, nom, code, adresse, statut)
-VALUES ('store_central', 'Laverie Centrale / Siège', 'LAV-001', 'Siège Principal', 'actif')
-ON CONFLICT (id) DO NOTHING;
+-- Migrations idempotentes : ajout des colonnes si déjà existantes
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS ville TEXT DEFAULT 'Cotonou';
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS responsable_id TEXT;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS responsable_nom TEXT;
 
--- 2. Ajout de store_id aux tables staff, customers et orders
 ALTER TABLE public.staff ADD COLUMN IF NOT EXISTS store_id TEXT;
 ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS store_id TEXT;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS created_by_id TEXT;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS created_by_name TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS store_id TEXT;
 
--- 3. Migration des commandes historiques orphelines vers store_central
-UPDATE public.orders 
-SET store_id = 'store_central' 
-WHERE store_id IS NULL OR TRIM(store_id) = '' OR store_id = 'all';
+CREATE INDEX IF NOT EXISTS idx_customers_store_id ON public.customers(store_id);
+
+-- 3. Migration des commandes historiques orphelines vers le premier store existant
+DO $$
+DECLARE
+  first_store_id TEXT;
+BEGIN
+  SELECT id INTO first_store_id FROM public.stores ORDER BY created_at ASC LIMIT 1;
+  IF first_store_id IS NOT NULL THEN
+    UPDATE public.orders 
+    SET store_id = first_store_id 
+    WHERE store_id IS NULL OR TRIM(store_id) = '' OR store_id = 'all' OR store_id = 'store_central';
+  END IF;
+END $$;
 
 -- 4. Application de la contrainte NOT NULL
 ALTER TABLE public.orders ALTER COLUMN store_id SET NOT NULL;
 
--- 5. Trigger de sécurité pour rejeter les commandes sans store_id au niveau SQL
+-- 5. Trigger de sécurité PostgreSQL pour auto-rattacher et imposer store_id sur public.customers
+CREATE OR REPLACE FUNCTION public.check_customer_store_id()
+RETURNS TRIGGER AS $$
+DECLARE
+  creator_store_id TEXT;
+BEGIN
+  -- Si store_id est absent, le déduire du profil de l'utilisateur créateur
+  IF NEW.store_id IS NULL OR TRIM(NEW.store_id) = '' OR NEW.store_id = 'all' THEN
+    IF NEW.created_by_id IS NOT NULL AND TRIM(NEW.created_by_id) <> '' THEN
+      SELECT store_id INTO creator_store_id FROM public.staff WHERE id = NEW.created_by_id;
+      IF creator_store_id IS NOT NULL AND TRIM(creator_store_id) <> '' AND creator_store_id <> 'all' THEN
+        NEW.store_id := creator_store_id;
+      END IF;
+    END IF;
+  END IF;
+
+  -- Si toujours absent, attribuer la première boutique existante
+  IF NEW.store_id IS NULL OR TRIM(NEW.store_id) = '' OR NEW.store_id = 'all' THEN
+    SELECT id INTO creator_store_id FROM public.stores ORDER BY created_at ASC LIMIT 1;
+    IF creator_store_id IS NOT NULL THEN
+      NEW.store_id := creator_store_id;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_customer_store ON public.customers;
+CREATE TRIGGER trg_enforce_customer_store
+BEFORE INSERT OR UPDATE ON public.customers
+FOR EACH ROW EXECUTE FUNCTION public.check_customer_store_id();
+
+-- 6. Trigger de sécurité PostgreSQL pour auto-rattacher et imposer store_id sur public.orders
 CREATE OR REPLACE FUNCTION public.check_order_store_id()
 RETURNS TRIGGER AS $$
+DECLARE
+  creator_store_id TEXT;
 BEGIN
   IF NEW.store_id IS NULL OR TRIM(NEW.store_id) = '' OR NEW.store_id = 'all' THEN
-    RAISE EXCEPTION 'ERREUR CRITIQUE DATABASE : Création de commande refusée sans point de laverie valide (store_id).';
+    IF NEW.created_by_id IS NOT NULL AND TRIM(NEW.created_by_id) <> '' THEN
+      SELECT store_id INTO creator_store_id FROM public.staff WHERE id = NEW.created_by_id;
+      IF creator_store_id IS NOT NULL AND TRIM(creator_store_id) <> '' AND creator_store_id <> 'all' THEN
+        NEW.store_id := creator_store_id;
+      END IF;
+    END IF;
   END IF;
+
+  IF NEW.store_id IS NULL OR TRIM(NEW.store_id) = '' OR NEW.store_id = 'all' THEN
+    SELECT id INTO creator_store_id FROM public.stores ORDER BY created_at ASC LIMIT 1;
+    IF creator_store_id IS NOT NULL THEN
+      NEW.store_id := creator_store_id;
+    END IF;
+  END IF;
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -487,7 +559,7 @@ CREATE OR REPLACE FUNCTION public.admin_create_staff_user(
   p_email TEXT,
   p_telephone TEXT DEFAULT '',
   p_code_pin TEXT DEFAULT '000000',
-  p_store_id TEXT DEFAULT 'store_central'
+  p_store_id TEXT DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -496,7 +568,11 @@ AS $$
 DECLARE
   v_user_id UUID;
   v_res JSONB;
+  v_resolved_store_id TEXT := p_store_id;
 BEGIN
+  IF v_resolved_store_id IS NULL OR TRIM(v_resolved_store_id) = '' THEN
+    SELECT id INTO v_resolved_store_id FROM public.stores ORDER BY created_at ASC LIMIT 1;
+  END IF;
   p_email := LOWER(TRIM(p_email));
   
   IF EXISTS (SELECT 1 FROM public.staff WHERE LOWER(email) = p_email) THEN
@@ -525,7 +601,7 @@ BEGIN
   INSERT INTO public.staff (
     id, nom, prenom, role, email, code_pin, statut, telephone, store_id, created_at
   ) VALUES (
-    v_user_id::text, p_nom, p_prenom, p_role, p_email, p_code_pin, 'actif', p_telephone, p_store_id, CURRENT_TIMESTAMP
+    v_user_id::text, p_nom, p_prenom, p_role, p_email, p_code_pin, 'actif', p_telephone, v_resolved_store_id, CURRENT_TIMESTAMP
   );
 
   SELECT row_to_json(s)::jsonb INTO v_res FROM public.staff s WHERE s.id = v_user_id::text;
@@ -558,7 +634,7 @@ GRANT EXECUTE ON FUNCTION public.verify_staff_login(TEXT) TO anon, authenticated
 CREATE TABLE IF NOT EXISTS public.staff_devices (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   staff_id TEXT REFERENCES public.staff(id) ON DELETE CASCADE,
-  store_id TEXT NOT NULL DEFAULT 'store_central',
+  store_id TEXT NOT NULL,
   push_token TEXT NOT NULL,
   platform TEXT DEFAULT 'mobile',
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -581,7 +657,7 @@ CREATE POLICY "Acces public et authentifie staff_devices" ON public.staff_device
 CREATE TABLE IF NOT EXISTS public.order_notifications (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   order_id TEXT NOT NULL,
-  store_id TEXT NOT NULL DEFAULT 'store_central',
+  store_id TEXT NOT NULL,
   type_action TEXT NOT NULL,
   titre TEXT NOT NULL,
   message TEXT NOT NULL,
@@ -618,9 +694,17 @@ DECLARE
   v_type_action TEXT := TG_OP;
 BEGIN
   v_ref := COALESCE(NEW.identifiant_unique_marquage, NEW.id, 'N/A');
-  v_new_statut := COALESCE(NEW.statut, NEW.status, '');
-  v_old_statut := CASE WHEN TG_OP = 'UPDATE' THEN COALESCE(OLD.statut, OLD.status, '') ELSE NULL END;
-  v_store_id := COALESCE(NEW.store_id, 'store_central');
+  v_new_statut := COALESCE(NEW.statut, '');
+  v_old_statut := CASE WHEN TG_OP = 'UPDATE' THEN COALESCE(OLD.statut, '') ELSE NULL END;
+  
+  -- Résolution dynamique du store_id
+  v_store_id := NEW.store_id;
+  IF v_store_id IS NULL OR TRIM(v_store_id) = '' THEN
+    SELECT store_id INTO v_store_id FROM public.staff WHERE id = NEW.created_by_id;
+  END IF;
+  IF v_store_id IS NULL OR TRIM(v_store_id) = '' THEN
+    SELECT id INTO v_store_id FROM public.stores ORDER BY created_at ASC LIMIT 1;
+  END IF;
 
   -- Ne créer une notification sur UPDATE que s'il y a un vrai changement de statut
   IF TG_OP = 'UPDATE' AND v_new_statut = v_old_statut THEN

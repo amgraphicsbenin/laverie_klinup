@@ -125,18 +125,6 @@ export const DEFAULT_ROLES = [
 
 export const DEFAULT_STORES = [
   {
-    id: 'store_central',
-    nom: 'Point Central - Haie Vive',
-    code: 'KLP-HV',
-    adresse: 'Avenue Jean-Paul II, Haie Vive',
-    ville: 'Cotonou',
-    telephone: '+229 97 01 01 01',
-    responsable_id: 'u4',
-    responsable_nom: 'Koutomi André',
-    statut: 'actif',
-    created_at: new Date().toISOString()
-  },
-  {
     id: 'store_akpakpa',
     nom: 'Point Akpakpa - Saint Jean',
     code: 'KLP-AKP',

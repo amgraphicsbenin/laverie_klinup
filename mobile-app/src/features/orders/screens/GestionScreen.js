@@ -550,7 +550,8 @@ export default function GestionScreen({
           prenom: custPrenom,
           telephone: custTelephone,
           adresse: custAdresse,
-          preferences_pliage: custPreferences
+          preferences_pliage: custPreferences,
+          store_id: currentUser?.store_id
         });
       }
 

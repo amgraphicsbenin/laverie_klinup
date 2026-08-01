@@ -6,7 +6,7 @@ let isUsingRemote = false;
 export function getIsUsingRemote(): boolean { return isUsingRemote; }
 
 // ─── Session-only localStorage helpers ────────────────────────────────────
-// ONLY for: current_user session, selected_store_id preference, notification prefs
+// ONLY for: current_user session, selected_store_id preference
 // NO business data is ever stored in localStorage.
 
 export function saveSession(key: string, value: any): void {
@@ -25,37 +25,37 @@ function loadSession(key: string, defaultVal: any): any {
   } catch { return defaultVal; }
 }
 
-// ─── Payload sanitizer ─────────────────────────────────────────────────────
+// ─── Known columns to strip before sending to Supabase ─────────────────────
+// These are fields used only in-memory and not yet in the DB schema.
+const STRIP_FROM_ALL = ['est_en_retard'];
+const STRIP_BY_TABLE: Record<string, string[]> = {
+  orders: ['remise_pourcentage', 'remise_montant', 'prix_base_avant_remise',
+           'motif_annulation', 'solde_paid_at', 'subscription_details',
+           'reference_paiement', 'reference_momo', 'acompte_paid_at', 'is_subscription_order'],
+  catalog: ['sku', 'prix_urgent', 'is_active'],
+};
 
 function sanitizePayload(table: string, data: any): any {
   if (!data) return data;
   const sanitized = { ...data };
-  if (table === 'orders') {
-    delete sanitized.remise_pourcentage;
-    delete sanitized.remise_montant;
-    delete sanitized.prix_base_avant_remise;
-  } else if (table === 'catalog') {
-    delete sanitized.sku;
-    delete sanitized.prix_urgent;
-    delete sanitized.is_active;
-  } else if (table === 'stores') {
-    delete sanitized.ville;
-    delete sanitized.responsable_id;
-    delete sanitized.responsable_nom;
-  } else if (table === 'staff') {
-    delete sanitized.store_id;
-  } else if (table === 'customers') {
-    delete sanitized.store_id;
-  }
+  for (const col of STRIP_FROM_ALL) delete sanitized[col];
+  for (const col of (STRIP_BY_TABLE[table] || [])) delete sanitized[col];
   return sanitized;
 }
 
-// ─── Core mutation — Direct Supabase, throws on error ─────────────────────
+// ─── Core mutation — Supabase-STRICT, always throws on any error ─────────────
+// Rule: If Supabase does not confirm success, throw.
+// The caller (dbEngine) must NOT update memoryDb if this throws.
 
-export async function performMutation(action: 'insert' | 'update' | 'delete', table: string, recordId?: string, data?: any): Promise<any> {
+export async function performMutation(
+  action: 'insert' | 'update' | 'delete',
+  table: string,
+  recordId?: string,
+  data?: any
+): Promise<any> {
   if (!supabase) {
     throw new Error(
-      'Supabase non connecté. Vérifiez votre connexion internet et la configuration.'
+      `[KLIN UP DB] Supabase non connecté. Vérifiez votre connexion internet et la configuration Supabase.`
     );
   }
 
@@ -72,87 +72,86 @@ export async function performMutation(action: 'insert' | 'update' | 'delete', ta
     }
   } catch (networkErr: any) {
     throw new Error(
-      `Erreur réseau lors de la communication avec Supabase : ${networkErr.message}`
+      `[KLIN UP DB] Erreur réseau lors de la communication avec Supabase (table: ${table}) : ${networkErr.message}`
     );
   }
 
-  if (res?.error) {
-    const errMsg = res.error.message || '';
-    const errCode = res.error.code || '';
-
-    // Graceful fallback for Row-Level Security (RLS) policy restrictions
-    if (
-      errCode === '42501' ||
-      errMsg.toLowerCase().includes('row-level security') ||
-      errMsg.toLowerCase().includes('rls policy')
-    ) {
-      console.warn(`[DB] ⚠️ Politique RLS Supabase active sur la table '${table}' (${errMsg}). Mise à jour conservée en mémoire.`);
-      return null;
-    }
-
-    if (
-      errCode === 'PGRST204' ||
-      errCode === '42703' ||
-      errMsg.includes('column') ||
-      errMsg.includes('schema cache')
-    ) {
-      console.warn(`[DB] Colonne non trouvée (${errMsg}). Tentative de repli sans champs optionnels...`);
-      const retriedData = { ...sanitizedData };
-      if (table !== 'orders') {
-        delete retriedData.store_id;
-      }
-      delete retriedData.motif_annulation;
-      delete retriedData.remise_pourcentage;
-      delete retriedData.remise_montant;
-      delete retriedData.responsable_id;
-      delete retriedData.responsable_nom;
-      delete retriedData.solde_paid_at;
-      delete retriedData.subscription_details;
-      delete retriedData.reference_paiement;
-      delete retriedData.reference_momo;
-      delete retriedData.acompte_paid_at;
-      delete retriedData.is_subscription_order;
-      delete retriedData.created_by_id;
-      delete retriedData.created_by_name;
-
-      let retryRes: any;
-      try {
-        if (action === 'insert') {
-          retryRes = await supabase.from(table).insert(retriedData);
-        } else if (action === 'update') {
-          retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
-        }
-      } catch (retryErr: any) {
-        throw new Error(`Erreur réseau lors du repli : ${retryErr.message}`);
-      }
-
-      if (retryRes?.error) {
-        if (
-          retryRes.error.code === '42501' ||
-          retryRes.error.message.toLowerCase().includes('row-level security')
-        ) {
-          console.warn(`[DB] ⚠️ RLS Supabase actif lors du repli sur '${table}'.`);
-          return null;
-        }
-        throw new Error(retryRes.error.message);
-      }
-      return retryRes?.data;
-    }
-
-    throw new Error(res.error.message);
+  if (!res?.error) {
+    return res?.data ?? null;
   }
 
-  return res?.data;
+  // ── Error handling ───────────────────────────────────────────────────────
+  const errCode = res.error.code || '';
+  const errMsg = res.error.message || '';
+
+  console.error(`[KLIN UP DB] ❌ Erreur Supabase sur table '${table}' [${action}] :`, errCode, errMsg);
+
+  // Schema cache / missing column → retry once with that column stripped
+  if (
+    errCode === 'PGRST204' ||
+    errCode === '42703' ||
+    errMsg.includes('column') ||
+    errMsg.includes('schema cache')
+  ) {
+    const retriedData = { ...sanitizedData };
+
+    // Detect the missing column name from the error message
+    const match = errMsg.match(/Could not find the '([^']+)' column/i)
+                || errMsg.match(/column "([^"]+)"/i);
+    const missingCol = match?.[1];
+
+    if (missingCol) {
+      console.warn(`[KLIN UP DB] ⚠️ Colonne '${missingCol}' absente du schéma Supabase — retrait automatique pour ce repli.`);
+      delete retriedData[missingCol];
+    } else {
+      // Generic fallback: strip known-optional columns that may not exist yet
+      const optionalCols = ['ville', 'responsable_id', 'responsable_nom', 'created_by_id', 'created_by_name',
+                            'push_token', 'push_token_updated_at', 'motif_annulation', 'solde_paid_at',
+                            'reference_paiement', 'reference_momo', 'acompte_paid_at'];
+      for (const col of optionalCols) delete retriedData[col];
+    }
+
+    let retryRes: any;
+    try {
+      if (action === 'insert') retryRes = await supabase.from(table).insert(retriedData);
+      else if (action === 'update') retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
+      else if (action === 'delete') retryRes = await supabase.from(table).delete().eq('id', recordId);
+    } catch (retryErr: any) {
+      throw new Error(`[KLIN UP DB] Erreur réseau lors du repli (table: ${table}) : ${retryErr.message}`);
+    }
+
+    if (!retryRes?.error) {
+      console.info(`[KLIN UP DB] ✅ Repli réussi pour table '${table}' après retrait de colonne(s) manquante(s).`);
+      return retryRes?.data ?? null;
+    }
+
+    // If retry also fails, throw with the full context
+    throw new Error(
+      `[KLIN UP DB] Échec persistant sur '${table}' même après repli de schéma. Erreur Supabase : ${retryRes.error.message} (code: ${retryRes.error.code})`
+    );
+  }
+
+  // RLS or any other error → ALWAYS throw (never silently succeed)
+  if (errCode === '42501' || errMsg.toLowerCase().includes('row-level security')) {
+    throw new Error(
+      `[KLIN UP DB] Accès refusé par Supabase (RLS) sur la table '${table}'. ` +
+      `Exécutez le script de migration SQL dans Supabase pour activer les politiques d'accès. ` +
+      `Détail : ${errMsg}`
+    );
+  }
+
+  // Any other Supabase error → throw
+  throw new Error(`[KLIN UP DB] Supabase a rejeté l'opération sur '${table}' : ${errMsg} (code: ${errCode})`);
 }
 
-// ─── Database initialization — Supabase only ──────────────────────────────
+// ─── Database initialization — Supabase-only ──────────────────────────────
 
 export async function initDb(): Promise<void> {
   memoryDb.selected_store_id = loadSession('klin_up_selected_store', 'all');
   memoryDb.current_user = loadSession('klin_up_current_user', null);
 
   if (!supabase) {
-    console.warn('[DB] ⚠️ Supabase non disponible. Mode dégradé sur données par défaut.');
+    console.error('[KLIN UP DB] ❌ Supabase non configuré. Vérifiez les variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.');
     isUsingRemote = false;
     startOrderStateCron();
     notifyListeners();
@@ -170,10 +169,10 @@ export async function initDb(): Promise<void> {
       supabase.from('stores').select('*').order('created_at', { ascending: true }),
     ]);
 
-    if (staffRes.error) throw staffRes.error;
+    if (staffRes.error) throw new Error(`Erreur chargement staff : ${staffRes.error.message}`);
 
     isUsingRemote = true;
-    console.log('[DB] 🟢 Connecté à Supabase !');
+    console.log('[KLIN UP DB] 🟢 Connecté à Supabase — mode données réelles activé.');
 
     memoryDb.staff = (staffRes.data || []).filter(Boolean);
 
@@ -186,9 +185,14 @@ export async function initDb(): Promise<void> {
     }
 
     if (!custRes.error) memoryDb.customers = custRes.data || [];
+    else console.warn('[KLIN UP DB] ⚠️ Chargement customers partiel :', custRes.error.message);
+
     if (!ordRes.error) memoryDb.orders = (ordRes.data || []).map(hydrateOrder);
+    else console.warn('[KLIN UP DB] ⚠️ Chargement orders partiel :', ordRes.error.message);
+
     if (!logRes.error) memoryDb.logs = logRes.data || [];
     if (!storeRes.error) memoryDb.stores = storeRes.data || [];
+    else console.warn('[KLIN UP DB] ⚠️ Chargement stores partiel :', storeRes.error.message);
 
     if (!catRes.error && catRes.data && catRes.data.length > 0) {
       memoryDb.catalog = catRes.data.map((item: any) => {
@@ -202,10 +206,10 @@ export async function initDb(): Promise<void> {
     startOrderStateCron();
     notifyListeners();
 
-    try { setupRealtime(); } catch (e: any) { console.warn('[DB Realtime] Inaccessible :', e.message); }
+    try { setupRealtime(); } catch (e: any) { console.warn('[KLIN UP DB Realtime] Inaccessible :', e.message); }
 
   } catch (err: any) {
-    console.error('[DB] ❌ Connexion Supabase échouée :', err.message);
+    console.error('[KLIN UP DB] ❌ Connexion Supabase échouée :', err.message);
     isUsingRemote = false;
     startOrderStateCron();
     notifyListeners();
@@ -220,9 +224,11 @@ export async function refreshStaff(): Promise<void> {
     if (!error && data) {
       memoryDb.staff = data.filter(Boolean);
       notifyListeners();
+    } else if (error) {
+      console.error('[KLIN UP DB] Erreur refresh staff :', error.message);
     }
-  } catch (e) {
-    console.error('Failed to refresh staff:', e);
+  } catch (e: any) {
+    console.error('[KLIN UP DB] Erreur réseau refresh staff :', e.message);
   }
 }
 
@@ -233,9 +239,11 @@ export async function refreshStores(): Promise<void> {
     if (!error && data) {
       memoryDb.stores = data;
       notifyListeners();
+    } else if (error) {
+      console.error('[KLIN UP DB] Erreur refresh stores :', error.message);
     }
-  } catch (e) {
-    console.error('Failed to refresh stores:', e);
+  } catch (e: any) {
+    console.error('[KLIN UP DB] Erreur réseau refresh stores :', e.message);
   }
 }
 
@@ -304,3 +312,5 @@ export async function testConnection(): Promise<{ success: boolean; message?: st
     return { success: false, error: e.message || 'Erreur de connexion réseau.' };
   }
 }
+
+

@@ -116,11 +116,11 @@ export default function DashboardTab({
             </span>
             <span style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', padding: '0.25rem 0.65rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-              Boutique en ligne
+              {currentStore ? `Point Actif (${currentStore.code})` : 'Vue Globale Réseau'}
             </span>
           </div>
           <h2 style={{ fontSize: '1.65rem', fontWeight: 800, fontFamily: 'var(--font-title)', margin: 0, letterSpacing: '-0.3px', color: '#0f172a' }}>
-            Supervision Globale KLIN UP
+            {currentStore ? `Supervision - ${currentStore.nom}` : 'Supervision Globale KLIN UP'}
           </h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span>{totalArticlesInProcess} textile{totalArticlesInProcess > 1 ? 's' : ''} actuellement en traitement en atelier</span>

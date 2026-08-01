@@ -108,7 +108,7 @@ body {
   background: var(--bg-app);
   color: var(--text-primary);
   min-height: 100vh;
-  overflow-y: hidden;
+  overflow-y: auto;
   transition: background 0.3s ease, color 0.3s ease;
   line-height: 1.5;
   font-size: 14px;
@@ -140,6 +140,46 @@ h4 { font-weight: 500; }
 [class*="total"] {
   font-weight: 500;
   letter-spacing: -0.01em;
+}
+
+/* D-005: Focus-visible accessibilité clavier */
+.filter-pill:focus-visible,
+.btn:focus-visible,
+.menu-item:focus-visible,
+.submenu-item:focus-visible,
+.topbar-icon-btn:focus-visible,
+.custom-select-trigger:focus-visible,
+.sidebar-mobile-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* D-011: Style focus cohérent sur input PIN reset (lockscreen) */
+.lockscreen-container input[type="email"]:focus,
+.lockscreen-container input[type="text"]:focus {
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12) !important;
+}
+
+/* D-013: État de chargement pour boutons Approver/Rejeter PIN */
+.btn-loading {
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
+}
+
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  top: 50%;
+  left: 50%;
+  margin: -7px 0 0 -7px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin-laundry 0.6s linear infinite;
 }
 
 a {
@@ -316,6 +356,9 @@ button, input, select, textarea {
   padding-left: 0.75rem;
   margin: 0.25rem 0 0.5rem 1.25rem;
   border-left: 2px solid rgba(0, 44, 247, 0.15);
+  max-height: 500px;
+  overflow: hidden;
+  transition: max-height 0.3s var(--ease-emphasized-decelerate), opacity 0.25s ease;
   animation: fadeIn 0.2s ease-out;
 }
 
@@ -347,6 +390,141 @@ button, input, select, textarea {
   margin-top: auto;
   border-top: 1px solid var(--border-color);
   padding-top: 1rem;
+}
+
+/* Bouton de réduction de la barre latérale */
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.55rem 1rem 0.55rem 1.25rem;
+  margin-bottom: 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.sidebar-collapse-btn:hover {
+  background: rgba(59, 130, 246, 0.06);
+  color: var(--primary);
+}
+
+.sidebar-collapse-btn-label {
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+
+/* État réduit de la barre latérale (icônes uniquement) */
+.sidebar-collapsed {
+  width: 72px;
+  padding: 0.75rem 0.5rem 2rem;
+}
+
+.sidebar-collapsed .sidebar-logo img {
+  max-width: 40px;
+}
+
+.sidebar-collapsed .sidebar-collapse-btn {
+  padding: 0.55rem 0;
+  justify-content: center;
+}
+
+.sidebar-collapsed .sidebar-collapse-btn-label {
+  display: none;
+}
+
+.sidebar-collapsed .menu-section-title {
+  text-align: center;
+  padding-left: 0;
+  font-size: 0;
+  height: 1px;
+  background: var(--border-color);
+  margin: 0.5rem 0.25rem;
+  letter-spacing: 0;
+}
+
+.sidebar-collapsed .menu-item {
+  justify-content: center;
+  padding: 0.75rem 0;
+  border-left: none;
+  border-radius: 8px;
+  position: relative;
+}
+
+.sidebar-collapsed .menu-item.active {
+  border-left: none;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 8px;
+}
+
+.sidebar-collapsed .menu-item:hover {
+  border-radius: 8px;
+}
+
+.sidebar-collapsed .menu-item-label,
+.sidebar-collapsed .menu-item-expand-icon {
+  display: none;
+}
+
+.sidebar-collapsed .submenu-container {
+  padding-left: 0;
+  margin-left: 0.25rem;
+  margin-right: 0.25rem;
+}
+
+.sidebar-collapsed .submenu-item {
+  justify-content: center;
+  padding: 0.45rem 0;
+}
+
+.sidebar-collapsed .submenu-item span {
+  display: none;
+}
+
+.sidebar-collapsed .sidebar-version {
+  font-size: 0;
+}
+
+.sidebar-collapsed .sidebar-version::first-letter {
+  font-size: 0.62rem;
+}
+
+/* Tooltips pour la sidebar réduite */
+.sidebar-collapsed .menu-item::after,
+.sidebar-collapsed .sidebar-collapse-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--text-primary);
+  color: #fff;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-collapsed .menu-item:hover::after,
+.sidebar-collapsed .sidebar-collapse-btn:hover::after {
+  opacity: 1;
+}
+
+.sidebar-collapsed .sidebar-collapse-btn::after {
+  content: "Réduire / Agrandir";
 }
 
 .user-badge {
@@ -606,7 +784,7 @@ button, input, select, textarea {
   place-items: center;
   padding: 1.25rem;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-y: auto;
   animation: fadeIn 0.2s ease-out;
 }
 
@@ -1415,13 +1593,67 @@ tr:hover td {
   transform: scale(0.92);
 }
 
+/* Mobile Sidebar Toggle Button */
+.sidebar-mobile-toggle {
+  display: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-primary);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.sidebar-mobile-toggle:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.sidebar-mobile-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 99;
+  animation: fadeIn 0.2s ease-out;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .sidebar {
-    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    transition: transform 0.3s var(--ease-emphasized-decelerate);
   }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-mobile-toggle {
+    display: flex;
+  }
+
+  .sidebar-mobile-overlay.sidebar-overlay-open {
+    display: block;
+  }
+
   .main-content {
     padding: 1rem 1.25rem;
+    width: 100%;
   }
 }
 

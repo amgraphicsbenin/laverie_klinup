@@ -539,14 +539,14 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setCatalog(db.getCatalog());
     setOrders(db.getOrders());
     setLogs(db.getLogs());
-    setStaff(db.getStaff());
+    setStaff(db.getAllStaff ? db.getAllStaff() : db.getStaff());
     setCustomers(db.getCustomers());
 
     const unsubscribe = db.subscribe(() => {
       setCatalog(db.getCatalog());
       setOrders(db.getOrders());
       setLogs(db.getLogs());
-      setStaff(db.getStaff());
+      setStaff(db.getAllStaff ? db.getAllStaff() : db.getStaff());
       setCustomers(db.getCustomers());
     });
     return () => unsubscribe();
@@ -571,6 +571,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setCatalog(db.getCatalog());
     setOrders(db.getOrders());
     setLogs(db.getLogs());
+    setStaff(db.getAllStaff ? db.getAllStaff() : db.getStaff());
     setCustomers(db.getCustomers());
   };
 

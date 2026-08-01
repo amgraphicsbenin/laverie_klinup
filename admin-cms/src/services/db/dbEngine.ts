@@ -99,8 +99,13 @@ export const dbEngine = {
   getStaff: (): Staff[] => {
     const sid = memoryDb.selected_store_id || 'all';
     if (sid === 'all') return [...memoryDb.staff];
-    return memoryDb.staff.filter(
-      s => s.role === 'super_admin' || s.store_id === sid || s.store_id === 'all' || (!s.store_id && sid === 'store_central')
+    const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
+    const storeCode = targetStore?.code;
+    return memoryDb.staff.filter(s => 
+      s.role === 'super_admin' || 
+      s.store_id === 'all' ||
+      s.store_id === sid || 
+      (storeCode && s.store_id === storeCode)
     );
   },
 
@@ -108,21 +113,52 @@ export const dbEngine = {
   getCustomers: (): Customer[] => {
     const sid = memoryDb.selected_store_id || 'all';
     if (sid === 'all') return [...memoryDb.customers];
-    return memoryDb.customers.filter((c: any) => c.store_id === sid || (!c.store_id && sid === 'store_central'));
+
+    const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
+    const storeCode = targetStore?.code;
+    const storeId = targetStore?.id || sid;
+
+    // Staff member IDs belonging to this store
+    const storeStaffIds = new Set(
+      memoryDb.staff.filter(s => s.store_id === storeId || (storeCode && s.store_id === storeCode)).map(s => s.id)
+    );
+
+    return memoryDb.customers.filter((c: any) => {
+      if (c.store_id === 'all') return true;
+      if (c.store_id === sid) return true;
+      if (c.store_id === storeId) return true;
+      if (storeCode && c.store_id === storeCode) return true;
+      if (c.created_by_id && storeStaffIds.has(c.created_by_id)) return true;
+      return false;
+    });
   },
 
   getAllOrders: (): Order[] => [...memoryDb.orders],
   getOrders: (): Order[] => {
     const sid = memoryDb.selected_store_id || 'all';
     if (sid === 'all') return [...memoryDb.orders];
-    return memoryDb.orders.filter(o => o.store_id === sid || (!o.store_id && sid === 'store_central'));
+    const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
+    const storeCode = targetStore?.code;
+
+    return memoryDb.orders.filter(o => {
+      if (o.store_id === sid) return true;
+      if (storeCode && o.store_id === storeCode) return true;
+      return false;
+    });
   },
 
   getAllLogs: (): ActivityLog[] => [...memoryDb.logs],
   getLogs: (): ActivityLog[] => {
     const sid = memoryDb.selected_store_id || 'all';
     if (sid === 'all') return [...memoryDb.logs];
-    return memoryDb.logs.filter((l: any) => l.store_id === sid || (!l.store_id && sid === 'store_central'));
+    const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
+    const storeCode = targetStore?.code;
+
+    return memoryDb.logs.filter((l: any) => {
+      if (l.store_id === sid) return true;
+      if (storeCode && l.store_id === storeCode) return true;
+      return false;
+    });
   },
 
   getCatalog: (): CatalogItem[] => [...memoryDb.catalog],
@@ -197,6 +233,7 @@ export const dbEngine = {
       ville: storeData.ville || 'Cotonou',
       telephone: storeData.telephone || '',
       responsable_id: storeData.responsable_id || undefined,
+      responsable_nom: storeData.responsable_nom || undefined,
       statut: storeData.statut || 'actif',
       created_at: new Date().toISOString()
     };
@@ -293,6 +330,15 @@ export const dbEngine = {
   // ── Customers ──
 
   addCustomer: async (customerData: Partial<Customer>): Promise<Customer> => {
+    const currentUser = dbEngine.getCurrentUser();
+    const staffMatch = currentUser ? memoryDb.staff.find(s => s.id === currentUser.id || (s.email && s.email.toLowerCase() === (currentUser.email || '').toLowerCase())) : null;
+    const userStoreId = (currentUser && currentUser.store_id && currentUser.store_id !== 'all') ? currentUser.store_id : (staffMatch && staffMatch.store_id && staffMatch.store_id !== 'all' ? staffMatch.store_id : null);
+
+    const currentStoreId = customerData.store_id ||
+      userStoreId ||
+      (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
+      (memoryDb.stores?.[0]?.id || '');
+
     const newCustomer: Customer = {
       id: 'c_' + Math.random().toString(36).substr(2, 9),
       nom: customerData.nom || '',
@@ -303,12 +349,15 @@ export const dbEngine = {
       preferences_pliage: customerData.preferences_pliage || 'Plié',
       points_fidelite: 0,
       solde_dette: 0,
+      store_id: currentStoreId,
+      created_by_id: currentUser ? currentUser.id : null,
+      created_by_name: currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : null,
       created_at: new Date().toISOString()
     };
 
     await performMutation('insert', 'customers', newCustomer.id, newCustomer);
     memoryDb.customers.push(newCustomer);
-    dbEngine.logAction('CREATION_CLIENT', `Client créé : ${newCustomer.prenom} ${newCustomer.nom}`);
+    dbEngine.logAction('CREATION_CLIENT', `Client créé : ${newCustomer.prenom} ${newCustomer.nom} pour le point ${currentStoreId}`);
     notifyListeners();
     return newCustomer;
   },
@@ -341,8 +390,12 @@ export const dbEngine = {
   // ── Orders ──
 
   createOrder: async (orderData: Partial<Order>): Promise<Order> => {
-    const sid = memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : 'store_central';
     const currentUser = dbEngine.getCurrentUser();
+    const currentStoreId = orderData.store_id ||
+      (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
+      (currentUser && currentUser.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : null) ||
+      (memoryDb.stores?.[0]?.id || '');
+
     const newOrder: Order = {
       id: 'o_' + Math.random().toString(36).substr(2, 9),
       customer_id: orderData.customer_id || '',
@@ -359,7 +412,7 @@ export const dbEngine = {
       items: orderData.items || [],
       created_by_id: currentUser ? currentUser.id : null,
       created_by_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : null,
-      store_id: sid
+      store_id: currentStoreId
     };
 
     await performMutation('insert', 'orders', newOrder.id, newOrder);
@@ -390,6 +443,20 @@ export const dbEngine = {
     order.statut = 'annule';
     order.motif_annulation = reason.trim();
     dbEngine.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} annulée. Motif : ${reason}`);
+    notifyListeners();
+    return order;
+  },
+
+  updateOrderStore: async (orderId: string, newStoreId: string): Promise<Order | undefined> => {
+    const order = memoryDb.orders.find(o => o.id === orderId);
+    if (!order) return;
+    const oldStoreId = order.store_id;
+
+    await performMutation('update', 'orders', orderId, { store_id: newStoreId });
+    order.store_id = newStoreId;
+    const store = memoryDb.stores?.find(s => s.id === newStoreId || s.code === newStoreId);
+    const storeName = store ? store.nom : newStoreId;
+    dbEngine.logAction('RATTACHEMENT_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} rattachée au point : ${storeName}`);
     notifyListeners();
     return order;
   },

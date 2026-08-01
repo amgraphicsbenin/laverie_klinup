@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from './supabaseClient';
+import { t } from './i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION FOREGROUND HANDLER
@@ -32,37 +33,24 @@ try {
 // ─────────────────────────────────────────────────────────────────────────────
 // STATUT DES COMMANDES → Textes lisibles
 // ─────────────────────────────────────────────────────────────────────────────
-const STATUS_LABELS = {
-  en_attente: 'En attente',
-  attente: 'En attente',
-  traitement: 'En cours de traitement',
-  en_cours_lavage: 'Lavage en cours',
-  lavage: 'Lavage en cours',
-  en_cours_repassage: 'Repassage en cours',
-  repassage: 'Repassage en cours',
-  pret: 'Prête',
-  a_livrer: 'Prête à livrer',
-  a_recuperer: 'À récupérer',
-  en_cours_livraison: 'En cours de livraison',
-  restitue: 'Livrée / Restituée',
-  livre: 'Livrée / Restituée',
-  annule: 'Annulée',
-};
 
 /**
  * Retourne l'emoji et le texte lisible pour un statut de commande.
+ * Utilise le service i18n pour supporter le multi-langue.
  */
 export function getOrderStatusLabel(statut) {
-  if (!statut) return 'Mise à jour';
+  if (!statut) return t('orders.statut_maj');
   const cleanKey = String(statut).trim().toLowerCase().replace(/['']/g, '');
-  if (STATUS_LABELS[cleanKey]) {
-    return STATUS_LABELS[cleanKey];
+  const translated = t(`status_labels.${cleanKey}`, {});
+  // Si la clé traduite est égale à la clé elle-même (non trouvée), on construit un libellé
+  if (translated === `status_labels.${cleanKey}`) {
+    const sanitized = String(statut)
+      .replace(/['']/g, '')
+      .replace(/_/g, ' ')
+      .trim();
+    return sanitized ? sanitized.charAt(0).toUpperCase() + sanitized.slice(1) : t('orders.statut_maj');
   }
-  const sanitized = String(statut)
-    .replace(/['']/g, '')
-    .replace(/_/g, ' ')
-    .trim();
-  return sanitized ? sanitized.charAt(0).toUpperCase() + sanitized.slice(1) : 'Mise à jour';
+  return translated;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

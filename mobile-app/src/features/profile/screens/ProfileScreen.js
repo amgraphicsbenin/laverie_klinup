@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler, Switch } from 'react-native';
-import { Key, LogOut, X, Printer, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle, ArrowLeft } from 'lucide-react-native';
+import { Key, LogOut, X, Bell, Moon, Globe, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle, ArrowLeft, Check } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
 import { MotiView } from '../../../components/SafeView';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
+import { t, LANGUAGES, setLanguage as setAppLanguage, getCurrentLang, getCurrentLangLabel, subscribeToLangChange } from '../../../services/i18n';
 
 export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigger, onShowSuccess }) {
   const { currentUser, isDarkMode } = useDbState();
@@ -14,11 +15,12 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
   const [showPinModal, setShowPinModal] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
+  const [showLangModal, setShowLangModal] = useState(false);
   
   // Interactive app preferences
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [autoPrintEnabled, setAutoPrintEnabled] = useState(true);
-  const [appLanguage, setAppLanguage] = useState("Français");
+  const [currentLang, setCurrentLangState] = useState(getCurrentLang());
+  const [langLabel, setLangLabel] = useState(getCurrentLangLabel());
 
   // Statistics calculated dynamically from database
   const [todayOrdersCount, setTodayOrdersCount] = useState(0);
@@ -26,6 +28,17 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 
   const scrollPaddingBottom = useScrollPaddingBottom();
   const styles = getStyles(isDarkMode);
+
+  // Subscribe to language changes
+  useEffect(() => {
+    const unsub = subscribeToLangChange((newLang) => {
+      setCurrentLangState(newLang);
+      setLangLabel(getCurrentLangLabel());
+      // Force re-render when language changes
+      db.notify();
+    });
+    return unsub;
+  }, []);
 
   // Close PIN modal when trigger increments
   useEffect(() => {
@@ -39,15 +52,19 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
   // Notify parent of modal visibility
   useEffect(() => {
     if (onModalStateChange) {
-      onModalStateChange(showPinModal);
+      onModalStateChange(showPinModal || showLangModal);
     }
-  }, [showPinModal]);
+  }, [showPinModal, showLangModal]);
 
   // Handle Android back button/gesture to close the PIN modal
   useEffect(() => {
-    if (Platform.OS === 'web' || !showPinModal) return;
+    if (Platform.OS === 'web' || (!showPinModal && !showLangModal)) return;
 
     const backAction = () => {
+      if (showLangModal) {
+        setShowLangModal(false);
+        return true;
+      }
       setShowPinModal(false);
       setCurrentPin('');
       setNewPin('');
@@ -60,7 +77,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
     );
 
     return () => backHandler.remove();
-  }, [showPinModal]);
+  }, [showPinModal, showLangModal]);
 
   // Compute daily stats for this cashier/employee shift
   useEffect(() => {
@@ -80,29 +97,23 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
   }, [currentUser]);
 
   const getRoleLabel = (role) => {
-    switch (role) {
-      case 'super_admin': return 'Super Administrateur';
-      case 'manager': return 'Gestionnaire';
-      case 'livreur': return 'Livreur';
-      case 'agent_lavage_repassage': return 'Atelier Lavage & Repassage';
-      default: return "Agent d'accueil";
-    }
+    return t(`roles.${role || 'agent_accueil'}`, {}, t('roles.agent_accueil'));
   };
 
   const formatPrice = (price) => {
     if (currentUser && (currentUser.role === 'livreur' || currentUser.role === 'agent_lavage_repassage')) {
       return '******';
     }
-    return `${(price || 0).toLocaleString('fr-FR')} FCFA`;
+    return `${(price || 0).toLocaleString(currentLang === 'fr' ? 'fr-FR' : currentLang === 'pt' ? 'pt-PT' : currentLang === 'es' ? 'es-ES' : 'en-US')} FCFA`;
   };
 
   const handleLogout = () => {
     Alert.alert(
-      "Déconnexion",
-      "Voulez-vous vraiment vous déconnecter de votre session ?",
+      t('auth.logout_confirm_title'),
+      t('auth.logout_confirm_message'),
       [
-        { text: "Annuler", style: "cancel" },
-        { text: "Déconnexion", style: "destructive", onPress: () => {
+        { text: t('app.cancel'), style: "cancel" },
+        { text: t('auth.logout_action'), style: "destructive", onPress: () => {
           db.setCurrentUser(null);
         }}
       ]
@@ -111,44 +122,45 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 
   const handleChangePin = async () => {
     if (!currentPin || !newPin) {
-      Alert.alert("Erreur", "Tous les champs sont obligatoires.");
+      Alert.alert(t('alert.error'), t('profile.pin_error_fields'));
       return;
     }
     if (newPin.length !== 6) {
-      Alert.alert("Erreur", "Le nouveau code PIN doit faire 6 chiffres.");
+      Alert.alert(t('alert.error'), t('profile.pin_error_length'));
       return;
     }
 
     if (currentUser.code_pin !== currentPin) {
-      Alert.alert("Erreur", "Code PIN actuel incorrect.");
+      Alert.alert(t('alert.error'), t('profile.pin_error_current'));
       return;
     }
 
     try {
       db.updateStaffPin(currentUser.id, newPin);
       if (onShowSuccess) {
-        onShowSuccess("Votre code PIN a été modifié avec succès.");
+        onShowSuccess(t('profile.pin_success'));
       } else {
-        Alert.alert("Succès", "Votre code PIN a été modifié avec succès.");
+        Alert.alert(t('alert.success'), t('profile.pin_success'));
       }
       setCurrentPin('');
       setNewPin('');
       setShowPinModal(false);
     } catch (e) {
       console.error("Error updating PIN:", e);
-      Alert.alert("Erreur", "Impossible de modifier le code PIN.");
+      Alert.alert(t('alert.error'), t('profile.pin_error_update'));
     }
   };
 
-  const handleLanguageToggle = () => {
-    setAppLanguage(prev => prev === "Français" ? "English" : "Français");
+  const handleLangSelect = async (langCode) => {
+    await setAppLanguage(langCode);
+    setShowLangModal(false);
   };
 
   const handleSupportPress = () => {
     Alert.alert(
-      "Support Technique",
-      "Besoin d'assistance avec l'application ou la caisse ?\n\nContactez le gérant au +229 97 00 00 00 ou par WhatsApp.",
-      [{ text: "Compris" }]
+      t('profile.support_title'),
+      t('profile.support_message'),
+      [{ text: t('alert.compris') }]
     );
   };
 
@@ -160,7 +172,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
     <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000000' : '#f8fafc' }}>
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mon Profil</Text>
+        <Text style={styles.headerTitle}>{t('profile.title')}</Text>
       </View>
 
       <ScrollView 
@@ -185,13 +197,13 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 
           {/* Name & Role Badge */}
           <Text style={styles.profileName}>
-            {currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Utilisateur'}
+            {currentUser ? `${currentUser.prenom} ${currentUser.nom}` : t('app.information')}
           </Text>
           
           <View style={styles.roleBadge}>
             <Shield size={12} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 5 }} />
             <Text style={styles.roleBadgeText}>
-              {currentUser ? getRoleLabel(currentUser.role) : 'Invité'}
+              {currentUser ? getRoleLabel(currentUser.role) : t('roles.invité')}
             </Text>
           </View>
 
@@ -199,13 +211,13 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
           <View style={styles.emailContainer}>
             <Mail size={14} color={isDarkMode ? '#a1a1aa' : '#64748b'} style={{ marginRight: 8 }} />
             <Text style={styles.emailText}>
-              {currentUser?.email || 'non configuré'}
+              {currentUser?.email || t('profile.email_non_config')}
             </Text>
           </View>
         </MotiView>
 
         {/* SHIFT ACTIVITY STATS */}
-        <Text style={styles.sectionTitle}>Activité de la Session (Aujourd'hui)</Text>
+        <Text style={styles.sectionTitle}>{t('profile.activite_session')}</Text>
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <View style={[styles.statIconBadge, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)' }]}>
@@ -213,7 +225,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
             </View>
             <View style={styles.statInfo}>
               <Text style={styles.statValue}>{todayOrdersCount}</Text>
-              <Text style={styles.statLabel}>Commandes créées</Text>
+              <Text style={styles.statLabel}>{t('profile.commandes_crees')}</Text>
             </View>
           </View>
           
@@ -223,13 +235,13 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
             </View>
             <View style={styles.statInfo}>
               <Text style={[styles.statValue, { color: '#16a34a' }]}>{formatPrice(todayRevenueSum)}</Text>
-              <Text style={styles.statLabel}>Volume encaissé</Text>
+              <Text style={styles.statLabel}>{t('profile.volume_encaisse')}</Text>
             </View>
           </View>
         </View>
 
         {/* APP PREFERENCES GROUP */}
-        <Text style={styles.sectionTitle}>Préférences Caisse</Text>
+        <Text style={styles.sectionTitle}>{t('profile.preferences')}</Text>
         <View style={styles.groupedCard}>
           {/* Dark Mode */}
           <View style={styles.settingsRow}>
@@ -237,7 +249,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
               <View style={[styles.settingIconBox, { backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.15)' : '#f1f5f9' }]}>
                 <Moon size={16} color={isDarkMode ? "#38bdf8" : "#475569"} />
               </View>
-              <Text style={styles.settingsLabel}>Mode Sombre</Text>
+              <Text style={styles.settingsLabel}>{t('profile.mode_sombre')}</Text>
             </View>
             <Switch
               value={isDarkMode}
@@ -255,7 +267,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
               <View style={[styles.settingIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
                 <Bell size={16} color="#f59e0b" />
               </View>
-              <Text style={styles.settingsLabel}>Notifications en temps réel</Text>
+              <Text style={styles.settingsLabel}>{t('profile.notifications')}</Text>
             </View>
             <Switch
               value={notificationsEnabled}
@@ -267,41 +279,23 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 
           <View style={styles.divider} />
 
-          {/* Auto Print */}
-          <View style={styles.settingsRow}>
-            <View style={styles.settingsLeft}>
-              <View style={[styles.settingIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                <Printer size={16} color="#10b981" />
-              </View>
-              <Text style={styles.settingsLabel}>Impression ticket automatique</Text>
-            </View>
-            <Switch
-              value={autoPrintEnabled}
-              onValueChange={setAutoPrintEnabled}
-              trackColor={{ false: "#e2e8f0", true: "#93c5fd" }}
-              thumbColor={autoPrintEnabled ? "#002cf7" : "#f1f5f9"}
-            />
-          </View>
-
-          <View style={styles.divider} />
-
           {/* Language Selector */}
-          <TouchableOpacity style={styles.settingsRow} onPress={handleLanguageToggle} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.settingsRow} onPress={() => setShowLangModal(true)} activeOpacity={0.7}>
             <View style={styles.settingsLeft}>
               <View style={[styles.settingIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
                 <Globe size={16} color="#6366f1" />
               </View>
-              <Text style={styles.settingsLabel}>Langue de l'interface</Text>
+              <Text style={styles.settingsLabel}>{t('profile.langue')}</Text>
             </View>
             <View style={styles.settingsRight}>
-              <Text style={styles.settingsValueText}>{appLanguage}</Text>
+              <Text style={styles.settingsValueText}>{langLabel}</Text>
               <ChevronRight size={16} color={isDarkMode ? "#94a3b8" : "#94a3b8"} />
             </View>
           </TouchableOpacity>
         </View>
 
         {/* SECURITY & ACCOUNT ACTIONS */}
-        <Text style={styles.sectionTitle}>Sécurité & Compte</Text>
+        <Text style={styles.sectionTitle}>{t('profile.securite')}</Text>
         <View style={styles.groupedCard}>
           {/* Modify PIN */}
           <TouchableOpacity 
@@ -313,7 +307,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
               <View style={[styles.settingIconBox, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)' }]}>
                 <Key size={16} color={isDarkMode ? "#38bdf8" : "#002cf7"} />
               </View>
-              <Text style={styles.settingsLabel}>Modifier mon code PIN</Text>
+              <Text style={styles.settingsLabel}>{t('profile.modifier_pin')}</Text>
             </View>
             <ChevronRight size={16} color={isDarkMode ? "#94a3b8" : "#94a3b8"} />
           </TouchableOpacity>
@@ -330,7 +324,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
               <View style={[styles.settingIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
                 <LogOut size={16} color="#ef4444" />
               </View>
-              <Text style={[styles.settingsLabel, { color: '#ef4444', fontWeight: '600' }]}>Se déconnecter</Text>
+              <Text style={[styles.settingsLabel, { color: '#ef4444', fontWeight: '600' }]}>{t('profile.se_deconnecter')}</Text>
             </View>
             <ChevronRight size={16} color="#ef4444" />
           </TouchableOpacity>
@@ -338,12 +332,62 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
 
         {/* FOOTER INFO & SUPPORT */}
         <View style={styles.supportFooter}>
-          <Text style={styles.versionText}>KLIN UP Mobile v1.5.0 — Caisse & Gestion</Text>
+          <Text style={styles.versionText}>{t('profile.version')}</Text>
           <TouchableOpacity onPress={handleSupportPress} style={styles.supportBtn} activeOpacity={0.8}>
             <HelpCircle size={13} color={isDarkMode ? "#a1a1aa" : "#64748b"} style={{ marginRight: 6 }} />
-            <Text style={styles.supportBtnText}>Support Technique Administrateur</Text>
+            <Text style={styles.supportBtnText}>{t('profile.support_button')}</Text>
           </TouchableOpacity>
         </View>
+
+        {/* LANGUAGE SELECTION MODAL */}
+        <Modal
+          visible={showLangModal}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setShowLangModal(false)}
+        >
+          <View style={styles.fullPageContainer}>
+            {/* HEADER BACK BUTTON */}
+            <View style={styles.fullPageHeader}>
+              <TouchableOpacity onPress={() => setShowLangModal(false)} style={styles.backBtnHeader} activeOpacity={0.7}>
+                <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+                <Text style={styles.backBtnText}>{t('profile.back')}</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.fullPageTitle} numberOfLines={1}>{t('profile.langue')}</Text>
+              <View style={{ width: 70 }} />
+            </View>
+
+            <ScrollView contentContainerStyle={styles.fullPageScroll} bounces={false}>
+              <View style={{ gap: 4 }}>
+                {LANGUAGES.map((lang) => (
+                  <TouchableOpacity
+                    key={lang.code}
+                    onPress={() => handleLangSelect(lang.code)}
+                    style={[
+                      styles.langItem,
+                      currentLang === lang.code && styles.langItemActive
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.langItemLeft}>
+                      <Text style={[
+                        styles.langItemLabel,
+                        currentLang === lang.code && styles.langItemLabelActive
+                      ]}>
+                        {lang.nativeLabel}
+                      </Text>
+                      <Text style={styles.langItemSubLabel}>{lang.label}</Text>
+                    </View>
+                    {currentLang === lang.code && (
+                      <Check size={20} color="#002cf7" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </Modal>
 
         {/* MODAL : MODIFIER PIN (FULL SCREEN PAGE) */}
         <Modal
@@ -357,17 +401,17 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
             <View style={styles.fullPageHeader}>
               <TouchableOpacity onPress={() => setShowPinModal(false)} style={styles.backBtnHeader} activeOpacity={0.7}>
                 <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-                <Text style={styles.backBtnText}>Retour</Text>
+                <Text style={styles.backBtnText}>{t('profile.back')}</Text>
               </TouchableOpacity>
 
-              <Text style={styles.fullPageTitle} numberOfLines={1}>Modifier mon code PIN</Text>
+              <Text style={styles.fullPageTitle} numberOfLines={1}>{t('profile.modifier_pin_title')}</Text>
               <View style={{ width: 70 }} />
             </View>
 
             <ScrollView contentContainerStyle={styles.fullPageScroll} bounces={false}>
               <View style={{ gap: 16 }}>
                 <View>
-                  <Text style={styles.modalLabel}>Code PIN actuel</Text>
+                  <Text style={styles.modalLabel}>{t('profile.pin_actuel')}</Text>
                   <TextInput
                     keyboardType="numeric"
                     maxLength={6}
@@ -381,7 +425,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
                 </View>
 
                 <View>
-                  <Text style={styles.modalLabel}>Nouveau code PIN (6 chiffres)</Text>
+                  <Text style={styles.modalLabel}>{t('profile.nouveau_pin')}</Text>
                   <TextInput
                     keyboardType="numeric"
                     maxLength={6}
@@ -399,7 +443,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
                   style={styles.modalSubmitBtn}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.modalSubmitBtnText}>Confirmer le changement</Text>
+                  <Text style={styles.modalSubmitBtnText}>{t('profile.confirmer_pin')}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -724,6 +768,39 @@ function getStyles(isDarkMode) {
       color: '#ffffff',
       fontSize: 14,
       fontWeight: '700',
+    },
+    langItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? '#121212' : '#f8fafc',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      marginBottom: 8,
+    },
+    langItemActive: {
+      borderColor: '#002cf7',
+      backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.12)' : 'rgba(0, 44, 247, 0.06)',
+    },
+    langItemLeft: {
+      flexDirection: 'column',
+      gap: 2,
+    },
+    langItemLabel: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDarkMode ? '#ffffff' : '#09090b',
+    },
+    langItemLabelActive: {
+      color: '#002cf7',
+    },
+    langItemSubLabel: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
     },
   });
 }

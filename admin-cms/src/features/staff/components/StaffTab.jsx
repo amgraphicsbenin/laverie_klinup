@@ -593,7 +593,6 @@ export default function StaffTab({
                 }}
               >
                 <option value="all">Toutes les laveries</option>
-                <option value="store_central">Point Central</option>
                 {db.getStores().map(st => (
                   <option key={st.id} value={st.id}>
                     {st.nom} ({st.code})
@@ -1705,7 +1704,7 @@ export default function StaffTab({
                     <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Point de Laverie</label>
                     <CustomSelect
                       className="input-control"
-                      value={editStaffStoreId || 'store_central'}
+                      value={editStaffStoreId || (db.getStores()[0]?.id || 'all')}
                       onChange={(e) => setEditStaffStoreId(e.target.value)}
                     >
                       <option value="all">Tous les points (Accès Global)</option>

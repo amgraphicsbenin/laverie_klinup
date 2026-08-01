@@ -43,6 +43,15 @@ function App() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [customDialog, setCustomDialog] = useState(null); // { message, title, type, isConfirm, resolve }
   const [openSubmenus, setOpenSubmenus] = useState({ staff: true });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('klin_up_sidebar_collapsed')) || false;
+    } catch (e) {
+      return false;
+    }
+  });
+  const [pinActionLoading, setPinActionLoading] = useState(null);
 
   // Notifications states & helper functions
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -179,18 +188,32 @@ function App() {
     }
   };
 
-  const handleApprovePin = (reqId) => {
-    const result = db.approvePinResetRequest(reqId);
-    if (result) {
-      alert(`PIN réinitialisé avec succès ! Nouveau PIN : ${result.newPin}. Un email de confirmation a été envoyé à ${result.staffMember.email}`);
-      setDbTick(prev => prev + 1);
+  const handleApprovePin = async (reqId) => {
+    setPinActionLoading(reqId);
+    try {
+      const result = db.approvePinResetRequest(reqId);
+      if (result) {
+        alert(`PIN réinitialisé avec succès ! Nouveau PIN : ${result.newPin}. Un email de confirmation a été envoyé à ${result.staffMember.email}`);
+        setDbTick(prev => prev + 1);
+      }
+    } catch (e) {
+      alert('Erreur lors de l\'approbation : ' + (e?.message || 'Erreur inconnue'));
+    } finally {
+      setPinActionLoading(null);
     }
   };
 
-  const handleRejectPin = (reqId) => {
-    db.rejectPinResetRequest(reqId);
-    alert("Demande de réinitialisation de PIN rejetée.");
-    setDbTick(prev => prev + 1);
+  const handleRejectPin = async (reqId) => {
+    setPinActionLoading(reqId);
+    try {
+      db.rejectPinResetRequest(reqId);
+      alert("Demande de réinitialisation de PIN rejetée.");
+      setDbTick(prev => prev + 1);
+    } catch (e) {
+      alert('Erreur lors du rejet : ' + (e?.message || 'Erreur inconnue'));
+    } finally {
+      setPinActionLoading(null);
+    }
   };
 
   const getNotifIconConfig = (action) => {
@@ -290,7 +313,7 @@ function App() {
     // Subscribe to memory store changes first
     const unsubscribe = db.subscribe(() => {
       setCurrentUser(db.getCurrentUser());
-      setStaffList(db.getStaff());
+      setStaffList(db.getAllStaff ? db.getAllStaff() : db.getStaff());
       setDbTick(prev => prev + 1);
       setDbIsRemote(db.isRemote());
       setSelectedStoreIdState(db.getSelectedStoreId());
@@ -300,7 +323,7 @@ function App() {
     db.init()
       .then(() => {
         setCurrentUser(db.getCurrentUser());
-        setStaffList(db.getStaff());
+        setStaffList(db.getAllStaff ? db.getAllStaff() : db.getStaff());
         setDbIsRemote(db.isRemote());
         setSelectedStoreIdState(db.getSelectedStoreId());
         setIsInitializing(false);
@@ -310,7 +333,7 @@ function App() {
         setInitError(err?.message || 'Impossible de joindre le serveur Supabase.');
         // Still show data from defaults even on error
         setCurrentUser(db.getCurrentUser());
-        setStaffList(db.getStaff());
+        setStaffList(db.getAllStaff ? db.getAllStaff() : db.getStaff());
         setDbIsRemote(db.isRemote());
         setSelectedStoreIdState(db.getSelectedStoreId());
         setIsInitializing(false);
@@ -323,12 +346,14 @@ function App() {
     e.preventDefault();
     if (!loginEmail) return;
     
-    let matchedUser = db.getStaff().find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
+    const currentStaff = db.getAllStaff ? db.getAllStaff() : db.getStaff();
+    let matchedUser = currentStaff.find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
     
     if (!matchedUser) {
       try {
         await db.refreshStaff();
-        matchedUser = db.getStaff().find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
+        const refreshedStaff = db.getAllStaff ? db.getAllStaff() : db.getStaff();
+        matchedUser = refreshedStaff.find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
       } catch (err) {
         console.warn("Failed to refresh staff on login:", err);
       }
@@ -445,6 +470,11 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedLoginUser, pinCode, pinError, isUnlocking]);
 
+
+  // Persist sidebar collapsed state
+  useEffect(() => {
+    localStorage.setItem('klin_up_sidebar_collapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   // ── Supabase loading screen ──────────────────────────────────────────────
   if (isInitializing) {
@@ -741,9 +771,14 @@ function App() {
   return (
     <div className="app-container">
       
+      {/* ================= OVERLAY MOBILE SIDEBAR ================= */}
+      {hasAdminAccess && sidebarOpen && (
+        <div className="sidebar-mobile-overlay sidebar-overlay-open" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* ================= SIDEBAR DESKTOP ================= */}
       {hasAdminAccess && (
-        <aside className="sidebar">
+        <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
           <div>
             <div className="sidebar-logo" style={{ 
               display: 'flex', 
@@ -759,43 +794,58 @@ function App() {
                 style={{ width: '100%', maxWidth: '130px', height: 'auto', objectFit: 'contain', display: 'block' }} 
               />
             </div>
+
+            {/* Bouton de réduction de la barre latérale */}
+            <button
+              className="sidebar-collapse-btn"
+              onClick={() => setSidebarCollapsed(prev => !prev)}
+              title={sidebarCollapsed ? "Agrandir le menu" : "Réduire le menu"}
+            >
+              <MIcon name={sidebarCollapsed ? "chevron_right" : "chevron_left"} size={20} />
+              <span className="sidebar-collapse-btn-label">Réduire le menu</span>
+            </button>
             
             <div className="menu-section-title">MENU</div>
             <ul className="menu-list">
               <li 
                 className={`menu-item ${adminMenu === 'dashboard' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('dashboard')}
+                data-tooltip="Vue d'Ensemble"
               >
                 <MIcon name="dashboard" size={20} />
-                Vue d'Ensemble
+                <span className="menu-item-label">Vue d'Ensemble</span>
               </li>
               <li 
                 className={`menu-item ${adminMenu === 'orders_management' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('orders_management')}
+                data-tooltip="Gestion Commandes"
               >
                 <MIcon name="shopping_bag" size={20} />
-                Gestion Commandes
+                <span className="menu-item-label">Gestion Commandes</span>
               </li>
               <li 
                 className={`menu-item ${adminMenu === 'crm_management' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('crm_management')}
+                data-tooltip="Clients CRM"
               >
                 <MIcon name="group" size={20} />
-                Clients CRM
+                <span className="menu-item-label">Clients CRM</span>
               </li>
               <li 
                 className={`menu-item ${adminMenu === 'catalog' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('catalog')}
+                data-tooltip="Catalogue Tarifs"
               >
                 <MIcon name="price_change" size={20} />
-                Catalogue Tarifs
+                <span className="menu-item-label">Catalogue Tarifs</span>
               </li>
               <li 
                 className={`menu-item ${adminMenu === 'laundry_points' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('laundry_points')}
+                data-tooltip="Points de Laverie"
               >
                 <MIcon name="store" size={20} />
-                Points de Laverie
+                <span className="menu-item-label">Points de Laverie</span>
               </li>
               {isSuperAdmin && (
                 <>
@@ -803,14 +853,16 @@ function App() {
                     className={`menu-item ${['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) ? 'active' : ''}`}
                     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                     onClick={() => setOpenSubmenus(prev => ({ ...prev, staff: !prev.staff }))}
+                    data-tooltip="Gestion des Accès"
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                       <MIcon name="admin_panel_settings" size={20} />
-                      <span>Gestion des Accès</span>
+                      <span className="menu-item-label">Gestion des Accès</span>
                     </div>
                     <MIcon 
                       name="expand_more" 
                       size={18} 
+                      className="menu-item-expand-icon"
                       style={{ 
                         transition: 'transform 0.25s ease', 
                         transform: openSubmenus?.staff ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -825,23 +877,24 @@ function App() {
                         onClick={() => setAdminMenu('staff_users')}
                       >
                         <MIcon name="group" size={16} />
-                        <span>1. Gestion Utilisateurs</span>
+                        <span className="menu-item-label">1. Gestion Utilisateurs</span>
                       </div>
                       <div 
                         className={`submenu-item ${adminMenu === 'staff_roles' ? 'active' : ''}`}
                         onClick={() => setAdminMenu('staff_roles')}
                       >
                         <MIcon name="verified_user" size={16} />
-                        <span>2. Config. des Rôles</span>
+                        <span className="menu-item-label">2. Config. des Rôles</span>
                       </div>
                     </div>
                   )}
                   <li 
                     className={`menu-item ${adminMenu === 'logs' ? 'active' : ''}`}
                     onClick={() => setAdminMenu('logs')}
+                    data-tooltip="Journal d'Audit"
                   >
                     <MIcon name="history" size={20} />
-                    Journal d'Audit
+                    <span className="menu-item-label">Journal d'Audit</span>
                   </li>
                 </>
               )}
@@ -852,21 +905,26 @@ function App() {
               <li 
                 className={`menu-item ${adminMenu === 'settings' ? 'active' : ''}`}
                 onClick={() => setAdminMenu('settings')}
+                data-tooltip="Paramètres"
               >
                 <MIcon name="settings" size={20} />
-                Paramètres
+                <span className="menu-item-label">Paramètres</span>
               </li>
-              <li className="menu-item" onClick={() => alert('Support / Aide en ligne')}>
+              <li className="menu-item" onClick={() => alert('Support KLIN UP : contact@klinup.com | Tél : +229 01 97 97 97 97\n\nHeures d\'ouverture : Lun-Sam, 8h-18h.')} data-tooltip="Aide">
                 <MIcon name="help" size={20} />
-                Aide
+                <span className="menu-item-label">Aide</span>
               </li>
-              <li className="menu-item" onClick={() => setShowLogoutConfirm(true)}>
+              <li className="menu-item" onClick={() => setShowLogoutConfirm(true)} data-tooltip="Déconnexion">
                 <MIcon name="logout" size={20} />
-                Déconnexion
+                <span className="menu-item-label">Déconnexion</span>
               </li>
             </ul>
           </div>
 
+          {/* D-003: Indicateur de version */}
+          <div className="sidebar-version" style={{ marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+            KLIN UP Admin CMS v1.0.0
+          </div>
         </aside>
       )}
 
@@ -875,6 +933,12 @@ function App() {
         
         {/* Topbar Donezo Style */}
         <div className="topbar">
+          {/* B-002: Bouton hamburger pour mobile */}
+          {hasAdminAccess && (
+            <button className="sidebar-mobile-toggle" onClick={() => setSidebarOpen(true)} title="Ouvrir le menu">
+              <MIcon name="menu" size={22} />
+            </button>
+          )}
           <div className="page-title">
             <h1>
               {!hasAdminAccess && "Accès non autorisé"}
@@ -975,6 +1039,7 @@ function App() {
                         top: '48px', 
                         right: 0, 
                         width: '360px', 
+                        maxWidth: 'calc(100vw - 2rem)',
                         background: 'var(--bg-card)', 
                         border: '1px solid rgba(0, 0, 0, 0.08)', 
                         borderRadius: '16px', 
@@ -1065,14 +1130,16 @@ function App() {
                                     <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
                                       <button 
                                         onClick={() => handleApprovePin(n.raw.id)}
-                                        className="btn btn-primary"
+                                        className={`btn btn-primary${pinActionLoading === n.raw.id ? ' btn-loading' : ''}`}
+                                        disabled={pinActionLoading === n.raw.id}
                                         style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '6px', flex: 1, height: 'auto', minHeight: 'unset' }}
                                       >
                                         Approuver
                                       </button>
                                       <button 
                                         onClick={() => handleRejectPin(n.raw.id)}
-                                        className="btn btn-outline"
+                                        className={`btn btn-outline${pinActionLoading === n.raw.id ? ' btn-loading' : ''}`}
+                                        disabled={pinActionLoading === n.raw.id}
                                         style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '6px', flex: 1, borderColor: '#ef4444', color: '#ef4444', height: 'auto', minHeight: 'unset' }}
                                       >
                                         Rejeter
@@ -1110,7 +1177,7 @@ function App() {
 
               {/* Profil Utilisateur Donezo Header Style */}
               <div className="topbar-profile">
-                <div className="topbar-profile-avatar">
+                <div className="topbar-profile-avatar" role="img" aria-label={`Avatar de ${currentUser?.prenom || ''} ${currentUser?.nom || 'Utilisateur'}`}>
                   <div className="user-avatar" style={{ margin: 0, width: '36px', height: '36px', fontSize: '0.8rem' }}>
                     {(currentUser?.prenom?.charAt(0) || 'U')}{(currentUser?.nom?.charAt(0) || '')}
                   </div>

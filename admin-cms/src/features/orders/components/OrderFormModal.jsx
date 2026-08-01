@@ -16,6 +16,12 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
   // Mode Commande state matching mobile app OrderFormModal.js 1:1
   const [orderClient, setOrderClient] = useState('');
+  const [selectedOrderStoreId, setSelectedOrderStoreId] = useState(() => {
+    const sid = db.getSelectedStoreId();
+    if (sid && sid !== 'all') return sid;
+    const stores = db.getStores();
+    return stores.length > 0 ? stores[0].id : '';
+  });
   const [selectedArticles, setSelectedArticles] = useState([]); // [{ id, article, service, price, quantity }]
   const [orderAvance, setOrderAvance] = useState('0');
   const [orderPaymentMethod, setOrderPaymentMethod] = useState('Espèce');
@@ -51,6 +57,9 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
   const resetForm = () => {
     setOrderClient('');
+    const sid = db.getSelectedStoreId();
+    const stores = db.getStores();
+    setSelectedOrderStoreId(sid && sid !== 'all' ? sid : (stores.length > 0 ? stores[0].id : ''));
     setSelectedArticles([]);
     setOrderAvance('0');
     setOrderPaymentMethod('Espèce');
@@ -169,6 +178,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
       const currentUser = db.getCurrentUser();
       const newOrder = {
         customer_id: orderClient,
+        store_id: selectedOrderStoreId,
         articles: selectedArticles.map(a => ({
           article: a.article,
           service: a.service,
@@ -243,6 +253,37 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
         {/* Scroll Content Container matching compactModalScroll */}
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px', display: 'flex', flexDirection: 'column' }}>
+
+          {/* Sélection du point de laverie */}
+          <div style={{ zIndex: 35, position: 'relative' }}>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: '#002cf7', marginTop: '4px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              📍 Point de Laverie d'Enregistrement
+            </label>
+            <select
+              style={{
+                width: '100%',
+                height: '48px',
+                backgroundColor: '#ffffff',
+                border: '1.5px solid #002cf7',
+                borderRadius: '14px',
+                padding: '0 16px',
+                fontSize: '14px',
+                color: '#09090b',
+                fontWeight: 600,
+                marginBottom: '12px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+              value={selectedOrderStoreId}
+              onChange={(e) => setSelectedOrderStoreId(e.target.value)}
+            >
+              {db.getStores().map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.nom} ({s.code})
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Sélection du client */}
           <div style={{ zIndex: 30, position: 'relative' }}>

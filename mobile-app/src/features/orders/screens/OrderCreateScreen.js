@@ -7,7 +7,7 @@ import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
 
 export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
-  const { isDarkMode, customers, catalog } = useDbState();
+  const { isDarkMode, customers, catalog, currentUser } = useDbState();
   const scrollPaddingBottom = useScrollPaddingBottom();
   const styles = getStyles(isDarkMode);
 
@@ -246,6 +246,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
         telephone: clientTelephone.trim(),
         adresse: clientAdresse.trim(),
         preferences_pliage: clientPrefPliage,
+        store_id: currentUser?.store_id
       });
 
       // Clear new client form state

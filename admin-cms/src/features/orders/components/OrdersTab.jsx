@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { db } from '../../../services/db';
 import {
   ShoppingBag,
   Flame,
@@ -437,18 +438,53 @@ export default function OrdersTab({
                     </div>
 
                     {/* Middle Row: Client info & Deposit Date */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-app)', padding: '0.5rem 0.75rem', borderRadius: '12px', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-app)', padding: '0.5rem 0.75rem', borderRadius: '12px', fontSize: '0.76rem', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <User size={14} color="var(--primary)" />
                         <span>Client : <strong style={{ color: 'var(--text-primary)' }}>{clientName}</strong> ({clientPhone})</span>
                       </div>
-                      <button 
-                        onClick={() => toggleExpand(order.id)} 
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', fontWeight: 700, fontSize: '0.74rem' }}
-                      >
-                        {expandedOrderId === order.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        Détails
-                      </button>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>📍 Point :</span>
+                        <select
+                          value={(() => {
+                            const stores = db.getStores();
+                            const match = stores.find(s => s.id === order.store_id || s.code === order.store_id);
+                            return match ? match.id : (stores[0]?.id || order.store_id || '');
+                          })()}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={async (e) => {
+                            e.stopPropagation();
+                            const newSid = e.target.value;
+                            await db.updateOrderStore(order.id, newSid);
+                          }}
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            color: 'var(--primary)',
+                            background: '#fff',
+                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                            borderRadius: '6px',
+                            padding: '0.15rem 0.45rem',
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                        >
+                          {db.getStores().map(st => (
+                            <option key={st.id} value={st.id}>
+                              {st.nom} ({st.code})
+                            </option>
+                          ))}
+                        </select>
+
+                        <button 
+                          onClick={() => toggleExpand(order.id)} 
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', fontWeight: 700, fontSize: '0.74rem', marginLeft: '0.25rem' }}
+                        >
+                          {expandedOrderId === order.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          Détails
+                        </button>
+                      </div>
                     </div>
 
                     {/* Expanded Drawer: Address, Phone & Quick Copy */}
@@ -748,8 +784,44 @@ export default function OrdersTab({
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'var(--primary)', textAlign: 'right', borderTop: '1px solid var(--border-color)', paddingTop: '0.35rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.2rem' }}>
-                      <Ticket size={12} /> Cliquer pour imprimer / voir ticket
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', fontSize: '0.68rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.35rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>📍 Point :</span>
+                        <select
+                          value={(() => {
+                            const stores = db.getStores();
+                            const match = stores.find(s => s.id === order.store_id || s.code === order.store_id);
+                            return match ? match.id : (stores[0]?.id || order.store_id || '');
+                          })()}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={async (e) => {
+                            e.stopPropagation();
+                            const newSid = e.target.value;
+                            await db.updateOrderStore(order.id, newSid);
+                          }}
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: 'var(--primary)',
+                            background: 'rgba(59, 130, 246, 0.08)',
+                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                            borderRadius: '6px',
+                            padding: '0.1rem 0.35rem',
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                        >
+                          {db.getStores().map(st => (
+                            <option key={st.id} value={st.id}>
+                              {st.nom} ({st.code})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                        <Ticket size={12} /> Cliquer pour ticket
+                      </div>
                     </div>
                   </button>
                 );

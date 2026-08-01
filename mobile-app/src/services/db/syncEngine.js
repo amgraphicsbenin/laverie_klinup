@@ -113,25 +113,18 @@ function sanitizePayload(table, data) {
     delete sanitized.sku;
     delete sanitized.prix_urgent;
     delete sanitized.is_active;
-  } else if (table === 'stores') {
-    delete sanitized.ville;
-    delete sanitized.responsable_id;
-    delete sanitized.responsable_nom;
-  } else if (table === 'staff') {
-    delete sanitized.store_id;
-  } else if (table === 'customers') {
-    delete sanitized.store_id;
   }
   return sanitized;
 }
 
 /**
  * Exécute une mutation réseau (insert/update/delete) directement sur Supabase.
- * Lève une exception si l'opération échoue.
+ * Architecture STRICT : toute erreur Supabase lève une exception.
+ * Le code appelant ne doit JAMAIS mettre à jour memoryDb si cette fonction lève.
  */
 export async function performMutation(action, table, recordId, data) {
   if (!supabase) {
-    throw new Error('Supabase non connecté. Vérifiez votre connexion réseau.');
+    throw new Error('[KLIN UP DB] Supabase non connecté. Vérifiez votre connexion réseau.');
   }
 
   const sanitizedData = sanitizePayload(table, data);
@@ -146,78 +139,73 @@ export async function performMutation(action, table, recordId, data) {
       res = await supabase.from(table).delete().eq('id', recordId);
     }
   } catch (networkErr) {
-    throw new Error(`Erreur réseau lors de la communication avec Supabase : ${networkErr.message}`);
+    throw new Error(`[KLIN UP DB] Erreur réseau Supabase (table: ${table}) : ${networkErr.message}`);
   }
 
-  if (res?.error) {
-    const errMsg = res.error.message || '';
-    const errCode = res.error.code || '';
-
-    if (
-      errCode === '42501' ||
-      errMsg.toLowerCase().includes('row-level security') ||
-      errMsg.toLowerCase().includes('rls policy')
-    ) {
-      console.warn(`[DB Sync] ⚠️ RLS Supabase actif sur la table '${table}' (${errMsg}).`);
-      return null;
-    }
-
-    if (
-      errCode === 'PGRST204' ||
-      errCode === '42703' ||
-      errMsg.includes('column') ||
-      errMsg.includes('schema cache')
-    ) {
-      console.warn(`[DB Sync] Colonne non trouvée (${errMsg}). Tentative de repli...`);
-      const retriedData = { ...sanitizedData };
-      if (table !== 'orders') {
-        delete retriedData.store_id;
-      }
-      delete retriedData.motif_annulation;
-      delete retriedData.remise_pourcentage;
-      delete retriedData.remise_montant;
-      delete retriedData.responsable_id;
-      delete retriedData.responsable_nom;
-      delete retriedData.solde_paid_at;
-      delete retriedData.subscription_details;
-      delete retriedData.reference_paiement;
-      delete retriedData.reference_momo;
-      delete retriedData.acompte_paid_at;
-      delete retriedData.is_subscription_order;
-      delete retriedData.created_by_id;
-      delete retriedData.created_by_name;
-
-      let retryRes;
-      try {
-        if (action === 'insert') {
-          retryRes = await supabase.from(table).insert(retriedData);
-        } else if (action === 'update') {
-          retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
-        }
-      } catch (retryErr) {
-        throw new Error(`Erreur réseau lors du repli : ${retryErr.message}`);
-      }
-
-      if (retryRes?.error) {
-        if (
-          retryRes.error.code === '42501' ||
-          retryRes.error.message.toLowerCase().includes('row-level security')
-        ) {
-          console.warn(`[DB Sync] ⚠️ RLS Supabase actif lors du repli sur '${table}'.`);
-          return null;
-        }
-        throw new Error(retryRes.error.message);
-      }
-      return retryRes?.data;
-    }
-
-    throw new Error(res.error.message);
+  if (!res?.error) {
+    return res?.data ?? null;
   }
 
-  return res?.data;
+  const errCode = res.error.code || '';
+  const errMsg = res.error.message || '';
+
+  console.error(`[KLIN UP DB] ❌ Erreur Supabase sur table '${table}' [${action}] :`, errCode, errMsg);
+
+  // Schéma cache / colonne manquante → un seul repli ciblé
+  if (
+    errCode === 'PGRST204' ||
+    errCode === '42703' ||
+    errMsg.includes('column') ||
+    errMsg.includes('schema cache')
+  ) {
+    const retriedData = { ...sanitizedData };
+
+    const match = errMsg.match(/Could not find the '([^']+)' column/i)
+                || errMsg.match(/column "([^"]+)"/i);
+    const missingCol = match?.[1];
+
+    if (missingCol) {
+      console.warn(`[KLIN UP DB] ⚠️ Colonne '${missingCol}' absente — retrait automatique pour repli.`);
+      delete retriedData[missingCol];
+    } else {
+      const optionalCols = ['ville', 'responsable_id', 'responsable_nom', 'created_by_id', 'created_by_name',
+                            'push_token', 'push_token_updated_at', 'motif_annulation', 'solde_paid_at',
+                            'reference_paiement', 'reference_momo', 'acompte_paid_at'];
+      for (const col of optionalCols) delete retriedData[col];
+    }
+
+    let retryRes;
+    try {
+      if (action === 'insert') retryRes = await supabase.from(table).insert(retriedData);
+      else if (action === 'update') retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
+      else if (action === 'delete') retryRes = await supabase.from(table).delete().eq('id', recordId);
+    } catch (retryErr) {
+      throw new Error(`[KLIN UP DB] Erreur réseau lors du repli (table: ${table}) : ${retryErr.message}`);
+    }
+
+    if (!retryRes?.error) {
+      console.info(`[KLIN UP DB] ✅ Repli réussi pour table '${table}'.`);
+      return retryRes?.data ?? null;
+    }
+
+    throw new Error(
+      `[KLIN UP DB] Échec persistant sur '${table}' après repli de schéma. Erreur : ${retryRes.error.message} (code: ${retryRes.error.code})`
+    );
+  }
+
+  // RLS ou autre erreur → toujours lever une exception
+  if (errCode === '42501' || errMsg.toLowerCase().includes('row-level security')) {
+    throw new Error(
+      `[KLIN UP DB] Accès refusé par Supabase (RLS) sur la table '${table}'. ` +
+      `Exécutez le script de migration SQL dans Supabase pour activer les politiques d'accès. Détail : ${errMsg}`
+    );
+  }
+
+  throw new Error(`[KLIN UP DB] Supabase a rejeté l'opération sur '${table}' : ${errMsg} (code: ${errCode})`);
 }
 
 // Timeout helper
+
 function withTimeout(promise, ms, label) {
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error(`[TIMEOUT] ${label} a dépassé ${ms}ms`)), ms)

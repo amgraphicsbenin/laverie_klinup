@@ -145,7 +145,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
         db.updateCustomer(editingCustomer.id, { nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences });
         handleCloseEditModal();
       } else {
-        db.addCustomer({ nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences });
+        db.addCustomer({ nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences, store_id: currentUser?.store_id });
         handleCloseCustomerModal();
       }
       refreshCustomers();
