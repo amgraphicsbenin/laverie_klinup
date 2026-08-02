@@ -325,22 +325,14 @@ function getStyles(isDarkMode) {
   return {
     fullPageContainer: {
       flex: 1,
-      backgroundColor: '#0c0c10',
-      alignItems: 'center',
-      justifyContent: 'center',
+      backgroundColor: isDarkMode ? '#000000' : '#ffffff',
       width: '100%',
     },
     fullPageInnerWrapper: {
       flex: 1,
       width: '100%',
-      maxWidth: 393,
       backgroundColor: isDarkMode ? '#000000' : '#ffffff',
       paddingTop: Platform.OS === 'ios' ? 48 : 24,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 16,
-      elevation: 5,
     },
     fullPageHeader: {
       flexDirection: 'row',

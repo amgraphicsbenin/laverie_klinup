@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform, BackHandler, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform, BackHandler, RefreshControl, Linking } from 'react-native';
 import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, Download, Award, Ban, ArrowLeft } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { CustomSelect } from '../../../components/CustomSelect';
@@ -1197,6 +1197,61 @@ export default function GestionScreen({
                       {getItemsSummary(item.items || item.articles)}
                     </Text>
                   </View>
+
+                  {/* ADRESSE DE LIVRAISON CLIENT (ÉTAPE LIVRAISON) */}
+                  {(item.statut === 'pret' || item.statut === 'a_recuperer' || item.statut === 'a_livrer' || item.statut === 'livraison' || item.statut === 'en_cours_de_livraison') && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={(e) => {
+                        if (e && e.stopPropagation) e.stopPropagation();
+                        const addr = client?.adresse || item.adresse_livraison || item.adresse || '';
+                        if (!addr || addr.trim() === '') {
+                          Alert.alert('Adresse manquante', 'Aucune adresse de livraison renseignée pour ce client.');
+                          return;
+                        }
+                        const encoded = encodeURIComponent(addr.trim());
+                        // URL universelle : Android l'intercepte vers l'app Maps native, iOS vers Apple/Google Maps
+                        Linking.openURL(`https://maps.google.com/?q=${encoded}`);
+                      }}
+                      style={{
+                        backgroundColor: isDarkMode ? 'rgba(3, 105, 161, 0.18)' : '#f0f9ff',
+                        borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#bae6fd',
+                        borderWidth: 1,
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        marginVertical: 6,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8
+                      }}
+                    >
+                      <View style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : '#e0f2fe',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <MapPin size={15} color={isDarkMode ? '#38bdf8' : '#0284c7'} />
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: isDarkMode ? '#38bdf8' : '#0284c7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            📍 Adresse de Livraison (GPS)
+                          </Text>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? '#38bdf8' : '#0284c7' }}>
+                            Ouvrir Carte →
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#0f172a', marginTop: 1 }} numberOfLines={2}>
+                          {client?.adresse || item.adresse_livraison || item.adresse || 'Adresse non spécifiée (Appuyer pour carte)'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
 
                   {client && client.active_subscription && (
                     <View style={styles.cardSubscriptionGaugeContainer}>

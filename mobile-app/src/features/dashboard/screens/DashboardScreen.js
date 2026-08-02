@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl, Modal, TextInput } from 'react-native';
-import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check } from 'lucide-react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl, Modal, TextInput, Linking, Alert } from 'react-native';
+import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check, MapPin } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { MotiView } from '../../../components/SafeView';
 import Svg, { Rect, Path, Circle } from 'react-native-svg';
@@ -1064,30 +1064,65 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                   onPress={() => handleOrderPress(item)}
                   style={styles.orderCard}
                 >
-                  <View style={styles.orderLeft}>
-                    <View style={styles.orderInfo}>
-                      <TouchableOpacity
-                        onPress={(e) => {
-                          if (e && e.stopPropagation) e.stopPropagation();
-                          if (clientObj) setSelectedClient(clientObj);
-                        }}
-                        activeOpacity={0.8}
-                        style={styles.clientPillBtn}
-                      >
-                        <User size={12} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 4 }} />
-                        <Text style={styles.clientPillBtnText}>{getCustomerName(item.customer_id)}</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.orderNumber}>Ticket #{getDisplayTicketId(item)}</Text>
+                  {/* CLIENT + STATUS + PRICE ROW */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={styles.orderLeft}>
+                      <View style={styles.orderInfo}>
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            if (e && e.stopPropagation) e.stopPropagation();
+                            if (clientObj) setSelectedClient(clientObj);
+                          }}
+                          activeOpacity={0.8}
+                          style={styles.clientPillBtn}
+                        >
+                          <User size={12} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 4 }} />
+                          <Text style={styles.clientPillBtnText}>{getCustomerName(item.customer_id)}</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.orderNumber}>Ticket #{getDisplayTicketId(item)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.orderRight}>
+                      <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border }]}>
+                        <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
+                      </View>
+                      <Text style={styles.orderPrice}>{formatPrice(item.prix_total || item.total)}</Text>
+                      <ChevronRight size={14} color="#64748b" style={styles.chevron} />
                     </View>
                   </View>
 
-                  <View style={styles.orderRight}>
-                    <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border }]}>
-                      <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
-                    </View>
-                    <Text style={styles.orderPrice}>{formatPrice(item.prix_total || item.total)}</Text>
-                    <ChevronRight size={14} color="#64748b" style={styles.chevron} />
-                  </View>
+                  {/* ADRESSE DE LIVRAISON (ÉTAPE LIVRAISON) */}
+                  {(item.statut === 'pret' || item.statut === 'a_recuperer' || item.statut === 'a_livrer' || item.statut === 'livraison' || item.statut === 'en_cours_de_livraison') && clientObj?.adresse ? (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={(e) => {
+                        if (e && e.stopPropagation) e.stopPropagation();
+                        const addr = clientObj?.adresse || '';
+                        if (!addr || addr.trim() === '') return;
+                        const encoded = encodeURIComponent(addr.trim());
+                        Linking.openURL(`https://maps.google.com/?q=${encoded}`);
+                      }}
+                      style={{
+                        backgroundColor: isDarkMode ? 'rgba(3, 105, 161, 0.18)' : '#f0f9ff',
+                        borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#bae6fd',
+                        borderWidth: 1,
+                        borderRadius: 10,
+                        paddingHorizontal: 10,
+                        paddingVertical: 7,
+                        marginTop: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8
+                      }}
+                    >
+                      <MapPin size={13} color={isDarkMode ? '#38bdf8' : '#0284c7'} />
+                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#0f172a' }} numberOfLines={1}>
+                        {clientObj.adresse}
+                      </Text>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? '#38bdf8' : '#0284c7' }}>Maps →</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </TouchableOpacity>
               </MotiView>
             );

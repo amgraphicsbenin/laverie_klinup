@@ -458,7 +458,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    maxHeight: '85%',
+    maxHeight: '92%',
+    height: '88%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -515,7 +516,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   catalogScroll: {
-    maxHeight: 380,
+    maxHeight: 540,
   },
   rewardCard: {
     flexDirection: 'row',

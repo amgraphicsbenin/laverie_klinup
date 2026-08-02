@@ -935,10 +935,11 @@ export default function CustomersTab({
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: '520px',
-                maxHeight: '90vh',
+                maxWidth: '560px',
+                minHeight: '580px',
+                maxHeight: '92vh',
                 background: '#ffffff',
-                padding: '20px 24px',
+                padding: '24px 28px',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
