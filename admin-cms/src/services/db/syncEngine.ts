@@ -190,7 +190,19 @@ export async function initDb(): Promise<void> {
     if (!ordRes.error) memoryDb.orders = (ordRes.data || []).map(hydrateOrder);
     else console.warn('[KLIN UP DB] ⚠️ Chargement orders partiel :', ordRes.error.message);
 
-    if (!logRes.error) memoryDb.logs = logRes.data || [];
+    if (!logRes.error) {
+      const staffList = memoryDb.staff || [];
+      memoryDb.logs = (logRes.data || []).map((l: any) => {
+        if (!l.user_name || l.user_name === 'NULL' || l.user_name === 'null') {
+          const foundStaff = staffList.find((s: any) => s.id === l.user_id);
+          return {
+            ...l,
+            user_name: foundStaff ? `${foundStaff.prenom} ${foundStaff.nom}` : (l.user_id === 'u_system' || !l.user_id ? 'Automate / Système' : 'Utilisateur Caisse')
+          };
+        }
+        return l;
+      });
+    }
     if (!storeRes.error) memoryDb.stores = storeRes.data || [];
     else console.warn('[KLIN UP DB] ⚠️ Chargement stores partiel :', storeRes.error.message);
 

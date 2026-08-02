@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Platform, Alert, RefreshControl } from 'react-native';
 import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus } from 'lucide-react-native';
 import { CustomSelect } from '../../../components/CustomSelect';
@@ -8,7 +8,12 @@ import { useDbState } from '../../../hooks/useDbState';
 import { t } from '../../../services/i18n';
 
 export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
-  const { isDarkMode, customers, catalog, currentUser } = useDbState();
+  const { isDarkMode, customers, catalog: rawCatalog, currentUser } = useDbState();
+  const catalog = useMemo(() => {
+    if (!rawCatalog) return [];
+    if (!currentUser?.store_id || currentUser?.store_id === 'all') return rawCatalog;
+    return rawCatalog.filter(c => !c.store_id || c.store_id === 'all' || c.store_id === currentUser.store_id);
+  }, [rawCatalog, currentUser]);
   const scrollPaddingBottom = useScrollPaddingBottom();
   const styles = getStyles(isDarkMode);
 

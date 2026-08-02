@@ -202,11 +202,18 @@ export const dbEngine = {
 
     if (sid === 'all') return [...memoryDb.logs];
     const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
-    const storeCode = targetStore?.code;
+    const storeCode = targetStore?.code?.toLowerCase();
+    const storeName = targetStore?.nom?.toLowerCase();
 
     return memoryDb.logs.filter((l: any) => {
-      if (l.store_id === sid) return true;
-      if (storeCode && l.store_id === storeCode) return true;
+      const userObj = memoryDb.staff.find(s => s.id === l.user_id);
+      const logStore = l.store_id || userObj?.store_id;
+      if (logStore === sid || (storeCode && logStore === storeCode)) return true;
+
+      const detailsLower = (l.details || '').toLowerCase();
+      if (storeCode && detailsLower.includes(storeCode)) return true;
+      if (storeName && detailsLower.includes(storeName)) return true;
+
       return false;
     });
   },
@@ -214,10 +221,115 @@ export const dbEngine = {
   getCatalog: (): CatalogItem[] => [...memoryDb.catalog],
   getCurrentUser: (): Staff | null => memoryDb.current_user ? { ...memoryDb.current_user } : null,
   getRoles: () => memoryDb.roles || DEFAULT_ROLES,
+  saveRole: (roleData: any): any => {
+    if (!memoryDb.roles) {
+      memoryDb.roles = [...DEFAULT_ROLES];
+    }
+
+    const existingIdx = memoryDb.roles.findIndex(
+      (r: any) => (roleData.id && r.id === roleData.id) || (roleData.key && r.key === roleData.key)
+    );
+
+    let savedRole: any;
+
+    if (existingIdx !== -1) {
+      const current = memoryDb.roles[existingIdx];
+      savedRole = {
+        ...current,
+        ...roleData,
+        id: current.id,
+        key: current.key || current.id,
+        permissions: { ...current.permissions, ...roleData.permissions }
+      };
+      memoryDb.roles[existingIdx] = savedRole;
+      dbEngine.logAction('MODIFICATION_ROLE', `Rôle mis à jour : ${savedRole.label}`);
+    } else {
+      const key = roleData.key || (roleData.label ? roleData.label.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'role_' + Date.now());
+      savedRole = {
+        id: roleData.id || key,
+        key: key,
+        label: roleData.label || 'Nouveau Rôle',
+        shortLabel: roleData.shortLabel || roleData.label || 'Rôle',
+        color: roleData.color || '#2563eb',
+        description: roleData.description || '',
+        isSystem: false,
+        permissions: roleData.permissions || { can_access_mobile: true }
+      };
+      memoryDb.roles.push(savedRole);
+      dbEngine.logAction('CREATION_ROLE', `Nouveau rôle créé : ${savedRole.label}`);
+    }
+
+    // Update staff members' permissions in memory and persist to Supabase
+    if (memoryDb.staff) {
+      memoryDb.staff.forEach(async (s: any) => {
+        if (s.role === savedRole.id || s.role === savedRole.key) {
+          s.permissions = { ...savedRole.permissions };
+          try {
+            await performMutation('update', 'staff', s.id, { permissions: s.permissions });
+          } catch (e) {
+            console.warn('[KLIN UP DB] ⚠️ Mise à jour permissions staff suite à modification rôle :', e);
+          }
+        }
+      });
+    }
+
+    notifyListeners();
+    return savedRole;
+  },
+
+  deleteRole: (roleId: string): boolean => {
+    if (!memoryDb.roles) return false;
+    const idx = memoryDb.roles.findIndex((r: any) => r.id === roleId || r.key === roleId);
+    if (idx === -1) return false;
+
+    const roleToDelete = memoryDb.roles[idx];
+    if (roleToDelete.isSystem) {
+      dbEngine.logAction('ATTEMPTE_SUPPRESSION_ROLE_SYSTEME', `Impossible de supprimer le rôle système natif : ${roleToDelete.label}`);
+      return false;
+    }
+
+    memoryDb.roles.splice(idx, 1);
+    dbEngine.logAction('SUPPRESSION_ROLE', `Rôle supprimé : ${roleToDelete.label}`);
+    notifyListeners();
+    return true;
+  },
   getSettings: () => memoryDb.settings || {
     express_hours: 6, express_markup: 50, normal_hours: 48,
     receipt_header: 'KLIN UP - Laverie & Pressing Premium',
-    receipt_footer: 'Merci de votre confiance ! A bientot chez KLIN UP.'
+    receipt_footer: 'Merci de votre confiance ! A bientot chez KLIN UP.',
+    fidelity_active: true,
+    fidelity_spend_per_point: 1000,
+    fidelity_tier_silver_pts: 50,
+    fidelity_tier_gold_pts: 150,
+    fidelity_tier_platinum_pts: 300,
+    invoice_paper_format: '80mm',
+    invoice_paper_width: 80,
+    invoice_paper_height: 0,
+    invoice_orientation: 'portrait',
+    invoice_margin: 5
+  },
+  updateSettings: (newSettings: Record<string, any>) => {
+    memoryDb.settings = {
+      ...(memoryDb.settings || {
+        express_hours: 6, express_markup: 50, normal_hours: 48,
+        receipt_header: 'KLIN UP - Laverie & Pressing Premium',
+        receipt_footer: 'Merci de votre confiance ! A bientot chez KLIN UP.',
+        fidelity_active: true,
+        fidelity_spend_per_point: 1000,
+        fidelity_tier_silver_pts: 50,
+        fidelity_tier_gold_pts: 150,
+        fidelity_tier_platinum_pts: 300,
+        invoice_paper_format: '80mm',
+        invoice_paper_width: 80,
+        invoice_paper_height: 0,
+        invoice_orientation: 'portrait',
+        invoice_margin: 5
+      }),
+      ...newSettings
+    };
+    dbEngine.logAction('MODIFICATION_PARAMETRES', 'Mise à jour des paramètres système, des dimensions de reçu et du programme de fidélité.');
+    notifyListeners();
+    return memoryDb.settings;
   },
   getCashClosures: () => {
     const closures = memoryDb.cash_closures ? [...memoryDb.cash_closures] : [];
@@ -291,17 +403,32 @@ export const dbEngine = {
 
   logAction: (action: string, details: string): ActivityLog => {
     const currentUser = dbEngine.getCurrentUser();
+    const currentStoreId = dbEngine.getSelectedStoreId();
+    const logStoreId = currentStoreId !== 'all' ? currentStoreId : (currentUser?.store_id || 'store_central');
     const newLog: ActivityLog = {
       id: 'l_' + Math.random().toString(36).substr(2, 9),
       user_id: currentUser ? currentUser.id : 'u_system',
       user_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système',
+      store_id: logStoreId,
       action,
       details,
       timestamp: new Date().toISOString(),
     };
     memoryDb.logs.unshift(newLog);
     notifyListeners();
-    performMutation('insert', 'activity_logs', newLog.id, newLog)
+
+    // Payload Supabase complet avec user_name et store_id
+    const dbPayload = {
+      id: newLog.id,
+      user_id: newLog.user_id,
+      user_name: newLog.user_name || (currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système'),
+      store_id: newLog.store_id || 'store_central',
+      action: newLog.action,
+      details: newLog.details,
+      timestamp: newLog.timestamp
+    };
+
+    performMutation('insert', 'activity_logs', newLog.id, dbPayload)
       .catch(e => console.warn('[DB] Log sync failed:', e.message));
     return newLog;
   },
@@ -368,7 +495,7 @@ export const dbEngine = {
         can_view_dashboard: staffData.role === 'super_admin' || staffData.role === 'manager',
         can_manage_orders: true,
         can_manage_crm: true,
-        can_edit_catalog: staffData.role === 'super_admin' || staffData.role === 'manager',
+        can_edit_catalog: staffData.role === 'super_admin' || staffData.role === 'manager' || staffData.role === 'editeur_catalogue',
         can_view_logs: staffData.role === 'super_admin',
         can_manage_staff: staffData.role === 'super_admin'
       },
@@ -471,6 +598,46 @@ export const dbEngine = {
     return true;
   },
 
+  adjustCustomerPoints: async (customerId: string, pointsDelta: number, reason?: string): Promise<Customer | undefined> => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    const currentPts = customer.points_fidelite || 0;
+    const newPts = Math.max(0, currentPts + pointsDelta);
+    
+    await performMutation('update', 'customers', customerId, { points_fidelite: newPts });
+    customer.points_fidelite = newPts;
+
+    const actionText = pointsDelta >= 0 ? `+${pointsDelta} pts` : `${pointsDelta} pts`;
+    dbEngine.logAction(
+      'AJUSTEMENT_POINTS_FIDELITE',
+      `Points de fidélité ajustés pour ${customer.prenom} ${customer.nom} (${actionText}, NOUVEAU SOLDE: ${newPts} pts). Motif: ${reason || 'Ajustement Admin'}`
+    );
+    notifyListeners();
+    return customer;
+  },
+
+  redeemCustomerReward: async (customerId: string, rewardId: string, rewardTitle: string, pointsCost: number): Promise<Customer | undefined> => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    const currentPts = customer.points_fidelite || 0;
+    if (currentPts < pointsCost) {
+      throw new Error(`Solde de points insuffisant (${currentPts} pts vs ${pointsCost} pts requis).`);
+    }
+
+    const newPts = currentPts - pointsCost;
+    await performMutation('update', 'customers', customerId, { points_fidelite: newPts });
+    customer.points_fidelite = newPts;
+
+    dbEngine.logAction(
+      'UTILISATION_RECOMPENSE',
+      `Récompense '${rewardTitle}' débloquée pour ${customer.prenom} ${customer.nom} (-${pointsCost} pts, NOUVEAU SOLDE: ${newPts} pts)`
+    );
+    notifyListeners();
+    return customer;
+  },
+
   // ── Orders ──
 
   createOrder: async (orderData: Partial<Order>): Promise<Order> => {
@@ -558,7 +725,38 @@ export const dbEngine = {
 
   // ── Catalog ──
 
-  addCatalogItem: async (itemData: Partial<CatalogItem>): Promise<CatalogItem> => {
+  addCatalogItem: async (
+    itemDataOrArticle: Partial<CatalogItem> | string,
+    service?: string,
+    prix?: number,
+    categorie?: 'individuel' | 'abonnement' | 'exclusif',
+    description?: string,
+    prix_urgent?: number,
+    nombre_vetements?: number,
+    ramassage?: boolean,
+    nombre_ramassages?: number,
+    ramassage_gratuit?: boolean,
+    livraison_gratuite?: boolean,
+    store_id?: string | null
+  ): Promise<CatalogItem> => {
+    let itemData: Partial<CatalogItem>;
+    if (typeof itemDataOrArticle === 'string') {
+      itemData = {
+        article: itemDataOrArticle,
+        service: service || 'lavage_simple',
+        prix: Number(prix || 0),
+        categorie: categorie || 'individuel',
+        description: description || '',
+        store_id: store_id !== undefined ? store_id : (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null)
+      };
+    } else {
+      itemData = itemDataOrArticle || {};
+    }
+
+    const effectiveStoreId = itemData.store_id !== undefined 
+      ? itemData.store_id 
+      : (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null);
+
     const newItem: CatalogItem = {
       id: 'cat_' + Math.random().toString(36).substr(2, 9),
       article: itemData.article || 'Article',
@@ -567,7 +765,8 @@ export const dbEngine = {
       categorie: itemData.categorie || 'individuel',
       description: itemData.description || '',
       is_active: itemData.is_active !== false,
-      statut: itemData.is_active !== false ? 'actif' : 'inactif'
+      statut: itemData.is_active !== false ? 'actif' : 'inactif',
+      store_id: effectiveStoreId
     };
 
     await performMutation('insert', 'catalog', newItem.id, newItem);

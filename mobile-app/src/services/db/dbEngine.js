@@ -366,7 +366,12 @@ export const db = {
     persist();
     db.notify();
   },
-  getCatalog: () => [...memoryDb.catalog],
+  getCatalog: (storeId) => {
+    const list = memoryDb.catalog || [];
+    const targetStore = storeId !== undefined ? storeId : (memoryDb.current_user?.store_id || null);
+    if (!targetStore || targetStore === 'all') return [...list];
+    return list.filter(item => !item.store_id || item.store_id === 'all' || item.store_id === targetStore);
+  },
   getCurrentUser: () => {
     if (!memoryDb.current_user) return null;
     const user = { ...memoryDb.current_user };
@@ -526,7 +531,8 @@ export const db = {
         prenom: updatedFields.prenom ?? customer.prenom,
         telephone: updatedFields.telephone ? updatedFields.telephone.trim() : customer.telephone,
         adresse: updatedFields.adresse ?? customer.adresse,
-        preferences_pliage: updatedFields.preferences_pliage ?? customer.preferences_pliage
+        preferences_pliage: updatedFields.preferences_pliage ?? customer.preferences_pliage,
+        points_fidelite: updatedFields.points_fidelite !== undefined ? Number(updatedFields.points_fidelite) : customer.points_fidelite
       };
 
       await performMutation('update', 'customers', id, updateData);
@@ -536,6 +542,41 @@ export const db = {
       return customer;
     }
     return null;
+  },
+
+  /**
+   * Ajuste manuellement les points de fidélité d'un client.
+   */
+  adjustCustomerPoints: async (customerId, pointsDelta, reason = '') => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (customer) {
+      const currentPts = Number(customer.points_fidelite || 0);
+      const newPts = Math.max(0, currentPts + Number(pointsDelta));
+      customer.points_fidelite = newPts;
+      await performMutation('update', 'customers', customerId, { points_fidelite: newPts });
+      db.logAction('AJUSTEMENT_POINTS_FIDELITE', `Points fidélité de ${customer.prenom} ${customer.nom} : ${pointsDelta >= 0 ? '+' : ''}${pointsDelta} pts (${reason || 'Ajustement manuel'}). Nouveau solde: ${newPts} pts`);
+      db.notify();
+      return customer;
+    }
+    return null;
+  },
+
+  /**
+   * Utilise/Échange les points de fidélité d'un client contre une récompense.
+   */
+  redeemCustomerReward: async (customerId, rewardId, rewardTitle, pointsCost) => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer) throw new Error("Client introuvable");
+    const currentPts = Number(customer.points_fidelite || 0);
+    if (currentPts < pointsCost) {
+      throw new Error(`Solde de points insuffisant. Requis : ${pointsCost} pts, Actuel : ${currentPts} pts.`);
+    }
+    const newPts = currentPts - pointsCost;
+    customer.points_fidelite = newPts;
+    await performMutation('update', 'customers', customerId, { points_fidelite: newPts });
+    db.logAction('UTILISATION_RECOMPENSE', `Récompense '${rewardTitle}' débloquée par ${customer.prenom} ${customer.nom} (-${pointsCost} pts). Nouveau solde: ${newPts} pts`);
+    db.notify();
+    return customer;
   },
 
   /**
@@ -617,14 +658,15 @@ export const db = {
     }
   },
 
-  addCatalogItem: async (article, service, prix, categorie = 'individuel', description = '') => {
+  addCatalogItem: async (article, service, prix, categorie = 'individuel', description = '', storeId = null) => {
     const newItem = {
       id: 'cat_' + Math.random().toString(36).substring(2, 11),
       article,
       service,
       prix: Number(prix),
       categorie,
-      description
+      description,
+      store_id: storeId || memoryDb.current_user?.store_id || null
     };
     await performMutation('insert', 'catalog', newItem.id, newItem);
     memoryDb.catalog.push(newItem);
@@ -1120,7 +1162,7 @@ export const db = {
         can_view_dashboard: member.role === 'super_admin' || member.role === 'manager',
         can_manage_orders: true,
         can_manage_crm: true,
-        can_edit_catalog: member.role === 'super_admin' || member.role === 'manager',
+        can_edit_catalog: member.role === 'super_admin' || member.role === 'manager' || member.role === 'editeur_catalogue',
         can_view_logs: member.role === 'super_admin',
         can_manage_staff: member.role === 'super_admin'
       },

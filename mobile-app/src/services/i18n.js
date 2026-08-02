@@ -69,6 +69,7 @@ const translations = {
     roles: {
       super_admin: 'Super Administrateur',
       manager: 'Gestionnaire',
+      editeur_catalogue: 'Éditeur Catalogue',
       livreur: 'Livreur',
       agent_lavage_repassage: 'Atelier Lavage & Repassage',
       agent_accueil: "Agent d'accueil",
@@ -375,6 +376,7 @@ const translations = {
     roles: {
       super_admin: 'Super Administrator',
       manager: 'Manager',
+      editeur_catalogue: 'Catalog Editor',
       livreur: 'Delivery Driver',
       agent_lavage_repassage: 'Wash & Iron Workshop',
       agent_accueil: 'Front Desk Agent',

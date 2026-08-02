@@ -56,6 +56,28 @@ export const DEFAULT_ROLES = [
     }
   },
   {
+    id: 'editeur_catalogue',
+    key: 'editeur_catalogue',
+    label: 'Éditeur Catalogue',
+    shortLabel: 'Catalogue',
+    color: '#8b5cf6',
+    description: 'Gestion complète du catalogue d\'articles, création de produits, ajustement des tarifs et formules d\'abonnement.',
+    isSystem: true,
+    permissions: {
+      can_view_dashboard: false,
+      can_manage_orders: false,
+      can_manage_crm: false,
+      can_edit_catalog: true,
+      can_manage_stores: false,
+      can_view_logs: false,
+      can_manage_staff: false,
+      can_access_mobile: true,
+      can_create_orders_mobile: false,
+      can_manage_delivery_mobile: false,
+      can_manage_workshop_mobile: false
+    }
+  },
+  {
     id: 'agent_accueil',
     key: 'agent_accueil',
     label: 'Agent d\'accueil',

@@ -1,4 +1,4 @@
-export type Role = 'super_admin' | 'manager' | 'agent_accueil' | 'agent_lavage_repassage' | 'livreur';
+export type Role = 'super_admin' | 'manager' | 'editeur_catalogue' | 'agent_accueil' | 'agent_lavage_repassage' | 'livreur';
 
 export type OrderStatus =
   | 'en_attente'
@@ -140,12 +140,14 @@ export interface CatalogItem {
   description?: string;
   is_active?: boolean;
   statut?: 'actif' | 'inactif';
+  store_id?: string | null;
 }
 
 export interface ActivityLog {
   id: string;
   user_id: string;
   user_name: string;
+  store_id?: string;
   action: string;
   details: string;
   timestamp: string;

@@ -67,6 +67,23 @@ class ErrorBoundary extends Component {
               L'application a rencontré un incident inattendu. Cliquez sur le bouton ci-dessous pour recharger l'interface administrateur.
             </p>
 
+            {this.state.error && (
+              <div style={{
+                background: '#f1f5f9',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                textAlign: 'left',
+                width: '100%',
+                fontSize: '0.75rem',
+                fontFamily: 'monospace',
+                color: '#ef4444',
+                maxHeight: '120px',
+                overflowY: 'auto'
+              }}>
+                {this.state.error.toString()}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => {

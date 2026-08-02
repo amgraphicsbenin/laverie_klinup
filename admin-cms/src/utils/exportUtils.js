@@ -126,7 +126,7 @@ export function exportCustomersCSV(customers) {
   exportToCSV(`Clients_KlinUp_${new Date().toISOString().slice(0, 10)}.csv`, headers, customers);
 }
 
-export function exportLogsCSV(logs, staffList = []) {
+export function exportLogsCSV(logs, staffList = [], storesList = []) {
   const actionLabels = {
     CONNEXION: 'Connexion Utilisateur',
     DECONNEXION: 'Déconnexion Session',
@@ -168,7 +168,22 @@ export function exportLogsCSV(logs, staffList = []) {
       }
       return r.user_role || 'Système';
     }},
-    { label: 'Point de Laverie', accessor: r => r.store_name || r.store_id || 'Point Central' },
+    { label: 'Point de Laverie', accessor: r => {
+      if (r.store_name) return r.store_name;
+      const user = Array.isArray(staffList) ? staffList.find(s => String(s.id) === String(r.user_id)) : null;
+      const targetStoreId = r.store_id || user?.store_id;
+
+      if (targetStoreId && Array.isArray(storesList) && storesList.length > 0) {
+        const found = storesList.find(st => String(st.id) === String(targetStoreId));
+        if (found && (found.nom || found.name || found.store_name)) {
+          return found.nom || found.name || found.store_name;
+        }
+      }
+      if (targetStoreId && targetStoreId !== 'store_central' && targetStoreId !== 'all') {
+        return targetStoreId;
+      }
+      return 'Point Central';
+    }},
     { label: 'Action Exécutée', accessor: r => actionLabels[r.action] || r.action || 'Action Système' },
     { label: 'Détails & Motif de l\'Opération', accessor: r => r.details || r.description || '' }
   ];

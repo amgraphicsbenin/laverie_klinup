@@ -969,6 +969,7 @@ export default function GestionScreen({
 
   const filteredCatalog = catalog.filter(c => 
     c.categorie !== 'system_setting' && c.service !== 'system' &&
+    (!currentUser?.store_id || currentUser.store_id === 'all' || !c.store_id || c.store_id === 'all' || c.store_id === currentUser.store_id) &&
     c.article.toLowerCase().includes(searchQuery.toLowerCase())
   );
 

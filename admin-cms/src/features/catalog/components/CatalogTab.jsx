@@ -23,7 +23,8 @@ export default function CatalogTab({
   handleStartEditProduct,
   handleDeleteCatalogItem,
   handleToggleCatalogItemActive,
-  setShowAddCatalogModal
+  setShowAddCatalogModal,
+  stores = []
 }) {
   const catalogItemsPerPage = 20;
   const totalCatalogPages = Math.ceil(filteredCatalog.length / catalogItemsPerPage);
@@ -61,27 +62,28 @@ export default function CatalogTab({
       </div>
 
       {/* Sub-tabs for Individual Clothes vs Subscriptions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <div className="filter-pills-group">
           <button
-            className={`btn ${catalogCategory === 'individuel' ? 'btn-primary' : 'btn-outline'}`}
+            type="button"
+            className={`filter-pill-btn ${catalogCategory === 'individuel' ? 'active' : ''}`}
             onClick={() => setCatalogCategory('individuel')}
-            style={{ padding: '0.4rem 1rem', borderRadius: '8px' }}
           >
-            Vêtements individuels
+            Vêtements Individuels
           </button>
           <button
-            className={`btn ${catalogCategory === 'abonnement' ? 'btn-primary' : 'btn-outline'}`}
+            type="button"
+            className={`filter-pill-btn ${catalogCategory === 'abonnement' ? 'active' : ''}`}
             onClick={() => setCatalogCategory('abonnement')}
-            style={{ padding: '0.4rem 1rem', borderRadius: '8px' }}
           >
             Abonnements
           </button>
         </div>
+
         {selectedCatalogIds.length > 0 && (
           <button
             className="btn btn-danger"
-            style={{ padding: '0.4rem 1rem', borderRadius: '8px', background: 'var(--danger)', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            style={{ padding: '0.45rem 1.1rem', borderRadius: '12px', background: 'var(--danger)', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, fontSize: '0.82rem' }}
             onClick={handleDeleteCatalogItemsBatch}
           >
             <Trash2 size={15} />
@@ -90,14 +92,13 @@ export default function CatalogTab({
         )}
       </div>
 
-      {/* Smart Filters bar */}
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '12px', flexShrink: 0 }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+      {/* Smart Filters panel */}
+      <div className="smart-filter-panel">
+        <div className="search-control-container">
+          <Search size={16} className="search-control-icon" />
           <input
             type="text"
-            className="input-control"
-            style={{ paddingLeft: '2.2rem', borderRadius: '8px', fontSize: '0.85rem', width: '100%', height: '36px' }}
+            className="search-control-input"
             placeholder="Rechercher un article..."
             value={catalogSearchText}
             onChange={(e) => setCatalogSearchText(e.target.value)}
@@ -105,10 +106,9 @@ export default function CatalogTab({
         </div>
         
         {catalogCategory === 'individuel' && (
-          <div style={{ width: '150px' }}>
+          <div className="select-control-wrapper">
             <CustomSelect
               className="input-control"
-              style={{ borderRadius: '8px', fontSize: '0.85rem', height: '36px' }}
               value={catalogServiceFilter}
               onChange={(e) => setCatalogServiceFilter(e.target.value)}
             >
@@ -120,10 +120,9 @@ export default function CatalogTab({
         )}
 
         {catalogCategory === 'individuel' && (
-          <div style={{ width: '150px' }}>
+          <div className="select-control-wrapper">
             <CustomSelect
               className="input-control"
-              style={{ borderRadius: '8px', fontSize: '0.85rem', height: '36px' }}
               value={catalogPriceFilter}
               onChange={(e) => setCatalogPriceFilter(e.target.value)}
             >
@@ -135,10 +134,9 @@ export default function CatalogTab({
           </div>
         )}
 
-        <div style={{ width: '150px' }}>
+        <div className="select-control-wrapper">
           <CustomSelect
             className="input-control"
-            style={{ borderRadius: '8px', fontSize: '0.85rem', height: '36px' }}
             value={catalogSortOrder}
             onChange={(e) => setCatalogSortOrder(e.target.value)}
           >
@@ -149,11 +147,10 @@ export default function CatalogTab({
           </CustomSelect>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 0.5rem', marginLeft: 'auto' }}>
+        <label className="filter-checkbox-badge" htmlFor="select-all-catalog">
           <input
             type="checkbox"
             id="select-all-catalog"
-            style={{ cursor: 'pointer', scale: '1.1' }}
             checked={paginatedCatalog.length > 0 && paginatedCatalog.every(item => selectedCatalogIds.includes(item.id))}
             onChange={(e) => {
               if (e.target.checked) {
@@ -166,10 +163,8 @@ export default function CatalogTab({
               }
             }}
           />
-          <label htmlFor="select-all-catalog" style={{ fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', color: 'var(--text-secondary)', userSelect: 'none' }}>
-            Tout cocher
-          </label>
-        </div>
+          <span>Tout cocher</span>
+        </label>
       </div>
 
       {/* Table list or Subscription container */}
@@ -252,7 +247,14 @@ export default function CatalogTab({
                               <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: isActive ? 'var(--primary-light)' : 'rgba(100, 116, 139, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                 {getAssetIcon(item.article)}
                               </div>
-                              <strong style={{ fontSize: '0.88rem', color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>{item.article}</strong>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                <strong style={{ fontSize: '0.88rem', color: isActive ? 'var(--text-primary)' : 'var(--text-muted)' }}>{item.article}</strong>
+                                {item.store_id && item.store_id !== 'all' && (
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 600 }}>
+                                    📍 {stores.find(s => s.id === item.store_id || s.code === item.store_id)?.nom || item.store_id}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
                           

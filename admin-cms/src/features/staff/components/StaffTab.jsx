@@ -257,6 +257,7 @@ export default function StaffTab({
     const defaultLabels = {
       super_admin: 'Super Admin',
       manager: 'Gérant (Manager)',
+      editeur_catalogue: 'Éditeur Catalogue',
       agent_accueil: 'Agent Caisse & Accueil',
       agent_lavage_repassage: 'Agent Atelier',
       livreur: 'Livreur Terrain',
@@ -534,15 +535,14 @@ export default function StaffTab({
           )}
 
           {/* BARRE DE FILTRES INTELLIGENTS ET RECHERCHE */}
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', background: 'var(--bg-app)', padding: '0.85rem', borderRadius: '14px', alignItems: 'center' }}>
+          <div className="smart-filter-panel">
             
             {/* Zone de Recherche Texte */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <div className="search-control-container">
+              <Search size={16} className="search-control-icon" />
               <input
                 type="text"
-                className="input-control"
-                style={{ paddingLeft: '2.2rem', borderRadius: '8px', fontSize: '0.85rem', width: '100%', height: '38px' }}
+                className="search-control-input"
                 placeholder="Rechercher par nom, prénom, email, téléphone..."
                 value={searchTerm}
                 onChange={(e) => {
@@ -554,7 +554,7 @@ export default function StaffTab({
                 <button
                   type="button"
                   onClick={() => setSearchTerm('')}
-                  style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
+                  className="search-control-clear"
                 >
                   <X size={14} />
                 </button>
@@ -562,10 +562,9 @@ export default function StaffTab({
             </div>
 
             {/* Filtre Rôle */}
-            <div style={{ width: '170px' }}>
+            <div className="select-control-wrapper" style={{ minWidth: '170px' }}>
               <CustomSelect
                 className="input-control"
-                style={{ borderRadius: '8px', fontSize: '0.82rem', height: '38px' }}
                 value={roleFilter}
                 onChange={(e) => {
                   setRoleFilter(e.target.value);
@@ -582,10 +581,9 @@ export default function StaffTab({
             </div>
 
             {/* Filtre Boutique / Laverie */}
-            <div style={{ width: '170px' }}>
+            <div className="select-control-wrapper" style={{ minWidth: '170px' }}>
               <CustomSelect
                 className="input-control"
-                style={{ borderRadius: '8px', fontSize: '0.82rem', height: '38px' }}
                 value={storeFilter}
                 onChange={(e) => {
                   setStoreFilter(e.target.value);
@@ -602,10 +600,9 @@ export default function StaffTab({
             </div>
 
             {/* Filtre Statut */}
-            <div style={{ width: '150px' }}>
+            <div className="select-control-wrapper" style={{ minWidth: '150px' }}>
               <CustomSelect
                 className="input-control"
-                style={{ borderRadius: '8px', fontSize: '0.82rem', height: '38px' }}
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
@@ -613,8 +610,8 @@ export default function StaffTab({
                 }}
               >
                 <option value="all">Tous les statuts</option>
-                <option value="actif">Actif (Autorisé)</option>
-                <option value="suspendu">Suspendu (Bloqué)</option>
+                <option value="actif">Comptes Actifs</option>
+                <option value="suspendu">Comptes Suspendus</option>
               </CustomSelect>
             </div>
 

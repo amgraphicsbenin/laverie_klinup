@@ -43,19 +43,27 @@ export default function LogsTab({
   logFilterAction,
   setLogFilterAction,
   filteredLogs,
-  staff = []
+  staff = [],
+  selectedStoreId = 'all',
+  stores: storesProp
 }) {
-  const stores = useMemo(() => (db.getStores ? db.getStores() : []), []);
+  const stores = useMemo(() => (storesProp && storesProp.length > 0 ? storesProp : (db.getStores ? db.getStores() : [])), [storesProp]);
 
   // --- ÉTATS LOCAUX DE FILTRAGE ET DE PAGINATION ---
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [originFilter, setOriginFilter] = useState('all');
-  const [storeFilter, setStoreFilter] = useState('all');
+  const [storeFilter, setStoreFilter] = useState(selectedStoreId || 'all');
   const [dateFilter, setDateFilter] = useState('all');
   const [selectedLog, setSelectedLog] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [logsPerPage, setLogsPerPage] = useState(15);
+
+  React.useEffect(() => {
+    if (selectedStoreId !== undefined) {
+      setStoreFilter(selectedStoreId);
+    }
+  }, [selectedStoreId]);
 
   // --- DÉTERMINATION DE L'ORIGINE DE L'ACTION (ADMIN vs MOBILE vs SYSTEME) ---
   const getLogOrigin = (log, user) => {
@@ -185,8 +193,18 @@ export default function LogsTab({
 
       // 5. Filtre par Point de Laverie
       if (storeFilter !== 'all') {
-        const logStore = log.store_id || (user?.store_id) || 'store_central';
-        if (logStore !== storeFilter) return false;
+        const targetStore = stores.find(s => s.id === storeFilter || s.code === storeFilter);
+        const storeCode = targetStore?.code?.toLowerCase();
+        const storeName = targetStore?.nom?.toLowerCase();
+
+        const logStore = log.store_id || user?.store_id;
+        const matchesStoreId = logStore === storeFilter || (storeCode && logStore === storeCode);
+
+        const detailsLower = (log.details || '').toLowerCase();
+        const matchesDetails = (storeCode && detailsLower.includes(storeCode)) ||
+                              (storeName && detailsLower.includes(storeName));
+
+        if (!matchesStoreId && !matchesDetails) return false;
       }
 
       // 6. Filtre par Période de Date
@@ -300,7 +318,7 @@ export default function LogsTab({
           <button
             type="button"
             className="btn btn-outline"
-            onClick={() => exportLogsCSV(fullyFilteredLogs, staff)}
+            onClick={() => exportLogsCSV(fullyFilteredLogs, staff, stores)}
             style={{ padding: '0.45rem 0.9rem', fontSize: '0.78rem', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
             title="Exporter les traces d'audit en fichier CSV"
           >
@@ -309,14 +327,13 @@ export default function LogsTab({
         </div>
 
         {/* 3. BARRE DE FILTRES MULTI-CRITÈRES */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', background: 'var(--bg-app)', padding: '0.85rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+        <div className="smart-filter-panel">
           {/* Recherche Textuelle */}
-          <div style={{ flex: '1 1 240px', position: 'relative' }}>
-            <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <div className="search-control-container" style={{ flex: '1 1 240px' }}>
+            <Search size={15} className="search-control-icon" />
             <input
               type="text"
-              className="input-control"
-              style={{ paddingLeft: '2.5rem', width: '100%', borderRadius: '10px', fontSize: '0.82rem', height: '38px' }}
+              className="search-control-input"
               placeholder="Rechercher par nom, email, détail, motif..."
               value={logSearchText}
               onChange={(e) => {
@@ -327,10 +344,9 @@ export default function LogsTab({
           </div>
 
           {/* Filtre par Origine Plateforme */}
-          <div style={{ width: '160px' }}>
+          <div className="select-control-wrapper" style={{ minWidth: '160px' }}>
             <CustomSelect
               className="input-control"
-              style={{ borderRadius: '10px', fontSize: '0.78rem', height: '38px' }}
               value={originFilter}
               onChange={(e) => { setOriginFilter(e.target.value); setCurrentPage(1); }}
             >
@@ -342,10 +358,9 @@ export default function LogsTab({
           </div>
 
           {/* Filtre par Catégorie d'Action */}
-          <div style={{ width: '170px' }}>
+          <div className="select-control-wrapper" style={{ minWidth: '170px' }}>
             <CustomSelect
               className="input-control"
-              style={{ borderRadius: '10px', fontSize: '0.78rem', height: '38px' }}
               value={categoryFilter}
               onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
             >
@@ -358,10 +373,9 @@ export default function LogsTab({
           </div>
 
           {/* Filtre par Point de Laverie */}
-          <div style={{ width: '170px' }}>
+          <div className="select-control-wrapper" style={{ minWidth: '170px' }}>
             <CustomSelect
               className="input-control"
-              style={{ borderRadius: '10px', fontSize: '0.78rem', height: '38px' }}
               value={storeFilter}
               onChange={(e) => { setStoreFilter(e.target.value); setCurrentPage(1); }}
             >
@@ -373,10 +387,9 @@ export default function LogsTab({
           </div>
 
           {/* Filtre par Période */}
-          <div style={{ width: '150px' }}>
+          <div className="select-control-wrapper" style={{ minWidth: '150px' }}>
             <CustomSelect
               className="input-control"
-              style={{ borderRadius: '10px', fontSize: '0.78rem', height: '38px' }}
               value={dateFilter}
               onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
             >

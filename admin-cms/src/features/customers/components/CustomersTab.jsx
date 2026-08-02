@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import {
   Users,
   UserPlus,
@@ -17,10 +18,22 @@ import {
   Tag,
   Clock,
   ArrowRight,
-  Download
+  Download,
+  Gift,
+  Zap,
+  Crown,
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import { exportCustomersCSV } from '../../../utils/exportUtils';
+import { getFidelityTier, FIDELITY_TIERS, REWARD_CATALOG, renderTierIcon, renderRewardIcon } from '../../../utils/fidelityUtils.jsx';
+import { db } from '../../../services/db';
+
+const ModalPortal = ({ children }) => {
+  if (typeof document === 'undefined') return children;
+  return ReactDOM.createPortal(children, document.body);
+};
 
 export default function CustomersTab({
   customers,
@@ -41,8 +54,16 @@ export default function CustomersTab({
   getOrderStatusLabel,
   setCreatedOrder
 }) {
-  const [filterMode, setFilterMode] = useState('all'); // 'all', 'abonne', 'dette'
+  const [filterMode, setFilterMode] = useState('all'); // 'all', 'abonne', 'dette', 'fidelite'
+  const [tierFilter, setTierFilter] = useState('all'); // 'all', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM'
   const [copiedId, setCopiedId] = useState(null);
+
+  // Modal Fidélité State
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [rewardTab, setRewardTab] = useState('redeem'); // 'redeem' | 'adjust'
+  const [pointsDeltaInput, setPointsDeltaInput] = useState('');
+  const [reasonInput, setReasonInput] = useState('');
+  const [modalFeedback, setModalFeedback] = useState(null); // { type: 'success'|'error', text: '' }
 
   // Helper to copy customer details
   const handleCopyCustomer = (customer) => {
@@ -67,8 +88,78 @@ export default function CustomersTab({
   const activeSubscribers = customers.filter(c => c.active_subscription).length;
   const indebtedCustomers = customers.filter(c => c.solde_dette > 0);
   const totalDebtAmount = indebtedCustomers.reduce((acc, c) => acc + (c.solde_dette || 0), 0);
+  const totalFidelityPoints = customers.reduce((acc, c) => acc + (c.points_fidelite || 0), 0);
+  const vipCustomersCount = customers.filter(c => (c.points_fidelite || 0) >= 150).length;
 
-  // Status badges mapping
+  // Handlers for Loyalty Actions
+  const handleOpenRewardModal = (tab = 'redeem') => {
+    setRewardTab(tab);
+    setPointsDeltaInput('');
+    setReasonInput('');
+    setModalFeedback(null);
+    setShowRewardModal(true);
+  };
+
+  const handleCloseRewardModal = () => {
+    setShowRewardModal(false);
+    setModalFeedback(null);
+  };
+
+  const handleApplyPointsAdjustment = async (customDelta = null) => {
+    if (!selectedCrmCustomer) return;
+    const deltaVal = customDelta !== null ? customDelta : Number(pointsDeltaInput);
+    if (isNaN(deltaVal) || deltaVal === 0) {
+      setModalFeedback({ type: 'error', text: 'Veuillez entrer un nombre de points valide.' });
+      return;
+    }
+
+    try {
+      const updated = await db.adjustCustomerPoints(
+        selectedCrmCustomer.id,
+        deltaVal,
+        reasonInput || 'Ajustement Admin CMS'
+      );
+      if (updated) {
+        setSelectedCrmCustomer({ ...updated });
+        setModalFeedback({ type: 'success', text: `Solde mis à jour (${deltaVal >= 0 ? '+' : ''}${deltaVal} pts) !` });
+        setTimeout(() => {
+          handleCloseRewardModal();
+        }, 1200);
+      }
+    } catch (err) {
+      setModalFeedback({ type: 'error', text: err.message || 'Échec de l\'ajustement des points.' });
+    }
+  };
+
+  const handleRedeemRewardAdmin = async (reward) => {
+    if (!selectedCrmCustomer) return;
+    const currentPts = Number(selectedCrmCustomer.points_fidelite || 0);
+
+    if (currentPts < reward.cost) {
+      setModalFeedback({ type: 'error', text: `Il manque ${reward.cost - currentPts} pts pour cette récompense.` });
+      return;
+    }
+
+    try {
+      const updated = await db.redeemCustomerReward(
+        selectedCrmCustomer.id,
+        reward.id,
+        reward.title,
+        reward.cost
+      );
+      if (updated) {
+        setSelectedCrmCustomer({ ...updated });
+        setModalFeedback({ type: 'success', text: `Récompense "${reward.title}" débloquée avec succès !` });
+        setTimeout(() => {
+          handleCloseRewardModal();
+        }, 1200);
+      }
+    } catch (err) {
+      setModalFeedback({ type: 'error', text: err.message || 'Échec du déblocage de la récompense.' });
+    }
+  };
+
+  // Status badges mapping for orders
   const statusBadgesConfig = {
     en_attente: { bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706', label: 'En attente' },
     traitement: { bg: 'rgba(124, 58, 237, 0.12)', color: '#7c3aed', label: 'Traitement' },
@@ -82,13 +173,15 @@ export default function CustomersTab({
     annule: { bg: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', label: 'Annulée' }
   };
 
+  const selectedTier = selectedCrmCustomer ? getFidelityTier(selectedCrmCustomer.points_fidelite || 0) : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-      {/* BANNIÈRE DE STATISTIQUES CRM (KPI BAR) */}
+      {/* BANNIÈRE DE STATISTIQUES CRM & FIDÉLITÉ (KPI BAR) */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '1rem'
       }}>
         {/* KPI 1 : Total Portefeuille Clients */}
@@ -151,7 +244,7 @@ export default function CustomersTab({
           </div>
           <div>
             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Abonnés VIP / Premium
+              Abonnés Actifs
             </div>
             <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#10b981', lineHeight: 1.1, marginTop: '2px' }}>
               {activeSubscribers} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>actifs</span>
@@ -159,7 +252,7 @@ export default function CustomersTab({
           </div>
         </div>
 
-        {/* KPI 3 : Clients en Dette */}
+        {/* KPI 3 : Programme Fidélité & Points Cumulés */}
         <div className="card" style={{
           padding: '1.1rem 1.25rem',
           display: 'flex',
@@ -174,21 +267,24 @@ export default function CustomersTab({
             width: '46px',
             height: '46px',
             borderRadius: '14px',
-            background: indebtedCustomers.length > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(100, 116, 139, 0.1)',
-            color: indebtedCustomers.length > 0 ? '#ef4444' : 'var(--text-muted)',
+            background: 'rgba(217, 119, 6, 0.12)',
+            color: '#d97706',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0
           }}>
-            <AlertTriangle size={24} />
+            <Crown size={24} />
           </div>
           <div>
             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Comptes en Dette
+              Fidélité & Rewards
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: indebtedCustomers.length > 0 ? '#ef4444' : 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
-              {indebtedCustomers.length} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>clients</span>
+            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#d97706', lineHeight: 1.1, marginTop: '2px' }}>
+              {totalFidelityPoints.toLocaleString('fr-FR')} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>pts</span>
+            </div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              {vipCustomersCount} clients VIP Or/Platine
             </div>
           </div>
         </div>
@@ -208,8 +304,8 @@ export default function CustomersTab({
             width: '46px',
             height: '46px',
             borderRadius: '14px',
-            background: 'rgba(245, 158, 11, 0.12)',
-            color: '#d97706',
+            background: 'rgba(239, 68, 68, 0.12)',
+            color: '#ef4444',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -219,10 +315,10 @@ export default function CustomersTab({
           </div>
           <div>
             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Total Dettes à Recouvrer
+              Comptes en Dette
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#d97706', lineHeight: 1.1, marginTop: '2px' }}>
-              {totalDebtAmount.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>FCFA</span>
+            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#ef4444', lineHeight: 1.1, marginTop: '2px' }}>
+              {totalDebtAmount.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>F</span>
             </div>
           </div>
         </div>
@@ -241,7 +337,7 @@ export default function CustomersTab({
                 Portefeuille Clients
               </h3>
               <p style={{ margin: '0.15rem 0 0', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                Fiches CRM & historiques de fréquentation
+                Fiches CRM, abonnements & programme fidélité
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -266,12 +362,11 @@ export default function CustomersTab({
           </div>
 
           {/* Search Input */}
-          <div style={{ position: 'relative' }}>
-            <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <div className="search-control-container">
+            <Search size={15} className="search-control-icon" />
             <input
               type="text"
-              className="input-control"
-              style={{ paddingLeft: '2.4rem', width: '100%', borderRadius: '10px', fontSize: '0.8rem', padding: '0.5rem 0.5rem 0.5rem 2.4rem' }}
+              className="search-control-input"
               placeholder="Rechercher par Nom, Prénom ou Téléphone..."
               value={crmSearch}
               onChange={(e) => setCrmSearch(e.target.value)}
@@ -279,68 +374,134 @@ export default function CustomersTab({
           </div>
 
           {/* Filter Chips Pills */}
-          <div style={{ display: 'flex', background: 'var(--bg-app)', padding: '0.25rem', borderRadius: '10px', border: '1px solid var(--border-color)', gap: '0.25rem' }}>
-            <button
-              type="button"
-              onClick={() => setFilterMode('all')}
-              style={{
-                flex: 1,
-                padding: '0.35rem 0.5rem',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                borderRadius: '7px',
-                border: 'none',
-                background: filterMode === 'all' ? 'var(--primary)' : 'transparent',
-                color: filterMode === 'all' ? '#fff' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              Tous ({customers.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterMode('abonne')}
-              style={{
-                flex: 1,
-                padding: '0.35rem 0.5rem',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                borderRadius: '7px',
-                border: 'none',
-                background: filterMode === 'abonne' ? '#10b981' : 'transparent',
-                color: filterMode === 'abonne' ? '#fff' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              Abonnés ({activeSubscribers})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterMode('dette')}
-              style={{
-                flex: 1,
-                padding: '0.35rem 0.5rem',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                borderRadius: '7px',
-                border: 'none',
-                background: filterMode === 'dette' ? '#ef4444' : 'transparent',
-                color: filterMode === 'dette' ? '#fff' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              Dettes ({indebtedCustomers.length})
-            </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="filter-pills-group" style={{ width: '100%' }}>
+              <button
+                type="button"
+                className={`filter-pill-btn ${filterMode === 'all' ? 'active' : ''}`}
+                onClick={() => setFilterMode('all')}
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                Tous ({customers.length})
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn ${filterMode === 'abonne' ? 'active' : ''}`}
+                onClick={() => setFilterMode('abonne')}
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                Abonnés ({activeSubscribers})
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn ${filterMode === 'fidelite' ? 'active' : ''}`}
+                onClick={() => setFilterMode('fidelite')}
+                style={{ flex: 1, justifyContent: 'center', gap: '0.25rem' }}
+              >
+                <Award size={13} /> Fidélité
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn ${filterMode === 'dette' ? 'active' : ''}`}
+                onClick={() => setFilterMode('dette')}
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                Dettes ({indebtedCustomers.length})
+              </button>
+            </div>
+
+            {/* Sub-Pills pour filtrer par statut de fidélité */}
+            {filterMode === 'fidelite' && (
+              <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setTierFilter('all')}
+                  style={{
+                    padding: '0.25rem 0.55rem',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    background: tierFilter === 'all' ? 'var(--primary)' : 'var(--bg-app)',
+                    color: tierFilter === 'all' ? '#ffffff' : 'var(--text-secondary)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Tous Tiers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTierFilter('BRONZE')}
+                  style={{
+                    padding: '0.25rem 0.55rem',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: '1px solid rgba(217, 119, 6, 0.4)',
+                    background: tierFilter === 'BRONZE' ? '#d97706' : 'rgba(217, 119, 6, 0.08)',
+                    color: tierFilter === 'BRONZE' ? '#ffffff' : '#d97706',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Bronze
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTierFilter('SILVER')}
+                  style={{
+                    padding: '0.25rem 0.55rem',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: '1px solid rgba(2, 132, 199, 0.4)',
+                    background: tierFilter === 'SILVER' ? '#0284c7' : 'rgba(2, 132, 199, 0.08)',
+                    color: tierFilter === 'SILVER' ? '#ffffff' : '#0284c7',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Argent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTierFilter('GOLD')}
+                  style={{
+                    padding: '0.25rem 0.55rem',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: '1px solid rgba(202, 138, 4, 0.4)',
+                    background: tierFilter === 'GOLD' ? '#ca8a04' : 'rgba(202, 138, 4, 0.08)',
+                    color: tierFilter === 'GOLD' ? '#ffffff' : '#ca8a04',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Or
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTierFilter('PLATINUM')}
+                  style={{
+                    padding: '0.25rem 0.55rem',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: '1px solid rgba(124, 58, 237, 0.4)',
+                    background: tierFilter === 'PLATINUM' ? '#7c3aed' : 'rgba(124, 58, 237, 0.08)',
+                    color: tierFilter === 'PLATINUM' ? '#ffffff' : '#7c3aed',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Platine VIP
+                </button>
+              </div>
+            )}
           </div>
 
           {/* List of Customers */}
           <div style={{ overflowY: 'auto', maxHeight: '580px', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem' }}>
             {(() => {
               const query = crmSearch.toLowerCase();
-              const filteredCrm = customers.filter(c => {
+              let filteredCrm = customers.filter(c => {
                 const nom = (c.nom || '').toLowerCase();
                 const prenom = (c.prenom || '').toLowerCase();
                 const tel = (c.telephone || '').toLowerCase();
@@ -349,8 +510,17 @@ export default function CustomersTab({
                 if (!matchesQuery) return false;
                 if (filterMode === 'abonne') return !!c.active_subscription;
                 if (filterMode === 'dette') return c.solde_dette > 0;
+                if (filterMode === 'fidelite') {
+                  if (tierFilter === 'all') return true;
+                  const tier = getFidelityTier(c.points_fidelite || 0);
+                  return tier.key === tierFilter;
+                }
                 return true;
               });
+
+              if (filterMode === 'fidelite') {
+                filteredCrm = filteredCrm.sort((a, b) => (b.points_fidelite || 0) - (a.points_fidelite || 0));
+              }
 
               if (filteredCrm.length === 0) {
                 return (
@@ -364,6 +534,7 @@ export default function CustomersTab({
               return filteredCrm.map(c => {
                 const isSelected = selectedCrmCustomer?.id === c.id;
                 const avatarBg = getAvatarColor(`${c.prenom} ${c.nom}`);
+                const tier = getFidelityTier(c.points_fidelite || 0);
 
                 return (
                   <button
@@ -411,8 +582,8 @@ export default function CustomersTab({
                         <strong style={{ fontSize: '0.88rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {c.prenom} {c.nom}
                         </strong>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.1rem 0.4rem', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
-                          <Star size={11} fill="var(--primary)" /> {c.points_fidelite} pts
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: tier.color, background: tier.bgLight, border: `1px solid ${tier.border}`, padding: '0.1rem 0.45rem', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                          {renderTierIcon(tier.iconName, 11, tier.color)} {tier.name} • {c.points_fidelite || 0} pts
                         </span>
                       </div>
 
@@ -436,7 +607,7 @@ export default function CustomersTab({
           </div>
         </div>
 
-        {/* COLONNE DROITE : PROFIL CLIENT DETAILE & HISTORIQUE */}
+        {/* COLONNE DROITE : PROFIL CLIENT DETAILLE, FIDELITE & HISTORIQUE */}
         <div className="card" style={{ minHeight: '500px', display: 'flex', flexDirection: 'column', padding: '1.5rem', borderRadius: '20px' }}>
           {selectedCrmCustomer ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%' }}>
@@ -488,13 +659,13 @@ export default function CustomersTab({
               {/* KPI Mini-Cards Client */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem' }}>
                 
-                {/* 1. Points Fidélité */}
-                <div style={{ padding: '0.85rem 1rem', background: 'var(--bg-app)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <Star size={13} color="var(--primary)" /> Points Fidélité
+                {/* 1. Statut Fidélité */}
+                <div style={{ padding: '0.85rem 1rem', background: selectedTier.bgLight, borderRadius: '14px', border: `1px solid ${selectedTier.border}`, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <span style={{ fontSize: '0.7rem', color: selectedTier.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    {renderTierIcon(selectedTier.iconName, 13, selectedTier.color)} Statut {selectedTier.name}
                   </span>
-                  <strong style={{ fontSize: '1.25rem', fontFamily: 'var(--font-title)', color: 'var(--primary)', fontWeight: 900 }}>
-                    {selectedCrmCustomer.points_fidelite} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>pts</span>
+                  <strong style={{ fontSize: '1.25rem', fontFamily: 'var(--font-title)', color: selectedTier.color, fontWeight: 900 }}>
+                    {selectedCrmCustomer.points_fidelite || 0} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>pts</span>
                   </strong>
                 </div>
 
@@ -531,6 +702,68 @@ export default function CustomersTab({
                   <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', marginTop: '0.1rem', fontWeight: 800 }}>
                     {selectedCrmCustomer.preferences_pliage}
                   </strong>
+                </div>
+              </div>
+
+              {/* SECTION FIDÉLITÉ & RÉCOMPENSES DU CLIENT */}
+              <div style={{ padding: '1.1rem', background: 'var(--bg-app)', border: `1px solid ${selectedTier.border}`, borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: selectedTier.bgLight, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${selectedTier.border}` }}>
+                      {renderTierIcon(selectedTier.iconName, 20, selectedTier.color)}
+                    </div>
+                    <div>
+                      <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: 'var(--text-primary)' }}>{selectedTier.title}</h5>
+                      <span style={{ fontSize: '0.72rem', color: selectedTier.color, fontWeight: 700 }}>Statut Fidélité Actif</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <strong style={{ fontSize: '1.25rem', fontWeight: 900, color: selectedTier.color }}>{selectedCrmCustomer.points_fidelite || 0} pts</strong>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Solde disponible</div>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      {selectedTier.ptsToNext > 0 ? `${selectedTier.ptsToNext} pts restants vers ${selectedTier.nextTierName}` : 'Niveau VIP Maximale Atteint'}
+                    </span>
+                    <strong style={{ color: selectedTier.color }}>{selectedTier.progressPct}%</strong>
+                  </div>
+                  <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${selectedTier.progressPct}%`, background: selectedTier.color, borderRadius: '10px', transition: 'width 0.4s ease' }} />
+                  </div>
+                </div>
+
+                {/* Perks */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'var(--bg-card)', padding: '0.65rem 0.85rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Avantages du statut {selectedTier.name} :</span>
+                  {selectedTier.advantages.map((adv, idx) => (
+                    <div key={idx} style={{ fontSize: '0.74rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <CheckCircle2 size={12} color={selectedTier.color} /> {adv}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '0.65rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => handleOpenRewardModal('redeem')}
+                    style={{ flex: 1, padding: '0.55rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', background: selectedTier.color, color: '#fff', border: 'none' }}
+                  >
+                    <Gift size={15} /> Échanger des Points
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => handleOpenRewardModal('adjust')}
+                    style={{ padding: '0.55rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--primary)', borderColor: 'var(--primary-light)' }}
+                  >
+                    <Zap size={14} /> Ajuster
+                  </button>
                 </div>
               </div>
 
@@ -692,6 +925,326 @@ export default function CustomersTab({
           )}
         </div>
       </div>
+
+      {/* MODAL ADMIN FIDÉLITÉ & RÉCOMPENSES */}
+      {showRewardModal && selectedCrmCustomer && (
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={handleCloseRewardModal}>
+            <div
+              className="card modal-dialog-card"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '520px',
+                maxHeight: '90vh',
+                background: '#ffffff',
+                padding: '20px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                borderRadius: '24px',
+                boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25)',
+                border: '1.5px solid #e2e8f0',
+                margin: 'auto'
+              }}
+            >
+              {/* Header exact match with Nouvelle Commande modal */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#09090b', margin: 0, fontFamily: 'inherit' }}>
+                  Fidélité & Échange de Points
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleCloseRewardModal}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#71717a' }}
+                  title="Fermer"
+                >
+                  <X size={20} color="#71717a" />
+                </button>
+              </div>
+
+              {/* Scroll Content Container */}
+              <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px', display: 'flex', flexDirection: 'column' }}>
+
+                {/* Banner Client & Solde */}
+                <div style={{
+                  backgroundColor: 'rgba(0, 44, 247, 0.04)',
+                  border: '1.5px solid rgba(0, 44, 247, 0.12)',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  justify: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      backgroundColor: selectedTier.bgLight,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: `1px solid ${selectedTier.border}`,
+                      flexShrink: 0
+                    }}>
+                      {renderTierIcon(selectedTier.iconName, 20, selectedTier.color)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        +{selectedCrmCustomer.indicatif || '229'} {selectedCrmCustomer.telephone} • Statut {selectedTier.name}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{
+                    backgroundColor: selectedTier.bgLight,
+                    border: `1px solid ${selectedTier.border}`,
+                    borderRadius: '12px',
+                    padding: '6px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    flexShrink: 0
+                  }}>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: selectedTier.color, lineHeight: 1.1 }}>
+                      {selectedCrmCustomer.points_fidelite || 0} <span style={{ fontSize: '11px', fontWeight: 700 }}>pts</span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>Solde disponible</div>
+                  </div>
+                </div>
+
+                {/* Segmented Control Tabs (Matching Urgence Normal / Express style) */}
+                <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '12px', padding: '4px', marginBottom: '16px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setRewardTab('redeem')}
+                    style={{
+                      flex: 1,
+                      padding: '10px 14px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      borderRadius: '10px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      backgroundColor: rewardTab === 'redeem' ? '#002cf7' : 'transparent',
+                      color: rewardTab === 'redeem' ? '#ffffff' : '#64748b',
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Gift size={15} /> Catalogue Récompenses ({REWARD_CATALOG.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRewardTab('adjust')}
+                    style={{
+                      flex: 1,
+                      padding: '10px 14px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      borderRadius: '10px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      backgroundColor: rewardTab === 'adjust' ? '#002cf7' : 'transparent',
+                      color: rewardTab === 'adjust' ? '#ffffff' : '#64748b',
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Zap size={15} /> Ajuster Points
+                  </button>
+                </div>
+
+                {/* Feedback Message */}
+                {modalFeedback && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    marginBottom: '14px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    backgroundColor: modalFeedback.type === 'success' ? '#f0fdf4' : '#fff1f2',
+                    color: modalFeedback.type === 'success' ? '#15803d' : '#ef4444',
+                    border: `1px solid ${modalFeedback.type === 'success' ? '#bbf7d0' : '#ffe4e6'}`
+                  }}>
+                    {modalFeedback.text}
+                  </div>
+                )}
+
+                {/* Tab 1 : Catalogue Récompenses (Matching item list layout in Nouvelle Commande modal) */}
+                {rewardTab === 'redeem' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {REWARD_CATALOG.map((reward) => {
+                      const pts = Number(selectedCrmCustomer.points_fidelite || 0);
+                      const canAfford = pts >= reward.cost;
+
+                      return (
+                        <div
+                          key={reward.id}
+                          style={{
+                            backgroundColor: '#ffffff',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            justify: 'space-between',
+                            alignItems: 'center',
+                            opacity: canAfford ? 1 : 0.75,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#09090b' }}>
+                              {reward.title}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                              {reward.description}
+                            </div>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#002cf7', marginTop: '4px' }}>
+                              Coût : {reward.cost} points
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={!canAfford}
+                            onClick={() => handleRedeemRewardAdmin(reward)}
+                            style={{
+                              backgroundColor: canAfford ? 'rgba(0, 44, 247, 0.08)' : '#f1f5f9',
+                              color: canAfford ? '#002cf7' : '#94a3b8',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                              border: 'none',
+                              borderRadius: '10px',
+                              padding: '8px 16px',
+                              cursor: canAfford ? 'pointer' : 'not-allowed',
+                              whiteSpace: 'nowrap',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {canAfford ? 'Échanger' : `-${reward.cost - pts} pts`}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Tab 2 : Ajustement Points */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '8px' }}>
+                        Bonus Rapides :
+                      </label>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {[10, 25, 50, 100].map((bonus) => (
+                          <button
+                            key={bonus}
+                            type="button"
+                            onClick={() => handleApplyPointsAdjustment(bonus)}
+                            style={{
+                              backgroundColor: 'rgba(0, 44, 247, 0.06)',
+                              color: '#002cf7',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              border: 'none',
+                              borderRadius: '10px',
+                              padding: '8px 14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            +{bonus} pts
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                          Variation Personnalisée (positif ou négatif) :
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="Ex: 50 ou -20"
+                          value={pointsDeltaInput}
+                          onChange={(e) => setPointsDeltaInput(e.target.value)}
+                          style={{
+                            width: '100%',
+                            height: '46px',
+                            backgroundColor: '#ffffff',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '12px',
+                            padding: '0 14px',
+                            fontSize: '13px',
+                            color: '#09090b',
+                            fontWeight: 500,
+                            outline: 'none',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                          Motif de l'ajustement (optionnel) :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Offert par la gérance, correction caisse..."
+                          value={reasonInput}
+                          onChange={(e) => setReasonInput(e.target.value)}
+                          style={{
+                            width: '100%',
+                            height: '46px',
+                            backgroundColor: '#ffffff',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '12px',
+                            padding: '0 14px',
+                            fontSize: '13px',
+                            color: '#09090b',
+                            fontWeight: 500,
+                            outline: 'none',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleApplyPointsAdjustment()}
+                        style={{
+                          backgroundColor: '#002cf7',
+                          color: '#ffffff',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                          border: 'none',
+                          borderRadius: '14px',
+                          height: '46px',
+                          cursor: 'pointer',
+                          marginTop: '4px'
+                        }}
+                      >
+                        Valider l'ajustement
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
     </div>
   );
 }

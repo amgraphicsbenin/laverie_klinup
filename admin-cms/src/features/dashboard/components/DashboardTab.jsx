@@ -129,26 +129,6 @@ export default function DashboardTab({
 
         {/* Action Buttons */}
         <div style={{ zIndex: 1, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={() => setShowCashClosureModal(true)}
-            style={{
-              background: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              color: '#10b981',
-              padding: '0.65rem 1.1rem',
-              borderRadius: '12px',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              boxShadow: 'var(--shadow-sm)'
-            }}
-          >
-            <Award size={16} /> Clôture Caisse (Z)
-          </button>
 
           <button
             type="button"
@@ -518,44 +498,56 @@ export default function DashboardTab({
               const roleLabel = isSuper ? 'Super Admin' : isMgr ? 'Manager Caisse' : isLivreur ? 'Livreur' : isAtelier ? 'Agent Atelier' : "Agent d'Accueil";
               const avatarBg = isSuper ? '#2563eb' : isMgr ? '#0284c7' : isLivreur ? '#d97706' : isAtelier ? '#8b5cf6' : '#16a34a';
 
+              const pChar = (s.prenom || 'U').trim().charAt(0) || 'U';
+              const nRaw = (s.nom || 'M').trim();
+              let nChar = nRaw.charAt(0);
+              if (/^\d+$/.test(nRaw)) {
+                nChar = nRaw.replace(/^0+/, '').charAt(0) || nRaw.charAt(0);
+              }
+              const initials = (pChar + (nChar || '')).toUpperCase();
+
               return (
                 <div 
                   key={s.id}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justify: 'space-between',
-                    padding: '0.75rem',
+                    justifyContent: 'space-between',
+                    padding: '0.75rem 0.9rem',
                     borderRadius: '12px',
                     background: 'var(--bg-app)',
-                    border: '1px solid var(--border-color)'
+                    border: '1px solid var(--border-color)',
+                    gap: '0.75rem'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
                     <div 
                       style={{ 
                         width: '38px', 
                         height: '38px', 
-                        borderRadius: '10px', 
+                        minWidth: '38px',
+                        flexShrink: 0,
+                        borderRadius: '50%', 
                         background: avatarBg, 
                         color: '#ffffff', 
                         display: 'flex', 
                         alignItems: 'center', 
-                        justify: 'center', 
+                        justifyContent: 'center', 
                         fontWeight: 800,
-                        fontSize: '0.85rem'
+                        fontSize: '0.82rem',
+                        boxShadow: `0 2px 6px ${avatarBg}40`
                       }}
                     >
-                      {(s.prenom || 'U').charAt(0)}{(s.nom || 'M').charAt(0)}
+                      {initials}
                     </div>
-                    <div>
-                      <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{s.prenom} {s.nom}</strong>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{roleLabel}</div>
+                    <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.prenom} {s.nom}</strong>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roleLabel}</div>
                     </div>
                   </div>
 
-                  <span style={{ fontSize: '0.65rem', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontWeight: 800, padding: '0.2rem 0.55rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+                  <span style={{ flexShrink: 0, fontSize: '0.65rem', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontWeight: 800, padding: '0.2rem 0.55rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
                     En Ligne
                   </span>
                 </div>
@@ -649,7 +641,7 @@ export default function DashboardTab({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justify: 'space-between',
+                    justifyContent: 'space-between',
                     padding: '0.85rem 1rem',
                     borderRadius: '14px',
                     background: 'var(--bg-app)',

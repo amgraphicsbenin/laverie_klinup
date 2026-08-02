@@ -67,10 +67,13 @@ CREATE TABLE IF NOT EXISTS public.orders (
 CREATE TABLE IF NOT EXISTS public.activity_logs (
   id TEXT PRIMARY KEY,
   user_id TEXT,
+  user_name TEXT,
   action TEXT NOT NULL,
   details TEXT,
   timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE public.activity_logs ADD COLUMN IF NOT EXISTS user_name TEXT;
 
 -- 5. Table: catalog
 CREATE TABLE IF NOT EXISTS public.catalog (
@@ -84,7 +87,8 @@ CREATE TABLE IF NOT EXISTS public.catalog (
   ramassage BOOLEAN DEFAULT FALSE,
   nombre_ramassages INTEGER,
   ramassage_gratuit BOOLEAN DEFAULT FALSE,
-  livraison_gratuite BOOLEAN DEFAULT FALSE
+  livraison_gratuite BOOLEAN DEFAULT FALSE,
+  store_id TEXT
 );
 
 -- Migrations idempotentes : ajout des colonnes si la table existait déjà antérieurement
@@ -94,6 +98,8 @@ ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS ramassage BOOLEAN DEFAULT FA
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS nombre_ramassages INTEGER;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS ramassage_gratuit BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS livraison_gratuite BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS store_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_catalog_store_id ON public.catalog(store_id);
 
 -- 6. Table: pin_reset_requests
 CREATE TABLE IF NOT EXISTS public.pin_reset_requests (

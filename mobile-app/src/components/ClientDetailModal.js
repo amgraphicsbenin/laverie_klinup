@@ -8,6 +8,7 @@ import { db } from '../services/db';
 import { useDbState } from '../hooks/useDbState';
 import { CustomSelect } from './CustomSelect';
 import { t } from '../services/i18n';
+import RewardFidelityCard from './RewardFidelityCard';
 
 export default function ClientDetailModal({
   visible,
@@ -107,18 +108,19 @@ export default function ClientDetailModal({
       onRequestClose={onClose}
     >
       <View style={styles.fullPageContainer}>
-        {/* EN-TÊTE PAGE ENTIÈRE AVEC BOUTON RETOUR */}
-        <View style={styles.fullPageHeader}>
-          <TouchableOpacity onPress={onClose} style={styles.backBtn} activeOpacity={0.7}>
-            <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-            <Text style={styles.backBtnText}>Retour</Text>
-          </TouchableOpacity>
+        <View style={styles.fullPageInnerWrapper}>
+          {/* EN-TÊTE PAGE ENTIÈRE AVEC BOUTON RETOUR */}
+          <View style={styles.fullPageHeader}>
+            <TouchableOpacity onPress={onClose} style={styles.backBtn} activeOpacity={0.7}>
+              <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+              <Text style={styles.backBtnText}>Retour</Text>
+            </TouchableOpacity>
 
-          <Text style={styles.fullPageTitle} numberOfLines={1}>Fiche Client</Text>
-          <View style={{ width: 70 }} />
-        </View>
+            <Text style={styles.fullPageTitle} numberOfLines={1}>Fiche Client</Text>
+            <View style={{ width: 70 }} />
+          </View>
 
-        <ScrollView contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
           {/* PROFILE CARD */}
           <View style={styles.detailCard}>
             <View style={styles.profileHeaderRow}>
@@ -146,22 +148,6 @@ export default function ClientDetailModal({
 
             <View style={styles.metricsGrid}>
               <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Préférence pliage</Text>
-                <Text style={styles.metricValue}>
-                  {activeClient.preferences_pliage === 'Cintre' ? 'Sur Cintre 👔' : (activeClient.preferences_pliage || 'Plié 📦')}
-                </Text>
-              </View>
-
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Points Fidélité</Text>
-                <Text style={[styles.metricValue, { color: '#059669', fontWeight: '800' }]}>
-                  ⭐ {activeClient.points_fidelite || 0} pts
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.metricsGrid}>
-              <View style={styles.metricItem}>
                 <Text style={styles.metricLabel}>Solde Dette Encours</Text>
                 <Text style={[styles.metricValue, { color: (activeClient.solde_dette || 0) > 0 ? '#ef4444' : '#10b981', fontWeight: '800' }]}>
                   {formatPrice(activeClient.solde_dette || 0)}
@@ -174,6 +160,14 @@ export default function ClientDetailModal({
                   {activeClient.created_at ? new Date(activeClient.created_at).toLocaleDateString('fr-FR') : 'Récemment'}
                 </Text>
               </View>
+            </View>
+
+            <View style={{ marginTop: 12 }}>
+              <RewardFidelityCard
+                client={activeClient}
+                isDarkMode={isDarkMode}
+                onShowSuccess={onShowSuccess}
+              />
             </View>
 
             <View style={styles.clientActionRow}>
@@ -321,6 +315,7 @@ export default function ClientDetailModal({
             );
           })()}
         </ScrollView>
+        </View>
       </View>
     </Modal>
   );
@@ -330,8 +325,22 @@ function getStyles(isDarkMode) {
   return {
     fullPageContainer: {
       flex: 1,
+      backgroundColor: '#0c0c10',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
+    },
+    fullPageInnerWrapper: {
+      flex: 1,
+      width: '100%',
+      maxWidth: 393,
       backgroundColor: isDarkMode ? '#000000' : '#ffffff',
       paddingTop: Platform.OS === 'ios' ? 48 : 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 16,
+      elevation: 5,
     },
     fullPageHeader: {
       flexDirection: 'row',

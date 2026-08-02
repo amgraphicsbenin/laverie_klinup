@@ -1779,3 +1779,219 @@ tr:hover td {
   color: var(--text-primary);
   letter-spacing: -0.01em;
 }
+
+/* ========================================================
+   UNIFIED DESIGN SYSTEM FOR SEARCH BARS, FILTERS & CONTROLS
+   ======================================================== */
+
+/* Filter Bar Panel Container */
+.smart-filter-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+  transition: all 0.25s ease;
+  margin-bottom: 0.5rem;
+}
+
+.smart-filter-panel:hover {
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+/* Unified Search Input Control */
+.search-control-container {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+
+.search-control-icon {
+  position: absolute;
+  left: 0.95rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.search-control-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 0.95rem 0 2.55rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.search-control-input:focus {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3.5px rgba(59, 130, 246, 0.12);
+}
+
+.search-control-container:focus-within .search-control-icon {
+  color: var(--primary);
+}
+
+/* Unified Select Dropdowns */
+.select-control-wrapper {
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+.input-control {
+  width: 100%;
+  height: 40px;
+  padding: 0 0.95rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  outline: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.input-control:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: var(--bg-card);
+}
+
+.input-control:focus,
+.custom-select-wrapper.open .input-control {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3.5px rgba(59, 130, 246, 0.12);
+}
+
+/* Custom Select Dropdown Popup */
+.custom-select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px -8px rgba(15, 23, 42, 0.22);
+  z-index: 1000;
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 0.4rem;
+  animation: scaleIn 0.18s var(--ease-emphasized-decelerate);
+}
+
+.custom-select-option {
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.15s ease;
+}
+
+.custom-select-option:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.custom-select-option.selected {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* Unified Filter Buttons / Category Pills */
+.filter-pills-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-app);
+  padding: 0.3rem;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+}
+
+.filter-pill-btn {
+  height: 36px;
+  padding: 0 1.15rem;
+  border-radius: 10px;
+  font-size: 0.83rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.filter-pill-btn:hover {
+  color: var(--text-primary);
+  background: rgba(100, 116, 139, 0.08);
+}
+
+.filter-pill-btn.active {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.28);
+}
+
+/* Unified Checkbox Control Badge */
+.filter-checkbox-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  height: 40px;
+  padding: 0 0.95rem;
+  border-radius: 12px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.filter-checkbox-badge:hover {
+  border-color: var(--primary);
+  background: var(--bg-card);
+}
+
+.filter-checkbox-badge input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.filter-checkbox-badge span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}

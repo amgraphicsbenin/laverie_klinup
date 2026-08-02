@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../services/db';
 import OrderFormModal from '../features/orders/components/OrderFormModal';
+import clothesIcon from '../assets/icon_clothes.png';
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -61,6 +62,8 @@ import StoresTab from '../features/stores/components/StoresTab';
 
 export default function AdminView({ activeTab, onManageStaff }) {
   const currentUser = db.getCurrentUser();
+  const stores = db.getStores ? db.getStores() : [];
+  const selectedStoreId = db.getSelectedStoreId ? db.getSelectedStoreId() : 'all';
   const [catalog, setCatalog] = useState([]);
   const [orders, setOrders] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -346,6 +349,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const [editSubName, setEditSubName] = useState('');
   const [editSubPrice, setEditSubPrice] = useState('');
   const [editSubDescription, setEditSubDescription] = useState('');
+  const [editArtStoreId, setEditArtStoreId] = useState('all');
 
 
   // Catalog add state
@@ -355,6 +359,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const [newArtService, setNewArtService] = useState('lavage_simple');
   const [newArtPrice, setNewArtPrice] = useState('');
   const [newArtDescription, setNewArtDescription] = useState('');
+  const [newArtStoreId, setNewArtStoreId] = useState('all');
 
   // Logs filters
   const [logFilterAction, setLogFilterAction] = useState('all');
@@ -383,6 +388,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const getRoleDefaultPermissions = (role) => {
     const isSuperAdmin = role === 'super_admin';
     const isManager = role === 'manager';
+    const isEditeurCatalogue = role === 'editeur_catalogue';
     const isAccueil = role === 'agent_accueil';
     const isLivreur = role === 'livreur';
     const isAtelier = role === 'agent_lavage_repassage';
@@ -391,7 +397,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       can_view_dashboard: isSuperAdmin || isManager,
       can_manage_orders: isSuperAdmin || isManager,
       can_manage_crm: isSuperAdmin || isManager || isAccueil,
-      can_edit_catalog: isSuperAdmin || isManager,
+      can_edit_catalog: isSuperAdmin || isManager || isEditeurCatalogue,
       can_manage_stores: isSuperAdmin,
       can_view_logs: isSuperAdmin,
       can_manage_staff: isSuperAdmin,
@@ -1156,6 +1162,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
     catalog.forEach(item => {
       if (!item || !item.article) return;
+      if (selectedStoreId !== 'all' && item.store_id && item.store_id !== 'all' && item.store_id !== selectedStoreId) {
+        return;
+      }
       if (item.categorie === 'individuel') {
         const articleKey = item.article.trim().toLowerCase();
         if (!groups[articleKey]) {
@@ -1166,7 +1175,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
             traitement: null,
             repassage: null,
             allIds: [],
-            is_active: false
+            is_active: false,
+            store_id: item.store_id
           };
         }
         groups[articleKey].allIds.push(item.id);
@@ -1364,6 +1374,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setEditingItem(groupedItem);
     setEditArtName(groupedItem.article);
     setEditArtDescription(groupedItem.description || '');
+    setEditArtStoreId(groupedItem.store_id || 'all');
     
     // Parse description for vertical draggable list
     const desc = groupedItem.description || '';
@@ -1446,7 +1457,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
               service: 'lavage_simple',
               prix: Number(editArtTraitementPrice),
               prix_urgent: Number(editArtTraitementUrgentPrice),
-              description: ''
+              description: '',
+              store_id: editArtStoreId
             });
           } else {
             await db.addCatalogItem(
@@ -1455,7 +1467,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
               Number(editArtTraitementPrice),
               'individuel',
               '',
-              Number(editArtTraitementUrgentPrice)
+              Number(editArtTraitementUrgentPrice),
+              null, false, null, false, false,
+              editArtStoreId
             );
           }
         } else {
@@ -1472,7 +1486,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
               service: 'repassage',
               prix: Number(editArtRepassagePrice),
               prix_urgent: Number(editArtRepassageUrgentPrice),
-              description: ''
+              description: '',
+              store_id: editArtStoreId
             });
           } else {
             await db.addCatalogItem(
@@ -1481,7 +1496,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
               Number(editArtRepassagePrice),
               'individuel',
               '',
-              Number(editArtRepassageUrgentPrice)
+              Number(editArtRepassageUrgentPrice),
+              null, false, null, false, false,
+              editArtStoreId
             );
           }
         } else {
@@ -1501,7 +1518,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
           ramassage: editArtRamassage,
           nombre_ramassages: editArtRamassage && editArtNombreRamassages ? Number(editArtNombreRamassages) : null,
           ramassage_gratuit: editArtRamassage ? editArtRamassageGratuit : false,
-          livraison_gratuite: editArtLivraisonGratuite
+          livraison_gratuite: editArtLivraisonGratuite,
+          store_id: editArtStoreId
         });
       }
 
@@ -1594,12 +1612,14 @@ export default function AdminView({ activeTab, onManageStaff }) {
       if (!newArtPrice) return;
     }
 
-    // Check unique name constraint
+    // Check unique name constraint within the same store
+    const targetStoreId = newArtStoreId || (selectedStoreId !== 'all' ? selectedStoreId : null);
     const nameExists = catalog.some(
-      item => item && item.article && item.article.trim().toLowerCase() === newArtName.trim().toLowerCase()
+      item => item && item.article && item.article.trim().toLowerCase() === newArtName.trim().toLowerCase() &&
+      ((!item.store_id || item.store_id === 'all') && (!targetStoreId || targetStoreId === 'all') || item.store_id === targetStoreId)
     );
     if (nameExists) {
-      setNewArtNameError(`Le produit "${newArtName}" existe déjà. Chaque nom de produit doit être unique.`);
+      setNewArtNameError(`Le produit "${newArtName}" existe déjà pour ce point de laverie. Chaque nom de produit doit être unique par point.`);
       return;
     }
 
@@ -1612,7 +1632,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
             Number(newArtTraitementPrice),
             'individuel',
             '',
-            Number(newArtTraitementUrgentPrice)
+            Number(newArtTraitementUrgentPrice),
+            null, false, null, false, false,
+            targetStoreId
           );
         }
         if (newArtRepassageActive) {
@@ -1622,7 +1644,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
             Number(newArtRepassagePrice),
             'individuel',
             '',
-            Number(newArtRepassageUrgentPrice)
+            Number(newArtRepassageUrgentPrice),
+            null, false, null, false, false,
+            targetStoreId
           );
         }
       } else {
@@ -1638,7 +1662,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
           newArtRamassage,
           newArtRamassage && newArtNombreRamassages ? Number(newArtNombreRamassages) : null,
           newArtRamassage ? newArtRamassageGratuit : false,
-          newArtLivraisonGratuite
+          newArtLivraisonGratuite,
+          targetStoreId
         );
       }
 
@@ -1678,12 +1703,18 @@ export default function AdminView({ activeTab, onManageStaff }) {
   };
 
   const getAssetIcon = (itemName) => {
-    const name = (itemName || '').toLowerCase();
-    if (name.includes('chemise') || name.includes('polo') || name.includes('haut')) return <Sparkles size={14} color="var(--primary)" />;
-    if (name.includes('pantalon') || name.includes('jeans') || name.includes('culotte') || name.includes('jupe')) return <Layers size={14} color="var(--primary)" />;
-    if (name.includes('robe') || name.includes('costume') || name.includes('veste')) return <Award size={14} color="var(--primary)" />;
-    if (name.includes('couette') || name.includes('drap') || name.includes('serviette') || name.includes('rideau')) return <Zap size={14} color="var(--primary)" />;
-    return <ShoppingBag size={14} color="var(--primary)" />;
+    return (
+      <img
+        src={clothesIcon}
+        alt="Vêtement"
+        style={{
+          width: '16px',
+          height: '16px',
+          objectFit: 'contain',
+          display: 'block'
+        }}
+      />
+    );
   };
 
   const getDynamicSku = (item) => {
@@ -2218,7 +2249,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
           handleStartEditProduct={handleStartEditProduct}
           handleDeleteCatalogItem={handleDeleteCatalogItem}
           handleToggleCatalogItemActive={handleToggleCatalogItemActive}
-          setShowAddCatalogModal={setShowAddCatalogModal}
+          setShowAddCatalogModal={(show) => {
+            if (show) {
+              setNewArtStoreId(selectedStoreId !== 'all' ? selectedStoreId : 'all');
+            }
+            setShowAddCatalogModal(show);
+          }}
+          stores={stores}
         />
       )}
 
@@ -2242,6 +2279,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
           setLogFilterAction={setLogFilterAction}
           filteredLogs={filteredLogs}
           staff={staff}
+          selectedStoreId={selectedStoreId}
+          stores={stores}
         />
       )}
 
@@ -2363,6 +2402,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     {((db.getRoles ? db.getRoles() : []).length > 0 ? db.getRoles() : [
                       { key: 'super_admin', label: 'Super Administrateur' },
                       { key: 'manager', label: 'Gérant (Manager)' },
+                      { key: 'editeur_catalogue', label: 'Éditeur Catalogue' },
                       { key: 'agent_accueil', label: 'Agent d\'Accueil / Caisse' },
                       { key: 'agent_lavage_repassage', label: 'Agent Atelier (Lavage / Repassage)' },
                       { key: 'livreur', label: 'Livreur / Agent de Collecte' }
@@ -2415,8 +2455,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
             </h3>
 
             <form onSubmit={handleAddCatalogItem} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Category choice & Name side-by-side */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '0.75rem' }}>
+              {/* Category choice, Point de laverie & Name */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1.4fr', gap: '0.75rem' }}>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label>Catégorie de tarif</label>
                   <CustomSelect
@@ -2426,6 +2466,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   >
                     <option value="individuel">Vêtement individuel</option>
                     <option value="abonnement">Formule d'abonnement</option>
+                  </CustomSelect>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Point de Laverie</label>
+                  <CustomSelect
+                    className="input-control"
+                    value={newArtStoreId}
+                    onChange={(e) => setNewArtStoreId(e.target.value)}
+                  >
+                    <option value="all">Tous les points (Global)</option>
+                    {stores && stores.map(st => (
+                      <option key={st.id} value={st.id}>{st.nom} ({st.code})</option>
+                    ))}
                   </CustomSelect>
                 </div>
 
@@ -2785,13 +2839,27 @@ export default function AdminView({ activeTab, onManageStaff }) {
               </h3>
 
               <form onSubmit={handleSaveProductAdvanced} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {/* Category info & Name side-by-side */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '0.75rem' }}>
+                {/* Category info, Point de Laverie & Name */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1.4fr', gap: '0.75rem' }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label>Catégorie de tarif</label>
                     <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-app)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                       {editArtCategory === 'individuel' ? 'Vêtement individuel' : "Formule d'abonnement"}
                     </div>
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Point de Laverie</label>
+                    <CustomSelect
+                      className="input-control"
+                      value={editArtStoreId}
+                      onChange={(e) => setEditArtStoreId(e.target.value)}
+                    >
+                      <option value="all">Tous les points (Global)</option>
+                      {stores && stores.map(st => (
+                        <option key={st.id} value={st.id}>{st.nom} ({st.code})</option>
+                      ))}
+                    </CustomSelect>
                   </div>
 
                   <div className="form-group" style={{ margin: 0 }}>
@@ -3453,173 +3521,216 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {/* ========================================================
          MODAL : TICKET DE DÉPÔT / REÇU CLIENT (TICKET POPUP)
          ======================================================== */}
-      {createdOrder && (
-        <ModalPortal>
-          <div className="modal-backdrop" onClick={() => setCreatedOrder(null)}>
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '360px', background: '#fff', color: '#000', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '24px', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
+      {/* ========================================================
+         MODAL : TICKET DE DÉPÔT / REÇU CLIENT (TICKET POPUP)
+         ======================================================== */}
+      {createdOrder && (() => {
+        const sysSettings = db.getSettings ? db.getSettings() : {};
+        const pWidth = sysSettings.invoice_paper_width || 80;
+        const pHeight = sysSettings.invoice_paper_height || 0;
+        const pFormat = sysSettings.invoice_paper_format || '80mm';
+        const pMargin = sysSettings.invoice_margin || 5;
+        const pOrient = sysSettings.invoice_orientation || 'portrait';
 
-              <div id="receipt-print-area-admin" style={{
-                background: '#ffffff',
-                padding: '24px 20px',
-                borderRadius: '8px',
-                fontFamily: 'Arial, Helvetica, sans-serif',
-                color: '#1a1a1a',
+        const isLandscape = pOrient === 'landscape';
+        const effW = isLandscape && pHeight > 0 ? pHeight : pWidth;
+        const effH = isLandscape && pHeight > 0 ? pWidth : pHeight;
+
+        const modalMaxWidthPx = `${Math.min(Math.max(effW * 3.4, 280), 560)}px`;
+        const modalPaddingPx = `${Math.min(Math.max(pMargin * 2.2, 10), 32)}px`;
+
+        return (
+          <ModalPortal>
+            <div className="modal-backdrop" onClick={() => setCreatedOrder(null)}>
+              <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{
                 width: '100%',
-                boxSizing: 'border-box'
+                maxWidth: modalMaxWidthPx,
+                background: '#fff',
+                color: '#000',
+                padding: '1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                borderRadius: '24px',
+                boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)',
+                border: '1px solid rgba(0,0,0,0.08)',
+                cursor: 'default',
+                transition: 'all 0.25s ease'
               }}>
-                {/* ---- EN-TÊTE ---- */}
-                <div style={{ textAlign: 'center', paddingBottom: '16px', marginBottom: '16px', borderBottom: '2px dashed #cccccc' }}>
-                  <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#000000', letterSpacing: '1px', fontFamily: 'Arial, Helvetica, sans-serif' }}>KLIN UP</h1>
-                  <p style={{ margin: '4px 0 12px', fontSize: '12px', color: '#f59e0b', fontWeight: '600' }}>Ticket de Dépôt Client</p>
-                  <div style={{
-                    display: 'inline-block',
-                    background: '#000000',
-                    color: '#ffffff',
-                    padding: '6px 16px',
-                    borderRadius: '6px',
-                    fontWeight: '800',
-                    fontSize: '16px',
-                    letterSpacing: '2px'
-                  }}>
-                    {createdOrder.identifiant_unique_marquage}
-                  </div>
-                </div>
 
-                {/* ---- DÉTAILS ---- */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', fontSize: '12px', paddingBottom: '14px', marginBottom: '14px', borderBottom: '1px solid #e5e5e5' }}>
-                  <div><span style={{ fontWeight: '700' }}>Client :</span> {customers.find(c => c.id === createdOrder.customer_id)?.prenom} {customers.find(c => c.id === createdOrder.customer_id)?.nom}</div>
-                  <div>
-                    <span style={{ fontWeight: '700' }}>Linge :</span>{' '}
-                    <span style={{ color: '#f59e0b', fontWeight: '600' }}>{createdOrder.type_article} ({serviceLabels[createdOrder.type_service] || createdOrder.type_service})</span>
+                <div id="receipt-print-area-admin" style={{
+                  background: '#ffffff',
+                  padding: modalPaddingPx,
+                  borderRadius: '8px',
+                  fontFamily: effW >= 140 ? 'sans-serif' : 'Arial, Helvetica, sans-serif',
+                  color: '#1a1a1a',
+                  width: '100%',
+                  minHeight: effH > 0 ? `${Math.min(Math.max(effH * 1.8, 220), 650)}px` : 'auto',
+                  boxSizing: 'border-box'
+                }}>
+                  {/* ---- EN-TÊTE DYNAMIQUE ---- */}
+                  <div style={{ textAlign: 'center', paddingBottom: '16px', marginBottom: '16px', borderBottom: '2px dashed #cccccc' }}>
+                    <h1 style={{ margin: 0, fontSize: effW >= 140 ? '22px' : '18px', fontWeight: '900', color: '#000000', letterSpacing: '1px', whiteSpace: 'pre-line' }}>
+                      {sysSettings.receipt_header || 'KLIN UP - Laverie & Pressing Premium'}
+                    </h1>
+                    <p style={{ margin: '4px 0 12px', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
+                      Ticket de Dépôt Client ({pFormat.toUpperCase()} • {pWidth}mm × {pHeight > 0 ? `${pHeight}mm` : 'Auto'})
+                    </p>
+                    <div style={{
+                      display: 'inline-block',
+                      background: '#000000',
+                      color: '#ffffff',
+                      padding: '6px 16px',
+                      borderRadius: '6px',
+                      fontWeight: '800',
+                      fontSize: '16px',
+                      letterSpacing: '2px'
+                    }}>
+                      {createdOrder.identifiant_unique_marquage}
+                    </div>
                   </div>
-                  <div><span style={{ fontWeight: '700' }}>Urgence :</span> {createdOrder.niveau_urgence}</div>
-                  <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement === 'mobile_money' ? 'Mobile Money' : createdOrder.mode_reglement === 'especes' ? 'Espèces' : createdOrder.mode_reglement}</div>
-                  {createdOrder.reference_momo && (
-                    <div><span style={{ fontWeight: '700' }}>Réf. Paiement :</span> <strong style={{ color: 'var(--primary)' }}>{createdOrder.reference_momo}</strong></div>
-                  )}
-                  <div><span style={{ fontWeight: '700' }}>Dépôt :</span> {formatDateTime(createdOrder.created_at)}</div>
-                  <div><span style={{ fontWeight: '700' }}>Échéance :</span> {formatDateTime(createdOrder.due_date)}</div>
-                  {createdOrder.acompte_paid_at && (
-                    <div><span style={{ fontWeight: '700' }}>Règlement Acompte :</span> {formatDateTime(createdOrder.acompte_paid_at)}</div>
-                  )}
-                  {createdOrder.solde_paid_at && (
-                    <div><span style={{ fontWeight: '700' }}>Règlement Solde :</span> {formatDateTime(createdOrder.solde_paid_at)}</div>
-                  )}
-                  {createdOrder.statut === 'annule' && (
-                    <div style={{ marginTop: '4px', padding: '6px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626' }}>
-                      <span style={{ fontWeight: '700' }}>Motif Annulation :</span> {createdOrder.motif_annulation || 'Non spécifié'}
-                    </div>
-                  )}
-                </div>
 
-                {createdOrder.is_subscription_order && createdOrder.subscription_details && (
-                  <div style={{ padding: '8px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
-                    <div style={{ fontWeight: '800', color: '#16a34a', borderBottom: '1px dashed #bbf7d0', paddingBottom: '3px', marginBottom: '2px' }}>
-                      Suivi Solde Abonnement
+                  {/* ---- DÉTAILS ---- */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', fontSize: '12px', paddingBottom: '14px', marginBottom: '14px', borderBottom: '1px solid #e5e5e5' }}>
+                    <div><span style={{ fontWeight: '700' }}>Client :</span> {customers.find(c => c.id === createdOrder.customer_id)?.prenom} {customers.find(c => c.id === createdOrder.customer_id)?.nom}</div>
+                    <div>
+                      <span style={{ fontWeight: '700' }}>Linge :</span>{' '}
+                      <span style={{ color: '#f59e0b', fontWeight: '600' }}>{createdOrder.type_article} ({serviceLabels[createdOrder.type_service] || createdOrder.type_service})</span>
                     </div>
-                    {createdOrder.subscription_details.immediate_subscription && (
-                      <div style={{ fontWeight: '800', color: '#b45309', borderBottom: '1px dashed #fbd38d', paddingBottom: '3px', marginBottom: '4px' }}>
-                        Abonnement souscrit : {createdOrder.subscription_details.immediate_subscription.name}
+                    <div><span style={{ fontWeight: '700' }}>Urgence :</span> {createdOrder.niveau_urgence}</div>
+                    <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement === 'mobile_money' ? 'Mobile Money' : createdOrder.mode_reglement === 'especes' ? 'Espèces' : createdOrder.mode_reglement}</div>
+                    {createdOrder.reference_momo && (
+                      <div><span style={{ fontWeight: '700' }}>Réf. Paiement :</span> <strong style={{ color: 'var(--primary)' }}>{createdOrder.reference_momo}</strong></div>
+                    )}
+                    <div><span style={{ fontWeight: '700' }}>Dépôt :</span> {formatDateTime(createdOrder.created_at)}</div>
+                    <div><span style={{ fontWeight: '700' }}>Échéance :</span> {formatDateTime(createdOrder.due_date)}</div>
+                    {createdOrder.acompte_paid_at && (
+                      <div><span style={{ fontWeight: '700' }}>Règlement Acompte :</span> {formatDateTime(createdOrder.acompte_paid_at)}</div>
+                    )}
+                    {createdOrder.solde_paid_at && (
+                      <div><span style={{ fontWeight: '700' }}>Règlement Solde :</span> {formatDateTime(createdOrder.solde_paid_at)}</div>
+                    )}
+                    {createdOrder.statut === 'annule' && (
+                      <div style={{ marginTop: '4px', padding: '6px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626' }}>
+                        <span style={{ fontWeight: '700' }}>Motif Annulation :</span> {createdOrder.motif_annulation || 'Non spécifié'}
                       </div>
                     )}
-                    <div>Forfait : <strong>{createdOrder.subscription_details.name}</strong></div>
-                    <div>Vêtements retirés : <strong>-{createdOrder.subscription_details.clothes_deducted}</strong></div>
-                    {!createdOrder.subscription_details.immediate_subscription && (
-                      <div>Solde précédent : <strong>{createdOrder.subscription_details.previous_balance} vêt.</strong></div>
-                    )}
-                    <div style={{ borderTop: '1px dashed #bbf7d0', paddingTop: '3px', marginTop: '2px', fontWeight: '800', color: '#16a34a' }}>
-                      Nouveau solde : {createdOrder.subscription_details.new_balance} vêtements restants
-                    </div>
                   </div>
-                )}
 
-                {/* ---- TOTAUX ---- */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
-                  {createdOrder.remise_pourcentage > 0 && (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ color: '#555555' }}>Prix de base :</span>
-                        <span style={{ fontWeight: '600', color: '#555555', textDecoration: 'line-through' }}>
-                          {(createdOrder.prix_base_avant_remise || 0).toLocaleString()} FCFA
-                        </span>
+                  {createdOrder.is_subscription_order && createdOrder.subscription_details && (
+                    <div style={{ padding: '8px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
+                      <div style={{ fontWeight: '800', color: '#16a34a', borderBottom: '1px dashed #bbf7d0', paddingBottom: '3px', marginBottom: '2px' }}>
+                        Suivi Solde Abonnement
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#16a34a' }}>
-                        <span style={{ fontWeight: '600' }}>Réduction ({createdOrder.remise_pourcentage}%) :</span>
-                        <span style={{ fontWeight: '700' }}>
-                          -{(createdOrder.remise_montant || 0).toLocaleString()} FCFA
-                        </span>
+                      {createdOrder.subscription_details.immediate_subscription && (
+                        <div style={{ fontWeight: '800', color: '#b45309', borderBottom: '1px dashed #fbd38d', paddingBottom: '3px', marginBottom: '4px' }}>
+                          Abonnement souscrit : {createdOrder.subscription_details.immediate_subscription.name}
+                        </div>
+                      )}
+                      <div>Forfait : <strong>{createdOrder.subscription_details.name}</strong></div>
+                      <div>Vêtements retirés : <strong>-{createdOrder.subscription_details.clothes_deducted}</strong></div>
+                      {!createdOrder.subscription_details.immediate_subscription && (
+                        <div>Solde précédent : <strong>{createdOrder.subscription_details.previous_balance} vêt.</strong></div>
+                      )}
+                      <div style={{ borderTop: '1px dashed #bbf7d0', paddingTop: '3px', marginTop: '2px', fontWeight: '800', color: '#16a34a' }}>
+                        Nouveau solde : {createdOrder.subscription_details.new_balance} vêtements restants
                       </div>
-                    </>
+                    </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#555555', fontWeight: createdOrder.remise_pourcentage > 0 ? '700' : 'normal' }}>Total Commande :</span>
-                    <span style={{ fontWeight: '700', color: '#000000' }}>
-                      {createdOrder.is_subscription_order
-                        ? (createdOrder.subscription_details.immediate_subscription
-                          ? `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`
-                          : '0 FCFA (Abonnement)')
-                        : `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`}
-                    </span>
-                  </div>
-                  {(!createdOrder.is_subscription_order || !!createdOrder.subscription_details.immediate_subscription) ? (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ color: '#555555' }}>Acompte Payé :</span>
-                        <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
-                        <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
-                        <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
-                          {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
-                      <span style={{ color: '#16a34a', fontWeight: '800' }}>Reste à payer :</span>
-                      <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a' }}>
-                        0 FCFA
+
+                  {/* ---- TOTAUX ---- */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+                    {createdOrder.remise_pourcentage > 0 && (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#555555' }}>Prix de base :</span>
+                          <span style={{ fontWeight: '600', color: '#555555', textDecoration: 'line-through' }}>
+                            {(createdOrder.prix_base_avant_remise || 0).toLocaleString()} FCFA
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#16a34a' }}>
+                          <span style={{ fontWeight: '600' }}>Réduction ({createdOrder.remise_pourcentage}%) :</span>
+                          <span style={{ fontWeight: '700' }}>
+                            -{(createdOrder.remise_montant || 0).toLocaleString()} FCFA
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#555555', fontWeight: createdOrder.remise_pourcentage > 0 ? '700' : 'normal' }}>Total Commande :</span>
+                      <span style={{ fontWeight: '700', color: '#000000' }}>
+                        {createdOrder.is_subscription_order
+                          ? (createdOrder.subscription_details.immediate_subscription
+                            ? `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`
+                            : '0 FCFA (Abonnement)')
+                          : `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`}
                       </span>
                     </div>
-                  )}
-                </div>
-              </div>
+                    {(!createdOrder.is_subscription_order || !!createdOrder.subscription_details.immediate_subscription) ? (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#555555' }}>Acompte Payé :</span>
+                          <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
+                          <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
+                          <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
+                            {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
+                        <span style={{ color: '#16a34a', fontWeight: '800' }}>Reste à payer :</span>
+                        <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a' }}>
+                          0 FCFA
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                    onClick={() => alert("Impression du reçu en cours !")}
-                  >
-                    <Printer size={12} /> Imprimer
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                    onClick={() => {
-                      const element = document.getElementById('receipt-print-area-admin');
-                      if (element && window.html2pdf) {
-                        const opt = {
-                          margin: 0.3,
-                          filename: `Facture_${createdOrder.identifiant_unique_marquage}.pdf`,
-                          image: { type: 'jpeg', quality: 0.98 },
-                          html2canvas: { scale: 2, useCORS: true, logging: false },
-                          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-                        };
-                        window.html2pdf().set(opt).from(element).save();
-                      } else {
-                        alert("Le module PDF est en cours de chargement. Veuillez réessayer.");
-                      }
-                    }}
-                  >
-                    ↓ Télécharger
-                  </button>
+                  {/* ---- PIED DE PAGE DYNAMIQUE ---- */}
+                  <div style={{ textAlign: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed #cccccc', fontSize: '11px', color: '#666666', whiteSpace: 'pre-line' }}>
+                    {sysSettings.receipt_footer || 'Merci de votre confiance ! À bientôt chez KLIN UP.'}
+                  </div>
                 </div>
 
-                <button
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                      onClick={() => window.print ? window.print() : alert("Impression du reçu en cours !")}
+                    >
+                      <Printer size={12} /> Imprimer ({pFormat.toUpperCase()})
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                      onClick={() => {
+                        const element = document.getElementById('receipt-print-area-admin');
+                        if (element && window.html2pdf) {
+                          const jsPdfFormat = pFormat === 'A4' ? 'a4' : pFormat === 'A5' ? 'a5' : (pHeight > 0 ? [pWidth, pHeight] : [pWidth, 200]);
+                          const opt = {
+                            margin: (pMargin || 5) / 25.4,
+                            filename: `Facture_${createdOrder.identifiant_unique_marquage}.pdf`,
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { scale: 2, useCORS: true, logging: false },
+                            jsPDF: { unit: 'mm', format: jsPdfFormat, orientation: pOrient || 'portrait' }
+                          };
+                          window.html2pdf().set(opt).from(element).save();
+                        } else {
+                          alert("Le module PDF est en cours de chargement. Veuillez réessayer.");
+                        }
+                      }}
+                    >
+                      ↓ Télécharger PDF
+                    </button>
+                  </div>
+
+                  <button
                   type="button"
                   className="btn btn-primary"
                   style={{ width: '100%', background: '#000', color: '#fff', border: 'none', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
@@ -3631,7 +3742,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
             </div>
           </div>
         </ModalPortal>
-      )}
+        );
+      })()}
 
       {activeDetailsCard && (
         <ModalPortal>
