@@ -768,6 +768,11 @@ function App() {
   const hasAdminAccess = currentUser?.role === 'super_admin' || currentUser?.role === 'manager';
   const isSuperAdmin = currentUser?.role === 'super_admin';
 
+  const selectMenu = (menuKey) => {
+    setAdminMenu(menuKey);
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="app-container">
       
@@ -776,7 +781,7 @@ function App() {
         <div className="sidebar-mobile-overlay sidebar-overlay-open" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* ================= SIDEBAR DESKTOP ================= */}
+      {/* ================= SIDEBAR DESKTOP & MOBILE ================= */}
       {hasAdminAccess && (
         <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
           <div>
@@ -799,7 +804,7 @@ function App() {
               <div className={`menu-group-block ${adminMenu === 'dashboard' ? 'active-block' : ''}`}>
                 <li 
                   className={`menu-item ${adminMenu === 'dashboard' ? 'active' : ''}`}
-                  onClick={() => setAdminMenu('dashboard')}
+                  onClick={() => selectMenu('dashboard')}
                   data-tooltip="Vue d'Ensemble"
                 >
                   <div className="menu-item-left">
@@ -812,7 +817,7 @@ function App() {
               <div className={`menu-group-block ${adminMenu === 'orders_management' ? 'active-block' : ''}`}>
                 <li 
                   className={`menu-item ${adminMenu === 'orders_management' ? 'active' : ''}`}
-                  onClick={() => setAdminMenu('orders_management')}
+                  onClick={() => selectMenu('orders_management')}
                   data-tooltip="Gestion Commandes"
                 >
                   <div className="menu-item-left">
@@ -825,7 +830,7 @@ function App() {
               <div className={`menu-group-block ${adminMenu === 'crm_management' ? 'active-block' : ''}`}>
                 <li 
                   className={`menu-item ${adminMenu === 'crm_management' ? 'active' : ''}`}
-                  onClick={() => setAdminMenu('crm_management')}
+                  onClick={() => selectMenu('crm_management')}
                   data-tooltip="Clients CRM"
                 >
                   <div className="menu-item-left">
@@ -838,7 +843,7 @@ function App() {
               <div className={`menu-group-block ${adminMenu === 'catalog' ? 'active-block' : ''}`}>
                 <li 
                   className={`menu-item ${adminMenu === 'catalog' ? 'active' : ''}`}
-                  onClick={() => setAdminMenu('catalog')}
+                  onClick={() => selectMenu('catalog')}
                   data-tooltip="Catalogue Tarifs"
                 >
                   <div className="menu-item-left">
@@ -853,7 +858,7 @@ function App() {
                   <div className={`menu-group-block ${adminMenu === 'laundry_points' ? 'active-block' : ''}`}>
                     <li 
                       className={`menu-item ${adminMenu === 'laundry_points' ? 'active' : ''}`}
-                      onClick={() => setAdminMenu('laundry_points')}
+                      onClick={() => selectMenu('laundry_points')}
                       data-tooltip="Points de Laverie"
                     >
                       <div className="menu-item-left">
@@ -878,14 +883,14 @@ function App() {
                       <div className="submenu-container">
                         <div 
                           className={`submenu-item ${(adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'active' : ''}`}
-                          onClick={() => setAdminMenu('staff_users')}
+                          onClick={() => selectMenu('staff_users')}
                         >
                           {(adminMenu === 'staff_users' || adminMenu === 'staff_management') && <span className="sub-bullet">•</span>}
                           <span className="menu-item-label">Gestion Utilisateurs</span>
                         </div>
                         <div 
                           className={`submenu-item ${adminMenu === 'staff_roles' ? 'active' : ''}`}
-                          onClick={() => setAdminMenu('staff_roles')}
+                          onClick={() => selectMenu('staff_roles')}
                         >
                           {adminMenu === 'staff_roles' && <span className="sub-bullet">•</span>}
                           <span className="menu-item-label">Config. des Rôles</span>
@@ -897,7 +902,7 @@ function App() {
                   <div className={`menu-group-block ${adminMenu === 'logs' ? 'active-block' : ''}`}>
                     <li 
                       className={`menu-item ${adminMenu === 'logs' ? 'active' : ''}`}
-                      onClick={() => setAdminMenu('logs')}
+                      onClick={() => selectMenu('logs')}
                       data-tooltip="Journal d'Audit"
                     >
                       <div className="menu-item-left">
@@ -915,7 +920,7 @@ function App() {
               <div className={`menu-group-block ${adminMenu === 'settings' ? 'active-block' : ''}`}>
                 <li 
                   className={`menu-item ${adminMenu === 'settings' ? 'active' : ''}`}
-                  onClick={() => setAdminMenu('settings')}
+                  onClick={() => selectMenu('settings')}
                   data-tooltip="Paramètres"
                 >
                   <div className="menu-item-left">
