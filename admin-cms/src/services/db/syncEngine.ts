@@ -86,50 +86,58 @@ export async function performMutation(
 
   console.error(`[KLIN UP DB] ❌ Erreur Supabase sur table '${table}' [${action}] :`, errCode, errMsg);
 
-  // Schema cache / missing column → retry once with that column stripped
-  if (
-    errCode === 'PGRST204' ||
-    errCode === '42703' ||
-    errMsg.includes('column') ||
-    errMsg.includes('schema cache')
-  ) {
-    const retriedData = { ...sanitizedData };
+  // Schema cache / missing column → iterative retry loop (up to 5 attempts)
+  let currentErrCode = errCode;
+  let currentErrMsg = errMsg;
+  let retriedData: Record<string, any> = { ...sanitizedData };
 
-    // Detect the missing column name from the error message
-    const match = errMsg.match(/Could not find the '([^']+)' column/i)
-                || errMsg.match(/column "([^"]+)"/i);
-    const missingCol = match?.[1];
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    if (
+      currentErrCode === 'PGRST204' ||
+      currentErrCode === '42703' ||
+      currentErrMsg.includes('column') ||
+      currentErrMsg.includes('schema cache')
+    ) {
+      const match = currentErrMsg.match(/Could not find the '([^']+)' column/i)
+                  || currentErrMsg.match(/column "([^"]+)"/i)
+                  || currentErrMsg.match(/column '([^']+)'/i)
+                  || currentErrMsg.match(/column ([a-z0-9_]+)/i);
+      const missingCol = match?.[1];
 
-    if (missingCol) {
-      console.warn(`[KLIN UP DB] ⚠️ Colonne '${missingCol}' absente du schéma Supabase — retrait automatique pour ce repli.`);
-      delete retriedData[missingCol];
+      if (missingCol && Object.prototype.hasOwnProperty.call(retriedData, missingCol)) {
+        console.warn(`[KLIN UP DB] ⚠️ Colonne '${missingCol}' absente du schéma Supabase — retrait (essai ${attempt}).`);
+        delete retriedData[missingCol];
+      } else {
+        const optionalCols = ['ville', 'responsable_id', 'responsable_nom', 'created_by_id', 'created_by_name',
+                              'push_token', 'push_token_updated_at', 'motif_annulation', 'solde_paid_at',
+                              'reference_paiement', 'reference_momo', 'acompte_paid_at', 'operateur_momo'];
+        for (const col of optionalCols) delete retriedData[col];
+      }
+
+      let retryRes: any;
+      try {
+        if (action === 'insert') retryRes = await supabase.from(table).insert(retriedData);
+        else if (action === 'update') retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
+        else if (action === 'delete') retryRes = await supabase.from(table).delete().eq('id', recordId);
+      } catch (retryErr: any) {
+        throw new Error(`[KLIN UP DB] Erreur réseau lors du repli (table: ${table}) : ${retryErr.message}`);
+      }
+
+      if (!retryRes?.error) {
+        console.info(`[KLIN UP DB] ✅ Repli de schéma réussi pour table '${table}' après ${attempt} essai(s).`);
+        return retryRes?.data ?? null;
+      }
+
+      currentErrCode = retryRes.error.code || '';
+      currentErrMsg = retryRes.error.message || '';
     } else {
-      // Generic fallback: strip known-optional columns that may not exist yet
-      const optionalCols = ['ville', 'responsable_id', 'responsable_nom', 'created_by_id', 'created_by_name',
-                            'push_token', 'push_token_updated_at', 'motif_annulation', 'solde_paid_at',
-                            'reference_paiement', 'reference_momo', 'acompte_paid_at'];
-      for (const col of optionalCols) delete retriedData[col];
+      break;
     }
-
-    let retryRes: any;
-    try {
-      if (action === 'insert') retryRes = await supabase.from(table).insert(retriedData);
-      else if (action === 'update') retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
-      else if (action === 'delete') retryRes = await supabase.from(table).delete().eq('id', recordId);
-    } catch (retryErr: any) {
-      throw new Error(`[KLIN UP DB] Erreur réseau lors du repli (table: ${table}) : ${retryErr.message}`);
-    }
-
-    if (!retryRes?.error) {
-      console.info(`[KLIN UP DB] ✅ Repli réussi pour table '${table}' après retrait de colonne(s) manquante(s).`);
-      return retryRes?.data ?? null;
-    }
-
-    // If retry also fails, throw with the full context
-    throw new Error(
-      `[KLIN UP DB] Échec persistant sur '${table}' même après repli de schéma. Erreur Supabase : ${retryRes.error.message} (code: ${retryRes.error.code})`
-    );
   }
+
+  throw new Error(
+    `[KLIN UP DB] Échec persistant sur '${table}' même après repli de schéma. Erreur Supabase : ${currentErrMsg} (code: ${currentErrCode})`
+  );
 
   // RLS or any other error → ALWAYS throw (never silently succeed)
   if (errCode === '42501' || errMsg.toLowerCase().includes('row-level security')) {

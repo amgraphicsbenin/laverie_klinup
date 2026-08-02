@@ -31,6 +31,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
   const [clothingSearchQuery, setClothingSearchQuery] = useState('');
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
+  const [momoOperator, setMomoOperator] = useState('MTN');
 
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
@@ -71,6 +72,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     setClothingSearchQuery('');
     setMomoRefNumber('');
     setMomoRefError('');
+    setMomoOperator('MTN');
   };
 
   const handleCancelOrder = () => {
@@ -168,10 +170,17 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     const finalModeReglement = isSubscriptionActive ? (isImmediateSub ? orderPaymentMethod : 'abonnement') : orderPaymentMethod;
     const finalAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
 
-    if (finalModeReglement === 'Mobile Money' && !momoRefNumber.trim()) {
-      setMomoRefError("Numéro de référence Mobile Money requis.");
-      alert("Confirmation Mobile Money requise : Veuillez saisir le numéro de référence de la transaction Mobile Money avant de valider la création de la commande.");
-      return;
+    if (finalModeReglement === 'Mobile Money') {
+      const ref = momoRefNumber.trim();
+      if (!ref) {
+        setMomoRefError("Numéro de référence Mobile Money requis.");
+        alert("Confirmation Mobile Money requise : Veuillez saisir le numéro de référence de la transaction Mobile Money avant de valider la création de la commande.");
+        return;
+      }
+      if (!/^\d{8,15}$/.test(ref)) {
+        setMomoRefError("Le numéro de référence doit contenir entre 8 et 15 chiffres.");
+        return;
+      }
     }
 
     try {
@@ -203,7 +212,8 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         created_by_id: currentUser ? currentUser.id : 'u1',
         pay_with_subscription: payWithSubscription,
         subscribe_plan_id: subscribePlanId,
-        reference_paiement: finalModeReglement === 'Mobile Money' ? momoRefNumber.trim() : null
+        reference_paiement: finalModeReglement === 'Mobile Money' ? momoRefNumber.trim() : null,
+        operateur_momo: finalModeReglement === 'Mobile Money' ? momoOperator : null
       };
 
       await db.createOrder(newOrder);
@@ -822,15 +832,51 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
             {/* Champ Référence Mobile Money Obligatoire */}
             {orderPaymentMethod === 'Mobile Money' && (
               <div style={{ marginTop: '12px' }}>
+                {/* Sélection Opérateur */}
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#002cf7', marginBottom: '6px', display: 'block' }}>
+                  Opérateur Réseau <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                  {['MTN', 'MOOV', 'CELTIS'].map((op) => (
+                    <button
+                      key={op}
+                      type="button"
+                      onClick={() => setMomoOperator(op)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 0',
+                        borderRadius: '10px',
+                        border: momoOperator === op ? '2px solid #002cf7' : '1.5px solid #d4d4d8',
+                        background: momoOperator === op
+                          ? (op === 'MTN' ? 'linear-gradient(135deg, #FFCC00, #FFA500)'
+                            : op === 'MOOV' ? 'linear-gradient(135deg, #0057A8, #003F7F)'
+                            : 'linear-gradient(135deg, #E30613, #B50010)')
+                          : '#f8fafc',
+                        color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : '#64748b',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: momoOperator === op ? '0 2px 8px rgba(0,44,247,0.15)' : 'none'
+                      }}
+                    >
+                      {op}
+                    </button>
+                  ))}
+                </div>
+
                 <label style={{ fontSize: '11px', fontWeight: 600, color: '#002cf7', marginBottom: '4px', display: 'block' }}>
                   N° Référence Transaction Mobile Money <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: MP240730.1945.A12345"
+                  placeholder="Ex: 12345678 (8 à 15 chiffres)"
                   value={momoRefNumber}
+                  maxLength={15}
+                  inputMode="numeric"
                   onChange={(e) => {
-                    setMomoRefNumber(e.target.value);
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 15);
+                    setMomoRefNumber(val);
                     if (momoRefError) setMomoRefError('');
                   }}
                   style={{

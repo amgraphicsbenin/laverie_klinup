@@ -43,6 +43,7 @@ export default function PaymentModal({
   const [paymentMethod, setPaymentMethod] = useState('Espèces');
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
+  const [momoOperator, setMomoOperator] = useState('MTN');
   const baseBorderColor = isDarkMode ? '#27272a' : '#cbd5e1';
   const baseBg = 'transparent';
   const activeBg = isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff';
@@ -65,6 +66,7 @@ export default function PaymentModal({
       setPaymentMethod('Espèces');
       setMomoRefNumber('');
       setMomoRefError('');
+      setMomoOperator('MTN');
     }
   }, [visible]);
 
@@ -72,11 +74,18 @@ export default function PaymentModal({
    * Valide les champs et lance la confirmation du paiement.
    */
   const handleConfirm = () => {
-    if (paymentMethod === 'Mobile Money' && !momoRefNumber.trim()) {
-      setMomoRefError("Le numéro de référence est obligatoire.");
-      return;
+    if (paymentMethod === 'Mobile Money') {
+      const ref = momoRefNumber.trim();
+      if (!ref) {
+        setMomoRefError("Le numéro de référence est obligatoire.");
+        return;
+      }
+      if (!/^\d{8,15}$/.test(ref)) {
+        setMomoRefError("Le numéro de référence doit contenir entre 8 et 15 chiffres.");
+        return;
+      }
     }
-    onConfirm(paymentMethod, momoRefNumber.trim());
+    onConfirm(paymentMethod, momoRefNumber.trim(), momoOperator);
   };
 
   if (!visible || !order) return null;
@@ -189,17 +198,51 @@ export default function PaymentModal({
               {/* Champ optionnel Référence Mobile Money */}
               {paymentMethod === 'Mobile Money' && (
                 <View style={{ marginBottom: 18 }}>
+                  {/* Opérateur Mobile Money */}
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
+                    Opérateur Réseau <Text style={{ color: '#ef4444' }}>*</Text>
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                    {['MTN', 'MOOV', 'CELTIS'].map((op) => (
+                      <TouchableOpacity
+                        key={op}
+                        onPress={() => setMomoOperator(op)}
+                        activeOpacity={0.8}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 10,
+                          borderWidth: momoOperator === op ? 2 : 1.5,
+                          borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
+                          backgroundColor: momoOperator === op
+                            ? (op === 'MTN' ? '#FFCC00' : op === 'MOOV' ? '#0057A8' : '#E30613')
+                            : (isDarkMode ? '#18181b' : '#f8fafc'),
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Text style={{
+                          fontWeight: '800',
+                          fontSize: 12,
+                          color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : (isDarkMode ? '#94a3b8' : '#64748b')
+                        }}>{op}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
                   <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
                     Numéro de Référence <Text style={{ color: '#ef4444' }}>*</Text>
                   </Text>
                   <TextInput
                     value={momoRefNumber}
                     onChangeText={(text) => {
-                      setMomoRefNumber(text);
-                      if (text.trim()) setMomoRefError('');
+                      const val = text.replace(/\D/g, '').slice(0, 15);
+                      setMomoRefNumber(val);
+                      if (val.trim()) setMomoRefError('');
                     }}
-                    placeholder="Ex: TXN12345678"
+                    placeholder="8 à 15 chiffres (ex: 12345678)"
                     placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
+                    keyboardType="numeric"
+                    maxLength={15}
                     style={{
                       borderWidth: 1,
                       borderColor: momoInputBorder,

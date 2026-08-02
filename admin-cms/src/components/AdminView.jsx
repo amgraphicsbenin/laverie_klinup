@@ -126,6 +126,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const [delivAmountPaid, setDelivAmountPaid] = useState('');
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
+  const [momoOperator, setMomoOperator] = useState('MTN');
 
   // Flow d'Annulation de Commande
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -1976,9 +1977,16 @@ export default function AdminView({ activeTab, onManageStaff }) {
     e.preventDefault();
     if (!delivOrder) return;
 
-    if (delivPaymentMethod === 'mobile_money' && !momoRefNumber.trim()) {
-      setMomoRefError("Le numéro de référence est obligatoire.");
-      return;
+    if (delivPaymentMethod === 'mobile_money') {
+      const ref = momoRefNumber.trim();
+      if (!ref) {
+        setMomoRefError("Le numéro de référence est obligatoire.");
+        return;
+      }
+      if (!/^\d{8,15}$/.test(ref)) {
+        setMomoRefError("Le numéro de référence doit contenir entre 8 et 15 chiffres.");
+        return;
+      }
     }
 
     try {
@@ -1987,7 +1995,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
         Number(delivAmountPaid || 0), 
         delivPaymentMethod, 
         delivFinalStatus,
-        delivPaymentMethod === 'mobile_money' ? momoRefNumber.trim() : null
+        delivPaymentMethod === 'mobile_money' ? momoRefNumber.trim() : null,
+        delivPaymentMethod === 'mobile_money' ? momoOperator : null
       );
       refreshAdminData();
       setShowDeliveryPaymentModal(false);
@@ -2003,6 +2012,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setDelivOrder(null);
       setMomoRefNumber('');
       setMomoRefError('');
+      setMomoOperator('MTN');
       alert("Livraison et paiement enregistrés avec succès dans la base de données !");
     } catch (err) {
       alert("Erreur lors de la livraison : " + err.message);
@@ -3402,7 +3412,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
          ======================================================== */}
       {showDeliveryPaymentModal && delivOrder && (
         <ModalPortal>
-          <div className="modal-backdrop" onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); }}>
+          <div className="modal-backdrop" onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); setMomoOperator('MTN'); }}>
             <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
               <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                 Livrer & Encaisser
@@ -3445,17 +3455,49 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
                 {delivPaymentMethod === 'mobile_money' && (
                   <div className="form-group">
+                    <label>Opérateur Réseau <span style={{ color: '#ef4444' }}>*</span></label>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                      {['MTN', 'MOOV', 'CELTIS'].map((op) => (
+                        <button
+                          key={op}
+                          type="button"
+                          onClick={() => setMomoOperator(op)}
+                          style={{
+                            flex: 1,
+                            padding: '7px 0',
+                            borderRadius: '8px',
+                            border: momoOperator === op ? '2px solid var(--primary)' : '1.5px solid var(--border-color)',
+                            background: momoOperator === op
+                              ? (op === 'MTN' ? 'linear-gradient(135deg, #FFCC00, #FFA500)'
+                                : op === 'MOOV' ? 'linear-gradient(135deg, #0057A8, #003F7F)'
+                                : 'linear-gradient(135deg, #E30613, #B50010)')
+                              : 'var(--bg-app)',
+                            color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : 'var(--text-secondary)',
+                            fontWeight: 700,
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {op}
+                        </button>
+                      ))}
+                    </div>
+
                     <label>Numéro de Référence <span style={{ color: '#ef4444' }}>*</span></label>
                     <input
                       type="text"
                       className="input-control"
-                      placeholder="Ex: TXN12345678"
+                      placeholder="Ex: 12345678 (8 à 15 chiffres)"
                       required
+                      maxLength={15}
+                      inputMode="numeric"
                       style={{ borderColor: momoRefError ? '#ef4444' : 'var(--border-color)' }}
                       value={momoRefNumber}
                       onChange={(e) => {
-                        setMomoRefNumber(e.target.value);
-                        if (e.target.value.trim()) setMomoRefError('');
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 15);
+                        setMomoRefNumber(val);
+                        if (val.trim()) setMomoRefError('');
                       }}
                     />
                     {momoRefError && (
@@ -3466,7 +3508,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                   <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--success)', border: 'none' }}>Confirmer la Livraison</button>
-                  <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); }}>Annuler</button>
+                  <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); setMomoOperator('MTN'); }}>Annuler</button>
                 </div>
               </form>
             </div>
@@ -3598,9 +3640,16 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       <span style={{ color: '#f59e0b', fontWeight: '600' }}>{createdOrder.type_article} ({serviceLabels[createdOrder.type_service] || createdOrder.type_service})</span>
                     </div>
                     <div><span style={{ fontWeight: '700' }}>Urgence :</span> {createdOrder.niveau_urgence}</div>
-                    <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement === 'mobile_money' ? 'Mobile Money' : createdOrder.mode_reglement === 'especes' ? 'Espèces' : createdOrder.mode_reglement}</div>
-                    {createdOrder.reference_momo && (
-                      <div><span style={{ fontWeight: '700' }}>Réf. Paiement :</span> <strong style={{ color: 'var(--primary)' }}>{createdOrder.reference_momo}</strong></div>
+                    <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement === 'mobile_money' || createdOrder.mode_reglement === 'Mobile Money' ? 'Mobile Money' : createdOrder.mode_reglement === 'especes' ? 'Espèces' : createdOrder.mode_reglement}</div>
+                    {(createdOrder.mode_reglement === 'mobile_money' || createdOrder.mode_reglement === 'Mobile Money' || createdOrder.reference_momo || createdOrder.reference_paiement || createdOrder.operateur_momo) && (
+                      <>
+                        {createdOrder.operateur_momo && (
+                          <div><span style={{ fontWeight: '700' }}>Opérateur Momo :</span> <strong style={{ color: '#002cf7' }}>{createdOrder.operateur_momo}</strong></div>
+                        )}
+                        {(createdOrder.reference_momo || createdOrder.reference_paiement) && (
+                          <div><span style={{ fontWeight: '700' }}>Réf. Paiement Momo :</span> <strong style={{ color: 'var(--primary)' }}>{createdOrder.reference_momo || createdOrder.reference_paiement}</strong></div>
+                        )}
+                      </>
                     )}
                     <div><span style={{ fontWeight: '700' }}>Dépôt :</span> {formatDateTime(createdOrder.created_at)}</div>
                     <div><span style={{ fontWeight: '700' }}>Échéance :</span> {formatDateTime(createdOrder.due_date)}</div>

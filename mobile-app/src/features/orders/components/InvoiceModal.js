@@ -121,6 +121,22 @@ export default function InvoiceModal({
                   <Text style={styles.tpeMetaLabel}>Client :</Text>
                   <Text style={styles.tpeMetaVal}>{clientFullName}</Text>
                 </View>
+                <View style={styles.tpeMetaRow}>
+                  <Text style={styles.tpeMetaLabel}>Règlement :</Text>
+                  <Text style={styles.tpeMetaVal}>{order.mode_reglement || order.mode_paiement || 'Espèces'}</Text>
+                </View>
+                {order.operateur_momo ? (
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>Opérateur MoMo :</Text>
+                    <Text style={[styles.tpeMetaVal, { fontWeight: '700', color: '#002cf7' }]}>{order.operateur_momo}</Text>
+                  </View>
+                ) : null}
+                {(order.reference_momo || order.reference_paiement) ? (
+                  <View style={styles.tpeMetaRow}>
+                    <Text style={styles.tpeMetaLabel}>N° Réf. MoMo :</Text>
+                    <Text style={[styles.tpeMetaVal, { fontWeight: '700' }]}>{order.reference_momo || order.reference_paiement}</Text>
+                  </View>
+                ) : null}
 
                 <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
 

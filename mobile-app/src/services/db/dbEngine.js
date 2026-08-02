@@ -981,7 +981,7 @@ export const db = {
   /**
    * Finalise une commande en validant le paiement final et en restituant les vêtements.
    */
-  deliverOrderWithPayment: async (orderId, amountPaid, paymentMethod, finalStatus = 'restitue', referencePaiement = null) => {
+  deliverOrderWithPayment: async (orderId, amountPaid, paymentMethod, finalStatus = 'restitue', referencePaiement = null, operateurMomo = null) => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
@@ -1000,6 +1000,7 @@ export const db = {
     const oldSubscriptionDetails = order.subscription_details ? { ...order.subscription_details } : undefined;
     const oldReferenceMomo = order.reference_momo;
     const oldReferencePaiement = order.reference_paiement;
+    const oldOperateurMomo = order.operateur_momo;
     const oldCustomerDette = customer ? Number(customer.solde_dette) : null;
     const oldCustomerPoints = customer ? Number(customer.points_fidelite) : null;
 
@@ -1015,6 +1016,9 @@ export const db = {
     if (referencePaiement) {
       order.reference_momo = referencePaiement;
       order.reference_paiement = referencePaiement;
+    }
+    if (operateurMomo) {
+      order.operateur_momo = operateurMomo;
     }
 
     order.avance_payee = avanceVal + cleanAmountPaid;
@@ -1063,7 +1067,8 @@ export const db = {
       solde_paid_at: order.solde_paid_at,
       subscription_details: order.subscription_details,
       reference_momo: order.reference_momo,
-      reference_paiement: order.reference_paiement
+      reference_paiement: order.reference_paiement,
+      operateur_momo: order.operateur_momo
     };
 
     try {

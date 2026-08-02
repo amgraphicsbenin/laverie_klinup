@@ -447,6 +447,20 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
               <span class="meta-label">Client :</span>
               <span class="meta-value">${client.prenom} ${client.nom}</span>
             </div>
+            <div class="meta-row">
+              <span class="meta-label">Règlement :</span>
+              <span class="meta-value">${order.mode_reglement || order.mode_paiement || 'Espèces'}</span>
+            </div>
+            ${order.operateur_momo ? `
+            <div class="meta-row">
+              <span class="meta-label">Opérateur MoMo :</span>
+              <span class="meta-value"><strong>${order.operateur_momo}</strong></span>
+            </div>` : ''}
+            ${(order.reference_momo || order.reference_paiement) ? `
+            <div class="meta-row">
+              <span class="meta-label">N° Réf. MoMo :</span>
+              <span class="meta-value"><strong>${order.reference_momo || order.reference_paiement}</strong></span>
+            </div>` : ''}
             
             <div class="divider"></div>
             <div class="section-title">- ARTICLES -</div>
@@ -849,6 +863,16 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
               <Text style={styles.sectionTitle}>Paiement & Mode</Text>
               <View style={styles.detailCard}>
                 <Text style={styles.logisticsText}>Mode de règlement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement || 'Non spécifié'}</Text>
+                {selectedOrder.operateur_momo ? (
+                  <Text style={[styles.logisticsText, { color: isDarkMode ? '#38bdf8' : '#002cf7', fontWeight: '600', marginTop: 4 }]}>
+                    Opérateur Mobile Money : {selectedOrder.operateur_momo}
+                  </Text>
+                ) : null}
+                {(selectedOrder.reference_momo || selectedOrder.reference_paiement) ? (
+                  <Text style={[styles.logisticsText, { color: isDarkMode ? '#38bdf8' : '#002cf7', fontWeight: '600', marginTop: 4 }]}>
+                    N° Référence MoMo : {selectedOrder.reference_momo || selectedOrder.reference_paiement}
+                  </Text>
+                ) : null}
               </View>
 
               {selectedOrder.statut === 'annule' && selectedOrder.motif_annulation && (
@@ -960,6 +984,22 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                           {getCustomerName(invoiceOrder.customer_id)}
                         </Text>
                       </View>
+                      <View style={styles.tpeMetaRow}>
+                        <Text style={styles.tpeMetaLabel}>Règlement :</Text>
+                        <Text style={styles.tpeMetaVal}>{invoiceOrder.mode_reglement || invoiceOrder.mode_paiement || 'Espèces'}</Text>
+                      </View>
+                      {invoiceOrder.operateur_momo ? (
+                        <View style={styles.tpeMetaRow}>
+                          <Text style={styles.tpeMetaLabel}>Opérateur MoMo :</Text>
+                          <Text style={[styles.tpeMetaVal, { fontWeight: '700', color: '#002cf7' }]}>{invoiceOrder.operateur_momo}</Text>
+                        </View>
+                      ) : null}
+                      {(invoiceOrder.reference_momo || invoiceOrder.reference_paiement) ? (
+                        <View style={styles.tpeMetaRow}>
+                          <Text style={styles.tpeMetaLabel}>N° Réf. MoMo :</Text>
+                          <Text style={[styles.tpeMetaVal, { fontWeight: '700' }]}>{invoiceOrder.reference_momo || invoiceOrder.reference_paiement}</Text>
+                        </View>
+                      ) : null}
 
                       <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
 

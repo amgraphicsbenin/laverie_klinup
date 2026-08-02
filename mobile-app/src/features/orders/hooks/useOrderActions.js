@@ -108,7 +108,7 @@ export default function useOrderActions({
    * @param {String} method - Mode de paiement ('Espèces' ou 'Mobile Money').
    * @param {String|null} reference - Référence de transaction Mobile Money.
    */
-  const confirmPayment = (method, reference) => {
+  const confirmPayment = (method, reference, operator) => {
     if (!paymentOrder) return;
 
     const total = Number(paymentOrder.prix_total || paymentOrder.total || 0);
@@ -123,14 +123,15 @@ export default function useOrderActions({
           soldeRestant,
           method,
           targetStatus,
-          reference
+          reference,
+          operator
         );
         if (onShowSuccess) {
           onShowSuccess("Paiement enregistré et commande finalisée.");
         }
       } catch (e) {
         console.error("Error validating payment:", e);
-        Alert.alert("Erreur", "Impossible de valider le règlement.");
+        Alert.alert("Erreur", e.message || "Impossible de valider le règlement.");
       }
     };
 

@@ -94,6 +94,7 @@ export default function GestionScreen({
   const [paymentMethod, setPaymentMethod] = useState('Espèces');
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
+  const [momoOperator, setMomoOperator] = useState('MTN');
 
   const validateCancelReason = (text) => {
     const trimmed = text.trim();
@@ -402,6 +403,7 @@ export default function GestionScreen({
       setPaymentMethod('Espèces');
       setMomoRefNumber('');
       setMomoRefError('');
+      setMomoOperator('MTN');
       setPaymentModalVisible(true);
       return;
     }
@@ -431,9 +433,16 @@ export default function GestionScreen({
 
   const handleConfirmPaymentAndComplete = async () => {
     if (!paymentOrder) return;
-    if (paymentMethod === 'Mobile Money' && !momoRefNumber.trim()) {
-      setMomoRefError("Le numéro de référence est obligatoire.");
-      return;
+    if (paymentMethod === 'Mobile Money') {
+      const ref = momoRefNumber.trim();
+      if (!ref) {
+        setMomoRefError("Le numéro de référence est obligatoire.");
+        return;
+      }
+      if (!/^\d{8,15}$/.test(ref)) {
+        setMomoRefError("Le numéro de référence doit contenir entre 8 et 15 chiffres.");
+        return;
+      }
     }
 
     const total = Number(paymentOrder.prix_total || paymentOrder.total || 0);
@@ -448,14 +457,15 @@ export default function GestionScreen({
           soldeRestant,
           paymentMethod,
           targetStatus,
-          paymentMethod === 'Mobile Money' ? momoRefNumber.trim() : null
+          paymentMethod === 'Mobile Money' ? momoRefNumber.trim() : null,
+          paymentMethod === 'Mobile Money' ? momoOperator : null
         );
         if (onShowSuccess) {
           onShowSuccess("Paiement enregistré et commande finalisée.");
         }
       } catch (e) {
         console.error("Error validating payment:", e);
-        Alert.alert("Erreur", "Impossible de valider le règlement.");
+        Alert.alert("Erreur", e.message || "Impossible de valider le règlement.");
       }
     };
 
@@ -845,6 +855,20 @@ export default function GestionScreen({
               <div class="meta-label">Client :</div>
               <div class="meta-value">${client.prenom} ${client.nom}</div>
             </div>
+            <div class="meta-row">
+              <div class="meta-label">Règlement :</div>
+              <div class="meta-value">${order.mode_reglement || order.mode_paiement || 'Espèces'}</div>
+            </div>
+            ${order.operateur_momo ? `
+            <div class="meta-row">
+              <div class="meta-label">Opérateur MoMo :</div>
+              <div class="meta-value"><strong>${order.operateur_momo}</strong></div>
+            </div>` : ''}
+            ${(order.reference_momo || order.reference_paiement) ? `
+            <div class="meta-row">
+              <div class="meta-label">N° Réf. MoMo :</div>
+              <div class="meta-value"><strong>${order.reference_momo || order.reference_paiement}</strong></div>
+            </div>` : ''}
             
             <div class="divider"></div>
             
@@ -1721,6 +1745,16 @@ export default function GestionScreen({
                     Date retrait prévue : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
                   </Text>
                   <Text style={styles.logisticsText}>Mode de paiement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement}</Text>
+                  {selectedOrder.operateur_momo ? (
+                    <Text style={[styles.logisticsText, { color: isDarkMode ? '#38bdf8' : '#002cf7', fontWeight: '600' }]}>
+                      Opérateur Mobile Money : {selectedOrder.operateur_momo}
+                    </Text>
+                  ) : null}
+                  {(selectedOrder.reference_momo || selectedOrder.reference_paiement) ? (
+                    <Text style={[styles.logisticsText, { color: isDarkMode ? '#38bdf8' : '#002cf7', fontWeight: '600' }]}>
+                      N° Référence MoMo : {selectedOrder.reference_momo || selectedOrder.reference_paiement}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
 
@@ -1976,6 +2010,22 @@ export default function GestionScreen({
                           })()}
                         </Text>
                       </View>
+                      <View style={styles.tpeMetaRow}>
+                        <Text style={styles.tpeMetaLabel}>Règlement :</Text>
+                        <Text style={styles.tpeMetaVal}>{invoiceOrder.mode_reglement || invoiceOrder.mode_paiement || 'Espèces'}</Text>
+                      </View>
+                      {invoiceOrder.operateur_momo ? (
+                        <View style={styles.tpeMetaRow}>
+                          <Text style={styles.tpeMetaLabel}>Opérateur MoMo :</Text>
+                          <Text style={[styles.tpeMetaVal, { fontWeight: '700', color: '#002cf7' }]}>{invoiceOrder.operateur_momo}</Text>
+                        </View>
+                      ) : null}
+                      {(invoiceOrder.reference_momo || invoiceOrder.reference_paiement) ? (
+                        <View style={styles.tpeMetaRow}>
+                          <Text style={styles.tpeMetaLabel}>N° Réf. MoMo :</Text>
+                          <Text style={[styles.tpeMetaVal, { fontWeight: '700' }]}>{invoiceOrder.reference_momo || invoiceOrder.reference_paiement}</Text>
+                        </View>
+                      ) : null}
 
                       <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
 
@@ -2293,17 +2343,51 @@ export default function GestionScreen({
                     {/* Reference Input for Mobile Money */}
                     {paymentMethod === 'Mobile Money' && (
                       <View style={{ marginBottom: 18 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
-                          Numéro de Référence <Text style={{ color: '#ef4444' }}>*</Text>
-                        </Text>
+                    {/* Opérateur Mobile Money */}
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
+                      Opérateur Réseau <Text style={{ color: '#ef4444' }}>*</Text>
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                      {['MTN', 'MOOV', 'CELTIS'].map((op) => (
+                        <TouchableOpacity
+                          key={op}
+                          onPress={() => setMomoOperator(op)}
+                          activeOpacity={0.8}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            borderWidth: momoOperator === op ? 2 : 1.5,
+                            borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
+                            backgroundColor: momoOperator === op
+                              ? (op === 'MTN' ? '#FFCC00' : op === 'MOOV' ? '#0057A8' : '#E30613')
+                              : (isDarkMode ? '#18181b' : '#f8fafc'),
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Text style={{
+                            fontWeight: '800',
+                            fontSize: 12,
+                            color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : (isDarkMode ? '#94a3b8' : '#64748b')
+                          }}>{op}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
+                      Numéro de Référence <Text style={{ color: '#ef4444' }}>*</Text>
+                    </Text>
                         <TextInput
                           value={momoRefNumber}
                           onChangeText={(text) => {
-                            setMomoRefNumber(text);
-                            if (text.trim()) setMomoRefError('');
+                            const val = text.replace(/\D/g, '').slice(0, 15);
+                            setMomoRefNumber(val);
+                            if (val.trim()) setMomoRefError('');
                           }}
-                          placeholder="Ex: TXN12345678"
+                          placeholder="8 à 15 chiffres (ex: 12345678)"
                           placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
+                          keyboardType="numeric"
+                          maxLength={15}
                           style={{
                             borderWidth: 1,
                             borderColor: momoRefError ? '#ef4444' : (isDarkMode ? '#27272a' : '#d4d4d8'),
