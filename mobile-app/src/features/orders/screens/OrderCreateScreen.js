@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Platform, Alert, RefreshControl } from 'react-native';
-import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus } from 'lucide-react-native';
+import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus, Gift } from 'lucide-react-native';
 import { CustomSelect } from '../../../components/CustomSelect';
 import { db } from '../../../services/db';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
@@ -34,6 +34,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
 
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
+  const [appliedReward, setAppliedReward] = useState(null);
 
   // Mode Nouveau Client state
   const [clientNom, setClientNom] = useState('');
@@ -53,6 +54,11 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
     }
   }, [isSubscriptionMode]);
 
+  const getAvailableRewards = (customer) => {
+    if (!customer || !Array.isArray(customer.rewards)) return [];
+    return customer.rewards.filter(r => r.status === 'available' || !r.status);
+  };
+
   const resetForm = () => {
     setOrderClient('');
     setSelectedArticles([]);
@@ -63,11 +69,12 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
     setExpandedArticles([]);
     setPayWithSubscription(false);
     setSubscribePlanId('');
+    setAppliedReward(null);
     setClientSearchQuery('');
   };
 
   const handleCancelOrder = () => {
-    const hasData = !!orderClient || selectedArticles.length > 0 || parseFloat(orderAvance) > 0 || parseInt(orderDiscount) > 0 || !!subscribePlanId;
+    const hasData = !!orderClient || selectedArticles.length > 0 || parseFloat(orderAvance) > 0 || parseInt(orderDiscount) > 0 || !!subscribePlanId || !!appliedReward;
     if (hasData) {
       Alert.alert(
         "Confirmer l'annulation",
@@ -97,6 +104,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
       setPayWithSubscription(false);
     }
     setSubscribePlanId('');
+    setAppliedReward(null);
   }, [orderClient]);
 
   const formatPrice = (price) => {
@@ -198,6 +206,21 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
 
     try {
       const currentUser = db.getCurrentUser();
+
+      let rewardDiscountVal = 0;
+      if (appliedReward) {
+        if (appliedReward.discount_amount > 0) {
+          rewardDiscountVal = Number(appliedReward.discount_amount);
+        } else if (appliedReward.discountAmount > 0) {
+          rewardDiscountVal = Number(appliedReward.discountAmount);
+        } else {
+          const match = (appliedReward.title || '').match(/(\d[\d\s]*)\s*FCFA/i);
+          if (match) {
+            rewardDiscountVal = parseInt(match[1].replace(/\s/g, ''), 10) || 0;
+          }
+        }
+      }
+
       const newOrder = {
         customer_id: orderClient,
         articles: selectedArticles.map(a => ({
@@ -212,6 +235,9 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
         mode_paiement: finalModeReglement,
         niveau_urgence: orderUrgency,
         remise_pourcentage: discountPercent,
+        applied_reward_id: appliedReward ? appliedReward.id : null,
+        applied_reward_title: appliedReward ? appliedReward.title : null,
+        applied_reward_discount: rewardDiscountVal,
         created_by_id: currentUser ? currentUser.id : 'u1',
         pay_with_subscription: payWithSubscription,
         subscribe_plan_id: subscribePlanId,
@@ -219,7 +245,13 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
         operateur_momo: finalModeReglement === 'Mobile Money' ? momoOperator : null
       };
 
-      await db.createOrder(newOrder);
+      const created = await db.createOrder(newOrder);
+
+      if (created && appliedReward && activeCustomer) {
+        if (db.markCustomerRewardUsed) {
+          await db.markCustomerRewardUsed(activeCustomer.id, appliedReward.id, created.id);
+        }
+      }
 
       // Clean state
       setOrderClient('');
@@ -230,6 +262,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
       setExpandedArticles([]);
       setPayWithSubscription(false);
       setSubscribePlanId('');
+      setAppliedReward(null);
       setMomoRefNumber('');
       setMomoRefError('');
       setMomoOperator('MTN');
@@ -789,6 +822,95 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
             />
           </View>
 
+          {/* Section Récompense Fidélité Client Disponible */}
+          {activeCustomer && (() => {
+            const availableRewards = getAvailableRewards(activeCustomer);
+            if (availableRewards.length === 0) return null;
+
+            return (
+              <View style={[styles.cardSection, { borderColor: isDarkMode ? '#38bdf8' : '#002cf7', borderWidth: 1.5, marginBottom: 16 }]}>
+                <View style={styles.sectionHeader}>
+                  <Gift size={16} color="#002cf7" />
+                  <Text style={styles.sectionTitle}>Récompense Fidélité Client Disponible</Text>
+                </View>
+
+                <Text style={[styles.subLabelSmallBold, { marginBottom: 10, color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
+                  Sélectionnez une récompense débloquée à appliquer sur cette commande :
+                </Text>
+
+                {availableRewards.map((reward) => {
+                  const isApplied = appliedReward?.id === reward.id;
+                  const rewardVal = Number(reward.discount_amount || reward.discountAmount || 0);
+                  return (
+                    <View
+                      key={reward.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
+                        borderRadius: 12,
+                        padding: 12,
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: isApplied ? '#002cf7' : (isDarkMode ? '#27272a' : '#e2e8f0')
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 10
+                        }}
+                      >
+                        <Gift size={18} color={isDarkMode ? '#38bdf8' : '#002cf7'} />
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {reward.title}
+                        </Text>
+                        {rewardVal > 0 ? (
+                          <Text style={{ fontSize: 11, color: '#10b981', fontWeight: '600', marginTop: 2 }}>
+                            Réduction de {formatPrice(rewardVal)}
+                          </Text>
+                        ) : (
+                          <Text style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                            {reward.description || 'Avantage fidélité client'}
+                          </Text>
+                        )}
+                      </View>
+
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (isApplied) {
+                            setAppliedReward(null);
+                          } else {
+                            setAppliedReward(reward);
+                          }
+                        }}
+                        style={{
+                          backgroundColor: isApplied ? '#10b981' : '#002cf7',
+                          paddingHorizontal: 14,
+                          paddingVertical: 8,
+                          borderRadius: 8
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 12 }}>
+                          {isApplied ? 'Appliquée ✓' : 'Appliquer'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })()}
+
           {/* Facturation & Live Receipt Preview */}
           {(() => {
             const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -813,7 +935,22 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
 
             const discountPercent = Number(orderDiscount) || 0;
             const discountAmount = Math.round(currentTotal * (discountPercent / 100));
-            const netTotal = currentTotal - discountAmount;
+
+            let rewardDiscountVal = 0;
+            if (appliedReward) {
+              if (appliedReward.discount_amount > 0) {
+                rewardDiscountVal = Number(appliedReward.discount_amount);
+              } else if (appliedReward.discountAmount > 0) {
+                rewardDiscountVal = Number(appliedReward.discountAmount);
+              } else {
+                const match = (appliedReward.title || '').match(/(\d[\d\s]*)\s*FCFA/i);
+                if (match) {
+                  rewardDiscountVal = parseInt(match[1].replace(/\s/g, ''), 10) || 0;
+                }
+              }
+            }
+
+            const netTotal = Math.max(0, currentTotal - discountAmount - rewardDiscountVal);
             const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
             const currentReste = netTotal - currentAvance;
             const totalClothes = selectedArticles.reduce((sum, item) => sum + item.quantity, 0);
@@ -893,6 +1030,17 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                   <View style={styles.receiptRow}>
                     <Text style={styles.receiptRowLabel}>Réduction ({discountPercent}%)</Text>
                     <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
+                  </View>
+                )}
+
+                {appliedReward && (
+                  <View style={styles.receiptRow}>
+                    <Text style={[styles.receiptRowLabel, { color: '#10b981', fontWeight: '700' }]}>
+                      Récompense ({appliedReward.title})
+                    </Text>
+                    <Text style={[styles.receiptRowVal, { color: '#10b981', fontWeight: '700' }]}>
+                      -{formatPrice(rewardDiscountVal)}
+                    </Text>
                   </View>
                 )}
 

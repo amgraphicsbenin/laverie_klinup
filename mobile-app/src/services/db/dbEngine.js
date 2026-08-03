@@ -605,11 +605,53 @@ export const db = {
     }
     const newPts = currentPts - pointsCost;
     customer.points_fidelite = newPts;
-    await performMutation('update', 'customers', customerId, { points_fidelite: newPts });
+
+    // Retrieve details from catalog if available
+    const catalogItem = (memoryDb.catalog || []).find(item => item.id === rewardId);
+    let discountAmount = Number(catalogItem?.discount_amount || catalogItem?.discountAmount || 0);
+    if (!discountAmount) {
+      const match = (rewardTitle || '').match(/(\d[\d\s]*)\s*FCFA/i);
+      if (match) {
+        discountAmount = parseInt(match[1].replace(/\s/g, ''), 10) || 0;
+      }
+    }
+
+    const voucher = {
+      id: 'vch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      reward_id: rewardId,
+      title: rewardTitle,
+      cost: pointsCost,
+      discount_amount: discountAmount,
+      icon_name: catalogItem?.service || 'Gift',
+      description: catalogItem?.description || `Récompense ${rewardTitle}`,
+      created_at: new Date().toISOString(),
+      status: 'available'
+    };
+
+    if (!Array.isArray(customer.rewards)) {
+      customer.rewards = [];
+    }
+    customer.rewards.push(voucher);
+
+    await performMutation('update', 'customers', customerId, { points_fidelite: newPts, rewards: customer.rewards });
     db.logAction('UTILISATION_RECOMPENSE', `Récompense '${rewardTitle}' débloquée par ${customer.prenom} ${customer.nom} (-${pointsCost} pts). Nouveau solde: ${newPts} pts`);
     persist();
     db.notify();
     return customer;
+  },
+
+  markCustomerRewardUsed: async (customerId, rewardVoucherId, orderId) => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer || !Array.isArray(customer.rewards)) return;
+    const voucher = customer.rewards.find(r => r.id === rewardVoucherId || r.reward_id === rewardVoucherId);
+    if (voucher) {
+      voucher.status = 'used';
+      voucher.used_at = new Date().toISOString();
+      voucher.used_order_id = orderId;
+      await performMutation('update', 'customers', customerId, { rewards: customer.rewards });
+      persist();
+      db.notify();
+    }
   },
 
   /**
@@ -800,6 +842,11 @@ export const db = {
       totalPrice = Math.max(0, totalPrice - discountAmount);
     }
 
+    let rewardDiscount = Number(orderData.applied_reward_discount || orderData.reward_discount || 0);
+    if (rewardDiscount > 0) {
+      totalPrice = Math.max(0, totalPrice - rewardDiscount);
+    }
+
     const avanceInput = orderData.avance_payee !== undefined ? orderData.avance_payee : (orderData.avance !== undefined ? orderData.avance : 0);
     const advancePaid = (isSubscriptionOrder && !subscribedPlan) ? 0 : Number(avanceInput);
     const unpaidBalance = totalPrice - advancePaid;
@@ -859,6 +906,9 @@ export const db = {
       prix_total: totalPrice,
       remise_pourcentage: discountPercent,
       remise_montant: discountAmount,
+      applied_reward_id: orderData.applied_reward_id || null,
+      applied_reward_title: orderData.applied_reward_title || null,
+      applied_reward_discount: rewardDiscount,
       prix_base_avant_remise: basePriceBeforeRemise,
       identifiant_unique_marquage: codeMarquage,
       created_at: nowStr,

@@ -758,7 +758,37 @@ export const dbEngine = {
     }
 
     const newPts = currentPts - pointsCost;
-    await performMutation('update', 'customers', customerId, { points_fidelite: newPts });
+
+    const catalogItem = (memoryDb.catalog || []).find((item: any) => item.id === rewardId);
+    let discountAmount = Number(catalogItem?.discount_amount || catalogItem?.discountAmount || 0);
+    if (!discountAmount) {
+      const match = (rewardTitle || '').match(/(\d[\d\s]*)\s*FCFA/i);
+      if (match) {
+        discountAmount = parseInt(match[1].replace(/\s/g, ''), 10) || 0;
+      }
+    }
+
+    const voucher = {
+      id: 'vch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      reward_id: rewardId,
+      title: rewardTitle,
+      cost: pointsCost,
+      discount_amount: discountAmount,
+      icon_name: catalogItem?.service || 'Gift',
+      description: catalogItem?.description || `Récompense ${rewardTitle}`,
+      created_at: new Date().toISOString(),
+      status: 'available'
+    };
+
+    if (!Array.isArray((customer as any).rewards)) {
+      (customer as any).rewards = [];
+    }
+    (customer as any).rewards.push(voucher);
+
+    await performMutation('update', 'customers', customerId, {
+      points_fidelite: newPts,
+      rewards: (customer as any).rewards
+    });
     customer.points_fidelite = newPts;
 
     dbEngine.logAction(
@@ -767,6 +797,19 @@ export const dbEngine = {
     );
     notifyListeners();
     return customer;
+  },
+
+  markCustomerRewardUsed: async (customerId: string, rewardVoucherId: string, orderId?: string): Promise<void> => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer || !Array.isArray((customer as any).rewards)) return;
+    const voucher = (customer as any).rewards.find((r: any) => r.id === rewardVoucherId || r.reward_id === rewardVoucherId);
+    if (voucher) {
+      voucher.status = 'used';
+      voucher.used_at = new Date().toISOString();
+      voucher.used_order_id = orderId;
+      await performMutation('update', 'customers', customerId, { rewards: (customer as any).rewards });
+      notifyListeners();
+    }
   },
 
   // ── Orders ──
