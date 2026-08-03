@@ -376,6 +376,10 @@ export const dbEngine = {
     }
     // ─── End fidelity sync ───────────────────────────────────────────────────
 
+    if (newSettings.reward_catalog && Array.isArray(newSettings.reward_catalog)) {
+      dbEngine.updateRewardCatalog(newSettings.reward_catalog);
+    }
+
     dbEngine.logAction('MODIFICATION_PARAMETRES', 'Mise à jour des paramètres système, des dimensions de reçu et du programme de fidélité.');
     notifyListeners();
     return memoryDb.settings;
@@ -388,7 +392,7 @@ export const dbEngine = {
         id: c.id,
         title: c.article,
         cost: Number(c.prix),
-        discountAmount: Number(c.description_data || c.discount_amount || 0),
+        discountAmount: Number(c.discount_amount || c.description_data || 0),
         iconName: c.service || 'Gift',
         description: c.description || ''
       }));
@@ -413,14 +417,20 @@ export const dbEngine = {
     saveSession('klin_up_settings', memoryDb.settings);
 
     // ─── Sync each reward to Supabase catalog so mobile app can read them ──
-    // Format in catalog: id=reward id, article=title, prix=cost (pts), service=iconName,
-    // description=description, categorie='reward_catalog'
-    // discount_amount is stored in prix_base_avant_remise or description_data column (JSONB not available)
-    // We use a JSON-encoded description to store discountAmount
-    const existingRewardIds = new Set(
-      (memoryDb.catalog || []).filter((c: any) => c.categorie === 'reward_catalog').map((c: any) => c.id)
-    );
+    const existingRewardItems = (memoryDb.catalog || []).filter((c: any) => c.categorie === 'reward_catalog');
+    const existingRewardIds = new Set(existingRewardItems.map((c: any) => c.id));
+    const newRewardIds = new Set((catalog || []).map(r => r.id));
 
+    // Remove deleted rewards from memoryDb and Supabase
+    for (const existingItem of existingRewardItems) {
+      if (!newRewardIds.has(existingItem.id)) {
+        const idx = (memoryDb.catalog || []).findIndex((c: any) => c.id === existingItem.id);
+        if (idx >= 0) (memoryDb.catalog as any[]).splice(idx, 1);
+        performMutation('delete', 'catalog', existingItem.id).catch(() => {});
+      }
+    }
+
+    // Upsert each reward in memoryDb and Supabase
     for (const reward of catalog) {
       const catalogItem = {
         id: reward.id,
@@ -439,25 +449,12 @@ export const dbEngine = {
       if (existingIdx >= 0) {
         memoryDb.catalog[existingIdx] = { ...memoryDb.catalog[existingIdx], ...catalogItem };
       } else {
+        if (!memoryDb.catalog) memoryDb.catalog = [];
         (memoryDb.catalog as any[]).push(catalogItem);
       }
 
-      // Sync to Supabase
-      if (existingRewardIds.has(reward.id)) {
-        performMutation('update', 'catalog', reward.id, { article: catalogItem.article, prix: catalogItem.prix, service: catalogItem.service, description: catalogItem.description }).catch(() => {});
-      } else {
-        performMutation('insert', 'catalog', reward.id, catalogItem).catch(() => {});
-      }
-    }
-
-    // Remove deleted rewards from Supabase
-    const newIds = new Set(catalog.map(r => r.id));
-    for (const existingId of existingRewardIds) {
-      if (!newIds.has(existingId)) {
-        const idx = (memoryDb.catalog || []).findIndex((c: any) => c.id === existingId);
-        if (idx >= 0) (memoryDb.catalog as any[]).splice(idx, 1);
-        performMutation('delete', 'catalog', existingId).catch(() => {});
-      }
+      // Upsert to Supabase
+      performMutation('upsert', 'catalog', reward.id, catalogItem).catch(() => {});
     }
     // ─── End reward sync ───────────────────────────────────────────────────
 

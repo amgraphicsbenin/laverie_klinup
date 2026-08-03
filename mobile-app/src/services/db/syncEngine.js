@@ -137,6 +137,8 @@ export async function performMutation(action, table, recordId, data) {
       res = await supabase.from(table).update(sanitizedData).eq('id', recordId);
     } else if (action === 'delete') {
       res = await supabase.from(table).delete().eq('id', recordId);
+    } else if (action === 'upsert') {
+      res = await supabase.from(table).upsert(sanitizedData, { onConflict: 'id' });
     }
   } catch (networkErr) {
     throw new Error(`[KLIN UP DB] Erreur réseau Supabase (table: ${table}) : ${networkErr.message}`);

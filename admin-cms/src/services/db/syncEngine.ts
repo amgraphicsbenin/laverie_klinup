@@ -48,7 +48,7 @@ function sanitizePayload(table: string, data: any): any {
 // The caller (dbEngine) must NOT update memoryDb if this throws.
 
 export async function performMutation(
-  action: 'insert' | 'update' | 'delete',
+  action: 'insert' | 'update' | 'delete' | 'upsert',
   table: string,
   recordId?: string,
   data?: any
@@ -69,6 +69,8 @@ export async function performMutation(
       res = await supabase.from(table).update(sanitizedData).eq('id', recordId);
     } else if (action === 'delete') {
       res = await supabase.from(table).delete().eq('id', recordId);
+    } else if (action === 'upsert') {
+      res = await supabase.from(table).upsert(sanitizedData, { onConflict: 'id' });
     }
   } catch (networkErr: any) {
     throw new Error(

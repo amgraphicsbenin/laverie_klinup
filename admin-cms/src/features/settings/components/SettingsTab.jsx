@@ -74,6 +74,25 @@ export default function SettingsTab({
   const [rewardIcon, setRewardIcon] = useState('Gift');
   const [rewardDescription, setRewardDescription] = useState('');
 
+  // Sync state when DB notifies of updates (e.g. after Supabase fetch completes)
+  React.useEffect(() => {
+    if (typeof db.subscribe === 'function') {
+      const unsubscribe = db.subscribe(() => {
+        if (db.getRewardCatalog) {
+          setRewardCatalog(db.getRewardCatalog());
+        }
+        if (db.getSettings) {
+          const s = db.getSettings();
+          if (s.fidelity_spend_per_point !== undefined) setSpendPerPoint(s.fidelity_spend_per_point);
+          if (s.fidelity_active !== undefined) setFidelityActive(s.fidelity_active);
+        }
+      });
+      return () => {
+        if (typeof unsubscribe === 'function') unsubscribe();
+      };
+    }
+  }, []);
+
   const handleOpenAddReward = () => {
     setEditingReward(null);
     setRewardTitle('');
