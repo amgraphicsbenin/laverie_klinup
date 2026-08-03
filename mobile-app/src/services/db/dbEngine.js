@@ -260,6 +260,10 @@ export const db = {
     const catalog = memoryDb.catalog || [];
     const spendPerPointItem = catalog.find(i => i.id === 'setting_fidelity_spend_per_point');
     const fidelityActiveItem = catalog.find(i => i.id === 'setting_fidelity_active');
+    const bronzeItem = catalog.find(i => i.id === 'setting_fidelity_tier_bronze_max_pts');
+    const silverItem = catalog.find(i => i.id === 'setting_fidelity_tier_silver_pts');
+    const goldItem = catalog.find(i => i.id === 'setting_fidelity_tier_gold_pts');
+    const platItem = catalog.find(i => i.id === 'setting_fidelity_tier_platinum_pts');
 
     const spendPerPoint = spendPerPointItem ? Number(spendPerPointItem.prix) : (memoryDb.settings?.fidelity_spend_per_point || 1000);
     const fidelityActive = fidelityActiveItem ? (Number(fidelityActiveItem.prix) !== 0) : (memoryDb.settings?.fidelity_active ?? true);
@@ -267,8 +271,79 @@ export const db = {
     return {
       ...(memoryDb.settings || {}),
       fidelity_spend_per_point: spendPerPoint,
-      fidelity_active: fidelityActive
+      fidelity_active: fidelityActive,
+      ...(bronzeItem ? { fidelity_tier_bronze_max_pts: Number(bronzeItem.prix) } : {}),
+      ...(silverItem ? { fidelity_tier_silver_pts: Number(silverItem.prix) } : {}),
+      ...(goldItem ? { fidelity_tier_gold_pts: Number(goldItem.prix) } : {}),
+      ...(platItem ? { fidelity_tier_platinum_pts: Number(platItem.prix) } : {}),
     };
+  },
+
+  getRewardCatalog: () => {
+    if (memoryDb.rewards && Array.isArray(memoryDb.rewards) && memoryDb.rewards.length > 0) {
+      return memoryDb.rewards.map(r => ({
+        id: r.id,
+        title: r.title || r.article,
+        cost: Number(r.cost !== undefined ? r.cost : r.prix),
+        discountAmount: Number(r.discount_amount !== undefined ? r.discount_amount : (r.discountAmount !== undefined ? r.discountAmount : 0)),
+        iconName: r.icon_name || r.service || 'Gift',
+        description: r.description || '',
+        is_active: r.is_active !== false
+      }));
+    }
+    const fromCatalog = (memoryDb.catalog || []).filter(c => c.categorie === 'reward_catalog');
+    if (fromCatalog.length > 0) {
+      return fromCatalog.map(c => ({
+        id: c.id,
+        title: c.article,
+        cost: Number(c.prix),
+        discountAmount: Number(c.discount_amount !== undefined ? c.discount_amount : (c.discountAmount !== undefined ? c.discountAmount : 0)),
+        iconName: c.service || 'Gift',
+        description: c.description || '',
+        is_active: c.is_active !== false
+      }));
+    }
+    return [
+      { id: 'remise_1000', title: 'Remise de 1 000 FCFA', cost: 30, discountAmount: 1000, iconName: 'Tag', description: 'Réduction de 1 000 FCFA sur la prochaine commande.' },
+      { id: 'lavage_offert', title: 'Lavage 1 Vêtement Offert', cost: 50, discountAmount: 2000, iconName: 'Shirt', description: 'Un lavage gratuit pour une pièce au choix.' },
+      { id: 'livraison_offerte', title: 'Livraison Offerte', cost: 60, discountAmount: 1500, iconName: 'Truck', description: 'Frais de livraison 100% offerts.' },
+      { id: 'repassage_offert', title: 'Repassage Offert', cost: 100, discountAmount: 4000, iconName: 'Sparkles', description: 'Repassage complet offert sur vos vêtements.' },
+      { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: "Réduction de 5 000 FCFA lors du renouvellement d'abonnement." }
+    ];
+  },
+
+  updateRewardCatalog: async (catalog) => {
+    const existingRewards = memoryDb.rewards || [];
+    const newRewardIds = new Set((catalog || []).map(r => r.id));
+
+    for (const existingItem of existingRewards) {
+      if (!newRewardIds.has(existingItem.id)) {
+        const idx = (memoryDb.rewards || []).findIndex(r => r.id === existingItem.id);
+        if (idx >= 0) (memoryDb.rewards).splice(idx, 1);
+        await performMutation('delete', 'rewards', existingItem.id).catch(e => console.warn('[DB] delete reward error:', e));
+      }
+    }
+
+    const updatedMemoryRewards = [];
+    for (const reward of catalog) {
+      const discountVal = Number(reward.discountAmount !== undefined ? reward.discountAmount : (reward.discount_amount || 0));
+      const rewardRow = {
+        id: reward.id,
+        title: reward.title,
+        cost: Number(reward.cost),
+        discount_amount: discountVal,
+        icon_name: reward.iconName || reward.icon_name || reward.service || 'Gift',
+        description: reward.description || '',
+        is_active: true
+      };
+
+      updatedMemoryRewards.push(rewardRow);
+      await performMutation('upsert', 'rewards', reward.id, rewardRow).catch(e => console.warn('[DB] upsert reward error:', e));
+    }
+
+    memoryDb.rewards = updatedMemoryRewards;
+    db.notify();
+    return db.getRewardCatalog();
   },
 
   updateSettings: (newSettings) => {

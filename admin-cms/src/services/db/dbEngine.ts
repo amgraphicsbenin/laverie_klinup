@@ -293,114 +293,176 @@ export const dbEngine = {
     notifyListeners();
     return true;
   },
-  getSettings: () => memoryDb.settings || {
-    express_hours: 6, express_markup: 50, normal_hours: 48,
-    receipt_header: 'KLIN UP - Laverie & Pressing Premium',
-    receipt_footer: 'Merci de votre confiance ! A bientot chez KLIN UP.',
-    fidelity_active: true,
-    fidelity_spend_per_point: 1000,
-    fidelity_tier_silver_pts: 50,
-    fidelity_tier_gold_pts: 150,
-    fidelity_tier_platinum_pts: 300,
-    invoice_paper_format: '80mm',
-    invoice_paper_width: 80,
-    invoice_paper_height: 0,
-    invoice_orientation: 'portrait',
-    invoice_margin: 5
+  getSettings: () => {
+    const catalog = memoryDb.catalog || [];
+    const spendItem = catalog.find((c: any) => c.id === 'setting_fidelity_spend_per_point');
+    const activeItem = catalog.find((c: any) => c.id === 'setting_fidelity_active');
+    const bronzeItem = catalog.find((c: any) => c.id === 'setting_fidelity_tier_bronze_max_pts');
+    const silverItem = catalog.find((c: any) => c.id === 'setting_fidelity_tier_silver_pts');
+    const goldItem = catalog.find((c: any) => c.id === 'setting_fidelity_tier_gold_pts');
+    const platItem = catalog.find((c: any) => c.id === 'setting_fidelity_tier_platinum_pts');
+    const expHoursItem = catalog.find((c: any) => c.id === 'setting_express_hours');
+    const normHoursItem = catalog.find((c: any) => c.id === 'setting_normal_hours');
+    const expMarkupItem = catalog.find((c: any) => c.id === 'setting_express_markup');
+
+    const defaults = {
+      express_hours: 6,
+      express_markup: 50,
+      normal_hours: 48,
+      receipt_header: 'KLIN UP - Laverie & Pressing Premium',
+      receipt_footer: 'Merci de votre confiance ! À bientôt chez KLIN UP.',
+      fidelity_active: true,
+      fidelity_spend_per_point: 1000,
+      fidelity_tier_bronze_max_pts: 49,
+      fidelity_tier_silver_pts: 50,
+      fidelity_tier_gold_pts: 150,
+      fidelity_tier_platinum_pts: 300,
+      invoice_paper_format: '80mm',
+      invoice_paper_width: 80,
+      invoice_paper_height: 0,
+      invoice_orientation: 'portrait',
+      invoice_margin: 5
+    };
+
+    const localSettings = memoryDb.settings || {};
+    const merged: Record<string, any> = {
+      ...defaults,
+      ...localSettings
+    };
+
+    if (spendItem) merged.fidelity_spend_per_point = Number(spendItem.prix) || 1000;
+    if (activeItem) merged.fidelity_active = Number(activeItem.prix) !== 0;
+    if (bronzeItem) merged.fidelity_tier_bronze_max_pts = Number(bronzeItem.prix);
+    if (silverItem) merged.fidelity_tier_silver_pts = Number(silverItem.prix);
+    if (goldItem) merged.fidelity_tier_gold_pts = Number(goldItem.prix);
+    if (platItem) merged.fidelity_tier_platinum_pts = Number(platItem.prix);
+    if (expHoursItem) merged.express_hours = Number(expHoursItem.prix);
+    if (normHoursItem) merged.normal_hours = Number(normHoursItem.prix);
+    if (expMarkupItem) merged.express_markup = Number(expMarkupItem.prix);
+
+    return merged;
   },
-  updateSettings: (newSettings: Record<string, any>) => {
+  updateSettings: async (newSettings: Record<string, any>) => {
     memoryDb.settings = {
-      ...(memoryDb.settings || {
-        express_hours: 6, express_markup: 50, normal_hours: 48,
-        receipt_header: 'KLIN UP - Laverie & Pressing Premium',
-        receipt_footer: 'Merci de votre confiance ! A bientot chez KLIN UP.',
-        fidelity_active: true,
-        fidelity_spend_per_point: 1000,
-        fidelity_tier_silver_pts: 50,
-        fidelity_tier_gold_pts: 150,
-        fidelity_tier_platinum_pts: 300,
-        invoice_paper_format: '80mm',
-        invoice_paper_width: 80,
-        invoice_paper_height: 0,
-        invoice_orientation: 'portrait',
-        invoice_margin: 5
-      }),
+      ...(memoryDb.settings || {}),
       ...newSettings
     };
     saveSession('klin_up_settings', memoryDb.settings);
 
-    // ─── Sync fidelity params to Supabase catalog so mobile app can read them ──
-    // The mobile app reads from memoryDb.catalog (synced from Supabase), not localStorage.
-    const settings = memoryDb.settings;
-    const spendPerPoint = Number(settings.fidelity_spend_per_point) || 1000;
-    const fidelityActive = settings.fidelity_active !== false ? 1 : 0;
-
-    // Upsert setting_fidelity_spend_per_point in catalog
-    const spendItem = (memoryDb.catalog || []).find((c: any) => c.id === 'setting_fidelity_spend_per_point');
-    if (spendItem) {
-      spendItem.prix = spendPerPoint;
-      performMutation('update', 'catalog', 'setting_fidelity_spend_per_point', { prix: spendPerPoint }).catch(() => {});
-    } else {
-      const newItem = {
-        id: 'setting_fidelity_spend_per_point',
-        article: 'Tranche Dépense par Point (FCFA)',
+    const syncSettingItem = async (id: string, article: string, prix: number, description: string) => {
+      const catalogItem = {
+        id,
+        article,
         service: 'system',
-        prix: spendPerPoint,
+        prix: Number(prix),
         categorie: 'system_setting',
-        description: 'Montant en FCFA requis pour gagner 1 point de fidélité',
+        description,
         is_active: true,
         statut: 'actif'
       };
-      (memoryDb.catalog as any[]).push(newItem);
-      performMutation('insert', 'catalog', 'setting_fidelity_spend_per_point', newItem).catch(() => {});
-    }
 
-    // Upsert setting_fidelity_active in catalog
-    const activeItem = (memoryDb.catalog || []).find((c: any) => c.id === 'setting_fidelity_active');
-    if (activeItem) {
-      activeItem.prix = fidelityActive;
-      performMutation('update', 'catalog', 'setting_fidelity_active', { prix: fidelityActive }).catch(() => {});
-    } else {
-      const newActiveItem = {
-        id: 'setting_fidelity_active',
-        article: 'Programme Fidélité Actif',
-        service: 'system',
-        prix: fidelityActive,
-        categorie: 'system_setting',
-        description: '1 = activé, 0 = désactivé',
-        is_active: true,
-        statut: 'actif'
-      };
-      (memoryDb.catalog as any[]).push(newActiveItem);
-      performMutation('insert', 'catalog', 'setting_fidelity_active', newActiveItem).catch(() => {});
+      const existingIdx = (memoryDb.catalog || []).findIndex((c: any) => c.id === id);
+      if (existingIdx >= 0) {
+        memoryDb.catalog[existingIdx] = { ...memoryDb.catalog[existingIdx], ...catalogItem };
+      } else {
+        if (!memoryDb.catalog) memoryDb.catalog = [];
+        (memoryDb.catalog as any[]).push(catalogItem);
+      }
+
+      await performMutation('upsert', 'catalog', id, catalogItem).catch(e => console.warn(`[DB] error upserting setting ${id}:`, e));
+    };
+
+    if (newSettings.fidelity_spend_per_point !== undefined) {
+      await syncSettingItem('setting_fidelity_spend_per_point', 'Tranche Dépense par Point (FCFA)', Number(newSettings.fidelity_spend_per_point), 'Montant en FCFA requis pour gagner 1 point de fidélité');
     }
-    // ─── End fidelity sync ───────────────────────────────────────────────────
+    if (newSettings.fidelity_active !== undefined) {
+      await syncSettingItem('setting_fidelity_active', 'Programme Fidélité Actif', newSettings.fidelity_active ? 1 : 0, '1 = activé, 0 = désactivé');
+    }
+    if (newSettings.fidelity_tier_bronze_max_pts !== undefined) {
+      await syncSettingItem('setting_fidelity_tier_bronze_max_pts', 'Seuil Max Bronze', Number(newSettings.fidelity_tier_bronze_max_pts), 'Seuil max Bronze');
+    }
+    if (newSettings.fidelity_tier_silver_pts !== undefined) {
+      await syncSettingItem('setting_fidelity_tier_silver_pts', 'Seuil Argent', Number(newSettings.fidelity_tier_silver_pts), 'Seuil Argent');
+    }
+    if (newSettings.fidelity_tier_gold_pts !== undefined) {
+      await syncSettingItem('setting_fidelity_tier_gold_pts', 'Seuil Or', Number(newSettings.fidelity_tier_gold_pts), 'Seuil Or');
+    }
+    if (newSettings.fidelity_tier_platinum_pts !== undefined) {
+      await syncSettingItem('setting_fidelity_tier_platinum_pts', 'Seuil Platine VIP', Number(newSettings.fidelity_tier_platinum_pts), 'Seuil Platine VIP');
+    }
+    if (newSettings.express_hours !== undefined) {
+      await syncSettingItem('setting_express_hours', 'Délais Express (h)', Number(newSettings.express_hours), 'Nombre d heures express');
+    }
+    if (newSettings.normal_hours !== undefined) {
+      await syncSettingItem('setting_normal_hours', 'Délais Normal (h)', Number(newSettings.normal_hours), 'Nombre d heures normal');
+    }
+    if (newSettings.express_markup !== undefined) {
+      await syncSettingItem('setting_express_markup', 'Majoration Express (%)', Number(newSettings.express_markup), 'Pourcentage majoration express');
+    }
 
     if (newSettings.reward_catalog && Array.isArray(newSettings.reward_catalog)) {
-      dbEngine.updateRewardCatalog(newSettings.reward_catalog);
+      await dbEngine.updateRewardCatalog(newSettings.reward_catalog);
     }
 
-    dbEngine.logAction('MODIFICATION_PARAMETRES', 'Mise à jour des paramètres système, des dimensions de reçu et du programme de fidélité.');
+    dbEngine.logAction('MODIFICATION_PARAMETRES', 'Mise à jour des paramètres système et du programme de fidélité.');
     notifyListeners();
-    return memoryDb.settings;
+    return dbEngine.getSettings();
+  },
+  updateCatalogPrice: async (itemId: string, newPrice: number): Promise<CatalogItem | undefined> => {
+    const numPrice = Number(newPrice) || 0;
+    const item = (memoryDb.catalog || []).find((c: any) => c.id === itemId);
+    if (item) {
+      item.prix = numPrice;
+      await performMutation('update', 'catalog', itemId, { prix: numPrice }).catch(e => console.warn('[DB] error updateCatalogPrice:', e));
+      notifyListeners();
+      return item;
+    } else {
+      const catalogItem = {
+        id: itemId,
+        article: itemId,
+        service: 'system',
+        prix: numPrice,
+        categorie: 'system_setting',
+        description: 'Paramètre système',
+        is_active: true,
+        statut: 'actif'
+      };
+      if (!memoryDb.catalog) memoryDb.catalog = [];
+      (memoryDb.catalog as any[]).push(catalogItem);
+      await performMutation('upsert', 'catalog', itemId, catalogItem).catch(e => console.warn('[DB] error upsertCatalogPrice:', e));
+      notifyListeners();
+      return catalogItem as any;
+    }
   },
   getRewardCatalog: () => {
-    // Priority 1: read from memoryDb.catalog (synced from Supabase) — shared with mobile app
+    // Priority 1: read from memoryDb.rewards (dedicated table `public.rewards` synced from Supabase)
+    if (memoryDb.rewards && Array.isArray(memoryDb.rewards) && memoryDb.rewards.length > 0) {
+      return memoryDb.rewards.map((r: any) => ({
+        id: r.id,
+        title: r.title || r.article,
+        cost: Number(r.cost !== undefined ? r.cost : r.prix),
+        discountAmount: Number(r.discount_amount !== undefined ? r.discount_amount : (r.discountAmount !== undefined ? r.discountAmount : 0)),
+        iconName: r.icon_name || r.service || 'Gift',
+        description: r.description || '',
+        is_active: r.is_active !== false
+      }));
+    }
+
+    // Priority 2: read from memoryDb.catalog (synced from Supabase)
     const fromCatalog = (memoryDb.catalog || []).filter((c: any) => c.categorie === 'reward_catalog');
     if (fromCatalog.length > 0) {
       return fromCatalog.map((c: any) => ({
         id: c.id,
         title: c.article,
         cost: Number(c.prix),
-        discountAmount: Number(c.discount_amount !== undefined ? c.discount_amount : (c.discountAmount !== undefined ? c.discountAmount : (c.description_data || 0))),
+        discountAmount: Number(c.discount_amount !== undefined ? c.discount_amount : (c.discountAmount !== undefined ? c.discountAmount : 0)),
         iconName: c.service || 'Gift',
-        description: c.description || ''
+        description: c.description || '',
+        is_active: c.is_active !== false
       }));
     }
-    // Priority 2: fallback to settings (localStorage — admin only, not visible on mobile)
-    if (memoryDb.settings && memoryDb.settings.reward_catalog && Array.isArray(memoryDb.settings.reward_catalog) && memoryDb.settings.reward_catalog.length > 0) {
-      return memoryDb.settings.reward_catalog;
-    }
+
+    // Priority 3: fallback defaults
     return [
       { id: 'remise_1000', title: 'Remise de 1 000 FCFA', cost: 30, discountAmount: 1000, iconName: 'Tag', description: 'Réduction de 1 000 FCFA sur la prochaine commande.' },
       { id: 'lavage_offert', title: 'Lavage 1 Vêtement Offert', cost: 50, discountAmount: 2000, iconName: 'Shirt', description: 'Un lavage gratuit pour une pièce au choix.' },
@@ -416,51 +478,55 @@ export const dbEngine = {
     memoryDb.settings.reward_catalog = catalog;
     saveSession('klin_up_settings', memoryDb.settings);
 
-    // ─── Sync each reward to Supabase catalog so mobile app can read them ──
-    const existingRewardItems = (memoryDb.catalog || []).filter((c: any) => c.categorie === 'reward_catalog');
+    const existingRewards = memoryDb.rewards || [];
     const newRewardIds = new Set((catalog || []).map(r => r.id));
 
-    // Remove deleted rewards from memoryDb and Supabase
-    for (const existingItem of existingRewardItems) {
+    // 1. Delete removed rewards from Supabase `rewards` table
+    for (const existingItem of existingRewards) {
       if (!newRewardIds.has(existingItem.id)) {
-        const idx = (memoryDb.catalog || []).findIndex((c: any) => c.id === existingItem.id);
-        if (idx >= 0) (memoryDb.catalog as any[]).splice(idx, 1);
-        await performMutation('delete', 'catalog', existingItem.id).catch(e => console.warn('[DB] delete reward error:', e));
+        const idx = (memoryDb.rewards || []).findIndex((r: any) => r.id === existingItem.id);
+        if (idx >= 0) (memoryDb.rewards as any[]).splice(idx, 1);
+        await performMutation('delete', 'rewards', existingItem.id).catch(e => console.warn('[DB] delete reward error:', e));
       }
     }
 
-    // Upsert each reward in memoryDb and Supabase
+    // 2. Upsert each reward in memoryDb.rewards AND Supabase `rewards` table
+    const updatedMemoryRewards: any[] = [];
     for (const reward of catalog) {
       const discountVal = Number(reward.discountAmount !== undefined ? reward.discountAmount : (reward.discount_amount || 0));
+      const rewardRow = {
+        id: reward.id,
+        title: reward.title,
+        cost: Number(reward.cost),
+        discount_amount: discountVal,
+        icon_name: reward.iconName || reward.icon_name || reward.service || 'Gift',
+        description: reward.description || '',
+        is_active: true
+      };
+
+      updatedMemoryRewards.push(rewardRow);
+      await performMutation('upsert', 'rewards', reward.id, rewardRow).catch(e => console.warn('[DB] upsert reward error:', e));
+
+      // Also update catalog fallback for backwards compatibility
       const catalogItem = {
         id: reward.id,
         article: reward.title,
         prix: Number(reward.cost),
-        service: reward.iconName || reward.service || 'Gift',
+        service: reward.iconName || 'Gift',
         categorie: 'reward_catalog',
         description: reward.description || '',
         discount_amount: discountVal,
         is_active: true,
         statut: 'actif'
       };
-
-      // Update memoryDb.catalog
-      const existingIdx = (memoryDb.catalog || []).findIndex((c: any) => c.id === reward.id);
-      if (existingIdx >= 0) {
-        memoryDb.catalog[existingIdx] = { ...memoryDb.catalog[existingIdx], ...catalogItem };
-      } else {
-        if (!memoryDb.catalog) memoryDb.catalog = [];
-        (memoryDb.catalog as any[]).push(catalogItem);
-      }
-
-      // Upsert to Supabase
-      await performMutation('upsert', 'catalog', reward.id, catalogItem).catch(e => console.warn('[DB] upsert reward error:', e));
+      await performMutation('upsert', 'catalog', reward.id, catalogItem).catch(() => {});
     }
-    // ─── End reward sync ───────────────────────────────────────────────────
+
+    memoryDb.rewards = updatedMemoryRewards;
 
     dbEngine.logAction('MODIFICATION_CATALOGUE_RECOMPENSES', `Mise à jour du catalogue des récompenses (${catalog.length} offres).`);
     notifyListeners();
-    return memoryDb.settings.reward_catalog;
+    return dbEngine.getRewardCatalog();
   },
   getCashClosures: () => {
     const closures = memoryDb.cash_closures ? [...memoryDb.cash_closures] : [];

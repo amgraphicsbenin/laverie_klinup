@@ -76,17 +76,27 @@ export default function SettingsTab({
 
   // Sync state when DB notifies of updates (e.g. after Supabase fetch completes)
   React.useEffect(() => {
+    const syncFromDb = () => {
+      if (db.getRewardCatalog) {
+        setRewardCatalog(db.getRewardCatalog());
+      }
+      if (db.getSettings) {
+        const s = db.getSettings();
+        if (s.fidelity_spend_per_point !== undefined) setSpendPerPoint(s.fidelity_spend_per_point);
+        if (s.fidelity_active !== undefined) setFidelityActive(s.fidelity_active);
+        if (s.fidelity_tier_bronze_max_pts !== undefined) setTierBronzeMaxPts(s.fidelity_tier_bronze_max_pts);
+        if (s.fidelity_tier_silver_pts !== undefined) setTierSilverPts(s.fidelity_tier_silver_pts);
+        if (s.fidelity_tier_gold_pts !== undefined) setTierGoldPts(s.fidelity_tier_gold_pts);
+        if (s.fidelity_tier_platinum_pts !== undefined) setTierPlatinumPts(s.fidelity_tier_platinum_pts);
+        if (s.fidelity_auto_earn_points !== undefined) setAutoEarnPoints(s.fidelity_auto_earn_points);
+        if (s.fidelity_allow_pos_redeem !== undefined) setAllowPOSRedeem(s.fidelity_allow_pos_redeem);
+      }
+    };
+
+    syncFromDb();
+
     if (typeof db.subscribe === 'function') {
-      const unsubscribe = db.subscribe(() => {
-        if (db.getRewardCatalog) {
-          setRewardCatalog(db.getRewardCatalog());
-        }
-        if (db.getSettings) {
-          const s = db.getSettings();
-          if (s.fidelity_spend_per_point !== undefined) setSpendPerPoint(s.fidelity_spend_per_point);
-          if (s.fidelity_active !== undefined) setFidelityActive(s.fidelity_active);
-        }
-      });
+      const unsubscribe = db.subscribe(syncFromDb);
       return () => {
         if (typeof unsubscribe === 'function') unsubscribe();
       };

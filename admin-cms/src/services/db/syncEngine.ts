@@ -173,7 +173,7 @@ export async function initDb(): Promise<void> {
   }
 
   try {
-    const [staffRes, custRes, ordRes, logRes, catRes, reqRes, storeRes] = await Promise.all([
+    const [staffRes, custRes, ordRes, logRes, catRes, reqRes, storeRes, rewardRes] = await Promise.all([
       supabase.from('staff').select('*'),
       supabase.from('customers').select('*'),
       supabase.from('orders').select('*'),
@@ -181,6 +181,7 @@ export async function initDb(): Promise<void> {
       supabase.from('catalog').select('*'),
       supabase.from('pin_reset_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('stores').select('*').order('created_at', { ascending: true }),
+      supabase.from('rewards').select('*').order('created_at', { ascending: true }),
     ]);
 
     if (staffRes.error) throw new Error(`Erreur chargement staff : ${staffRes.error.message}`);
@@ -225,6 +226,10 @@ export async function initDb(): Promise<void> {
         const isActive = item.is_active === false || item.statut === 'inactif' ? false : true;
         return { ...item, is_active: isActive, statut: isActive ? 'actif' : 'inactif' };
       });
+    }
+
+    if (!rewardRes.error && rewardRes.data) {
+      memoryDb.rewards = rewardRes.data;
     }
 
     if (!reqRes.error) memoryDb.pin_reset_requests = reqRes.data || [];

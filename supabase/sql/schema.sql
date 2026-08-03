@@ -113,9 +113,34 @@ CREATE TABLE IF NOT EXISTS public.pin_reset_requests (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 7. Table: rewards (Dédiée aux récompenses et offres fidélité)
+CREATE TABLE IF NOT EXISTS public.rewards (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  cost INTEGER NOT NULL DEFAULT 10,
+  discount_amount NUMERIC DEFAULT 0.00,
+  icon_name TEXT DEFAULT 'Gift',
+  description TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ========================================================
 -- SEED DATA (INITIALISATION DES DONNÉES PAR DÉFAUT)
 -- ========================================================
+
+INSERT INTO public.rewards (id, title, cost, discount_amount, icon_name, description) VALUES
+  ('remise_1000', 'Remise de 1 000 FCFA', 30, 1000, 'Tag', 'Réduction de 1 000 FCFA sur la prochaine commande.'),
+  ('lavage_offert', 'Lavage 1 Vêtement Offert', 50, 2000, 'Shirt', 'Un lavage gratuit pour une pièce au choix.'),
+  ('livraison_offerte', 'Livraison Offerte', 60, 1500, 'Truck', 'Frais de livraison 100% offerts.'),
+  ('repassage_offert', 'Repassage Offert', 100, 4000, 'Sparkles', 'Repassage complet offert sur vos vêtements.'),
+  ('remise_5000', 'Remise 5 000 FCFA Abonnement', 150, 5000, 'Gift', 'Réduction de 5 000 FCFA lors du renouvellement d''abonnement.')
+ON CONFLICT (id) DO UPDATE SET
+  title = EXCLUDED.title,
+  cost = EXCLUDED.cost,
+  discount_amount = EXCLUDED.discount_amount,
+  icon_name = EXCLUDED.icon_name,
+  description = EXCLUDED.description;
 
 INSERT INTO public.catalog (id, article, service, prix, categorie, description) VALUES
 ('cat1', 'Chemise', 'lavage_simple', 1500, 'individuel', ''),

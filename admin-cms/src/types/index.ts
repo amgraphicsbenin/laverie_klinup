@@ -169,6 +169,17 @@ export interface AdminSettings {
   receipt_footer: string;
 }
 
+export interface RewardItem {
+  id: string;
+  title: string;
+  cost: number;
+  discount_amount?: number;
+  icon_name?: string;
+  description?: string;
+  is_active?: boolean;
+  created_at?: string;
+}
+
 export interface MemoryStore {
   stores: Store[];
   selected_store_id: string;
@@ -178,6 +189,7 @@ export interface MemoryStore {
   orders: Order[];
   logs: ActivityLog[];
   catalog: CatalogItem[];
+  rewards?: RewardItem[];
   current_user: Staff | null;
   pin_reset_requests: PinResetRequest[];
   settings: AdminSettings;
