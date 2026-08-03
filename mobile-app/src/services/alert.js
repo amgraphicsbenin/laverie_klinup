@@ -12,7 +12,21 @@ export const customAlert = (title, message, buttons) => {
   } else {
     // Fallback if the custom handler is not registered yet
     if (Platform.OS === 'web') {
-      window.alert(`${title}\n\n${message}`);
+      if (buttons && buttons.length > 1) {
+        const confirmBtn = buttons.find(b => b.style !== 'cancel') || buttons[buttons.length - 1];
+        const cancelBtn = buttons.find(b => b.style === 'cancel');
+        const ok = window.confirm(`${title}\n\n${message}`);
+        if (ok) {
+          if (confirmBtn && typeof confirmBtn.onPress === 'function') confirmBtn.onPress();
+        } else {
+          if (cancelBtn && typeof cancelBtn.onPress === 'function') cancelBtn.onPress();
+        }
+      } else {
+        window.alert(`${title}\n\n${message}`);
+        if (buttons && buttons[0] && typeof buttons[0].onPress === 'function') {
+          buttons[0].onPress();
+        }
+      }
     } else {
       Alert.alert(title, message, buttons);
     }

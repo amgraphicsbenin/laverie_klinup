@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Modal, ScrollView, TextInput, Alert } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Modal, ScrollView, TextInput, Alert, Platform } from 'react-native';
 import { Award, Gift, Sparkles, Star, Crown, ChevronRight, X, CheckCircle2, Zap, ArrowRight, ShieldCheck } from 'lucide-react-native';
 import { getFidelityTier, getRewardCatalog, FIDELITY_TIERS, renderTierIcon, renderRewardIcon } from '../utils/fidelityUtils';
 import { db } from '../services/db';
@@ -41,26 +41,37 @@ export default function RewardFidelityCard({
       return;
     }
 
+    const confirmMsg = `Voulez-vous échanger ${reward.cost} points contre la récompense "${reward.title}" pour ${client.prenom} ${client.nom} ?`;
+
+    const executeRedeem = async () => {
+      try {
+        const updated = await db.redeemCustomerReward(client.id, reward.id, reward.title, reward.cost);
+        if (updated) {
+          if (onUpdateClient) onUpdateClient(updated);
+          if (onShowSuccess) onShowSuccess(`Récompense '${reward.title}' débloquée !`);
+          handleCloseModal();
+        }
+      } catch (err) {
+        Alert.alert("Erreur", err.message || "Impossible d'effectuer l'échange.");
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Confirmation d'échange\n\n${confirmMsg}`)) {
+        await executeRedeem();
+      }
+      return;
+    }
+
     Alert.alert(
       "Confirmation d'échange",
-      `Voulez-vous échanger ${reward.cost} points contre la récompense "${reward.title}" pour ${client.prenom} ${client.nom} ?`,
+      confirmMsg,
       [
         { text: "Annuler", style: "cancel" },
         {
           text: "Échanger",
           style: "default",
-          onPress: async () => {
-            try {
-              const updated = await db.redeemCustomerReward(client.id, reward.id, reward.title, reward.cost);
-              if (updated) {
-                if (onUpdateClient) onUpdateClient(updated);
-                if (onShowSuccess) onShowSuccess(`Récompense '${reward.title}' débloquée !`);
-                handleCloseModal();
-              }
-            } catch (err) {
-              Alert.alert("Erreur", err.message || "Impossible d'effectuer l'échange.");
-            }
-          }
+          onPress: executeRedeem
         }
       ]
     );

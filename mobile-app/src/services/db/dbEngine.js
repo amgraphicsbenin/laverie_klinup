@@ -607,6 +607,7 @@ export const db = {
     customer.points_fidelite = newPts;
     await performMutation('update', 'customers', customerId, { points_fidelite: newPts });
     db.logAction('UTILISATION_RECOMPENSE', `Récompense '${rewardTitle}' débloquée par ${customer.prenom} ${customer.nom} (-${pointsCost} pts). Nouveau solde: ${newPts} pts`);
+    persist();
     db.notify();
     return customer;
   },
