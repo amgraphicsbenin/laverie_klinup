@@ -263,7 +263,9 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.catalog (id, article, service, prix, categorie, description) VALUES
 ('setting_express_hours', 'Délai Express (heures)', 'system', 6, 'system_setting', 'Configuration système'),
 ('setting_normal_hours', 'Délai Normal (heures)', 'system', 48, 'system_setting', 'Configuration système'),
-('setting_express_markup', 'Majoration Express (%)', 'system', 50, 'system_setting', 'Configuration système')
+('setting_express_markup', 'Majoration Express (%)', 'system', 50, 'system_setting', 'Configuration système'),
+('setting_fidelity_spend_per_point', 'Tranche Dépense par Point (FCFA)', 'system', 1000, 'system_setting', 'Montant en FCFA requis pour gagner 1 point de fidélité'),
+('setting_fidelity_active', 'Programme Fidélité Actif', 'system', 1, 'system_setting', '1 = activé, 0 = désactivé')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.staff (id, nom, prenom, role, email, code_pin, statut) VALUES

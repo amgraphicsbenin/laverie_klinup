@@ -1,6 +1,16 @@
 import { DEFAULT_STAFF, DEFAULT_CUSTOMERS, DEFAULT_ORDERS, DEFAULT_LOGS, DEFAULT_CATALOG, DEFAULT_ROLES } from './seeds.js';
 import { MemoryStore } from '../../types';
 
+function loadInitialSettings() {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('klin_up_settings') : null;
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* fallback */ }
+  return null;
+}
+
+const savedInitialSettings = loadInitialSettings();
+
 export const memoryDb: MemoryStore = {
   stores: [],
   selected_store_id: 'all',
@@ -17,7 +27,8 @@ export const memoryDb: MemoryStore = {
     express_markup: 50,
     normal_hours: 48,
     receipt_header: "KLIN UP - Laverie & Pressing Premium",
-    receipt_footer: "Merci de votre confiance ! A bientot chez KLIN UP."
+    receipt_footer: "Merci de votre confiance ! A bientot chez KLIN UP.",
+    ...(savedInitialSettings || {})
   },
   cash_closures: [],
   debt_payments: []

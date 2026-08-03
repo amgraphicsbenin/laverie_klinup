@@ -157,6 +157,10 @@ export async function performMutation(
 export async function initDb(): Promise<void> {
   memoryDb.selected_store_id = loadSession('klin_up_selected_store', 'all');
   memoryDb.current_user = loadSession('klin_up_current_user', null);
+  const storedSettings = loadSession('klin_up_settings', null);
+  if (storedSettings) {
+    memoryDb.settings = { ...memoryDb.settings, ...storedSettings };
+  }
 
   if (!supabase) {
     console.error('[KLIN UP DB] ❌ Supabase non configuré. Vérifiez les variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.');

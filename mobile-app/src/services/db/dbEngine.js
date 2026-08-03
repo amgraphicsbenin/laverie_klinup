@@ -27,7 +27,14 @@ export const memoryDb = {
   stores: [],
   current_user: null,
   pin_reset_requests: [],
-  dark_mode: false
+  dark_mode: false,
+  settings: {
+    fidelity_active: true,
+    fidelity_spend_per_point: 1000,
+    fidelity_tier_silver_pts: 50,
+    fidelity_tier_gold_pts: 150,
+    fidelity_tier_platinum_pts: 300
+  }
 };
 
 // Ensemble d'écouteurs de changement d'état (Pattern Observateur)
@@ -246,6 +253,30 @@ export const db = {
       return memoryDb.selected_store_id;
     }
     return 'all';
+  },
+  getSettings: () => {
+    // Read fidelity settings from memoryDb.catalog (synced from Supabase)
+    // This is the correct way to share settings between Admin CMS and Mobile App
+    const catalog = memoryDb.catalog || [];
+    const spendPerPointItem = catalog.find(i => i.id === 'setting_fidelity_spend_per_point');
+    const fidelityActiveItem = catalog.find(i => i.id === 'setting_fidelity_active');
+
+    const spendPerPoint = spendPerPointItem ? Number(spendPerPointItem.prix) : (memoryDb.settings?.fidelity_spend_per_point || 1000);
+    const fidelityActive = fidelityActiveItem ? (Number(fidelityActiveItem.prix) !== 0) : (memoryDb.settings?.fidelity_active ?? true);
+
+    return {
+      ...(memoryDb.settings || {}),
+      fidelity_spend_per_point: spendPerPoint,
+      fidelity_active: fidelityActive
+    };
+  },
+
+  updateSettings: (newSettings) => {
+    memoryDb.settings = {
+      ...(memoryDb.settings || {}),
+      ...newSettings
+    };
+    return memoryDb.settings;
   },
 
   getAllStaff: () => [...(memoryDb.staff || [])],
@@ -777,8 +808,13 @@ export const db = {
     }
 
     if (customer && advancePaid > 0) {
-      const newPoints = Math.floor(advancePaid / 1000) * 1;
-      customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
+      const sysSettings = db.getSettings ? db.getSettings() : {};
+      const fidelityActive = sysSettings.fidelity_active ?? true;
+      const spendPerPoint = Number(sysSettings.fidelity_spend_per_point) || 1000;
+      if (fidelityActive) {
+        const newPoints = Math.floor(advancePaid / spendPerPoint);
+        customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
+      }
     }
 
     const codeMarquage = orderData.identifiant_unique_marquage || ('KLIN-' + (memoryDb.orders ? memoryDb.orders.length : 0));
@@ -943,8 +979,13 @@ export const db = {
         if (remainingToPay > 0) {
           const currentDette = Number(customer.solde_dette) || 0;
           customer.solde_dette = Math.max(0, currentDette - remainingToPay);
-          const newPoints = Math.floor(remainingToPay / 1000) * 1;
-          customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
+          const sysSettings = db.getSettings ? db.getSettings() : {};
+          const fidelityActive = sysSettings.fidelity_active ?? true;
+          const spendPerPoint = Number(sysSettings.fidelity_spend_per_point) || 1000;
+          if (fidelityActive) {
+            const newPoints = Math.floor(remainingToPay / spendPerPoint);
+            customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
+          }
           db.logAction('PAIEMENT_FINAL', `Règlement du solde restant (${remainingToPay} FCFA) par le client ${customer.prenom} ${customer.nom} lors de la restitution`);
 
           await performMutation('update', 'customers', customer.id, {
@@ -1046,8 +1087,13 @@ export const db = {
     if (customer && cleanAmountPaid > 0) {
       const currentDette = Number(customer.solde_dette) || 0;
       customer.solde_dette = Math.max(0, currentDette - cleanAmountPaid);
-      const newPoints = Math.floor(cleanAmountPaid / 1000) * 1;
-      customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
+      const sysSettings = db.getSettings ? db.getSettings() : {};
+      const fidelityActive = sysSettings.fidelity_active ?? true;
+      const spendPerPoint = Number(sysSettings.fidelity_spend_per_point) || 1000;
+      if (fidelityActive) {
+        const newPoints = Math.floor(cleanAmountPaid / spendPerPoint);
+        customer.points_fidelite = (Number(customer.points_fidelite) || 0) + newPoints;
+      }
 
       await performMutation('update', 'customers', customer.id, {
         solde_dette: customer.solde_dette,

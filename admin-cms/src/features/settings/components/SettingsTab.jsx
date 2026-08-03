@@ -121,8 +121,8 @@ export default function SettingsTab({
     }
     setRewardCatalog(updatedList);
     setShowRewardModal(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 3000);
   };
 
   const handleDeleteReward = (rewardId) => {
@@ -134,18 +134,20 @@ export default function SettingsTab({
       db.updateSettings({ reward_catalog: updatedList });
     }
     setRewardCatalog(updatedList);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 3000);
   };
 
   const handleResetRewardCatalog = () => {
     if (!window.confirm('Réinitialiser le catalogue des récompenses avec la configuration par défaut ?')) return;
     if (db.updateRewardCatalog) {
       db.updateRewardCatalog(REWARD_CATALOG);
+    } else if (db.updateSettings) {
+      db.updateSettings({ reward_catalog: REWARD_CATALOG });
     }
     setRewardCatalog(REWARD_CATALOG);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 3000);
   };
 
   // Invoice / Receipt Dimensions State
@@ -215,7 +217,8 @@ export default function SettingsTab({
         invoice_paper_width: Number(paperWidth),
         invoice_paper_height: Number(paperHeight),
         invoice_orientation: orientation,
-        invoice_margin: Number(margin)
+        invoice_margin: Number(margin),
+        reward_catalog: rewardCatalog
       });
     }
     if (typeof handleSaveSettings === 'function') {

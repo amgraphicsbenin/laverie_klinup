@@ -327,6 +327,55 @@ export const dbEngine = {
       }),
       ...newSettings
     };
+    saveSession('klin_up_settings', memoryDb.settings);
+
+    // ─── Sync fidelity params to Supabase catalog so mobile app can read them ──
+    // The mobile app reads from memoryDb.catalog (synced from Supabase), not localStorage.
+    const settings = memoryDb.settings;
+    const spendPerPoint = Number(settings.fidelity_spend_per_point) || 1000;
+    const fidelityActive = settings.fidelity_active !== false ? 1 : 0;
+
+    // Upsert setting_fidelity_spend_per_point in catalog
+    const spendItem = (memoryDb.catalog || []).find((c: any) => c.id === 'setting_fidelity_spend_per_point');
+    if (spendItem) {
+      spendItem.prix = spendPerPoint;
+      performMutation('update', 'catalog', 'setting_fidelity_spend_per_point', { prix: spendPerPoint }).catch(() => {});
+    } else {
+      const newItem = {
+        id: 'setting_fidelity_spend_per_point',
+        article: 'Tranche Dépense par Point (FCFA)',
+        service: 'system',
+        prix: spendPerPoint,
+        categorie: 'system_setting',
+        description: 'Montant en FCFA requis pour gagner 1 point de fidélité',
+        is_active: true,
+        statut: 'actif'
+      };
+      (memoryDb.catalog as any[]).push(newItem);
+      performMutation('insert', 'catalog', 'setting_fidelity_spend_per_point', newItem).catch(() => {});
+    }
+
+    // Upsert setting_fidelity_active in catalog
+    const activeItem = (memoryDb.catalog || []).find((c: any) => c.id === 'setting_fidelity_active');
+    if (activeItem) {
+      activeItem.prix = fidelityActive;
+      performMutation('update', 'catalog', 'setting_fidelity_active', { prix: fidelityActive }).catch(() => {});
+    } else {
+      const newActiveItem = {
+        id: 'setting_fidelity_active',
+        article: 'Programme Fidélité Actif',
+        service: 'system',
+        prix: fidelityActive,
+        categorie: 'system_setting',
+        description: '1 = activé, 0 = désactivé',
+        is_active: true,
+        statut: 'actif'
+      };
+      (memoryDb.catalog as any[]).push(newActiveItem);
+      performMutation('insert', 'catalog', 'setting_fidelity_active', newActiveItem).catch(() => {});
+    }
+    // ─── End fidelity sync ───────────────────────────────────────────────────
+
     dbEngine.logAction('MODIFICATION_PARAMETRES', 'Mise à jour des paramètres système, des dimensions de reçu et du programme de fidélité.');
     notifyListeners();
     return memoryDb.settings;
@@ -348,6 +397,7 @@ export const dbEngine = {
       memoryDb.settings = {} as any;
     }
     memoryDb.settings.reward_catalog = catalog;
+    saveSession('klin_up_settings', memoryDb.settings);
     dbEngine.logAction('MODIFICATION_CATALOGUE_RECOMPENSES', `Mise à jour du catalogue des récompenses (${catalog.length} offres).`);
     notifyListeners();
     return memoryDb.settings.reward_catalog;
@@ -687,11 +737,91 @@ export const dbEngine = {
       store_id: currentStoreId
     };
 
+    const customer = memoryDb.customers.find(c => c.id === newOrder.customer_id);
+    if (customer) {
+      const unpaidBalance = newOrder.prix_total - newOrder.avance_payee;
+      if (unpaidBalance > 0) {
+        customer.solde_dette = Math.max(0, Number(customer.solde_dette || 0) + unpaidBalance);
+      }
+
+      const sysSettings = dbEngine.getSettings();
+      const fidelityActive = sysSettings.fidelity_active ?? true;
+      const spendPerPoint = Number(sysSettings.fidelity_spend_per_point) || 1000;
+      if (fidelityActive && newOrder.avance_payee > 0) {
+        const earnedPoints = Math.floor(newOrder.avance_payee / spendPerPoint);
+        if (earnedPoints > 0) {
+          customer.points_fidelite = (Number(customer.points_fidelite) || 0) + earnedPoints;
+        }
+      }
+
+      await performMutation('update', 'customers', customer.id, {
+        solde_dette: customer.solde_dette,
+        points_fidelite: customer.points_fidelite
+      }).catch(e => console.warn('[DB] Customer update error on createOrder:', e));
+    }
+
     await performMutation('insert', 'orders', newOrder.id, newOrder);
     memoryDb.orders.unshift(newOrder);
     dbEngine.logAction('CREATION_COMMANDE', `Commande créée : ${newOrder.identifiant_unique_marquage} (${newOrder.prix_total} FCFA)`);
     notifyListeners();
     return newOrder;
+  },
+
+  deliverOrderWithPayment: async (
+    orderId: string,
+    amountPaid: number,
+    paymentMethod: string,
+    finalStatus: string = 'restitue',
+    referencePaiement: string | null = null,
+    operateurMomo: string | null = null
+  ): Promise<Order | undefined> => {
+    const order = memoryDb.orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const normalizedFinalStatus = (finalStatus === 'livre' ? 'restitue' : finalStatus) as OrderStatus;
+    const customer = memoryDb.customers.find(c => c.id === order.customer_id);
+
+    const totalVal = Number(order.prix_total || 0);
+    const avanceVal = Number(order.avance_payee || 0);
+    const cleanAmountPaid = isNaN(Number(amountPaid)) ? Math.max(0, totalVal - avanceVal) : Math.max(0, Number(amountPaid));
+
+    order.statut = normalizedFinalStatus;
+    order.mode_reglement = paymentMethod || order.mode_reglement || 'especes';
+    order.avance_payee = avanceVal + cleanAmountPaid;
+    order.solde_paid_at = new Date().toISOString();
+    if (referencePaiement) (order as any).reference_momo = referencePaiement;
+    if (operateurMomo) (order as any).operateur_momo = operateurMomo;
+
+    if (customer && cleanAmountPaid > 0) {
+      const currentDette = Number(customer.solde_dette) || 0;
+      customer.solde_dette = Math.max(0, currentDette - cleanAmountPaid);
+
+      const sysSettings = dbEngine.getSettings();
+      const fidelityActive = sysSettings.fidelity_active ?? true;
+      const spendPerPoint = Number(sysSettings.fidelity_spend_per_point) || 1000;
+      if (fidelityActive) {
+        const earnedPoints = Math.floor(cleanAmountPaid / spendPerPoint);
+        if (earnedPoints > 0) {
+          customer.points_fidelite = (Number(customer.points_fidelite) || 0) + earnedPoints;
+        }
+      }
+
+      await performMutation('update', 'customers', customer.id, {
+        solde_dette: customer.solde_dette,
+        points_fidelite: customer.points_fidelite
+      }).catch(e => console.warn('[DB] Customer update error on deliverOrderWithPayment:', e));
+    }
+
+    await performMutation('update', 'orders', orderId, {
+      statut: order.statut,
+      mode_reglement: order.mode_reglement,
+      avance_payee: order.avance_payee,
+      solde_paid_at: order.solde_paid_at
+    });
+
+    dbEngine.logAction('PAIEMENT_FINAL', `Livraison commande ${order.identifiant_unique_marquage || order.id}. Règlement solde: ${cleanAmountPaid} FCFA`);
+    notifyListeners();
+    return order;
   },
 
   updateOrderStatus: async (orderId: string, newStatus: OrderStatus): Promise<Order | undefined> => {
