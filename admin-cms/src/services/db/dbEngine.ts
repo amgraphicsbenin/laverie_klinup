@@ -381,6 +381,19 @@ export const dbEngine = {
     return memoryDb.settings;
   },
   getRewardCatalog: () => {
+    // Priority 1: read from memoryDb.catalog (synced from Supabase) — shared with mobile app
+    const fromCatalog = (memoryDb.catalog || []).filter((c: any) => c.categorie === 'reward_catalog');
+    if (fromCatalog.length > 0) {
+      return fromCatalog.map((c: any) => ({
+        id: c.id,
+        title: c.article,
+        cost: Number(c.prix),
+        discountAmount: Number(c.description_data || c.discount_amount || 0),
+        iconName: c.service || 'Gift',
+        description: c.description || ''
+      }));
+    }
+    // Priority 2: fallback to settings (localStorage — admin only, not visible on mobile)
     if (memoryDb.settings && memoryDb.settings.reward_catalog && Array.isArray(memoryDb.settings.reward_catalog) && memoryDb.settings.reward_catalog.length > 0) {
       return memoryDb.settings.reward_catalog;
     }
@@ -389,15 +402,65 @@ export const dbEngine = {
       { id: 'lavage_offert', title: 'Lavage 1 Vêtement Offert', cost: 50, discountAmount: 2000, iconName: 'Shirt', description: 'Un lavage gratuit pour une pièce au choix.' },
       { id: 'livraison_offerte', title: 'Livraison Offerte', cost: 60, discountAmount: 1500, iconName: 'Truck', description: 'Frais de livraison 100% offerts.' },
       { id: 'repassage_offert', title: 'Repassage Offert', cost: 100, discountAmount: 4000, iconName: 'Sparkles', description: 'Repassage complet offert sur vos vêtements.' },
-      { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: 'Réduction de 5 000 FCFA lors du renouvellement d\'abonnement.' }
+      { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: "Réduction de 5 000 FCFA lors du renouvellement d'abonnement." }
     ];
   },
-  updateRewardCatalog: (catalog: any[]) => {
+  updateRewardCatalog: async (catalog: any[]) => {
     if (!memoryDb.settings) {
       memoryDb.settings = {} as any;
     }
     memoryDb.settings.reward_catalog = catalog;
     saveSession('klin_up_settings', memoryDb.settings);
+
+    // ─── Sync each reward to Supabase catalog so mobile app can read them ──
+    // Format in catalog: id=reward id, article=title, prix=cost (pts), service=iconName,
+    // description=description, categorie='reward_catalog'
+    // discount_amount is stored in prix_base_avant_remise or description_data column (JSONB not available)
+    // We use a JSON-encoded description to store discountAmount
+    const existingRewardIds = new Set(
+      (memoryDb.catalog || []).filter((c: any) => c.categorie === 'reward_catalog').map((c: any) => c.id)
+    );
+
+    for (const reward of catalog) {
+      const catalogItem = {
+        id: reward.id,
+        article: reward.title,
+        prix: Number(reward.cost),
+        service: reward.iconName || 'Gift',
+        categorie: 'reward_catalog',
+        description: reward.description || '',
+        discount_amount: Number(reward.discountAmount || 0),
+        is_active: true,
+        statut: 'actif'
+      };
+
+      // Update memoryDb.catalog
+      const existingIdx = (memoryDb.catalog || []).findIndex((c: any) => c.id === reward.id);
+      if (existingIdx >= 0) {
+        memoryDb.catalog[existingIdx] = { ...memoryDb.catalog[existingIdx], ...catalogItem };
+      } else {
+        (memoryDb.catalog as any[]).push(catalogItem);
+      }
+
+      // Sync to Supabase
+      if (existingRewardIds.has(reward.id)) {
+        performMutation('update', 'catalog', reward.id, { article: catalogItem.article, prix: catalogItem.prix, service: catalogItem.service, description: catalogItem.description }).catch(() => {});
+      } else {
+        performMutation('insert', 'catalog', reward.id, catalogItem).catch(() => {});
+      }
+    }
+
+    // Remove deleted rewards from Supabase
+    const newIds = new Set(catalog.map(r => r.id));
+    for (const existingId of existingRewardIds) {
+      if (!newIds.has(existingId)) {
+        const idx = (memoryDb.catalog || []).findIndex((c: any) => c.id === existingId);
+        if (idx >= 0) (memoryDb.catalog as any[]).splice(idx, 1);
+        performMutation('delete', 'catalog', existingId).catch(() => {});
+      }
+    }
+    // ─── End reward sync ───────────────────────────────────────────────────
+
     dbEngine.logAction('MODIFICATION_CATALOGUE_RECOMPENSES', `Mise à jour du catalogue des récompenses (${catalog.length} offres).`);
     notifyListeners();
     return memoryDb.settings.reward_catalog;

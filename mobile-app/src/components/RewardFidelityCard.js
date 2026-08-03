@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Modal, ScrollView, TextInput, Alert } from 'react-native';
 import { Award, Gift, Sparkles, Star, Crown, ChevronRight, X, CheckCircle2, Zap, ArrowRight, ShieldCheck } from 'lucide-react-native';
-import { getFidelityTier, REWARD_CATALOG, FIDELITY_TIERS, renderTierIcon, renderRewardIcon } from '../utils/fidelityUtils';
+import { getFidelityTier, getRewardCatalog, FIDELITY_TIERS, renderTierIcon, renderRewardIcon } from '../utils/fidelityUtils';
 import { db } from '../services/db';
 
 export default function RewardFidelityCard({
@@ -19,6 +19,8 @@ export default function RewardFidelityCard({
 
   const pts = Number(client.points_fidelite || 0);
   const tier = getFidelityTier(pts);
+  // Dynamic reward catalog from Supabase (via db.getCatalog())
+  const rewardCatalog = getRewardCatalog(db.getCatalog());
 
   const handleOpenModal = (tab = 'redeem') => {
     setActiveTab(tab);
@@ -202,7 +204,7 @@ export default function RewardFidelityCard({
                 onPress={() => setActiveTab('redeem')}
               >
                 <Gift size={14} color={activeTab === 'redeem' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#a1a1aa' : '#64748b')} style={{ marginRight: 6 }} />
-                <Text style={[styles.tabText, isDarkMode && { color: '#a1a1aa' }, activeTab === 'redeem' && [styles.tabTextActive, isDarkMode && { color: '#38bdf8' }]]}>Récompenses ({REWARD_CATALOG.length})</Text>
+                <Text style={[styles.tabText, isDarkMode && { color: '#a1a1aa' }, activeTab === 'redeem' && [styles.tabTextActive, isDarkMode && { color: '#38bdf8' }]]}>Récompenses ({rewardCatalog.length})</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -217,7 +219,7 @@ export default function RewardFidelityCard({
             {/* TAB CONTENT 1: REDEEM CATALOG */}
             {activeTab === 'redeem' ? (
               <ScrollView style={styles.catalogScroll} showsVerticalScrollIndicator={false}>
-                {REWARD_CATALOG.map((reward) => {
+                {rewardCatalog.map((reward) => {
                   const canAfford = pts >= reward.cost;
                   return (
                     <View

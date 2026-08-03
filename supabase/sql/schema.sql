@@ -100,6 +100,7 @@ ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS nombre_ramassages INTEGER;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS ramassage_gratuit BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS livraison_gratuite BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS store_id TEXT;
+ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_catalog_store_id ON public.catalog(store_id);
 
 -- 6. Table: pin_reset_requests
@@ -266,6 +267,15 @@ INSERT INTO public.catalog (id, article, service, prix, categorie, description) 
 ('setting_express_markup', 'Majoration Express (%)', 'system', 50, 'system_setting', 'Configuration système'),
 ('setting_fidelity_spend_per_point', 'Tranche Dépense par Point (FCFA)', 'system', 1000, 'system_setting', 'Montant en FCFA requis pour gagner 1 point de fidélité'),
 ('setting_fidelity_active', 'Programme Fidélité Actif', 'system', 1, 'system_setting', '1 = activé, 0 = désactivé')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seeds pour le catalogue de récompenses
+INSERT INTO public.catalog (id, article, service, prix, categorie, description, discount_amount) VALUES
+('remise_1000', 'Remise de 1 000 FCFA', 'Tag', 30, 'reward_catalog', 'Réduction de 1 000 FCFA sur la prochaine commande.', 1000),
+('lavage_offert', 'Lavage 1 Vêtement Offert', 'Shirt', 50, 'reward_catalog', 'Un lavage gratuit pour une pièce au choix.', 2000),
+('livraison_offerte', 'Livraison Offerte', 'Truck', 60, 'reward_catalog', 'Frais de livraison 100% offerts.', 1500),
+('repassage_offert', 'Repassage Offert', 'Sparkles', 100, 'reward_catalog', 'Repassage complet offert sur vos vêtements.', 4000),
+('remise_5000', 'Remise 5 000 FCFA Abonnement', 'Gift', 150, 'reward_catalog', 'Réduction de 5 000 FCFA lors du renouvellement d''abonnement.', 5000)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.staff (id, nom, prenom, role, email, code_pin, statut) VALUES

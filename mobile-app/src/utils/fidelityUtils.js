@@ -69,13 +69,37 @@ export const FIDELITY_TIERS = {
   }
 };
 
-export const REWARD_CATALOG = [
+const DEFAULT_REWARD_CATALOG = [
   { id: 'remise_1000', title: 'Remise de 1 000 FCFA', cost: 30, discountAmount: 1000, iconName: 'Tag', description: 'Réduction de 1 000 FCFA sur la prochaine commande.' },
   { id: 'lavage_offert', title: 'Lavage 1 Vêtement Offert', cost: 50, discountAmount: 2000, iconName: 'Shirt', description: 'Un lavage gratuit pour une pièce au choix.' },
   { id: 'livraison_offerte', title: 'Livraison Offerte', cost: 60, discountAmount: 1500, iconName: 'Truck', description: 'Frais de livraison 100% offerts.' },
   { id: 'repassage_offert', title: 'Repassage Offert', cost: 100, discountAmount: 4000, iconName: 'Sparkles', description: 'Repassage complet offert sur vos vêtements.' },
-  { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: 'Réduction de 5 000 FCFA lors du renouvellement d\'abonnement.' }
+  { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: "Réduction de 5 000 FCFA lors du renouvellement d'abonnement." }
 ];
+
+// Keep for backward compatibility (static fallback)
+export const REWARD_CATALOG = DEFAULT_REWARD_CATALOG;
+
+/**
+ * Retourne le catalogue de récompenses dynamique depuis les données Supabase.
+ * Les items de récompenses sont stockés dans la table catalog avec categorie='reward_catalog'.
+ * Fallback sur le catalogue par défaut si aucune donnée Supabase n'est disponible.
+ * @param {Array} catalogData - Le tableau memoryDb.catalog (passé par le composant)
+ */
+export function getRewardCatalog(catalogData = []) {
+  const rewardItems = (catalogData || []).filter(item => item.categorie === 'reward_catalog');
+  if (rewardItems.length > 0) {
+    return rewardItems.map(item => ({
+      id: item.id,
+      title: item.article,
+      cost: Number(item.prix),
+      discountAmount: Number(item.discount_amount || 0),
+      iconName: item.service || 'Gift',
+      description: item.description || ''
+    }));
+  }
+  return DEFAULT_REWARD_CATALOG;
+}
 
 export function getFidelityTier(points = 0) {
   const pts = Number(points) || 0;
