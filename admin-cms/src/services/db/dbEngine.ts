@@ -392,7 +392,7 @@ export const dbEngine = {
         id: c.id,
         title: c.article,
         cost: Number(c.prix),
-        discountAmount: Number(c.discount_amount || c.description_data || 0),
+        discountAmount: Number(c.discount_amount !== undefined ? c.discount_amount : (c.discountAmount !== undefined ? c.discountAmount : (c.description_data || 0))),
         iconName: c.service || 'Gift',
         description: c.description || ''
       }));
@@ -418,7 +418,6 @@ export const dbEngine = {
 
     // ─── Sync each reward to Supabase catalog so mobile app can read them ──
     const existingRewardItems = (memoryDb.catalog || []).filter((c: any) => c.categorie === 'reward_catalog');
-    const existingRewardIds = new Set(existingRewardItems.map((c: any) => c.id));
     const newRewardIds = new Set((catalog || []).map(r => r.id));
 
     // Remove deleted rewards from memoryDb and Supabase
@@ -426,20 +425,21 @@ export const dbEngine = {
       if (!newRewardIds.has(existingItem.id)) {
         const idx = (memoryDb.catalog || []).findIndex((c: any) => c.id === existingItem.id);
         if (idx >= 0) (memoryDb.catalog as any[]).splice(idx, 1);
-        performMutation('delete', 'catalog', existingItem.id).catch(() => {});
+        await performMutation('delete', 'catalog', existingItem.id).catch(e => console.warn('[DB] delete reward error:', e));
       }
     }
 
     // Upsert each reward in memoryDb and Supabase
     for (const reward of catalog) {
+      const discountVal = Number(reward.discountAmount !== undefined ? reward.discountAmount : (reward.discount_amount || 0));
       const catalogItem = {
         id: reward.id,
         article: reward.title,
         prix: Number(reward.cost),
-        service: reward.iconName || 'Gift',
+        service: reward.iconName || reward.service || 'Gift',
         categorie: 'reward_catalog',
         description: reward.description || '',
-        discount_amount: Number(reward.discountAmount || 0),
+        discount_amount: discountVal,
         is_active: true,
         statut: 'actif'
       };
@@ -454,7 +454,7 @@ export const dbEngine = {
       }
 
       // Upsert to Supabase
-      performMutation('upsert', 'catalog', reward.id, catalogItem).catch(() => {});
+      await performMutation('upsert', 'catalog', reward.id, catalogItem).catch(e => console.warn('[DB] upsert reward error:', e));
     }
     // ─── End reward sync ───────────────────────────────────────────────────
 

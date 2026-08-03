@@ -113,7 +113,25 @@ export default function SettingsTab({
     setShowRewardModal(true);
   };
 
-  const handleSaveReward = (e) => {
+  const handleSaveFidelitySettings = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (db.updateSettings) {
+      await db.updateSettings({
+        fidelity_active: fidelityActive,
+        fidelity_spend_per_point: Number(spendPerPoint) || 1000,
+        fidelity_tier_bronze_max_pts: Number(tierBronzeMaxPts) || 49,
+        fidelity_tier_silver_pts: Number(tierSilverPts) || 50,
+        fidelity_tier_gold_pts: Number(tierGoldPts) || 150,
+        fidelity_tier_platinum_pts: Number(tierPlatinumPts) || 300,
+        fidelity_auto_earn_points: autoEarnPoints,
+        fidelity_allow_pos_redeem: allowPOSRedeem
+      });
+    }
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 3000);
+  };
+
+  const handleSaveReward = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!rewardTitle.trim()) return;
 
@@ -123,7 +141,7 @@ export default function SettingsTab({
       cost: Math.max(1, Number(rewardCost) || 10),
       discountAmount: Math.max(0, Number(rewardDiscount) || 0),
       iconName: rewardIcon,
-      description: rewardDescription.trim() || `Récompense de ${rewardTitle.trim()}`
+      description: rewardDescription.trim() || `Récompense ${rewardTitle.trim()}`
     };
 
     let updatedList;
@@ -134,9 +152,9 @@ export default function SettingsTab({
     }
 
     if (db.updateRewardCatalog) {
-      db.updateRewardCatalog(updatedList);
+      await db.updateRewardCatalog(updatedList);
     } else if (db.updateSettings) {
-      db.updateSettings({ reward_catalog: updatedList });
+      await db.updateSettings({ reward_catalog: updatedList });
     }
     setRewardCatalog(updatedList);
     setShowRewardModal(false);
@@ -144,25 +162,25 @@ export default function SettingsTab({
     setTimeout(() => setIsSavedToast(false), 3000);
   };
 
-  const handleDeleteReward = (rewardId) => {
+  const handleDeleteReward = async (rewardId) => {
     if (!window.confirm('Voulez-vous vraiment supprimer cette offre du catalogue des récompenses ?')) return;
     const updatedList = rewardCatalog.filter(r => r.id !== rewardId);
     if (db.updateRewardCatalog) {
-      db.updateRewardCatalog(updatedList);
+      await db.updateRewardCatalog(updatedList);
     } else if (db.updateSettings) {
-      db.updateSettings({ reward_catalog: updatedList });
+      await db.updateSettings({ reward_catalog: updatedList });
     }
     setRewardCatalog(updatedList);
     setIsSavedToast(true);
     setTimeout(() => setIsSavedToast(false), 3000);
   };
 
-  const handleResetRewardCatalog = () => {
+  const handleResetRewardCatalog = async () => {
     if (!window.confirm('Réinitialiser le catalogue des récompenses avec la configuration par défaut ?')) return;
     if (db.updateRewardCatalog) {
-      db.updateRewardCatalog(REWARD_CATALOG);
+      await db.updateRewardCatalog(REWARD_CATALOG);
     } else if (db.updateSettings) {
-      db.updateSettings({ reward_catalog: REWARD_CATALOG });
+      await db.updateSettings({ reward_catalog: REWARD_CATALOG });
     }
     setRewardCatalog(REWARD_CATALOG);
     setIsSavedToast(true);
@@ -628,6 +646,30 @@ export default function SettingsTab({
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* ACTION BAR : SAVE FIDELITY SETTINGS */}
+              <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '-0.25rem' }}>
+                <button
+                  type="button"
+                  onClick={handleSaveFidelitySettings}
+                  style={{
+                    padding: '0.65rem 1.5rem',
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'var(--primary)',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.35)'
+                  }}
+                >
+                  <Save size={16} /> Enregistrer les Paramètres de Fidélité
+                </button>
               </div>
 
               {/* CARD 3 : CONFIGURATION MANUELLE DU CATALOGUE DES RÉCOMPENSES */}
