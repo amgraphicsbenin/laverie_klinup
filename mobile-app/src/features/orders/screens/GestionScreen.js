@@ -718,10 +718,50 @@ export default function GestionScreen({
       </div>
     `).join('');
 
-    const remiseHtml = order.remise_pourcentage > 0 ? `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px;">
-        <div style="font-weight: bold;">REMISE (${order.remise_pourcentage}%)</div>
-        <div style="color: #ff3b30; font-weight: bold;">-${formatPrice(order.remise_montant || 0)}</div>
+    const isExpress = order.niveau_urgence === 'Express';
+    const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
+    const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+
+    const itemsList = order.items || order.articles || [];
+    let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+    if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
+      const catalogItem = db.getCatalog().find(c => c.article === order.type_article && c.service === order.type_service);
+      itemsSum = catalogItem ? catalogItem.prix : 1500;
+    }
+
+    const netPrice = order.prix_total || order.total || 0;
+    const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+    const displayBrut = order.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
+
+    const displayRemiseMontant = order.remise_montant || (order.remise_pourcentage > 0 ? Math.round(displayBrut * (order.remise_pourcentage / 100)) : 0);
+    const displayRemisePourcent = order.remise_pourcentage || (displayBrut > 0 ? Math.round((displayRemiseMontant / displayBrut) * 100) : 0);
+    const hasDiscount = displayRemiseMontant > 0;
+
+    const rewardDiscount = Number(order.applied_reward_discount || order.reward_discount || 0);
+    const rewardTitle = order.applied_reward_title;
+    const hasReward = rewardDiscount > 0 || !!rewardTitle;
+
+    const avance = order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0);
+    const reste = order.reste !== undefined ? order.reste : Math.max(0, netPrice - avance);
+
+    const expressHtml = isExpress ? `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #d97706;">
+        <div style="font-weight: bold;">MAJORATION EXPRESS (+${expressMarkup}%)</div>
+        <div style="font-weight: bold;">Inclus</div>
+      </div>
+    ` : '';
+
+    const remiseHtml = hasDiscount ? `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #ff3b30;">
+        <div style="font-weight: bold;">REMISE (${displayRemisePourcent}%)</div>
+        <div style="font-weight: bold;">-${formatPrice(displayRemiseMontant)}</div>
+      </div>
+    ` : '';
+
+    const rewardHtml = hasReward ? `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #10b981;">
+        <div style="font-weight: bold;">RECOMPENSE (${rewardTitle || 'Fidélité'})</div>
+        <div style="font-weight: bold;">-${formatPrice(rewardDiscount)}</div>
       </div>
     ` : '';
 
@@ -879,20 +919,22 @@ export default function GestionScreen({
             
             <div class="total-row">
               <div>TOTAL BRUT</div>
-              <div>${formatPrice(order.prix_total || order.total)}</div>
+              <div>${formatPrice(displayBrut)}</div>
             </div>
+            ${expressHtml}
             ${remiseHtml}
+            ${rewardHtml}
             <div class="total-row total-bold">
               <div>NET A PAYER</div>
-              <div>${formatPrice(order.total || order.prix_total)}</div>
+              <div>${formatPrice(netPrice)}</div>
             </div>
             <div class="total-row">
               <div>AVANCE PAYEE</div>
-              <div>${formatPrice(order.avance_payee || order.avance || 0)}</div>
+              <div>${formatPrice(avance)}</div>
             </div>
-            <div class="total-row total-bold" style="color: ${(order.reste || 0) > 0 ? '#ff3b30' : '#34c759'};">
+            <div class="total-row total-bold" style="color: ${reste > 0 ? '#ff3b30' : '#34c759'};">
               <div>RESTE A PAYER</div>
-              <div>${formatPrice(order.reste || 0)}</div>
+              <div>${formatPrice(reste)}</div>
             </div>
             
             <div class="divider"></div>

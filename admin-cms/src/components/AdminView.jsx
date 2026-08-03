@@ -3748,55 +3748,95 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   )}
 
                   {/* ---- TOTAUX ---- */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
-                    {createdOrder.remise_pourcentage > 0 && (
-                      <>
+                  {(() => {
+                    const isExpress = createdOrder.niveau_urgence === 'Express';
+                    const itemsList = createdOrder.items || createdOrder.articles || [];
+                    let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+                    if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
+                      const catalogItem = db.getCatalog().find(c => c.article === createdOrder.type_article && c.service === createdOrder.type_service);
+                      itemsSum = catalogItem ? catalogItem.prix : 1500;
+                    }
+                    const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
+                    const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+                    const netPrice = createdOrder.prix_total !== undefined ? createdOrder.prix_total : (createdOrder.total || 0);
+                    const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+                    const displayBrut = createdOrder.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
+
+                    const discountPercent = createdOrder.remise_pourcentage || 0;
+                    const discountAmount = createdOrder.remise_montant || (discountPercent > 0 ? Math.round(displayBrut * (discountPercent / 100)) : 0);
+
+                    const rewardTitle = createdOrder.applied_reward_title;
+                    const rewardDiscount = Number(createdOrder.applied_reward_discount || createdOrder.reward_discount || 0);
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ color: '#555555' }}>Prix de base :</span>
-                          <span style={{ fontWeight: '600', color: '#555555', textDecoration: 'line-through' }}>
-                            {(createdOrder.prix_base_avant_remise || 0).toLocaleString()} FCFA
+                          <span style={{ color: '#555555' }}>Total Brut :</span>
+                          <span style={{ fontWeight: '600', color: '#555555' }}>
+                            {displayBrut.toLocaleString()} FCFA
                           </span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#16a34a' }}>
-                          <span style={{ fontWeight: '600' }}>Réduction ({createdOrder.remise_pourcentage}%) :</span>
-                          <span style={{ fontWeight: '700' }}>
-                            -{(createdOrder.remise_montant || 0).toLocaleString()} FCFA
+
+                        {isExpress && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#d97706' }}>
+                            <span style={{ fontWeight: '600' }}>Majoration Express (+{expressMarkup}%) :</span>
+                            <span style={{ fontWeight: '700' }}>Inclus</span>
+                          </div>
+                        )}
+
+                        {discountAmount > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#dc2626' }}>
+                            <span style={{ fontWeight: '600' }}>Réduction ({discountPercent}%) :</span>
+                            <span style={{ fontWeight: '700' }}>
+                              -{discountAmount.toLocaleString()} FCFA
+                            </span>
+                          </div>
+                        )}
+
+                        {(rewardDiscount > 0 || rewardTitle) && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#16a34a' }}>
+                            <span style={{ fontWeight: '700' }}>Récompense ({rewardTitle || 'Fidélité'}) :</span>
+                            <span style={{ fontWeight: '800' }}>
+                              -{rewardDiscount.toLocaleString()} FCFA
+                            </span>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px dashed #e5e5e5' }}>
+                          <span style={{ color: '#1e293b', fontWeight: '800' }}>Net à payer :</span>
+                          <span style={{ fontWeight: '800', color: '#000000', fontSize: '14px' }}>
+                            {createdOrder.is_subscription_order
+                              ? (createdOrder.subscription_details?.immediate_subscription
+                                ? `${netPrice.toLocaleString()} FCFA`
+                                : '0 FCFA (Abonnement)')
+                              : `${netPrice.toLocaleString()} FCFA`}
                           </span>
                         </div>
-                      </>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#555555', fontWeight: createdOrder.remise_pourcentage > 0 ? '700' : 'normal' }}>Total Commande :</span>
-                      <span style={{ fontWeight: '700', color: '#000000' }}>
-                        {createdOrder.is_subscription_order
-                          ? (createdOrder.subscription_details.immediate_subscription
-                            ? `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`
-                            : '0 FCFA (Abonnement)')
-                          : `${(createdOrder.prix_total || 0).toLocaleString()} FCFA`}
-                      </span>
-                    </div>
-                    {(!createdOrder.is_subscription_order || !!createdOrder.subscription_details.immediate_subscription) ? (
-                      <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ color: '#555555' }}>Acompte Payé :</span>
-                          <span style={{ fontWeight: '700', color: '#000000' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
-                          <span style={{ color: '#555555', fontWeight: '600' }}>Reste à payer :</span>
-                          <span style={{ fontWeight: '800', fontSize: '14px', color: (createdOrder.prix_total - createdOrder.avance_payee) > 0 ? '#d32f2f' : '#16a34a' }}>
-                            {((createdOrder.prix_total || 0) - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #e5e5e5' }}>
-                        <span style={{ color: '#16a34a', fontWeight: '800' }}>Reste à payer :</span>
-                        <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a' }}>
-                          0 FCFA
-                        </span>
+
+                        {(!createdOrder.is_subscription_order || !!createdOrder.subscription_details?.immediate_subscription) ? (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: '#555555' }}>Acompte Payé :</span>
+                              <span style={{ fontWeight: '700', color: '#002cf7' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid #e5e5e5' }}>
+                              <span style={{ color: '#555555', fontWeight: '700' }}>Reste à payer :</span>
+                              <span style={{ fontWeight: '800', fontSize: '14px', color: (netPrice - (createdOrder.avance_payee || 0)) > 0 ? '#d32f2f' : '#16a34a' }}>
+                                {Math.max(0, netPrice - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid #e5e5e5' }}>
+                            <span style={{ color: '#16a34a', fontWeight: '800' }}>Reste à payer :</span>
+                            <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a' }}>
+                              0 FCFA
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* ---- PIED DE PAGE DYNAMIQUE ---- */}
                   <div style={{ textAlign: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed #cccccc', fontSize: '11px', color: '#666666', whiteSpace: 'pre-line' }}>

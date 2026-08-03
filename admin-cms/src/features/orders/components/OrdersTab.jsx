@@ -487,9 +487,9 @@ export default function OrdersTab({
                       </div>
                     </div>
 
-                    {/* Expanded Drawer: Address, Phone & Quick Copy */}
+                    {/* Expanded Drawer: Address, Phone & Detailed Billing */}
                     {expandedOrderId === order.id && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', background: 'rgba(59, 130, 246, 0.04)', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.15)', fontSize: '0.76rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(59, 130, 246, 0.04)', padding: '0.85rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.15)', fontSize: '0.76rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)' }}>
                           <MapPin size={14} color="var(--primary)" />
                           <span>Adresse : <strong style={{ color: 'var(--text-primary)' }}>{customer?.adresse || 'Non renseignée'}</strong></span>
@@ -502,11 +502,78 @@ export default function OrdersTab({
                           <Clock size={14} color="var(--primary)" />
                           <span>Dépôt le : <strong style={{ color: 'var(--text-primary)' }}>{formatDateTime(order.created_at)}</strong></span>
                         </div>
-                        
+
+                        {/* Detailed Billing breakdown */}
+                        {(() => {
+                          const isExpress = order.niveau_urgence === 'Express';
+                          const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
+                          const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+
+                          const itemsList = order.items || order.articles || [];
+                          let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+                          if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
+                            const catalogItem = db.getCatalog().find(c => c.article === order.type_article && c.service === order.type_service);
+                            itemsSum = catalogItem ? catalogItem.prix : 1500;
+                          }
+
+                          const netPrice = order.prix_total !== undefined ? order.prix_total : (order.total || 0);
+                          const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+                          const displayBrut = order.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
+
+                          const discountPercent = order.remise_pourcentage || 0;
+                          const discountAmount = order.remise_montant || (discountPercent > 0 ? Math.round(displayBrut * (discountPercent / 100)) : 0);
+
+                          const rewardTitle = order.applied_reward_title;
+                          const rewardDiscount = Number(order.applied_reward_discount || order.reward_discount || 0);
+
+                          return (
+                            <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed rgba(59, 130, 246, 0.2)', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                              <div style={{ fontWeight: 800, color: 'var(--primary)', marginBottom: '0.2rem' }}>Détails de la Facturation :</div>
+                              
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Total Brut :</span>
+                                <strong>{displayBrut.toLocaleString()} FCFA</strong>
+                              </div>
+
+                              {isExpress && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#d97706' }}>
+                                  <span>Majoration Express (+{expressMarkup}%) :</span>
+                                  <strong>Inclus</strong>
+                                </div>
+                              )}
+
+                              {discountAmount > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
+                                  <span>Réduction ({discountPercent}%) :</span>
+                                  <strong>-{discountAmount.toLocaleString()} FCFA</strong>
+                                </div>
+                              )}
+
+                              {(rewardDiscount > 0 || rewardTitle) && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981' }}>
+                                  <span>Récompense ({rewardTitle || 'Fidélité'}) :</span>
+                                  <strong>-{rewardDiscount.toLocaleString()} FCFA</strong>
+                                </div>
+                              )}
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(0,0,0,0.1)', paddingTop: '0.2rem', fontWeight: 800 }}>
+                                <span>Net à payer :</span>
+                                <span style={{ color: 'var(--text-primary)' }}>{netPrice.toLocaleString()} FCFA</span>
+                              </div>
+
+                              {(order.operateur_momo || order.reference_momo || order.reference_paiement) && (
+                                <div style={{ marginTop: '0.25rem', padding: '0.35rem 0.5rem', background: 'rgba(0, 44, 247, 0.05)', borderRadius: '6px', fontSize: '0.72rem', color: '#002cf7' }}>
+                                  <strong>Règlement Mobile Money :</strong> {order.operateur_momo || 'MoMo'} {order.reference_momo || order.reference_paiement ? `(Réf: ${order.reference_momo || order.reference_paiement})` : ''}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         <button
                           type="button"
                           className="btn btn-outline"
-                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.7rem', fontWeight: 700, borderRadius: '8px', width: 'fit-content', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.3rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.7rem', fontWeight: 700, borderRadius: '8px', width: 'fit-content', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
                           onClick={(e) => {
                             e.stopPropagation();
                             const cName = customer ? `${customer.prenom} ${customer.nom}` : '';

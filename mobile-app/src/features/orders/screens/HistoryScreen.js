@@ -301,21 +301,39 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       itemsSum = catalogItem ? catalogItem.prix : 1500;
     }
     
-    const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
     const netPrice = order.prix_total || order.total || 0;
-    
+    const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
     const displayBrut = order.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
-    const displayRemiseMontant = order.remise_montant || Math.max(0, displayBrut - netPrice);
+    
+    const displayRemiseMontant = order.remise_montant || (order.remise_pourcentage > 0 ? Math.round(displayBrut * (order.remise_pourcentage / 100)) : 0);
     const displayRemisePourcent = order.remise_pourcentage || (displayBrut > 0 ? Math.round((displayRemiseMontant / displayBrut) * 100) : 0);
     const hasDiscount = displayRemiseMontant > 0;
+
+    const rewardDiscount = Number(order.applied_reward_discount || order.reward_discount || 0);
+    const rewardTitle = order.applied_reward_title;
+    const hasReward = rewardDiscount > 0 || !!rewardTitle;
     
     const avance = order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0);
     const reste = order.reste !== undefined ? order.reste : Math.max(0, netPrice - avance);
 
+    const expressHtml = isExpress ? `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #d97706;">
+        <div style="font-weight: bold;">MAJORATION EXPRESS (+${expressMarkup}%)</div>
+        <div style="font-weight: bold;">Inclus</div>
+      </div>
+    ` : '';
+
     const remiseHtml = hasDiscount ? `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px;">
-        <div style="font-weight: bold; color: #ff3b30;">REMISE (${displayRemisePourcent}%)</div>
-        <div style="color: #ff3b30; font-weight: bold;">-${formatPrice(displayRemiseMontant)}</div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #ff3b30;">
+        <div style="font-weight: bold;">REMISE (${displayRemisePourcent}%)</div>
+        <div style="font-weight: bold;">-${formatPrice(displayRemiseMontant)}</div>
+      </div>
+    ` : '';
+
+    const rewardHtml = hasReward ? `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #10b981;">
+        <div style="font-weight: bold;">RECOMPENSE (${rewardTitle || 'Fidélité'})</div>
+        <div style="font-weight: bold;">-${formatPrice(rewardDiscount)}</div>
       </div>
     ` : '';
 
@@ -474,7 +492,9 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
               <span>${formatPrice(displayBrut)}</span>
             </div>
             
+            ${expressHtml}
             ${remiseHtml}
+            ${rewardHtml}
             
             <div class="total-row total-bold">
               <span>Net à payer</span>
@@ -816,48 +836,91 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 })()}
               </View>
 
-              <Text style={styles.sectionTitle}>Articles</Text>
+              <Text style={styles.sectionTitle}>Articles & Détails de Facturation</Text>
               <View style={styles.detailCard}>
-                {(selectedOrder.items || selectedOrder.articles || []).map((art) => (
-                  <View key={`${art.article}-${art.service}`} style={styles.articleRow}>
-                    <Text style={styles.articleText}>{art.article} ({(art.service || '').replace(/_/g, ' ')}) x{art.quantite}</Text>
-                    <Text style={styles.articlePrice}>{formatPrice(art.prix * art.quantite)}</Text>
+                {(selectedOrder.items || selectedOrder.articles || []).map((art, idx) => (
+                  <View key={`${art.article}-${art.service}-${idx}`} style={styles.articleRow}>
+                    <Text style={styles.articleText}>{art.article} ({(art.service || '').replace(/_/g, ' ')}) x{art.quantite || art.quantity || 1}</Text>
+                    <Text style={styles.articlePrice}>{formatPrice((art.prix || art.price || 0) * (art.quantite || art.quantity || 1))}</Text>
                   </View>
                 ))}
                 <View style={styles.divider} />
-                {selectedOrder.remise_pourcentage > 0 && (
-                  <>
-                    <View style={styles.articleRow}>
-                      <Text style={styles.subLabel}>Sous-total</Text>
-                      <Text style={styles.subValue}>
-                        {formatPrice((selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0))}
-                      </Text>
-                    </View>
-                    <View style={styles.articleRow}>
-                      <Text style={[styles.subLabel, { color: '#ef4444' }]}>Réduction ({selectedOrder.remise_pourcentage}%)</Text>
-                      <Text style={[styles.subValue, { color: '#ef4444', fontWeight: '600' }]}>
-                        -{formatPrice(
-                          (selectedOrder.items || selectedOrder.articles || []).reduce((sum, art) => sum + (art.prix * art.quantite), 0) - 
-                          (selectedOrder.prix_total || selectedOrder.total)
-                        )}
-                      </Text>
-                    </View>
-                  </>
-                )}
-                <View style={styles.articleRow}>
-                  <Text style={styles.totalLabel}>Total</Text>
-                  <Text style={styles.totalValue}>{formatPrice(selectedOrder.prix_total || selectedOrder.total)}</Text>
-                </View>
-                <View style={styles.articleRow}>
-                  <Text style={styles.subLabel}>Avance payée</Text>
-                  <Text style={styles.subValue}>{formatPrice(selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : selectedOrder.avance)}</Text>
-                </View>
-                <View style={styles.articleRow}>
-                  <Text style={styles.subLabel}>Reste à payer</Text>
-                  <Text style={styles.subValue}>
-                    {formatPrice((selectedOrder.prix_total || selectedOrder.total) - (selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : (selectedOrder.avance || 0)))}
-                  </Text>
-                </View>
+                {(() => {
+                  const itemsList = selectedOrder.items || selectedOrder.articles || [];
+                  let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+                  if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
+                    const catalogItem = db.getCatalog().find(c => c.article === selectedOrder.type_article && c.service === selectedOrder.type_service);
+                    itemsSum = catalogItem ? catalogItem.prix : 1500;
+                  }
+                  const isExpress = selectedOrder.niveau_urgence === 'Express';
+                  const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
+                  const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+                  const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+                  const netPrice = selectedOrder.prix_total !== undefined ? selectedOrder.prix_total : (selectedOrder.total || 0);
+                  const displayBrut = selectedOrder.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
+
+                  const discountPercent = selectedOrder.remise_pourcentage || 0;
+                  const discountAmount = selectedOrder.remise_montant || (discountPercent > 0 ? Math.round(displayBrut * (discountPercent / 100)) : 0);
+
+                  const rewardTitle = selectedOrder.applied_reward_title;
+                  const rewardDiscount = Number(selectedOrder.applied_reward_discount || selectedOrder.reward_discount || 0);
+
+                  const avance = selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : (selectedOrder.avance || 0);
+                  const reste = Math.max(0, netPrice - avance);
+
+                  return (
+                    <>
+                      <View style={styles.articleRow}>
+                        <Text style={styles.subLabel}>Total Brut</Text>
+                        <Text style={styles.subValue}>{formatPrice(displayBrut)}</Text>
+                      </View>
+
+                      {isExpress && (
+                        <View style={styles.articleRow}>
+                          <Text style={[styles.subLabel, { color: '#d97706', fontWeight: '600' }]}>Majoration Express (+{expressMarkup}%)</Text>
+                          <Text style={[styles.subValue, { color: '#d97706', fontWeight: '600' }]}>Inclus</Text>
+                        </View>
+                      )}
+
+                      {discountAmount > 0 && (
+                        <View style={styles.articleRow}>
+                          <Text style={[styles.subLabel, { color: '#ef4444', fontWeight: '600' }]}>Réduction ({discountPercent}%)</Text>
+                          <Text style={[styles.subValue, { color: '#ef4444', fontWeight: '600' }]}>-{formatPrice(discountAmount)}</Text>
+                        </View>
+                      )}
+
+                      {(rewardDiscount > 0 || rewardTitle) && (
+                        <View style={styles.articleRow}>
+                          <Text style={[styles.subLabel, { color: '#10b981', fontWeight: '700' }]}>
+                            Récompense ({rewardTitle || 'Fidélité'})
+                          </Text>
+                          <Text style={[styles.subValue, { color: '#10b981', fontWeight: '700' }]}>
+                            -{formatPrice(rewardDiscount)}
+                          </Text>
+                        </View>
+                      )}
+
+                      <View style={styles.divider} />
+
+                      <View style={styles.articleRow}>
+                        <Text style={styles.totalLabel}>Net à Payer</Text>
+                        <Text style={styles.totalValue}>{formatPrice(netPrice)}</Text>
+                      </View>
+
+                      <View style={styles.articleRow}>
+                        <Text style={styles.subLabel}>Avance Payée</Text>
+                        <Text style={[styles.subValue, { color: '#002cf7', fontWeight: '700' }]}>{formatPrice(avance)}</Text>
+                      </View>
+
+                      <View style={styles.articleRow}>
+                        <Text style={[styles.subLabel, { fontWeight: '800', color: reste > 0 ? '#ef4444' : '#10b981' }]}>Solde Dû</Text>
+                        <Text style={[styles.subValue, { fontWeight: '800', color: reste > 0 ? '#ef4444' : '#10b981' }]}>
+                          {formatPrice(reste)}
+                        </Text>
+                      </View>
+                    </>
+                  );
+                })()}
               </View>
 
               <Text style={styles.sectionTitle}>Paiement & Mode</Text>
