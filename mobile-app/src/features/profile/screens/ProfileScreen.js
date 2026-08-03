@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler, Switch } from 'react-native';
-import { Key, LogOut, X, Bell, Moon, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle, ArrowLeft, Check, BarChart2, Award, DollarSign, Package, Zap, CheckCircle2, Calendar } from 'lucide-react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler, Switch, Image } from 'react-native';
+import { Key, LogOut, X, Bell, Moon, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle, ArrowLeft, Check, BarChart2, Award, DollarSign, Package, Zap, CheckCircle2, Calendar, MapPin, Camera } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { db } from '../../../services/db';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
@@ -65,6 +66,46 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
       completedCount,
     };
   }, [currentUser, db.getOrders()]);
+
+  const storeName = useMemo(() => {
+    if (!currentUser) return null;
+    const storeId = currentUser.store_id || currentUser.storeId;
+    if (!storeId || storeId === 'all') {
+      return currentUser.role === 'super_admin' 
+        ? 'Tous les points de laverie (Accès Global)' 
+        : 'Point de Laverie Central';
+    }
+
+    // 1. Chercher dans la liste des boutiques (local + Supabase)
+    const stores = db.getStores ? db.getStores() : [];
+    const found = stores.find(s => s && (s.id === storeId || s.code === storeId || s.nom === storeId));
+    if (found && (found.nom || found.name)) {
+      const displayName = found.nom || found.name;
+      const displayCode = found.code && found.code !== displayName ? ` (${found.code})` : '';
+      return `${displayName}${displayCode}`;
+    }
+
+    // 2. Si l'utilisateur possède un nom de boutique direct
+    if (currentUser.store_name || currentUser.store_nom || currentUser.point_laverie) {
+      return currentUser.store_name || currentUser.store_nom || currentUser.point_laverie;
+    }
+
+    // 3. Fallbacks connus si hors-ligne
+    if (storeId === 'store_akpakpa' || storeId === 'KLP-AKP') return 'Point Akpakpa - Saint Jean';
+    if (storeId === 'store_calavi' || storeId === 'KLP-CAL') return 'Point Calavi - Université';
+    if (storeId === 'store_central' || storeId === 'KLP-CTR') return 'Pressing & Laverie Central';
+
+    // 4. Si l'ID est un identifiant généré (ex: store_l8ig2nlor), afficher un nom propre au lieu de l'ID brut
+    if (typeof storeId === 'string' && storeId.startsWith('store_')) {
+      const cleanName = storeId.replace(/^store_/, '');
+      if (cleanName && !/^[a-z0-9]{8,15}$/.test(cleanName)) {
+        return `Point ${cleanName.charAt(0).toUpperCase() + cleanName.slice(1)}`;
+      }
+      return 'Point de Laverie Partenaire';
+    }
+
+    return storeId;
+  }, [currentUser]);
 
   // Close PIN modal when trigger increments
   useEffect(() => {
@@ -171,6 +212,66 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
     );
   };
 
+  const handlePickImage = async () => {
+    if (!currentUser) return;
+
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+          const file = e.target?.files?.[0];
+          if (!file) return;
+
+          if (file.size > 3 * 1024 * 1024) {
+            Alert.alert(t('alert.error', {}, 'Erreur'), 'La taille de l\'image ne doit pas dépasser 3 Mo.');
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64Data = event.target?.result;
+            if (base64Data) {
+              db.updateStaffPicture(currentUser.id, base64Data);
+              if (onShowSuccess) {
+                onShowSuccess('Photo de profil mise à jour avec succès !');
+              }
+            }
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      } else {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) {
+          Alert.alert('Permission requise', 'L\'accès à vos photos est requis pour changer la photo de profil.');
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.7,
+          base64: true,
+        });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+          const asset = result.assets[0];
+          const imageUri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+          db.updateStaffPicture(currentUser.id, imageUri);
+          if (onShowSuccess) {
+            onShowSuccess('Photo de profil mise à jour avec succès !');
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Erreur sélection photo de profil:", err);
+      Alert.alert(t('alert.error', {}, 'Erreur'), 'Impossible de charger la photo de profil.');
+    }
+  };
+
   const userInitials = currentUser 
     ? `${(currentUser.prenom || 'K')[0].toUpperCase()}${(currentUser.nom || 'U')[0].toUpperCase()}`
     : 'KU';
@@ -194,24 +295,54 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
           transition={{ type: 'timing', duration: 150 }}
           style={styles.heroProfileCard}
         >
-          {/* Avatar with Status Badge */}
-          <View style={styles.avatarWrapper}>
+          {/* Avatar with Status Badge & Camera Overlay */}
+          <TouchableOpacity 
+            onPress={handlePickImage} 
+            activeOpacity={0.8}
+            style={styles.avatarWrapper}
+            accessibilityLabel="Modifier la photo de profil"
+          >
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{userInitials}</Text>
+              {currentUser?.user_picture ? (
+                <Image 
+                  source={{ uri: currentUser.user_picture }} 
+                  style={styles.avatarImage} 
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.avatarText}>{userInitials}</Text>
+              )}
+            </View>
+            <View style={styles.cameraBadge}>
+              <Camera size={11} color="#ffffff" />
             </View>
             <View style={styles.onlineBadge} />
-          </View>
+          </TouchableOpacity>
 
           {/* Name & Role Badge */}
           <Text style={styles.profileName}>
             {currentUser ? `${currentUser.prenom} ${currentUser.nom}` : t('app.information')}
           </Text>
           
-          <View style={styles.roleBadge}>
-            <Shield size={12} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 5 }} />
-            <Text style={styles.roleBadgeText}>
-              {currentUser ? getRoleLabel(currentUser.role) : t('roles.invité')}
-            </Text>
+          {/* Badges Container : Role Pill + Store Pill */}
+          <View style={styles.badgesRow}>
+            {/* Role Badge Pill */}
+            <View style={styles.pillBadge}>
+              <Shield size={12} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 5 }} />
+              <Text style={styles.pillBadgeText}>
+                {currentUser ? getRoleLabel(currentUser.role) : t('roles.invité')}
+              </Text>
+            </View>
+
+            {/* Store Badge Pill */}
+            {storeName && (
+              <View style={styles.pillBadge}>
+                <MapPin size={12} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 5 }} />
+                <Text style={styles.pillBadgeText}>
+                  {storeName}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Email Info Bar */}
@@ -587,6 +718,26 @@ function getStyles(isDarkMode) {
       alignItems: 'center',
       borderWidth: 2,
       borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.3)' : 'rgba(0, 44, 247, 0.15)',
+      overflow: 'hidden',
+    },
+    avatarImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 38,
+    },
+    cameraBadge: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: isDarkMode ? '#38bdf8' : '#002cf7',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: isDarkMode ? '#121212' : '#ffffff',
+      zIndex: 2,
     },
     avatarText: {
       fontSize: 28,
@@ -610,6 +761,29 @@ function getStyles(isDarkMode) {
       color: isDarkMode ? '#ffffff' : '#09090b',
       marginBottom: 6,
       textAlign: 'center',
+    },
+    badgesRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 16,
+    },
+    pillBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.06)',
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.12)',
+    },
+    pillBadgeText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDarkMode ? '#38bdf8' : '#002cf7',
     },
     roleBadge: {
       flexDirection: 'row',

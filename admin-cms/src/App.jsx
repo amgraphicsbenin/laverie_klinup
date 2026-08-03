@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from './services/db';
 import AdminView from './components/AdminView';
+import CustomSelect from './components/CustomSelect';
 import logoDark from './assets/logo_dark.png';
 import logoGold from './assets/logo_gold.png';
 // Composant utilitaire pour les icônes Google Material Symbols
@@ -52,6 +53,33 @@ function App() {
     }
   });
   const [pinActionLoading, setPinActionLoading] = useState(null);
+
+  // Dark mode state & theme switcher persistent
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('klinup_admin_theme');
+      if (saved) return saved === 'dark';
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark-mode');
+      document.body.classList.add('dark-mode');
+      localStorage.setItem('klinup_admin_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark-mode');
+      document.body.classList.remove('dark-mode');
+      localStorage.setItem('klinup_admin_theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => !prev);
+  };
 
   // Notifications states & helper functions
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -796,7 +824,15 @@ function App() {
               <img 
                 src={logoDark} 
                 alt="KLIN UP Logo" 
-                style={{ width: '100%', maxWidth: '130px', height: 'auto', objectFit: 'contain', display: 'block' }} 
+                style={{ 
+                  width: '100%', 
+                  maxWidth: '130px', 
+                  height: 'auto', 
+                  objectFit: 'contain', 
+                  display: 'block',
+                  filter: isDarkMode ? 'invert(1) hue-rotate(180deg)' : 'none',
+                  transition: 'filter 0.3s ease'
+                }} 
               />
             </div>
 
@@ -931,7 +967,7 @@ function App() {
               </div>
 
               <div className="menu-group-block">
-                <li className="menu-item" onClick={() => alert('Support KLIN UP : contact@klinup.com | Tél : +229 01 97 97 97 97\n\nHeures d\'ouverture : Lun-Sam, 8h-18h.')} data-tooltip="Aide">
+                <li className="menu-item" onClick={() => alert('Support KLIN UP : andre.koutomi98@gmail.com | Tél : +229 01 67 98 77 97\n\nHeures d\'ouverture : Lun-Sam, 8h-18h.')} data-tooltip="Aide">
                   <div className="menu-item-left">
                     <MIcon name="help" size={20} />
                     <span className="menu-item-label">Aide</span>
@@ -999,14 +1035,15 @@ function App() {
             <div className="topbar-actions">
               {/* Sélecteur de Point de Laverie (Seul le Super Admin peut naviguer entre les laveries et voir la Vue Globale) */}
               {isSuperAdmin ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.35rem 0.65rem', borderRadius: '10px' }}>
-                  <MIcon name="storefront" size={18} style={{ color: 'var(--primary)' }} />
-                  <select
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.25rem 0.65rem', borderRadius: '12px', minWidth: '220px' }}>
+                  <MIcon name="storefront" size={18} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                  <CustomSelect
                     value={selectedStoreId}
                     onChange={(e) => {
                       db.setSelectedStoreId(e.target.value);
                       setSelectedStoreIdState(e.target.value);
                     }}
+                    className=""
                     style={{
                       border: 'none',
                       background: 'transparent',
@@ -1014,7 +1051,15 @@ function App() {
                       fontWeight: 700,
                       fontSize: '0.82rem',
                       outline: 'none',
-                      cursor: 'pointer'
+                      padding: 0,
+                      height: 'auto',
+                      boxShadow: 'none'
+                    }}
+                    dropdownStyle={{
+                      minWidth: '230px',
+                      right: 0,
+                      left: 'auto',
+                      top: 'calc(100% + 8px)'
                     }}
                   >
                     <option value="all">Tous les points (Vue Globale)</option>
@@ -1023,7 +1068,7 @@ function App() {
                         {s.nom} ({s.code})
                       </option>
                     ))}
-                  </select>
+                  </CustomSelect>
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(79, 70, 229, 0.08)', border: '1px solid rgba(79, 70, 229, 0.2)', padding: '0.35rem 0.75rem', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary)' }}>
@@ -1037,14 +1082,37 @@ function App() {
                   </span>
                 </div>
               )}
-              {/* Raccourcis Icônes */}
-              <div style={{ position: 'relative' }}>
+              {/* Raccourcis Icônes (Bouton Mode Sombre & Notifications) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {/* Bouton Mode Sombre */}
                 <div 
                   className="topbar-icon-btn" 
-                  title="Notifications" 
-                  onClick={handleToggleNotifDropdown}
-                  style={{ borderColor: showNotifDropdown ? 'var(--primary)' : 'var(--border-color)', position: 'relative' }}
+                  title={isDarkMode ? "Activer le mode clair" : "Activer le mode sombre"} 
+                  onClick={toggleDarkMode}
+                  style={{ 
+                    borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.4)' : 'var(--border-color)',
+                    background: isDarkMode ? 'rgba(251, 191, 36, 0.12)' : 'transparent',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.25s var(--ease-emphasized)'
+                  }}
                 >
+                  <MIcon 
+                    name={isDarkMode ? 'light_mode' : 'dark_mode'} 
+                    size={18} 
+                    style={{ color: isDarkMode ? '#fbbf24' : 'var(--text-secondary)', transition: 'color 0.25s ease' }} 
+                  />
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                  <div 
+                    className="topbar-icon-btn" 
+                    title="Notifications" 
+                    onClick={handleToggleNotifDropdown}
+                    style={{ borderColor: showNotifDropdown ? 'var(--primary)' : 'var(--border-color)', position: 'relative' }}
+                  >
                   <MIcon name="notifications" size={18} />
                   {unreadCount > 0 && (
                     <span style={{
@@ -1214,8 +1282,7 @@ function App() {
                   </>
                 )}
               </div>
-
-
+            </div>
 
               {/* Profil Utilisateur Donezo Header Style */}
               <div className="topbar-profile">

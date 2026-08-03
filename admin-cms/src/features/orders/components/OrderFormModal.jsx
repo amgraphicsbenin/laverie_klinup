@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Search } from 'lucide-react';
+import { X, Plus, Search, Smartphone } from 'lucide-react';
 import { db } from '../../../services/db';
 
 const ModalPortal = ({ children }) => {
@@ -249,15 +249,15 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         >
         {/* Header matching compactModalHeader */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#09090b', margin: 0, fontFamily: 'inherit' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, fontFamily: 'inherit' }}>
             Nouvelle Commande
           </h3>
           <button 
             type="button" 
             onClick={handleCancelOrder}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#71717a' }}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
           >
-            <X size={20} color="#71717a" />
+            <X size={20} color="var(--text-muted)" />
           </button>
         </div>
 
@@ -266,19 +266,19 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
           {/* Sélection du point de laverie */}
           <div style={{ zIndex: 35, position: 'relative' }}>
-            <label style={{ fontSize: '12px', fontWeight: 700, color: '#002cf7', marginTop: '4px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
               📍 Point de Laverie d'Enregistrement
             </label>
             <select
               style={{
                 width: '100%',
                 height: '48px',
-                backgroundColor: '#ffffff',
-                border: '1.5px solid #002cf7',
+                backgroundColor: 'var(--bg-app)',
+                border: '1px solid var(--primary)',
                 borderRadius: '14px',
                 padding: '0 16px',
                 fontSize: '14px',
-                color: '#09090b',
+                color: 'var(--text-primary)',
                 fontWeight: 600,
                 marginBottom: '12px',
                 outline: 'none',
@@ -297,19 +297,19 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
           {/* Sélection du client */}
           <div style={{ zIndex: 30, position: 'relative' }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', marginTop: '4px', marginBottom: '6px', display: 'block' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px', marginBottom: '6px', display: 'block' }}>
               Client
             </label>
             <select
               style={{
                 width: '100%',
                 height: '48px',
-                backgroundColor: '#ffffff',
-                border: '1.5px solid #e2e8f0',
+                backgroundColor: 'var(--bg-app)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '14px',
                 padding: '0 16px',
                 fontSize: '14px',
-                color: '#09090b',
+                color: 'var(--text-primary)',
                 fontWeight: 500,
                 marginBottom: '12px',
                 outline: 'none',
@@ -464,11 +464,11 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
           {/* Choisir les vêtements avec barre de recherche & hauteur optimale */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', marginBottom: '6px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', display: 'block' }}>
               Choisir les vêtements
             </label>
             {getTotalClothesCount() > 0 && (
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#002cf7', backgroundColor: 'rgba(0, 44, 247, 0.08)', padding: '2px 8px', borderRadius: '12px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', backgroundColor: 'var(--primary-light)', padding: '2px 8px', borderRadius: '12px' }}>
                 {getTotalClothesCount()} vêt. sélectionné(s)
               </span>
             )}
@@ -477,7 +477,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
           <div style={{ position: 'relative', marginBottom: '10px' }}>
             <Search 
               size={16} 
-              color="#64748b" 
+              color="var(--text-muted)" 
               style={{ 
                 position: 'absolute', 
                 left: '12px', 
@@ -494,13 +494,13 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
               style={{
                 width: '100%',
                 height: '42px',
-                backgroundColor: '#ffffff',
-                border: '1.5px solid #cbd5e1',
+                backgroundColor: 'var(--bg-app)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '12px',
                 paddingLeft: '38px',
                 paddingRight: '14px',
                 fontSize: '13px',
-                color: '#09090b',
+                color: 'var(--text-primary)',
                 fontWeight: 500,
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -515,8 +515,8 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
             borderRadius: '16px',
             overflowY: 'auto',
             marginBottom: '14px',
-            backgroundColor: '#f8fafc',
-            border: '1.5px solid #cbd5e1',
+            backgroundColor: 'var(--bg-app)',
+            border: '1px solid var(--border-color)',
             padding: '12px',
             display: 'flex',
             flexDirection: 'column',
@@ -592,26 +592,26 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
                 return (
                   <div key={articleName} style={{
-                    backgroundColor: '#ffffff',
+                    backgroundColor: 'var(--bg-card)',
                     borderRadius: '16px',
                     padding: '12px',
-                    border: '1.5px solid #e2e8f0',
+                    border: '1px solid var(--border-color)',
                     display: 'flex',
                     flexDirection: 'column'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#09090b' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {articleName}
                       </span>
                       <button
                         type="button"
                         onClick={() => toggleExpandArticle(articleName)}
                         style={{
-                          backgroundColor: isExpanded ? '#f1f5f9' : 'rgba(0, 44, 247, 0.08)',
+                          backgroundColor: isExpanded ? 'var(--bg-app)' : 'var(--primary-light)',
                           padding: '6px 14px',
                           borderRadius: '10px',
-                          border: 'none',
-                          color: isExpanded ? '#475569' : '#002cf7',
+                          border: '1px solid var(--border-color)',
+                          color: isExpanded ? 'var(--text-secondary)' : 'var(--primary)',
                           fontSize: '11px',
                           fontWeight: 700,
                           cursor: 'pointer'
@@ -645,16 +645,16 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                               justifyContent: 'space-between',
                               alignItems: 'center',
                               padding: '8px 12px',
-                              backgroundColor: qty > 0 ? 'rgba(0, 44, 247, 0.05)' : '#f8fafc',
+                              backgroundColor: qty > 0 ? 'var(--primary-light)' : 'var(--bg-app)',
                               borderRadius: '12px',
-                              border: qty > 0 ? '1.5px solid rgba(0, 44, 247, 0.25)' : '1px solid #e2e8f0',
+                              border: qty > 0 ? '1px solid var(--primary)' : '1px solid var(--border-color)',
                               boxSizing: 'border-box'
                             }}>
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                                   {serviceLabel}
                                 </div>
-                                <div style={{ fontSize: '12px', fontWeight: 700, color: '#002cf7', marginTop: '1px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginTop: '1px' }}>
                                   {formatPrice(item.prix)}
                                 </div>
                               </div>
@@ -742,7 +742,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
           </div>
 
           {/* Niveau d'urgence matching urgencyRow */}
-          <label style={{ fontSize: '12px', fontWeight: 600, color: isSubscriptionMode ? '#94a3b8' : '#475569', marginTop: '6px', marginBottom: '6px', display: 'block' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '6px', marginBottom: '6px', display: 'block' }}>
             Urgence
           </label>
           <div style={{ display: 'flex', gap: '12px', marginBottom: '14px', opacity: isSubscriptionMode ? 0.7 : 1 }}>
@@ -762,11 +762,11 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '12px',
-                    backgroundColor: isActive ? '#002cf7' : '#ffffff',
-                    border: isActive ? '1.5px solid #002cf7' : '1.5px solid #e2e8f0',
+                    backgroundColor: isActive ? 'var(--primary)' : 'var(--bg-app)',
+                    border: isActive ? '1px solid var(--primary)' : '1px solid var(--border-color)',
                     fontSize: '12px',
                     fontWeight: 600,
-                    color: isActive ? '#ffffff' : (isDisabled && level === 'Express' ? '#94a3b8' : '#475569'),
+                    color: isActive ? '#ffffff' : 'var(--text-secondary)',
                     cursor: isDisabled ? 'default' : 'pointer'
                   }}
                 >
@@ -779,7 +779,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
           {/* Avance, Mode de règlement & Réduction (%) en grille alignée */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '14px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: isSubscriptionMode ? '#94a3b8' : '#475569', marginBottom: '4px', display: 'block' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'block' }}>
                 Avance (FCFA)
               </label>
               <input
@@ -790,12 +790,12 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                 style={{
                   width: '100%',
                   height: '42px',
-                  backgroundColor: isSubscriptionMode ? '#f1f5f9' : '#ffffff',
-                  border: '1.5px solid #e2e8f0',
+                  backgroundColor: 'var(--bg-app)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '12px',
                   padding: '0 12px',
                   fontSize: '13px',
-                  color: isSubscriptionMode ? '#94a3b8' : '#09090b',
+                  color: isSubscriptionMode ? 'var(--text-muted)' : 'var(--text-primary)',
                   fontWeight: 500,
                   outline: 'none',
                   boxSizing: 'border-box'
@@ -804,19 +804,19 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
             </div>
 
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px', display: 'block' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'block' }}>
                 Mode Règlement
               </label>
               <select
                 style={{
                   width: '100%',
                   height: '42px',
-                  backgroundColor: '#ffffff',
-                  border: '1.5px solid #e2e8f0',
+                  backgroundColor: 'var(--bg-app)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '12px',
                   padding: '0 10px',
                   fontSize: '13px',
-                  color: '#09090b',
+                  color: 'var(--text-primary)',
                   fontWeight: 500,
                   outline: 'none',
                   boxSizing: 'border-box'
@@ -829,80 +829,8 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
               </select>
             </div>
 
-            {/* Champ Référence Mobile Money Obligatoire */}
-            {orderPaymentMethod === 'Mobile Money' && (
-              <div style={{ marginTop: '12px' }}>
-                {/* Sélection Opérateur */}
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#002cf7', marginBottom: '6px', display: 'block' }}>
-                  Opérateur Réseau <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                  {['MTN', 'MOOV', 'CELTIS'].map((op) => (
-                    <button
-                      key={op}
-                      type="button"
-                      onClick={() => setMomoOperator(op)}
-                      style={{
-                        flex: 1,
-                        padding: '8px 0',
-                        borderRadius: '10px',
-                        border: momoOperator === op ? '2px solid #002cf7' : '1.5px solid #d4d4d8',
-                        background: momoOperator === op
-                          ? (op === 'MTN' ? 'linear-gradient(135deg, #FFCC00, #FFA500)'
-                            : op === 'MOOV' ? 'linear-gradient(135deg, #0057A8, #003F7F)'
-                            : 'linear-gradient(135deg, #E30613, #B50010)')
-                          : '#f8fafc',
-                        color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : '#64748b',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        boxShadow: momoOperator === op ? '0 2px 8px rgba(0,44,247,0.15)' : 'none'
-                      }}
-                    >
-                      {op}
-                    </button>
-                  ))}
-                </div>
-
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#002cf7', marginBottom: '4px', display: 'block' }}>
-                  N° Référence Transaction Mobile Money <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: 12345678 (8 à 15 chiffres)"
-                  value={momoRefNumber}
-                  maxLength={15}
-                  inputMode="numeric"
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '').slice(0, 15);
-                    setMomoRefNumber(val);
-                    if (momoRefError) setMomoRefError('');
-                  }}
-                  style={{
-                    width: '100%',
-                    height: '42px',
-                    backgroundColor: '#ffffff',
-                    border: momoRefError ? '1.5px solid #ef4444' : '1.5px solid #002cf7',
-                    borderRadius: '12px',
-                    padding: '0 12px',
-                    fontSize: '13px',
-                    color: '#09090b',
-                    fontWeight: 500,
-                    outline: 'none',
-                    boxSizing: 'border-box'
-                  }}
-                />
-                {momoRefError && (
-                  <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px', fontWeight: 600 }}>
-                    {momoRefError}
-                  </div>
-                )}
-              </div>
-            )}
-
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: isSubscriptionMode ? '#94a3b8' : '#475569', marginBottom: '4px', display: 'block' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'block' }}>
                 Réduction (%)
               </label>
               <div style={{ position: 'relative' }}>
@@ -922,13 +850,13 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                   style={{
                     width: '100%',
                     height: '42px',
-                    backgroundColor: isSubscriptionMode ? '#f1f5f9' : '#ffffff',
-                    border: '1.5px solid #e2e8f0',
+                    backgroundColor: 'var(--bg-app)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '12px',
                     paddingLeft: '12px',
                     paddingRight: '28px',
                     fontSize: '13px',
-                    color: isSubscriptionMode ? '#94a3b8' : '#09090b',
+                    color: isSubscriptionMode ? 'var(--text-muted)' : 'var(--text-primary)',
                     fontWeight: 500,
                     outline: 'none',
                     boxSizing: 'border-box'
@@ -941,12 +869,100 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                   transform: 'translateY(-50%)',
                   fontSize: '12px',
                   fontWeight: 700,
-                  color: isSubscriptionMode ? '#94a3b8' : '#64748b',
+                  color: isSubscriptionMode ? 'var(--text-muted)' : 'var(--text-secondary)',
                   pointerEvents: 'none'
                 }}>%</span>
               </div>
             </div>
           </div>
+
+          {/* Section Dédiée Mobile Money Pleine Largeur */}
+          {orderPaymentMethod === 'Mobile Money' && (
+            <div style={{
+              width: '100%',
+              padding: '14px 16px',
+              borderRadius: '16px',
+              backgroundColor: 'var(--bg-app)',
+              border: '1px solid var(--primary)',
+              marginBottom: '14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxSizing: 'border-box'
+            }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Smartphone size={16} /> Opérateur Réseau <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  {['MTN', 'MOOV', 'CELTIS'].map((op) => {
+                    const isSelected = momoOperator === op;
+                    return (
+                      <button
+                        key={op}
+                        type="button"
+                        onClick={() => setMomoOperator(op)}
+                        style={{
+                          padding: '10px 0',
+                          borderRadius: '12px',
+                          border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                          background: isSelected
+                            ? (op === 'MTN' ? 'linear-gradient(135deg, #FFCC00, #FFA500)'
+                              : op === 'MOOV' ? 'linear-gradient(135deg, #0057A8, #003F7F)'
+                              : 'linear-gradient(135deg, #E30613, #B50010)')
+                            : 'var(--bg-card)',
+                          color: isSelected ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : 'var(--text-secondary)',
+                          fontWeight: 800,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          boxShadow: isSelected ? '0 4px 12px rgba(0, 44, 247, 0.25)' : 'none'
+                        }}
+                      >
+                        {op}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)', marginBottom: '6px', display: 'block' }}>
+                  N° Référence Transaction Mobile Money <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: 12345678 (8 à 15 chiffres)"
+                  value={momoRefNumber}
+                  maxLength={15}
+                  inputMode="numeric"
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 15);
+                    setMomoRefNumber(val);
+                    if (momoRefError) setMomoRefError('');
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    backgroundColor: 'var(--bg-card)',
+                    border: momoRefError ? '1px solid var(--danger)' : '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '0 14px',
+                    fontSize: '13px',
+                    color: 'var(--text-primary)',
+                    fontWeight: 500,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                {momoRefError && (
+                  <div style={{ fontSize: '11px', color: 'var(--danger)', marginTop: '4px', fontWeight: 600 }}>
+                    {momoRefError}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Live Receipt Card matching receiptPreviewCard */}
           {(() => {
@@ -985,125 +1001,125 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
             return (
               <div style={{
-                backgroundColor: 'rgba(0, 44, 247, 0.03)',
-                border: '1px solid rgba(0, 44, 247, 0.1)',
+                backgroundColor: 'var(--bg-app)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '16px',
                 padding: '16px',
                 margin: '14px 0',
                 display: 'flex',
                 flexDirection: 'column'
               }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>
                   Facturation
                 </div>
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Total Brut</span>
-                  <span style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Total Brut</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600 }}>
                     {isSubscriptionActive && !isImmediateSub ? 'Débit forfait abonnement' : formatPrice(currentTotal)}
                   </span>
                 </div>
                 
                 {discountAmount > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Réduction ({discountPercent}%)</span>
-                    <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>-{formatPrice(discountAmount)}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Réduction ({discountPercent}%)</span>
+                    <span style={{ fontSize: '12px', color: 'var(--danger)', fontWeight: 700 }}>-{formatPrice(discountAmount)}</span>
                   </div>
                 )}
 
                 {isImmediateSub && subPlan ? (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Abonnement Choisi</span>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#002cf7' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Abonnement Choisi</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>
                         {subPlan.article} ({subPlan.nombre_vetements || 0} vêt.)
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Prix Souscription</span>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>{formatPrice(subPlan.prix)}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Prix Souscription</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600 }}>{formatPrice(subPlan.prix)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Vêtements Commande En Cours</span>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Vêtements Commande En Cours</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600 }}>
                         {getTotalClothesCount()} vêt. (Valeur {formatPrice(selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0))})
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Prise en Charge par l'Abonnement</span>
-                      <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Prise en Charge par l'Abonnement</span>
+                      <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: 700 }}>
                         -{getTotalClothesCount()} vêt. (0 FCFA)
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '13px', color: '#09090b', fontWeight: 600 }}>Solde Restant (Nouvel Abonnement)</span>
-                      <span style={{ fontSize: '13px', color: '#10b981', fontWeight: 600 }}>
+                      <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>Solde Restant (Nouvel Abonnement)</span>
+                      <span style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 700 }}>
                         {Math.max(0, (subPlan.nombre_vetements || 0) - getTotalClothesCount())} vêt.
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '13px', color: '#09090b', fontWeight: 600 }}>Net à Payer (Abonnement)</span>
-                      <span style={{ fontSize: '13px', color: '#002cf7', fontWeight: 600 }}>{formatPrice(netTotal)}</span>
+                      <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>Net à Payer (Abonnement)</span>
+                      <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 700 }}>{formatPrice(netTotal)}</span>
                     </div>
                   </>
                 ) : isSubscriptionActive && !isImmediateSub && activeCustomer && activeCustomer.active_subscription ? (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Formule Active</span>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#002cf7' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Formule Active</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>
                         {activeCustomer.active_subscription.name}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Solde Actuel</span>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Solde Actuel</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600 }}>
                         {activeCustomer.active_subscription.remaining_clothes} vêt.
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Vêtements Déduits</span>
-                      <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Vêtements Déduits</span>
+                      <span style={{ fontSize: '12px', color: 'var(--danger)', fontWeight: 700 }}>
                         -{getTotalClothesCount()} vêt.
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '13px', color: '#09090b', fontWeight: 600 }}>Solde Restant (Abonnement)</span>
-                      <span style={{ fontSize: '13px', color: '#10b981', fontWeight: 600 }}>
+                      <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>Solde Restant (Abonnement)</span>
+                      <span style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 700 }}>
                         {activeCustomer.active_subscription.remaining_clothes - getTotalClothesCount()} vêt.
                       </span>
                     </div>
                   </>
                 ) : (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', color: '#09090b', fontWeight: 600 }}>Net à Payer</span>
-                    <span style={{ fontSize: '13px', color: '#09090b', fontWeight: 600 }}>{formatPrice(netTotal)}</span>
+                    <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>Net à Payer</span>
+                    <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 700 }}>{formatPrice(netTotal)}</span>
                   </div>
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '12px', color: '#475569', fontWeight: 500 }}>Acompte (Avance)</span>
-                  <span style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>{formatPrice(currentAvance)}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Acompte (Avance)</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600 }}>{formatPrice(currentAvance)}</span>
                 </div>
 
-                <div style={{ height: '1px', backgroundColor: 'rgba(0, 44, 247, 0.1)', margin: '8px 0' }} />
+                <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '8px 0' }} />
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: '#09090b', fontWeight: 600 }}>Solde Restant</span>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: currentReste > 0 ? '#ef4444' : '#10b981' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 700 }}>Solde Restant</span>
+                  <span style={{ fontSize: '14px', fontWeight: 800, color: currentReste > 0 ? 'var(--danger)' : 'var(--success)' }}>
                     {formatPrice(currentReste)}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Mode règlement :</span>
-                  <span style={{ fontSize: '11px', color: '#475569', fontWeight: 600 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>Mode règlement :</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: 600 }}>
                     {isSubscriptionActive && !isImmediateSub ? 'Abonnement' : orderPaymentMethod}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Disponibilité :</span>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#002cf7' }}>Sous {delay}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>Disponibilité :</span>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)' }}>Sous {delay}</span>
                 </div>
               </div>
             );

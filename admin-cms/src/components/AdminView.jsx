@@ -2458,11 +2458,41 @@ export default function AdminView({ activeTab, onManageStaff }) {
          MODAL D'AJOUT D'ARTICLE OU ABONNEMENT AU CATALOGUE
          ======================================================== */}
       {showAddCatalogModal && (
-        <div className="modal-backdrop">
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
-            <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              Ajouter au Catalogue
-            </h3>
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => setShowAddCatalogModal(false)}>
+            <div 
+              className="card modal-dialog-card" 
+              onClick={(e) => e.stopPropagation()} 
+              style={{ 
+                width: '100%', 
+                maxWidth: '650px', 
+                maxHeight: '90vh', 
+                overflowY: 'auto', 
+                background: 'var(--bg-card)', 
+                padding: '24px 28px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '1.25rem', 
+                boxShadow: 'var(--shadow-lg)', 
+                border: '1px solid var(--border-color)', 
+                borderRadius: '24px',
+                margin: 'auto', 
+                cursor: 'default' 
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Ajouter au Catalogue
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCatalogModal(false)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  title="Fermer"
+                >
+                  <X size={20} color="var(--text-muted)" />
+                </button>
+              </div>
 
             <form onSubmit={handleAddCatalogItem} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {/* Category choice, Point de laverie & Name */}
@@ -2835,7 +2865,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </form>
               </div>
             </div>
-          )}
+          </ModalPortal>
+        )}
 
       {/* ========================================================
          MODAL DE MODIFICATION AVANCÉE D'ARTICLE OU ABONNEMENT
@@ -2843,10 +2874,39 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {showEditCatalogModal && (
         <ModalPortal>
           <div className="modal-backdrop" onClick={() => setShowEditCatalogModal(false)}>
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25)', border: '1px solid var(--border-color)', margin: 'auto', cursor: 'default' }}>
-              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                Options d'Édition Avancées
-              </h3>
+            <div 
+              className="card modal-dialog-card" 
+              onClick={(e) => e.stopPropagation()} 
+              style={{ 
+                width: '100%', 
+                maxWidth: '650px', 
+                maxHeight: '90vh', 
+                overflowY: 'auto', 
+                background: 'var(--bg-card)', 
+                padding: '24px 28px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '1.25rem', 
+                boxShadow: 'var(--shadow-lg)', 
+                border: '1px solid var(--border-color)', 
+                borderRadius: '24px',
+                margin: 'auto', 
+                cursor: 'default' 
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Options d'Édition Avancées
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowEditCatalogModal(false)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  title="Fermer"
+                >
+                  <X size={20} color="var(--text-muted)" />
+                </button>
+              </div>
 
               <form onSubmit={handleSaveProductAdvanced} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {/* Category info, Point de Laverie & Name */}

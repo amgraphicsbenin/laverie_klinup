@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Zap,
   Clock,
@@ -19,10 +20,23 @@ import {
   Crown,
   Award,
   Gift,
-  Maximize2
+  Maximize2,
+  Plus,
+  Edit,
+  Trash2,
+  RotateCcw,
+  Tag,
+  Shirt,
+  Truck,
+  X
 } from 'lucide-react';
 import { db } from '../../../services/db';
 import { REWARD_CATALOG } from '../../../utils/fidelityUtils.jsx';
+
+const ModalPortal = ({ children }) => {
+  if (typeof document === 'undefined') return children;
+  return createPortal(children, document.body);
+};
 
 export default function SettingsTab({
   handleSaveSettings,
@@ -47,6 +61,92 @@ export default function SettingsTab({
   const [tierPlatinumPts, setTierPlatinumPts] = useState(() => (db.getSettings ? (db.getSettings().fidelity_tier_platinum_pts || 300) : 300));
   const [autoEarnPoints, setAutoEarnPoints] = useState(true);
   const [allowPOSRedeem, setAllowPOSRedeem] = useState(true);
+
+  // Reward Catalog Management State
+  const [rewardCatalog, setRewardCatalog] = useState(() => (db.getRewardCatalog ? db.getRewardCatalog() : REWARD_CATALOG));
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [editingReward, setEditingReward] = useState(null);
+
+  // Modal Form State
+  const [rewardTitle, setRewardTitle] = useState('');
+  const [rewardCost, setRewardCost] = useState('');
+  const [rewardDiscount, setRewardDiscount] = useState('');
+  const [rewardIcon, setRewardIcon] = useState('Gift');
+  const [rewardDescription, setRewardDescription] = useState('');
+
+  const handleOpenAddReward = () => {
+    setEditingReward(null);
+    setRewardTitle('');
+    setRewardCost('50');
+    setRewardDiscount('2000');
+    setRewardIcon('Gift');
+    setRewardDescription('');
+    setShowRewardModal(true);
+  };
+
+  const handleOpenEditReward = (reward) => {
+    setEditingReward(reward);
+    setRewardTitle(reward.title || '');
+    setRewardCost(String(reward.cost || 0));
+    setRewardDiscount(String(reward.discountAmount || 0));
+    setRewardIcon(reward.iconName || 'Gift');
+    setRewardDescription(reward.description || '');
+    setShowRewardModal(true);
+  };
+
+  const handleSaveReward = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!rewardTitle.trim()) return;
+
+    const newItem = {
+      id: editingReward ? editingReward.id : 'reward_' + Date.now(),
+      title: rewardTitle.trim(),
+      cost: Math.max(1, Number(rewardCost) || 10),
+      discountAmount: Math.max(0, Number(rewardDiscount) || 0),
+      iconName: rewardIcon,
+      description: rewardDescription.trim() || `Récompense de ${rewardTitle.trim()}`
+    };
+
+    let updatedList;
+    if (editingReward) {
+      updatedList = rewardCatalog.map(r => r.id === editingReward.id ? newItem : r);
+    } else {
+      updatedList = [...rewardCatalog, newItem];
+    }
+
+    if (db.updateRewardCatalog) {
+      db.updateRewardCatalog(updatedList);
+    } else if (db.updateSettings) {
+      db.updateSettings({ reward_catalog: updatedList });
+    }
+    setRewardCatalog(updatedList);
+    setShowRewardModal(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleDeleteReward = (rewardId) => {
+    if (!window.confirm('Voulez-vous vraiment supprimer cette offre du catalogue des récompenses ?')) return;
+    const updatedList = rewardCatalog.filter(r => r.id !== rewardId);
+    if (db.updateRewardCatalog) {
+      db.updateRewardCatalog(updatedList);
+    } else if (db.updateSettings) {
+      db.updateSettings({ reward_catalog: updatedList });
+    }
+    setRewardCatalog(updatedList);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleResetRewardCatalog = () => {
+    if (!window.confirm('Réinitialiser le catalogue des récompenses avec la configuration par défaut ?')) return;
+    if (db.updateRewardCatalog) {
+      db.updateRewardCatalog(REWARD_CATALOG);
+    }
+    setRewardCatalog(REWARD_CATALOG);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
 
   // Invoice / Receipt Dimensions State
   const [paperFormat, setPaperFormat] = useState(() => (db.getSettings ? (db.getSettings().invoice_paper_format || '80mm') : '80mm'));
@@ -508,32 +608,114 @@ export default function SettingsTab({
                 </div>
               </div>
 
-              {/* CARD 3 : APPERÇU DU CATALOGUE DES RÉCOMPENSES */}
+              {/* CARD 3 : CONFIGURATION MANUELLE DU CATALOGUE DES RÉCOMPENSES */}
               <div className="card" style={{ gridColumn: '1 / -1', borderRadius: '18px', padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '1.1rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Gift size={18} />
                     </div>
                     <div>
                       <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Catalogue des Récompenses Client</h4>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Offres actuelles échangeables en caisse et sur l'application mobile</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Offres configurables échangeables en caisse et sur l'application mobile ({rewardCatalog.length} offres)</span>
                     </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={handleResetRewardCatalog}
+                      style={{
+                        padding: '0.45rem 0.75rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-app)',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem'
+                      }}
+                      title="Réinitialiser au catalogue par défaut"
+                    >
+                      <RotateCcw size={13} /> Réinitialiser
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenAddReward}
+                      style={{
+                        padding: '0.45rem 0.85rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: 'var(--primary)',
+                        color: '#ffffff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
+                      }}
+                    >
+                      <Plus size={14} /> Ajouter une Récompense
+                    </button>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem' }}>
-                  {REWARD_CATALOG.map((reward) => (
-                    <div key={reward.id} style={{ padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>{reward.title}</strong>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '8px' }}>
-                          {reward.cost} pts
-                        </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
+                  {rewardCatalog.map((reward) => {
+                    const getRewardIcon = (iconName) => {
+                      switch (iconName) {
+                        case 'Tag': return <Tag size={16} color="#3b82f6" />;
+                        case 'Shirt': return <Shirt size={16} color="#10b981" />;
+                        case 'Truck': return <Truck size={16} color="#f59e0b" />;
+                        case 'Sparkles': return <Sparkles size={16} color="#ec4899" />;
+                        default: return <Gift size={16} color="#8b5cf6" />;
+                      }
+                    };
+
+                    return (
+                      <div key={reward.id} style={{ padding: '0.95rem 1rem', borderRadius: '14px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.65rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              {getRewardIcon(reward.iconName)}
+                              <strong style={{ fontSize: '0.84rem', color: 'var(--text-primary)' }}>{reward.title}</strong>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.55rem', borderRadius: '8px', flexShrink: 0 }}>
+                              {reward.cost} pts
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{reward.description}</span>
+                          {reward.discountAmount > 0 && (
+                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981', marginTop: '0.15rem' }}>
+                              Valeur : {reward.discountAmount.toLocaleString()} FCFA
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', paddingTop: '0.45rem', borderTop: '1px dashed var(--border-color)' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditReward(reward)}
+                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          >
+                            <Edit size={12} /> Modifier
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReward(reward.id)}
+                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          >
+                            <Trash2 size={12} /> Supprimer
+                          </button>
+                        </div>
                       </div>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{reward.description}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -791,8 +973,7 @@ export default function SettingsTab({
                           {receiptHeader || 'KLIN UP - Laverie & Pressing Premium'}
                         </div>
                         <div style={{ textAlign: 'center', fontSize: '0.68rem', color: '#64748b', marginBottom: '0.75rem' }}>
-                          Point de Laverie: Akpakpa (KLP-739) • Tél: +229 90 00 00 00<br />
-                          Format d'Impression : {paperFormat.toUpperCase()} ({paperWidth}mm × {Number(paperHeight) > 0 ? `${paperHeight}mm` : 'Rouleau'}) • Marges: {margin}mm
+                          Point de Laverie: Akpakpa (KLP-739) • Tél: +229 90 00 00 00
                         </div>
 
                         <div style={{ borderTop: '1px dashed #94a3b8', borderBottom: '1px dashed #94a3b8', padding: '0.4rem 0', margin: '0.5rem 0', fontSize: '0.72rem' }}>
@@ -1042,6 +1223,163 @@ export default function SettingsTab({
 
         </form>
       </div>
+
+      {/* MODAL CONFIGURATION DE RÉCOMPENSE */}
+      {showRewardModal && (
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => setShowRewardModal(false)}>
+            <div
+              className="card modal-dialog-card"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '520px',
+                background: 'var(--bg-card)',
+                borderRadius: '24px',
+                padding: '24px 28px',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-lg)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.25rem',
+                margin: 'auto'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Gift size={20} color="var(--primary)" />
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {editingReward ? 'Modifier la Récompense' : 'Nouvelle Récompense Client'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRewardModal(false)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                >
+                  <X size={20} color="var(--text-muted)" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveReward} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                    Titre de l'offre / récompense
+                  </label>
+                  <input
+                    type="text"
+                    className="input-control"
+                    placeholder="Ex: Remise de 2 000 FCFA"
+                    required
+                    value={rewardTitle}
+                    onChange={(e) => setRewardTitle(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                      Coût en Points (pts)
+                    </label>
+                    <input
+                      type="number"
+                      className="input-control"
+                      placeholder="Ex: 50"
+                      required
+                      min="1"
+                      value={rewardCost}
+                      onChange={(e) => setRewardCost(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                      Valeur / Déduction (FCFA)
+                    </label>
+                    <input
+                      type="number"
+                      className="input-control"
+                      placeholder="Ex: 2000"
+                      required
+                      min="0"
+                      value={rewardDiscount}
+                      onChange={(e) => setRewardDiscount(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Icône représentative
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {[
+                      { name: 'Tag', label: 'Remise', icon: <Tag size={16} /> },
+                      { name: 'Shirt', label: 'Vêtement', icon: <Shirt size={16} /> },
+                      { name: 'Truck', label: 'Livraison', icon: <Truck size={16} /> },
+                      { name: 'Sparkles', label: 'Repassage', icon: <Sparkles size={16} /> },
+                      { name: 'Gift', label: 'Cadeau', icon: <Gift size={16} /> }
+                    ].map(item => (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => setRewardIcon(item.name)}
+                        style={{
+                          padding: '0.45rem 0.75rem',
+                          borderRadius: '10px',
+                          border: `1px solid ${rewardIcon === item.name ? 'var(--primary)' : 'var(--border-color)'}`,
+                          background: rewardIcon === item.name ? 'var(--primary-light)' : 'var(--bg-app)',
+                          color: rewardIcon === item.name ? 'var(--primary)' : 'var(--text-primary)',
+                          fontWeight: 700,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}
+                      >
+                        {item.icon} {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                    Description détaillée
+                  </label>
+                  <textarea
+                    className="input-control"
+                    rows={2}
+                    style={{ resize: 'none', height: 'auto', padding: '0.65rem 0.85rem' }}
+                    placeholder="Ex: Réduction de 2 000 FCFA sur la prochaine commande."
+                    value={rewardDescription}
+                    onChange={(e) => setRewardDescription(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ flex: 1 }}
+                    onClick={() => setShowRewardModal(false)}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  >
+                    <Save size={16} /> Enregistrer
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
 
     </div>
   );

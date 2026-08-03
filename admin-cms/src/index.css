@@ -2189,3 +2189,196 @@ tr:hover td {
   }
 }
 
+/* ========================================================
+   SYSTEME DE MODE SOMBRE KLIN UP (#181818 Noir de Base)
+   ======================================================== */
+.dark-mode {
+  color-scheme: dark;
+
+  /* Palette de couleurs KLIN UP - Mode Sombre (#181818 pour le noir de base) */
+  --bg-app: #121212;           /* Fond d'application sombre et profond */
+  --bg-card: #181818;          /* Noir de base exigé pour les cartes & conteneurs */
+  --bg-sidebar: #181818;       /* Barre latérale en #181818 */
+  
+  --text-primary: #f4f4f5;     /* Chiffres et titres en blanc-gris élégant */
+  --text-secondary: #a1a1aa;   /* Textes secondaires lisibles */
+  --text-muted: #71717a;       /* Textes désactivés */
+  --text-on-dark: #ffffff;
+  --border-color: #27272a;     /* Bordures tamisées très douces */
+
+  /* Couleurs de marque KLIN UP tamisées pour le mode sombre */
+  --primary: #3b82f6;          /* Bleu principal adouci */
+  --primary-hover: #60a5fa;
+  --primary-light: rgba(59, 130, 246, 0.14);
+  --primary-gradient: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  
+  --secondary: #38bdf8;        /* Bleu ciel lumineux */
+  --secondary-hover: #0284c7;
+  --secondary-light: rgba(56, 189, 248, 0.14);
+
+  --accent: #e879f9;           /* Violet/Rose accent tamisé */
+  --accent-light: rgba(232, 121, 249, 0.14);
+
+  --success: #34d399;          /* Vert menthe tamisé */
+  --success-light: rgba(52, 211, 153, 0.14);
+
+  --warning: #fbbf24;          /* Ambre chaleureux */
+  --warning-light: rgba(251, 191, 36, 0.14);
+
+  --danger: #f87171;           /* Rouge d'alerte adouci */
+  --danger-light: rgba(248, 113, 113, 0.14);
+
+  /* Ombres raffinées pour le mode sombre */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 4px 18px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.7);
+}
+
+/* Finition et polissage artisanal des éléments UI en mode sombre */
+.dark-mode select,
+.dark-mode input,
+.dark-mode textarea {
+  background-color: #141414 !important;
+  color: #f4f4f5 !important;
+  border-color: #27272a !important;
+}
+
+.dark-mode select option {
+  background-color: #181818 !important;
+  color: #f4f4f5 !important;
+}
+
+.dark-mode input::placeholder,
+.dark-mode textarea::placeholder {
+  color: #71717a !important;
+}
+
+.dark-mode .topbar {
+  background: transparent !important;
+  border-bottom-color: #27272a !important;
+}
+
+.dark-mode .sidebar {
+  background: #181818 !important;
+  border-right-color: #27272a !important;
+}
+
+.dark-mode .topbar-icon-btn {
+  background: #222226;
+  border-color: #27272a;
+  color: #f4f4f5;
+}
+
+.dark-mode .topbar-icon-btn:hover {
+  background: #2a2a2e;
+}
+
+.dark-mode .menu-item {
+  color: #a1a1aa;
+}
+
+.dark-mode .menu-item:hover {
+  color: #f4f4f5;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.dark-mode .menu-item.active {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border-right-color: #3b82f6;
+}
+
+.dark-mode .menu-group-block.expanded,
+.dark-mode .menu-group-block.active-block {
+  background: rgba(59, 130, 246, 0.12);
+  border-right-color: #3b82f6;
+}
+
+.dark-mode .card,
+.dark-mode .kpi-card,
+.dark-mode .table-container,
+.dark-mode .modal-box,
+.dark-mode .modal-dialog-card,
+.dark-mode .popup-card,
+.dark-mode .drawer {
+  background-color: #181818 !important;
+  border-color: #27272a !important;
+}
+
+.dark-mode table th {
+  background-color: #1c1c1e !important;
+  color: #a1a1aa !important;
+  border-bottom-color: #27272a !important;
+}
+
+.dark-mode table td {
+  color: #f4f4f5 !important;
+  border-bottom-color: #27272a !important;
+}
+
+.dark-mode table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark-mode .filter-pill {
+  background-color: #222226;
+  border-color: #27272a;
+  color: #a1a1aa;
+}
+
+.dark-mode .filter-pill:hover {
+  background-color: #2a2a2e;
+  color: #f4f4f5;
+}
+
+.dark-mode .filter-pill.active {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+
+.dark-mode .btn-outline {
+  background-color: transparent;
+  border-color: #3f3f46;
+  color: #f4f4f5;
+}
+
+.dark-mode .btn-outline:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: #52525b;
+}
+
+.dark-mode .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* Surcharges universelles pour attraper tous les styles inline clairs en mode sombre */
+.dark-mode [style*="color: #09090b"],
+.dark-mode [style*="color: #0f172a"],
+.dark-mode [style*="color: #475569"],
+.dark-mode [style*="color: #334155"] {
+  color: var(--text-primary) !important;
+}
+
+.dark-mode [style*="color: #64748b"],
+.dark-mode [style*="color: #71717a"] {
+  color: var(--text-secondary) !important;
+}
+
+.dark-mode [style*="background: #ffffff"],
+.dark-mode [style*="background-color: #ffffff"],
+.dark-mode [style*="backgroundColor: #ffffff"],
+.dark-mode [style*="background: #f1f5f9"],
+.dark-mode [style*="backgroundColor: #f1f5f9"] {
+  background-color: #181818 !important;
+}
+
+.dark-mode [style*="border: 1.5px solid #e2e8f0"],
+.dark-mode [style*="border: 1px solid #e2e8f0"] {
+  border-color: #27272a !important;
+}
+
+
+

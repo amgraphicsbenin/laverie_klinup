@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl, Modal, TextInput, Linking, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl, Modal, TextInput, Linking, Alert, Image } from 'react-native';
 import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check, MapPin } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { MotiView } from '../../../components/SafeView';
@@ -15,6 +15,10 @@ import { t } from '../../../services/i18n';
 export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { orders, customers, notifications, currentUser, isDarkMode } = useDbState();
   const [refreshing, setRefreshing] = useState(false);
+
+  const userInitials = currentUser 
+    ? `${(currentUser.prenom || 'K')[0].toUpperCase()}${(currentUser.nom || 'U')[0].toUpperCase()}`
+    : 'KU';
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [revenuePeriod, setRevenuePeriod] = useState('today'); // 'today' | 'week' | 'month' | 'year' | 'custom'
   const [periodPickerVisible, setPeriodPickerVisible] = useState(false);
@@ -148,10 +152,10 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
     ? Math.round(orders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0) / orders.length)
     : 0;
 
-  // Recovery Rate
+  // Recovery Rate & Total Paid Volume
   const totalVolume = orders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
-  const totalPaid = orders.reduce((sum, o) => sum + (o.avance_payee || o.avance || 0), 0);
-  const recoveryRate = totalVolume > 0 ? Math.round((totalPaid / totalVolume) * 100) : 100;
+  const totalPaid = orders.reduce((sum, o) => sum + (o.avance_payee !== undefined ? Number(o.avance_payee) : Number(o.avance || 0)), 0);
+  const recoveryRate = totalVolume > 0 ? Math.min(100, Math.max(0, Math.round((totalPaid / totalVolume) * 100))) : 0;
 
   // Express Orders Ratio
   const expressOrdersCount = orders.filter(o => o.niveau_urgence === 'Express').length;
@@ -682,10 +686,32 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>
-            {currentUser ? `Salut ${currentUser.prenom}` : 'Salut'}
-          </Text>
+        <View style={styles.headerLeftContainer}>
+          {/* Avatar Circle Clickable -> Navigate to Profile */}
+          <TouchableOpacity
+            onPress={() => onNavigate && onNavigate('profile')}
+            style={styles.headerAvatarWrapper}
+            activeOpacity={0.8}
+            accessibilityLabel="Voir le profil"
+          >
+            <View style={styles.headerAvatar}>
+              {currentUser?.user_picture ? (
+                <Image
+                  source={{ uri: currentUser.user_picture }}
+                  style={styles.headerAvatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.headerAvatarText}>{userInitials}</Text>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <View>
+            <Text style={styles.headerTitle}>
+              {currentUser ? `Salut ${currentUser.prenom}` : 'Salut'}
+            </Text>
+          </View>
         </View>
 
         {/* NOTIFICATION BUTTON */}
@@ -727,116 +753,144 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
             onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
           >
-            {/* KPI 1: CA Mensuel (Inspiré Card 1 & 8) */}
+            {/* KPI 1: CA Mensuel */}
             <View style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 150 }}
-                style={styles.newKpiCard}
+                style={[
+                  styles.newKpiCard, 
+                  { 
+                    backgroundColor: isDarkMode ? '#09153d' : '#002cf7', 
+                    borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#002cf7' 
+                  }
+                ]}
               >
                 <View style={styles.cardHeaderRow}>
-                  <Text style={styles.newCardTitle}>CA Mensuel</Text>
-                  <View style={styles.purpleBadge}>
-                    <Text style={styles.purpleBadgeText}>Mois</Text>
+                  <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>CA Mensuel</Text>
+                  <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                    <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>Mois</Text>
                   </View>
                 </View>
-                <Text style={styles.newCardSub}>Mois en cours</Text>
+                <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.85)' }]}>Mois en cours</Text>
                 
-                <Text style={styles.newCardBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(monthlyRevenue)}</Text>
+                <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(monthlyRevenue)}</Text>
                 
-                <View style={styles.greenPillBadge}>
-                  <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
-                  <Text style={styles.greenPillText}>+12.4% ce mois</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start', marginTop: 4 }}>
+                  <TrendingUp size={12} color="#ffffff" style={{ marginRight: 3 }} />
+                  <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>+12.4% ce mois</Text>
                 </View>
               </MotiView>
             </View>
 
-            {/* KPI 2: Panier Moyen (Inspiré Card 5 avec mini bâtonnets) */}
+            {/* KPI 2: Panier Moyen */}
             <View style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 150, delay: 30 }}
-                style={styles.newKpiCard}
+                style={[
+                  styles.newKpiCard, 
+                  { 
+                    backgroundColor: isDarkMode ? '#0d1b4c' : '#2E54FF', 
+                    borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#2E54FF' 
+                  }
+                ]}
               >
                 <View style={styles.cardHeaderRow}>
-                  <Text style={styles.newCardTitle}>Panier Moyen</Text>
+                  <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>Panier Moyen</Text>
                 </View>
-                <Text style={styles.newCardBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(averageBasket)}</Text>
+                <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(averageBasket)}</Text>
 
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 26, marginVertical: 4 }}>
-                  <View style={{ flex: 1, height: '40%', backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.18)', borderRadius: 4 }} />
-                  <View style={{ flex: 1, height: '65%', backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.18)', borderRadius: 4 }} />
-                  <View style={{ flex: 1, height: '45%', backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.18)', borderRadius: 4 }} />
-                  <View style={{ flex: 1, height: '90%', backgroundColor: '#002cf7', borderRadius: 4 }} />
+                  <View style={{ flex: 1, height: '40%', backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 4 }} />
+                  <View style={{ flex: 1, height: '65%', backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 4 }} />
+                  <View style={{ flex: 1, height: '45%', backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 4 }} />
+                  <View style={{ flex: 1, height: '90%', backgroundColor: isDarkMode ? '#38bdf8' : '#ffffff', borderRadius: 4 }} />
                 </View>
 
-                <Text style={styles.newCardSub}>Par commande</Text>
+                <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.85)' }]}>Par commande</Text>
               </MotiView>
             </View>
 
-            {/* KPI 3: Recouvrement (Inspiré Card 3 anneau de progression) */}
+            {/* KPI 3: Volume total encaissé */}
             <View style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 150, delay: 60 }}
-                style={styles.newKpiCard}
+                style={[
+                  styles.newKpiCard, 
+                  { 
+                    backgroundColor: isDarkMode ? '#12225c' : '#5C7AFF', 
+                    borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#5C7AFF' 
+                  }
+                ]}
               >
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View>
-                    <Text style={styles.newCardBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{recoveryRate || 0}%</Text>
-                    <Text style={styles.newCardSub}>Recouvrement</Text>
+                    <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{recoveryRate}%</Text>
+                    <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.85)' }]}>Recouvrement</Text>
                   </View>
 
-                  <Svg height="44" width="44" viewBox="0 0 36 36">
-                    <Circle
-                      cx="18"
-                      cy="18"
-                      r="15.9155"
-                      fill="none"
-                      stroke={isDarkMode ? '#27272a' : '#f1f5f9'}
-                      strokeWidth="3.8"
-                    />
-                    <Circle
-                      cx="18"
-                      cy="18"
-                      r="15.9155"
-                      fill="none"
-                      stroke="#002cf7"
-                      strokeWidth="3.8"
-                      strokeDasharray={`${Math.min(100, Math.max(0, recoveryRate || 0))} 100`}
-                      strokeDashoffset="25"
-                      strokeLinecap="round"
-                    />
-                  </Svg>
+                  {/* Dynamic Svg Ring Gauge */}
+                  <View style={{ position: 'relative', width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                    <Svg height="48" width="48" viewBox="0 0 36 36">
+                      <Circle
+                        cx="18"
+                        cy="18"
+                        r="15.9155"
+                        fill="none"
+                        stroke="rgba(255, 255, 255, 0.25)"
+                        strokeWidth="3.8"
+                      />
+                      <Circle
+                        cx="18"
+                        cy="18"
+                        r="15.9155"
+                        fill="none"
+                        stroke={isDarkMode ? '#38bdf8' : '#ffffff'}
+                        strokeWidth="3.8"
+                        strokeDasharray={[recoveryRate, Math.max(0, 100 - recoveryRate)]}
+                        strokeLinecap="round"
+                        rotation={-90}
+                        origin="18, 18"
+                      />
+                    </Svg>
+                  </View>
                 </View>
 
-                <Text style={[styles.newCardSub, { marginTop: 6 }]}>Volume total encaissé</Text>
+                <Text style={[styles.newCardSub, { color: '#ffffff', fontWeight: '700', marginTop: 6 }]}>Volume total encaissé</Text>
               </MotiView>
             </View>
 
-            {/* KPI 4: Part Express (Inspiré Card 7 jauges de progression) */}
+            {/* KPI 4: Part Express */}
             <View style={{ borderRadius: 24, overflow: 'hidden' }}>
               <MotiView
                 from={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'timing', duration: 150, delay: 90 }}
-                style={styles.newKpiCard}
+                style={[
+                  styles.newKpiCard, 
+                  { 
+                    backgroundColor: isDarkMode ? '#18296e' : '#8A9FFF', 
+                    borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#8A9FFF' 
+                  }
+                ]}
               >
                 <View style={styles.cardHeaderRow}>
-                  <Text style={styles.newCardTitle}>Part Express</Text>
+                  <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>Part Express</Text>
                 </View>
-                <Text style={styles.newCardSub}>{expressOrdersCount} commandes urgentes</Text>
+                <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.9)' }]}>{expressOrdersCount} commandes urgentes</Text>
 
                 <View style={{ marginVertical: 6, gap: 5 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#475569' }}>Express</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#002cf7' }}>{expressRate}%</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: 'rgba(255, 255, 255, 0.9)' }}>Express</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>{expressRate}%</Text>
                   </View>
-                  <View style={{ height: 6, backgroundColor: isDarkMode ? '#27272a' : '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
-                    <View style={{ width: `${Math.min(100, expressRate)}%`, height: '100%', backgroundColor: '#002cf7', borderRadius: 3 }} />
+                  <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.min(100, expressRate)}%`, height: '100%', backgroundColor: isDarkMode ? '#38bdf8' : '#ffffff', borderRadius: 3 }} />
                   </View>
                 </View>
               </MotiView>
@@ -1034,8 +1088,12 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         {/* ACTIVE ORDERS FEED */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Commandes Actives</Text>
-          <TouchableOpacity onPress={() => onNavigate('gestion')}>
-            <Text style={styles.seeAllLink}>Voir tout</Text>
+          <TouchableOpacity
+            onPress={() => onNavigate('gestion')}
+            activeOpacity={0.7}
+            style={styles.seeAllPillBtn}
+          >
+            <Text style={styles.seeAllPillText}>Voir tout</Text>
           </TouchableOpacity>
         </View>
 
@@ -1492,8 +1550,37 @@ const baseStyles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: '#ffffff',
   },
+  headerLeftContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerAvatarWrapper: {
+    position: 'relative',
+  },
+  headerAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0, 44, 247, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 44, 247, 0.15)',
+    overflow: 'hidden',
+  },
+  headerAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 21,
+  },
+  headerAvatarText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#002cf7',
+  },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     color: '#09090b',
     letterSpacing: -0.5,
@@ -1714,6 +1801,23 @@ const baseStyles = StyleSheet.create({
     fontSize: 12,
     color: '#002cf7',
     fontWeight: '600',
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+  },
+  seeAllPillBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 44, 247, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 44, 247, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  seeAllPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#002cf7',
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
   },
   emptyContainer: {
@@ -2327,6 +2431,8 @@ function getStyles(isDarkMode) {
   const overrides = {
     container: { backgroundColor: '#000000' },
     header: { backgroundColor: '#000000' },
+    headerAvatar: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.3)' },
+    headerAvatarText: { color: '#38bdf8' },
     headerTitle: { color: '#ffffff' },
     subHeadline: { color: '#a1a1aa' },
     boldText: { color: '#ffffff' },
@@ -2357,6 +2463,8 @@ function getStyles(isDarkMode) {
     kpiSubLbl: { color: '#a1a1aa' },
     sectionTitle: { color: '#a1a1aa' },
     viewAllText: { color: '#38bdf8' },
+    seeAllPillBtn: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.35)' },
+    seeAllPillText: { color: '#38bdf8' },
     orderCard: { backgroundColor: '#121212', borderColor: '#27272a' },
     clientPillBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
     clientPillBtnText: { color: '#38bdf8' },
@@ -2383,8 +2491,8 @@ function getStyles(isDarkMode) {
     premiumKpiSubBox: { backgroundColor: '#09090b', borderColor: '#27272a' },
     premiumKpiSubBoxLbl: { color: '#a1a1aa' },
     premiumModalTitle: { color: '#ffffff' },
-    emptyStateContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
-    emptyStateText: { color: '#a1a1aa' },
+    emptyContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
+    emptyText: { color: '#a1a1aa' },
   };
 
   const merged = {};

@@ -634,14 +634,14 @@ export default function LogsTab({
               }}
             >
               {/* En-tête Modale */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                   <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: meta.bg, color: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <ActionIcon size={24} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{meta.label}</h4>
-                    <div style={{ fontSize: '0.76rem', color: '#64748b', fontFamily: 'monospace', fontWeight: 700, marginTop: '0.15rem' }}>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{meta.label}</h4>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontFamily: 'monospace', fontWeight: 700, marginTop: '0.15rem' }}>
                       ID Trace: {selectedLog.id}
                     </div>
                   </div>
@@ -651,13 +651,13 @@ export default function LogsTab({
                   type="button"
                   onClick={() => setSelectedLog(null)}
                   style={{
-                    background: '#f1f5f9',
-                    border: 'none',
+                    background: 'var(--bg-app)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '50%',
                     width: '34px',
                     height: '34px',
                     cursor: 'pointer',
-                    color: '#475569',
+                    color: 'var(--text-secondary)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -671,27 +671,27 @@ export default function LogsTab({
 
               {/* Corps Modale : Métadonnées */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Horodatage</div>
-                  <div style={{ fontWeight: 800, marginTop: '0.25rem', color: '#0f172a', fontSize: '0.88rem' }}>{new Date(selectedLog.timestamp).toLocaleString()}</div>
+                <div style={{ background: 'var(--bg-app)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Horodatage</div>
+                  <div style={{ fontWeight: 800, marginTop: '0.25rem', color: 'var(--text-primary)', fontSize: '0.88rem' }}>{new Date(selectedLog.timestamp).toLocaleString()}</div>
                 </div>
 
-                <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Origine Plateforme</div>
+                <div style={{ background: 'var(--bg-app)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Origine Plateforme</div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.25rem', fontWeight: 800, color: origin.color, fontSize: '0.88rem' }}>
                     <OriginIcon size={16} /> {origin.label}
                   </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Opérateur / Utilisateur</div>
-                  <div style={{ fontWeight: 800, marginTop: '0.25rem', color: '#0f172a', fontSize: '0.88rem' }}>{user ? `${user.prenom} ${user.nom}` : 'Automate / Système'}</div>
-                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, marginTop: '0.1rem' }}>Rôle: {user ? user.role : 'N/A'}</div>
+                <div style={{ background: 'var(--bg-app)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Opérateur / Utilisateur</div>
+                  <div style={{ fontWeight: 800, marginTop: '0.25rem', color: 'var(--text-primary)', fontSize: '0.88rem' }}>{user ? `${user.prenom} ${user.nom}` : 'Automate / Système'}</div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600, marginTop: '0.1rem' }}>Rôle: {user ? user.role : 'N/A'}</div>
                 </div>
 
-                <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Point de Laverie</div>
-                  <div style={{ fontWeight: 800, marginTop: '0.25rem', color: '#0f172a', fontSize: '0.88rem' }}>
+                <div style={{ background: 'var(--bg-app)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Point de Laverie</div>
+                  <div style={{ fontWeight: 800, marginTop: '0.25rem', color: 'var(--text-primary)', fontSize: '0.88rem' }}>
                     📍 {(stores.find(st => st.id === selectedLog.store_id || st.id === user?.store_id) || {}).nom || 'Point Central'}
                   </div>
                 </div>
@@ -699,28 +699,28 @@ export default function LogsTab({
 
               {/* Contenu textuel complet */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Description complète de l'opération
                 </div>
-                <div style={{ background: '#f8fafc', padding: '0.9rem 1rem', borderRadius: '12px', fontSize: '0.88rem', color: '#0f172a', fontWeight: 600, lineHeight: 1.5, border: '1px solid #e2e8f0' }}>
+                <div style={{ background: 'var(--bg-app)', padding: '0.9rem 1rem', borderRadius: '12px', fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 600, lineHeight: 1.5, border: '1px solid var(--border-color)' }}>
                   {selectedLog.details}
                 </div>
               </div>
 
               {/* Bloc Motif si disponible */}
               {motifText && (
-                <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(220, 38, 38, 0.06)', borderRadius: '12px', border: '1px solid rgba(220, 38, 38, 0.25)', borderLeft: '4px solid #dc2626' }}>
-                  <div style={{ fontSize: '0.74rem', color: '#b91c1c', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(220, 38, 38, 0.1)', borderRadius: '12px', border: '1px solid rgba(220, 38, 38, 0.3)', borderLeft: '4px solid #dc2626' }}>
+                  <div style={{ fontSize: '0.74rem', color: '#f87171', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     💡 Motif Spécifié pour cette Opération
                   </div>
-                  <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 800, marginTop: '0.3rem', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '0.92rem', color: '#fca5a5', fontWeight: 800, marginTop: '0.3rem', lineHeight: 1.4 }}>
                     {motifText}
                   </div>
                 </div>
               )}
 
               {/* Pied de Modale */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
                 <button
                   type="button"
                   onClick={() => setSelectedLog(null)}
@@ -729,11 +729,11 @@ export default function LogsTab({
                     borderRadius: '10px',
                     fontSize: '0.84rem',
                     fontWeight: 800,
-                    backgroundColor: '#0f172a',
+                    backgroundColor: 'var(--primary)',
                     color: '#ffffff',
                     border: 'none',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
                     transition: 'all 0.15s ease'
                   }}
                 >

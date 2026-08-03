@@ -89,8 +89,8 @@ export default function DashboardTab({
       {/* 🚀 BANNIÈRE D'ACCUEIL & EN-TÊTE STATUTAIRE */}
       <div 
         style={{ 
-          background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 50%, #f8fafc 100%)',
-          border: '1px solid rgba(59, 130, 246, 0.18)',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
           borderRadius: '24px',
           padding: '1.75rem 2rem',
           color: 'var(--text-primary)',
@@ -105,21 +105,21 @@ export default function DashboardTab({
         }}
       >
         {/* Glow Effects */}
-        <div style={{ position: 'absolute', right: '-50px', top: '-50px', width: '220px', height: '220px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '50%', filter: 'blur(50px)' }} />
-        <div style={{ position: 'absolute', left: '30%', bottom: '-60px', width: '180px', height: '180px', background: 'rgba(217, 70, 239, 0.05)', borderRadius: '50%', filter: 'blur(45px)' }} />
+        <div style={{ position: 'absolute', right: '-50px', top: '-50px', width: '220px', height: '220px', background: 'var(--primary-light)', borderRadius: '50%', filter: 'blur(50px)' }} />
+        <div style={{ position: 'absolute', left: '30%', bottom: '-60px', width: '180px', height: '180px', background: 'var(--accent-light)', borderRadius: '50%', filter: 'blur(45px)' }} />
 
         <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span style={{ background: 'rgba(59, 130, 246, 0.08)', color: 'var(--primary)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+            <span style={{ background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid var(--border-color)' }}>
               <Store size={14} color="var(--primary)" />
               {storeName}
             </span>
-            <span style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', padding: '0.25rem 0.65rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
+            <span style={{ background: 'var(--success-light)', color: 'var(--success)', padding: '0.25rem 0.65rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 8px var(--success)' }} />
               {currentStore ? `Point Actif (${currentStore.code})` : 'Vue Globale Réseau'}
             </span>
           </div>
-          <h2 style={{ fontSize: '1.65rem', fontWeight: 800, fontFamily: 'var(--font-title)', margin: 0, letterSpacing: '-0.3px', color: '#0f172a' }}>
+          <h2 style={{ fontSize: '1.65rem', fontWeight: 800, fontFamily: 'var(--font-title)', margin: 0, letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>
             {currentStore ? `Supervision - ${currentStore.nom}` : 'Supervision Globale KLIN UP'}
           </h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -347,56 +347,56 @@ export default function DashboardTab({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem' }}>
           
           {/* Étape 1 : Attente */}
-          <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(217, 119, 6, 0.05)', border: '1px solid rgba(217, 119, 6, 0.2)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ padding: '1rem', borderRadius: '14px', background: 'var(--warning-light)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#d97706', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <Clock size={16} /> 1. Attente / Tri
               </span>
-              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#d97706' }}>{pendingOrdersCount}</span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--warning)' }}>{pendingOrdersCount}</span>
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Nouveaux dépôts à marquer</div>
           </div>
 
           {/* Étape 2 : Lavage / Nettoyage */}
-          <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ padding: '1rem', borderRadius: '14px', background: 'var(--primary-light)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <Shirt size={16} /> 2. Lavage & Séchage
               </span>
-              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#3b82f6' }}>{countWashing}</span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>{countWashing}</span>
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>En cours de traitement textile</div>
           </div>
 
           {/* Étape 3 : Repassage */}
-          <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.2)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ padding: '1rem', borderRadius: '14px', background: 'var(--accent-light)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <Wind size={16} /> 3. Repassage & Finition
               </span>
-              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#8b5cf6' }}>{activeOrdersCount - countWashing}</span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent)' }}>{activeOrdersCount - countWashing}</span>
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Repassage & conditionnement</div>
           </div>
 
           {/* Étape 4 : Prêt */}
-          <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ padding: '1rem', borderRadius: '14px', background: 'var(--success-light)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <CheckCircle2 size={16} /> 4. Prêt en Caisse
               </span>
-              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981' }}>{countReady}</span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--success)' }}>{countReady}</span>
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Prêt pour retrait ou livraison</div>
           </div>
 
           {/* Étape 5 : Restitué */}
-          <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(100, 116, 139, 0.05)', border: '1px solid rgba(100, 116, 139, 0.2)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(100, 116, 139, 0.08)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <Truck size={16} /> 5. Livré & Restitué
               </span>
-              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#64748b' }}>{completedOrdersCount}</span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-secondary)' }}>{completedOrdersCount}</span>
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Remis en main propre</div>
           </div>

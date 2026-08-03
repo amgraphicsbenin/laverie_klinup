@@ -136,7 +136,7 @@ export default function LoginScreen() {
             <View style={styles.logoContainer}>
               <View style={styles.logoCircle}>
                 <Image 
-                  source={require('../../../../assets/icon.png')} 
+                  source={require('../../../../assets/android-icon-foreground.png')} 
                   style={styles.logo}
                   resizeMode="contain"
                 />
@@ -151,10 +151,10 @@ export default function LoginScreen() {
             <View style={styles.inputWrapper}>
               <Text style={styles.label}>{t('auth.email_label')}</Text>
               <View style={styles.inputContainer}>
-                <Mail size={16} color="#71717a" style={styles.inputIcon} />
+                <Mail size={16} color={isDarkMode ? '#a1a1aa' : '#71717a'} style={styles.inputIcon} />
                 <TextInput
                   placeholder={t('auth.email_placeholder')}
-                  placeholderTextColor="#a1a1aa"
+                  placeholderTextColor={isDarkMode ? '#71717a' : '#a1a1aa'}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -185,7 +185,7 @@ export default function LoginScreen() {
               onPress={() => { setSelectedUser(null); setPin(''); }}
               style={styles.backButton}
             >
-              <ChevronLeft size={20} color="#71717a" />
+              <ChevronLeft size={20} color={isDarkMode ? '#a1a1aa' : '#71717a'} />
             </TouchableOpacity>
 
             <View style={styles.avatarContainer}>
@@ -277,15 +277,17 @@ const baseStyles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(37, 99, 235, 0.05)',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(37, 99, 235, 0.08)',
+    borderColor: 'rgba(37, 99, 235, 0.15)',
+    overflow: 'hidden',
   },
   logo: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
   title: {
     fontSize: 22,
@@ -464,21 +466,24 @@ function getStyles(isDarkMode) {
   const overrides = {
     container: { backgroundColor: '#000000' },
     card: { backgroundColor: '#121212', borderColor: '#27272a' },
-    title: { color: '#ffffff' },
-    subtitle: { color: '#d4d4d8' },
-    label: { color: '#d4d4d8' },
+    logoCircle: { backgroundColor: 'rgba(56, 189, 248, 0.12)', borderColor: 'rgba(56, 189, 248, 0.25)' },
+    title: { color: '#ffffff', fontWeight: '700' },
+    subtitle: { color: '#a1a1aa' },
+    label: { color: '#d4d4d8', fontWeight: '600' },
     inputContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
     input: { color: '#ffffff' },
+    pinTitle: { color: '#ffffff', fontWeight: '700' },
+    pinSubtitle: { color: '#a1a1aa' },
+    userName: { color: '#ffffff', fontWeight: '700' },
+    userRole: { color: '#a1a1aa' },
     
     // User card overrides (user selection list)
     userCard: { backgroundColor: '#09090b', borderColor: '#27272a' },
-    userName: { color: '#ffffff' },
-    userRole: { color: '#a1a1aa' },
     
     // Keypad and PIN entry overrides
     pinDot: { backgroundColor: '#09090b', borderColor: '#27272a' },
-    pinDotFilled: { borderColor: '#002cf7', backgroundColor: 'rgba(0, 44, 247, 0.1)' },
-    dotText: { color: '#ffffff' },
+    pinDotFilled: { borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.15)' },
+    dotText: { color: '#38bdf8' },
     keypadContainer: { borderTopColor: '#27272a' },
     keypadButton: { backgroundColor: '#09090b', borderColor: '#27272a' },
     keypadButtonText: { color: '#ffffff' },

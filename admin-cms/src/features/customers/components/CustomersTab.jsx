@@ -58,6 +58,8 @@ export default function CustomersTab({
   const [tierFilter, setTierFilter] = useState('all'); // 'all', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM'
   const [copiedId, setCopiedId] = useState(null);
 
+  const activeRewardCatalog = (db.getRewardCatalog && db.getRewardCatalog()) || REWARD_CATALOG;
+
   // Modal Fidélité State
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardTab, setRewardTab] = useState('redeem'); // 'redeem' | 'adjust'
@@ -938,29 +940,29 @@ export default function CustomersTab({
                 maxWidth: '560px',
                 minHeight: '580px',
                 maxHeight: '92vh',
-                background: '#ffffff',
+                background: 'var(--bg-card)',
                 padding: '24px 28px',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
                 borderRadius: '24px',
-                boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25)',
-                border: '1.5px solid #e2e8f0',
+                boxShadow: 'var(--shadow-lg)',
+                border: '1px solid var(--border-color)',
                 margin: 'auto'
               }}
             >
               {/* Header exact match with Nouvelle Commande modal */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#09090b', margin: 0, fontFamily: 'inherit' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, fontFamily: 'inherit' }}>
                   Fidélité & Échange de Points
                 </h3>
                 <button
                   type="button"
                   onClick={handleCloseRewardModal}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#71717a' }}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
                   title="Fermer"
                 >
-                  <X size={20} color="#71717a" />
+                  <X size={20} color="var(--text-muted)" />
                 </button>
               </div>
 
@@ -969,8 +971,8 @@ export default function CustomersTab({
 
                 {/* Banner Client & Solde */}
                 <div style={{
-                  backgroundColor: 'rgba(0, 44, 247, 0.04)',
-                  border: '1.5px solid rgba(0, 44, 247, 0.12)',
+                  backgroundColor: 'var(--primary-light)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '16px',
                   padding: '12px 16px',
                   marginBottom: '16px',
@@ -994,10 +996,10 @@ export default function CustomersTab({
                       {renderTierIcon(selectedTier.iconName, 20, selectedTier.color)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         +{selectedCrmCustomer.indicatif || '229'} {selectedCrmCustomer.telephone} • Statut {selectedTier.name}
                       </div>
                     </div>
@@ -1015,12 +1017,12 @@ export default function CustomersTab({
                     <div style={{ fontSize: '15px', fontWeight: 800, color: selectedTier.color, lineHeight: 1.1 }}>
                       {selectedCrmCustomer.points_fidelite || 0} <span style={{ fontSize: '11px', fontWeight: 700 }}>pts</span>
                     </div>
-                    <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>Solde disponible</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, marginTop: '2px' }}>Solde disponible</div>
                   </div>
                 </div>
 
                 {/* Segmented Control Tabs (Matching Urgence Normal / Express style) */}
-                <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '12px', padding: '4px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '4px', marginBottom: '16px' }}>
                   <button
                     type="button"
                     onClick={() => setRewardTab('redeem')}
@@ -1032,8 +1034,8 @@ export default function CustomersTab({
                       borderRadius: '10px',
                       border: 'none',
                       cursor: 'pointer',
-                      backgroundColor: rewardTab === 'redeem' ? '#002cf7' : 'transparent',
-                      color: rewardTab === 'redeem' ? '#ffffff' : '#64748b',
+                      backgroundColor: rewardTab === 'redeem' ? 'var(--primary)' : 'transparent',
+                      color: rewardTab === 'redeem' ? '#ffffff' : 'var(--text-secondary)',
                       transition: 'all 0.15s ease',
                       display: 'flex',
                       alignItems: 'center',
@@ -1041,7 +1043,7 @@ export default function CustomersTab({
                       gap: '6px'
                     }}
                   >
-                    <Gift size={15} /> Catalogue Récompenses ({REWARD_CATALOG.length})
+                    <Gift size={15} /> Catalogue Récompenses ({activeRewardCatalog.length})
                   </button>
                   <button
                     type="button"
@@ -1054,8 +1056,8 @@ export default function CustomersTab({
                       borderRadius: '10px',
                       border: 'none',
                       cursor: 'pointer',
-                      backgroundColor: rewardTab === 'adjust' ? '#002cf7' : 'transparent',
-                      color: rewardTab === 'adjust' ? '#ffffff' : '#64748b',
+                      backgroundColor: rewardTab === 'adjust' ? 'var(--primary)' : 'transparent',
+                      color: rewardTab === 'adjust' ? '#ffffff' : 'var(--text-secondary)',
                       transition: 'all 0.15s ease',
                       display: 'flex',
                       alignItems: 'center',
@@ -1086,7 +1088,7 @@ export default function CustomersTab({
                 {/* Tab 1 : Catalogue Récompenses (Matching item list layout in Nouvelle Commande modal) */}
                 {rewardTab === 'redeem' ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {REWARD_CATALOG.map((reward) => {
+                    {activeRewardCatalog.map((reward) => {
                       const pts = Number(selectedCrmCustomer.points_fidelite || 0);
                       const canAfford = pts >= reward.cost;
 
@@ -1094,8 +1096,8 @@ export default function CustomersTab({
                         <div
                           key={reward.id}
                           style={{
-                            backgroundColor: '#ffffff',
-                            border: '1.5px solid #e2e8f0',
+                            backgroundColor: 'var(--bg-app)',
+                            border: '1px solid var(--border-color)',
                             borderRadius: '16px',
                             padding: '12px 16px',
                             display: 'flex',
@@ -1106,13 +1108,13 @@ export default function CustomersTab({
                           }}
                         >
                           <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#09090b' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
                               {reward.title}
                             </div>
-                            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                               {reward.description}
                             </div>
-                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#002cf7', marginTop: '4px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px' }}>
                               Coût : {reward.cost} points
                             </div>
                           </div>
@@ -1122,11 +1124,11 @@ export default function CustomersTab({
                             disabled={!canAfford}
                             onClick={() => handleRedeemRewardAdmin(reward)}
                             style={{
-                              backgroundColor: canAfford ? 'rgba(0, 44, 247, 0.08)' : '#f1f5f9',
-                              color: canAfford ? '#002cf7' : '#94a3b8',
+                              backgroundColor: canAfford ? 'var(--primary-light)' : 'var(--bg-card)',
+                              color: canAfford ? 'var(--primary)' : 'var(--text-muted)',
                               fontWeight: 700,
                               fontSize: '13px',
-                              border: 'none',
+                              border: '1px solid var(--border-color)',
                               borderRadius: '10px',
                               padding: '8px 16px',
                               cursor: canAfford ? 'pointer' : 'not-allowed',
@@ -1144,7 +1146,7 @@ export default function CustomersTab({
                   /* Tab 2 : Ajustement Points */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '8px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>
                         Bonus Rapides :
                       </label>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1154,11 +1156,11 @@ export default function CustomersTab({
                             type="button"
                             onClick={() => handleApplyPointsAdjustment(bonus)}
                             style={{
-                              backgroundColor: 'rgba(0, 44, 247, 0.06)',
-                              color: '#002cf7',
+                              backgroundColor: 'var(--primary-light)',
+                              color: 'var(--primary)',
                               fontWeight: 700,
                               fontSize: '12px',
-                              border: 'none',
+                              border: '1px solid var(--border-color)',
                               borderRadius: '10px',
                               padding: '8px 14px',
                               cursor: 'pointer'
@@ -1170,9 +1172,9 @@ export default function CustomersTab({
                       </div>
                     </div>
 
-                    <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '6px' }}>
                           Variation Personnalisée (positif ou négatif) :
                         </label>
                         <input
@@ -1183,12 +1185,12 @@ export default function CustomersTab({
                           style={{
                             width: '100%',
                             height: '46px',
-                            backgroundColor: '#ffffff',
-                            border: '1.5px solid #e2e8f0',
+                            backgroundColor: 'var(--bg-app)',
+                            border: '1px solid var(--border-color)',
                             borderRadius: '12px',
                             padding: '0 14px',
                             fontSize: '13px',
-                            color: '#09090b',
+                            color: 'var(--text-primary)',
                             fontWeight: 500,
                             outline: 'none',
                             boxSizing: 'border-box'
@@ -1197,7 +1199,7 @@ export default function CustomersTab({
                       </div>
 
                       <div>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '6px' }}>
                           Motif de l'ajustement (optionnel) :
                         </label>
                         <input
@@ -1208,12 +1210,12 @@ export default function CustomersTab({
                           style={{
                             width: '100%',
                             height: '46px',
-                            backgroundColor: '#ffffff',
-                            border: '1.5px solid #e2e8f0',
+                            backgroundColor: 'var(--bg-app)',
+                            border: '1px solid var(--border-color)',
                             borderRadius: '12px',
                             padding: '0 14px',
                             fontSize: '13px',
-                            color: '#09090b',
+                            color: 'var(--text-primary)',
                             fontWeight: 500,
                             outline: 'none',
                             boxSizing: 'border-box'

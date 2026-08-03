@@ -424,10 +424,10 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                       </View>
                     </View>
 
-                    <View style={styles.clientMeta}>
-                      <Text style={styles.clientOrderCount}>{clientOrders.length}</Text>
-                      <Text style={styles.clientOrderLabel}>cmde{clientOrders.length > 1 ? "s" : ""}</Text>
-                      <ChevronRight size={14} color={isDarkMode ? '#71717a' : '#a1a1aa'} style={{ marginTop: 4 }} />
+                    <View style={styles.clientMetaPill}>
+                      <Text style={styles.clientOrderCountPill}>{clientOrders.length}</Text>
+                      <Text style={styles.clientOrderLabelPill}>cmde{clientOrders.length > 1 ? "s" : ""}</Text>
+                      <ChevronRight size={13} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginLeft: 2 }} />
                     </View>
                   </View>
 
@@ -705,6 +705,20 @@ const baseStyles = StyleSheet.create({
   clientMeta: { alignItems: "center", marginLeft: "auto" },
   clientOrderCount: { fontSize: 16, fontWeight: "800", color: "#09090b", textAlign: "center" },
   clientOrderLabel: { fontSize: 9, color: "#94a3b8", fontWeight: "600", textAlign: "center" },
+  clientMetaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    backgroundColor: "rgba(0, 44, 247, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(0, 44, 247, 0.18)",
+    marginLeft: "auto",
+    alignSelf: "center",
+  },
+  clientOrderCountPill: { fontSize: 13, fontWeight: "800", color: "#002cf7", marginRight: 4 },
+  clientOrderLabelPill: { fontSize: 11, fontWeight: "600", color: "#002cf7" },
   cardSubscriptionGaugeContainer: { marginTop: 10, backgroundColor: "rgba(0, 44, 247, 0.03)", padding: 8, borderRadius: 10, borderWidth: 1, borderColor: "rgba(0, 44, 247, 0.08)" },
   cardSubText: { fontSize: 10, color: "#475569", fontWeight: "500" },
   cardSubTextBold: { fontSize: 10, color: "#002cf7", fontWeight: "700" },
@@ -946,6 +960,9 @@ function getStyles(isDarkMode) {
     compactInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
     
     // Fiche client details card overrides
+    clientMetaPill: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.3)' },
+    clientOrderCountPill: { color: '#38bdf8' },
+    clientOrderLabelPill: { color: '#38bdf8' },
     detailCard: { backgroundColor: '#09090b', borderColor: '#27272a', borderWidth: 1 },
     ficheAvatarLarge: { backgroundColor: 'rgba(56, 189, 248, 0.1)' },
     ficheAvatarTextLarge: { color: '#38bdf8' },

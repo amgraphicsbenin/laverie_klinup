@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS public.staff (
   permissions JSONB,
   push_token TEXT,
   push_token_updated_at TIMESTAMP WITH TIME ZONE,
+  user_picture TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

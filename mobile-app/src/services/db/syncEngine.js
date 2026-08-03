@@ -174,7 +174,7 @@ export async function performMutation(action, table, recordId, data) {
         delete retriedData[missingCol];
       } else {
         const optionalCols = ['ville', 'responsable_id', 'responsable_nom', 'created_by_id', 'created_by_name',
-                              'push_token', 'push_token_updated_at', 'motif_annulation', 'solde_paid_at',
+                              'push_token', 'push_token_updated_at', 'user_picture', 'motif_annulation', 'solde_paid_at',
                               'reference_paiement', 'reference_momo', 'acompte_paid_at', 'operateur_momo'];
         for (const col of optionalCols) delete retriedData[col];
       }
@@ -245,13 +245,14 @@ export async function initDb(isRetry = false) {
 
     try {
       const TIMEOUT_MS = 15000;
-      const [staffRes, custRes, orderRes, logsRes, catalogRes, reqsRes] = await Promise.allSettled([
+      const [staffRes, custRes, orderRes, logsRes, catalogRes, reqsRes, storesRes] = await Promise.allSettled([
         withTimeout(supabase.from('staff').select('*'), TIMEOUT_MS, 'staff'),
         withTimeout(supabase.from('customers').select('*'), TIMEOUT_MS, 'customers'),
         withTimeout(supabase.from('orders').select('*'), TIMEOUT_MS, 'orders'),
         withTimeout(supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }), TIMEOUT_MS, 'activity_logs'),
         withTimeout(supabase.from('catalog').select('*'), TIMEOUT_MS, 'catalog'),
         withTimeout(supabase.from('pin_reset_requests').select('*'), TIMEOUT_MS, 'pin_reset_requests'),
+        withTimeout(supabase.from('stores').select('*'), TIMEOUT_MS, 'stores'),
       ]);
 
       const staffOk = staffRes.status === 'fulfilled' && !staffRes.value?.error;
@@ -317,6 +318,9 @@ export async function initDb(isRetry = false) {
       }
       if (reqsRes.status === 'fulfilled' && !reqsRes.value?.error) {
         memoryDb.pin_reset_requests = reqsRes.value.data || [];
+      }
+      if (storesRes && storesRes.status === 'fulfilled' && !storesRes.value?.error) {
+        memoryDb.stores = storesRes.value.data || [];
       }
 
       memoryDb.current_user = await loadData(STORAGE_KEYS.CURRENT_USER, null);

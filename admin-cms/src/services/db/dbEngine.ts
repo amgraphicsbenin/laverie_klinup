@@ -331,6 +331,27 @@ export const dbEngine = {
     notifyListeners();
     return memoryDb.settings;
   },
+  getRewardCatalog: () => {
+    if (memoryDb.settings && memoryDb.settings.reward_catalog && Array.isArray(memoryDb.settings.reward_catalog) && memoryDb.settings.reward_catalog.length > 0) {
+      return memoryDb.settings.reward_catalog;
+    }
+    return [
+      { id: 'remise_1000', title: 'Remise de 1 000 FCFA', cost: 30, discountAmount: 1000, iconName: 'Tag', description: 'Réduction de 1 000 FCFA sur la prochaine commande.' },
+      { id: 'lavage_offert', title: 'Lavage 1 Vêtement Offert', cost: 50, discountAmount: 2000, iconName: 'Shirt', description: 'Un lavage gratuit pour une pièce au choix.' },
+      { id: 'livraison_offerte', title: 'Livraison Offerte', cost: 60, discountAmount: 1500, iconName: 'Truck', description: 'Frais de livraison 100% offerts.' },
+      { id: 'repassage_offert', title: 'Repassage Offert', cost: 100, discountAmount: 4000, iconName: 'Sparkles', description: 'Repassage complet offert sur vos vêtements.' },
+      { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: 'Réduction de 5 000 FCFA lors du renouvellement d\'abonnement.' }
+    ];
+  },
+  updateRewardCatalog: (catalog: any[]) => {
+    if (!memoryDb.settings) {
+      memoryDb.settings = {} as any;
+    }
+    memoryDb.settings.reward_catalog = catalog;
+    dbEngine.logAction('MODIFICATION_CATALOGUE_RECOMPENSES', `Mise à jour du catalogue des récompenses (${catalog.length} offres).`);
+    notifyListeners();
+    return memoryDb.settings.reward_catalog;
+  },
   getCashClosures: () => {
     const closures = memoryDb.cash_closures ? [...memoryDb.cash_closures] : [];
     const user = memoryDb.current_user;

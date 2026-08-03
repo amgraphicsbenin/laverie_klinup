@@ -147,7 +147,7 @@ export default function RewardFidelityCard({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.adjustBtn, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', borderColor: isDarkMode ? '#334155' : '#cbd5e1' }]}
+            style={[styles.adjustBtn, { backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9', borderColor: isDarkMode ? '#27272a' : '#cbd5e1' }]}
             activeOpacity={0.8}
             onPress={() => handleOpenModal('adjust')}
           >
@@ -165,7 +165,7 @@ export default function RewardFidelityCard({
         onRequestClose={handleCloseModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalBox, { backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }]}>
+          <View style={[styles.modalBox, { backgroundColor: isDarkMode ? '#121212' : '#ffffff', borderColor: isDarkMode ? '#27272a' : 'transparent', borderWidth: isDarkMode ? 1 : 0 }]}>
             
             {/* MODAL HEADER */}
             <View style={styles.modalHeader}>
@@ -196,21 +196,21 @@ export default function RewardFidelityCard({
             </View>
 
             {/* TABS NAVIGATION */}
-            <View style={styles.tabRow}>
+            <View style={[styles.tabRow, { backgroundColor: isDarkMode ? '#18181b' : 'rgba(0,0,0,0.04)' }]}>
               <TouchableOpacity
-                style={[styles.tabItem, activeTab === 'redeem' && styles.tabItemActive]}
+                style={[styles.tabItem, activeTab === 'redeem' && [styles.tabItemActive, isDarkMode && { backgroundColor: '#27272a' }]]}
                 onPress={() => setActiveTab('redeem')}
               >
-                <Gift size={14} color={activeTab === 'redeem' ? '#002cf7' : '#64748b'} style={{ marginRight: 6 }} />
-                <Text style={[styles.tabText, activeTab === 'redeem' && styles.tabTextActive]}>Récompenses ({REWARD_CATALOG.length})</Text>
+                <Gift size={14} color={activeTab === 'redeem' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#a1a1aa' : '#64748b')} style={{ marginRight: 6 }} />
+                <Text style={[styles.tabText, isDarkMode && { color: '#a1a1aa' }, activeTab === 'redeem' && [styles.tabTextActive, isDarkMode && { color: '#38bdf8' }]]}>Récompenses ({REWARD_CATALOG.length})</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.tabItem, activeTab === 'adjust' && styles.tabItemActive]}
+                style={[styles.tabItem, activeTab === 'adjust' && [styles.tabItemActive, isDarkMode && { backgroundColor: '#27272a' }]]}
                 onPress={() => setActiveTab('adjust')}
               >
-                <Zap size={14} color={activeTab === 'adjust' ? '#002cf7' : '#64748b'} style={{ marginRight: 6 }} />
-                <Text style={[styles.tabText, activeTab === 'adjust' && styles.tabTextActive]}>Ajuster Points</Text>
+                <Zap size={14} color={activeTab === 'adjust' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#a1a1aa' : '#64748b')} style={{ marginRight: 6 }} />
+                <Text style={[styles.tabText, isDarkMode && { color: '#a1a1aa' }, activeTab === 'adjust' && [styles.tabTextActive, isDarkMode && { color: '#38bdf8' }]]}>Ajuster Points</Text>
               </TouchableOpacity>
             </View>
 
@@ -225,8 +225,8 @@ export default function RewardFidelityCard({
                       style={[
                         styles.rewardCard,
                         {
-                          backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
-                          borderColor: canAfford ? '#3b82f6' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                          backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
+                          borderColor: canAfford ? (isDarkMode ? '#38bdf8' : '#3b82f6') : (isDarkMode ? '#27272a' : '#e2e8f0'),
                           opacity: canAfford ? 1 : 0.75
                         }
                       ]}
@@ -264,21 +264,21 @@ export default function RewardFidelityCard({
                   {[10, 25, 50, 100].map((bonus) => (
                     <TouchableOpacity
                       key={bonus}
-                      style={styles.quickBonusChip}
+                      style={[styles.quickBonusChip, isDarkMode && { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: 'rgba(56, 189, 248, 0.3)' }]}
                       onPress={() => handleApplyAdjustment(bonus)}
                     >
-                      <Text style={styles.quickBonusText}>+{bonus} pts</Text>
+                      <Text style={[styles.quickBonusText, isDarkMode && { color: '#38bdf8' }]}>+{bonus} pts</Text>
                     </TouchableOpacity>
                   ))}
                   <TouchableOpacity
-                    style={[styles.quickBonusChip, { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}
+                    style={[styles.quickBonusChip, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2', borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca' }]}
                     onPress={() => handleApplyAdjustment(-20)}
                   >
-                    <Text style={[styles.quickBonusText, { color: '#dc2626' }]}>-20 pts</Text>
+                    <Text style={[styles.quickBonusText, { color: isDarkMode ? '#f87171' : '#dc2626' }]}>-20 pts</Text>
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.dividerLine} />
+                <View style={[styles.dividerLine, isDarkMode && { backgroundColor: '#27272a' }]} />
 
                 <Text style={[styles.adjustTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>Ajustement Personnalisé :</Text>
                 <Text style={[styles.fieldLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>Nombre de points (positif ou négatif) :</Text>
@@ -288,7 +288,7 @@ export default function RewardFidelityCard({
                   keyboardType="numeric"
                   value={pointsDeltaInput}
                   onChangeText={setPointsDeltaInput}
-                  style={[styles.modalInput, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', color: isDarkMode ? '#ffffff' : '#0f172a' }]}
+                  style={[styles.modalInput, { backgroundColor: isDarkMode ? '#09090b' : '#f1f5f9', borderColor: isDarkMode ? '#27272a' : '#e2e8f0', borderWidth: 1, color: isDarkMode ? '#ffffff' : '#0f172a' }]}
                 />
 
                 <Text style={[styles.fieldLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>Motif de l'opération :</Text>
@@ -297,7 +297,7 @@ export default function RewardFidelityCard({
                   placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
                   value={reasonInput}
                   onChangeText={setReasonInput}
-                  style={[styles.modalInput, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', color: isDarkMode ? '#ffffff' : '#0f172a' }]}
+                  style={[styles.modalInput, { backgroundColor: isDarkMode ? '#09090b' : '#f1f5f9', borderColor: isDarkMode ? '#27272a' : '#e2e8f0', borderWidth: 1, color: isDarkMode ? '#ffffff' : '#0f172a' }]}
                 />
 
                 <TouchableOpacity

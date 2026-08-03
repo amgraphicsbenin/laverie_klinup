@@ -249,6 +249,7 @@ export const db = {
   },
 
   getAllStaff: () => [...(memoryDb.staff || [])],
+  getStores: () => [...(memoryDb.stores || [])],
   getStaff: () => {
     const effectiveStore = db.getEffectiveStore();
     if (effectiveStore === 'all') {
@@ -1365,6 +1366,23 @@ export const db = {
       db.notify();
 
       performMutation('update', 'staff', userId, { code_pin: newPin });
+      return staffMember;
+    }
+    return null;
+  },
+
+  updateStaffPicture: (userId, pictureData) => {
+    const staffMember = memoryDb.staff.find(s => s.id === userId);
+    if (staffMember) {
+      staffMember.user_picture = pictureData;
+      if (memoryDb.current_user && memoryDb.current_user.id === userId) {
+        memoryDb.current_user.user_picture = pictureData;
+      }
+      db.logAction('MODIFICATION_PERSONNEL', `Photo de profil mise à jour pour ${staffMember.prenom} ${staffMember.nom}`);
+      persist();
+      db.notify();
+
+      performMutation('update', 'staff', userId, { user_picture: pictureData });
       return staffMember;
     }
     return null;
