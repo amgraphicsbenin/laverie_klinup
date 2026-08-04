@@ -191,7 +191,13 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
     }
 
     try {
-      const currentUser = db.getCurrentUser();
+      const deliveryCalc = activeCustomer
+        ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+        : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+      const deliveryFee = deliveryCalc.fee || 0;
+
+      const finalTotal = netTotal + deliveryFee;
+
       const newOrder = {
         customer_id: orderClient,
         articles: selectedArticles.map(a => ({
@@ -200,7 +206,9 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
           quantite: a.quantity,
           prix: a.price
         })),
-        total: netTotal,
+        total: finalTotal,
+        frais_livraison: deliveryFee,
+        distance_km: deliveryCalc.distanceKm,
         avance: finalAvance,
         statut: 'attente',
         mode_paiement: finalModeReglement,
@@ -687,7 +695,13 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
 
                 const discountPercent = Number(orderDiscount) || 0;
                 const discountAmount = Math.round(currentTotal * (discountPercent / 100));
-                const netTotal = currentTotal - discountAmount;
+
+                const deliveryCalc = activeCustomer
+                  ? db.calculateDeliveryFee(db.getCurrentUser()?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+                  : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+                const deliveryFee = deliveryCalc.fee || 0;
+
+                const netTotal = currentTotal - discountAmount + deliveryFee;
                 
                 // Avance behaves differently for active sub vs sub purchase
                 const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
@@ -712,6 +726,17 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                       <View style={styles.receiptRow}>
                         <Text style={styles.receiptRowLabel}>Réduction ({discountPercent}%)</Text>
                         <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
+                      </View>
+                    )}
+
+                    {deliveryFee > 0 && (
+                      <View style={styles.receiptRow}>
+                        <Text style={[styles.receiptRowLabel, { color: '#3b82f6', fontWeight: '700' }]}>
+                          Frais de Livraison ({deliveryCalc.zoneLabel} • {deliveryCalc.distanceKm} km)
+                        </Text>
+                        <Text style={[styles.receiptRowVal, { color: '#3b82f6', fontWeight: '700' }]}>
+                          +{formatPrice(deliveryFee)}
+                        </Text>
                       </View>
                     )}
 

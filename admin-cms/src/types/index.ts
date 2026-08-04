@@ -22,6 +22,19 @@ export interface Store {
   responsable_id?: string;
   responsable_nom?: string;
   statut: 'actif' | 'inactif';
+  latitude?: number;
+  longitude?: number;
+  created_at?: string;
+}
+
+export interface DeliveryZone {
+  id: string;
+  store_id?: string | null;
+  label_zone: string;
+  min_km: number;
+  max_km: number;
+  frais_livraison: number;
+  is_active?: boolean;
   created_at?: string;
 }
 
@@ -63,14 +76,15 @@ export interface Customer {
   prenom: string;
   telephone: string;
   adresse?: string;
+  coordonnees_livraison?: string;
   indicatif?: string;
   preferences_pliage?: string;
   points_fidelite?: number;
   solde_dette?: number;
+  active_subscription?: ActiveSubscription | null;
   store_id?: string;
   created_by_id?: string;
   created_by_name?: string;
-  active_subscription?: ActiveSubscription | null;
   created_at?: string;
 }
 
@@ -79,56 +93,34 @@ export interface OrderItem {
   service: string;
   quantite: number;
   prix: number;
-  description?: string;
 }
 
 export interface SubscriptionDetails {
-  name?: string;
-  previous_balance?: number;
-  new_balance?: number;
-  clothes_deducted?: number;
   remise_pourcentage?: number;
   remise_montant?: number;
   prix_base_avant_remise?: number;
-  type_livraison?: 'recuperation' | 'livraison';
-  immediate_subscription?: {
-    id: string;
-    name: string;
-    prix: number;
-  };
 }
 
 export interface Order {
   id: string;
-  customer_id: string;
+  customer_id?: string | null;
   statut: OrderStatus;
-  type_article?: string;
-  type_service?: string;
-  niveau_urgence?: 'Normal' | 'Express';
-  mode_reglement?: string;
-  avance_payee?: number;
-  prix_total?: number;
-  total?: number;
-  avance?: number;
-  remise_pourcentage?: number;
-  remise_montant?: number;
-  prix_base_avant_remise?: number;
-  identifiant_unique_marquage?: string;
-  ticket_numero?: string;
+  type_article: string;
+  type_service: string;
+  niveau_urgence: string;
+  mode_reglement: string;
+  avance_payee: number;
+  prix_total: number;
+  frais_livraison?: number;
+  distance_km?: number;
+  identifiant_unique_marquage: string;
   created_at?: string;
-  due_date?: string;
+  due_date?: string | null;
   acompte_paid_at?: string | null;
   solde_paid_at?: string | null;
   items?: OrderItem[];
   created_by_id?: string | null;
   created_by_name?: string | null;
-  motif_annulation?: string | null;
-  store_id?: string;
-  est_en_retard?: boolean;
-  is_subscription_order?: boolean;
-  subscription_details?: SubscriptionDetails | null;
-  reference_momo?: string;
-  reference_paiement?: string;
 }
 
 export interface CatalogItem {
@@ -180,6 +172,26 @@ export interface RewardItem {
   created_at?: string;
 }
 
+export interface SupportTicket {
+  id: string;
+  ticket_type: 'bug' | 'help' | 'feature';
+  subject: string;
+  module_name: string;
+  priority: 'Basse' | 'Moyenne' | 'Haute' | 'Critique';
+  status: 'Ouvert' | 'En cours' | 'Résolu' | 'Fermé';
+  description: string;
+  steps_to_reproduce?: string;
+  contact_phone?: string;
+  contact_email?: string;
+  user_id?: string;
+  user_name?: string;
+  store_id?: string;
+  attached_files?: any[];
+  response_notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface MemoryStore {
   stores: Store[];
   selected_store_id: string;
@@ -190,6 +202,8 @@ export interface MemoryStore {
   logs: ActivityLog[];
   catalog: CatalogItem[];
   rewards?: RewardItem[];
+  delivery_zones?: DeliveryZone[];
+  support_tickets?: SupportTicket[];
   current_user: Staff | null;
   pin_reset_requests: PinResetRequest[];
   settings: AdminSettings;

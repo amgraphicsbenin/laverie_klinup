@@ -21,6 +21,8 @@ export const memoryDb: MemoryStore = {
   logs: DEFAULT_LOGS as any,
   catalog: DEFAULT_CATALOG as any,
   rewards: [],
+  delivery_zones: [],
+  support_tickets: [],
   current_user: null,
   pin_reset_requests: [],
   settings: {

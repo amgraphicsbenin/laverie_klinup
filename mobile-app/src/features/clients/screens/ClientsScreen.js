@@ -15,7 +15,7 @@ import { t } from "../../../services/i18n";
 import { getFidelityTier, FIDELITY_TIERS, renderTierIcon } from "../../../utils/fidelityUtils";
 import RewardFidelityCard from "../../../components/RewardFidelityCard";
 
-export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess }) {
+export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, isActive }) {
   const { currentUser, isDarkMode } = useDbState();
   const styles = getStyles(isDarkMode);
   const [customers, setCustomers] = useState(() => db.getCustomers());
@@ -33,12 +33,42 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
   const [custPrenom, setCustPrenom] = useState("");
   const [custTelephone, setCustTelephone] = useState("");
   const [custAdresse, setCustAdresse] = useState("");
+  const [custQuartier, setCustQuartier] = useState("");
+  const [custVille, setCustVille] = useState("Cotonou");
+  const [custLatitude, setCustLatitude] = useState("");
+  const [custLongitude, setCustLongitude] = useState("");
+  const [custCoordonneesLivraison, setCustCoordonneesLivraison] = useState("");
   const [custPreferences, setCustPreferences] = useState("Plié");
   const [custSubscriptionPlanId, setCustSubscriptionPlanId] = useState("");
+  const [deliveryPreview, setDeliveryPreview] = useState(null);
 
   const scrollPaddingBottom = useScrollPaddingBottom();
 
   const refreshCustomers = () => setCustomers(db.getCustomers());
+
+  // Réinitialiser complètement le formulaire et fermer la fiche / modale quand on quitte l'onglet
+  useEffect(() => {
+    if (isActive === false) {
+      setShowCustomerModal(false);
+      setShowEditModal(false);
+      setEditingCustomer(null);
+      setSelectedClient(null);
+      setIsFicheVisible(false);
+      setSelectedCrmSubId("");
+      setCustNom("");
+      setCustPrenom("");
+      setCustTelephone("");
+      setCustAdresse("");
+      setCustQuartier("");
+      setCustVille("Cotonou");
+      setCustLatitude("");
+      setCustLongitude("");
+      setCustCoordonneesLivraison("");
+      setCustPreferences("Plié");
+      setCustSubscriptionPlanId("");
+      setDeliveryPreview(null);
+    }
+  }, [isActive]);
 
   const handleSelectClientForFiche = (client) => {
     setSelectedClient(client);
@@ -131,25 +161,32 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
   const handleCloseCustomerModal = () => {
     setShowCustomerModal(false);
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié"); setCustSubscriptionPlanId("");
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustQuartier(""); setCustVille("Cotonou"); setCustLatitude(""); setCustLongitude(""); setCustCoordonneesLivraison(""); setCustPreferences("Plié"); setCustSubscriptionPlanId(""); setDeliveryPreview(null);
   };
 
   const handleCloseEditModal = () => {
     setShowEditModal(false);
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié"); setCustSubscriptionPlanId("");
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustQuartier(""); setCustVille("Cotonou"); setCustLatitude(""); setCustLongitude(""); setCustCoordonneesLivraison(""); setCustPreferences("Plié"); setCustSubscriptionPlanId(""); setDeliveryPreview(null);
   };
 
   const handleOpenAddCustomer = () => {
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié"); setCustSubscriptionPlanId("");
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustQuartier(""); setCustVille("Cotonou"); setCustLatitude(""); setCustLongitude(""); setCustCoordonneesLivraison(""); setCustPreferences("Plié"); setCustSubscriptionPlanId(""); setDeliveryPreview(null);
     setShowCustomerModal(true);
   };
 
   const handleEditCustomer = (client) => {
     setEditingCustomer(client);
     setCustNom(client.nom); setCustPrenom(client.prenom); setCustTelephone(client.telephone);
-    setCustAdresse(client.adresse || ""); setCustPreferences(client.preferences_pliage || "Plié");
+    setCustAdresse(client.adresse || "");
+    setCustQuartier(client.quartier || "");
+    setCustVille(client.ville || "Cotonou");
+    setCustLatitude(client.latitude != null ? String(client.latitude) : "");
+    setCustLongitude(client.longitude != null ? String(client.longitude) : "");
+    setCustCoordonneesLivraison(client.coordonnees_livraison || "");
+    setCustPreferences(client.preferences_pliage || "Plié");
+    setDeliveryPreview(null);
     setSelectedClient(null);
     setShowEditModal(true);
   };
@@ -158,18 +195,38 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
     if (!custNom || !custTelephone) { Alert.alert("Erreur", "Le nom et le telephone sont obligatoires."); return; }
     try {
       const isEditing = !!editingCustomer;
+      // Résolution GPS : priorité aux champs lat/lng séparés
+      const lat = custLatitude.trim() ? parseFloat(custLatitude.trim()) : null;
+      const lng = custLongitude.trim() ? parseFloat(custLongitude.trim()) : null;
+      const coords = (lat != null && lng != null && !isNaN(lat) && !isNaN(lng))
+        ? `${lat},${lng}`
+        : custCoordonneesLivraison.trim() || null;
+
+      const customerPayload = {
+        nom: custNom,
+        prenom: custPrenom,
+        telephone: custTelephone,
+        adresse: custAdresse,
+        quartier: custQuartier,
+        ville: custVille,
+        latitude: lat,
+        longitude: lng,
+        coordonnees_livraison: coords,
+        preferences_pliage: custPreferences
+      };
+
       if (isEditing) {
-        db.updateCustomer(editingCustomer.id, { nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences });
+        db.updateCustomer(editingCustomer.id, customerPayload);
         handleCloseEditModal();
       } else {
-        const newCust = await db.addCustomer({ nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences, store_id: currentUser?.store_id });
+        const newCust = await db.addCustomer({ ...customerPayload, store_id: currentUser?.store_id });
         if (newCust && custSubscriptionPlanId) {
           await db.subscribeCustomer(newCust.id, custSubscriptionPlanId);
         }
         handleCloseCustomerModal();
       }
       refreshCustomers();
-      if (onShowSuccess) onShowSuccess(isEditing ? "Profil client modifie !" : "Nouveau client cree !");
+      if (onShowSuccess) onShowSuccess(isEditing ? "Profil client modifié !" : "Nouveau client créé !");
     } catch (e) {
       console.error("Error saving customer:", e);
       Alert.alert("Erreur", "Impossible d enregistrer le profil client.");
@@ -263,14 +320,134 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
               style={styles.compactInput}
             />
 
-            <Text style={styles.compactLabel}>Adresse</Text>
+            <Text style={styles.compactLabel}>Adresse (Rue / Domicile)</Text>
             <TextInput
-              placeholder="Quartier, Rue..."
+              placeholder="Ex: Rue 123, Immeuble..."
               placeholderTextColor={isDarkMode ? "#71717a" : "#a1a1aa"}
               value={custAdresse}
               onChangeText={setCustAdresse}
               style={styles.compactInput}
             />
+
+            <View style={styles.compactInputRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.compactLabel}>Quartier</Text>
+                <TextInput
+                  placeholder="Ex: Akpakpa, Cadjehoun..."
+                  placeholderTextColor={isDarkMode ? "#71717a" : "#a1a1aa"}
+                  value={custQuartier}
+                  onChangeText={setCustQuartier}
+                  style={styles.compactInput}
+                />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.compactLabel}>Ville</Text>
+                <TextInput
+                  placeholder="Ex: Cotonou"
+                  placeholderTextColor={isDarkMode ? "#71717a" : "#a1a1aa"}
+                  value={custVille}
+                  onChangeText={setCustVille}
+                  style={styles.compactInput}
+                />
+              </View>
+            </View>
+
+            {/* Section coordonnées GPS pour livraison */}
+            <View style={[styles.deliverySectionCard, { backgroundColor: isDarkMode ? '#1e293b' : '#f0f7ff', borderColor: isDarkMode ? '#1d4ed8' : '#93c5fd' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <MapPin size={16} color="#002cf7" />
+                <Text style={[styles.compactLabel, { marginLeft: 6, marginBottom: 0, color: '#002cf7', fontWeight: '700' }]}>
+                  Position GPS (Calcul de livraison)
+                </Text>
+              </View>
+              <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 11, marginBottom: 10 }}>
+                Saisissez la latitude et la longitude du domicile du client pour calculer automatiquement les frais de livraison.
+              </Text>
+
+              <View style={styles.compactInputRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.compactLabel}>Latitude</Text>
+                  <TextInput
+                    placeholder="Ex: 6.3650"
+                    placeholderTextColor={isDarkMode ? "#71717a" : "#a1a1aa"}
+                    keyboardType="decimal-pad"
+                    value={custLatitude}
+                    onChangeText={(v) => {
+                      setCustLatitude(v);
+                      setDeliveryPreview(null);
+                    }}
+                    style={styles.compactInput}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.compactLabel}>Longitude</Text>
+                  <TextInput
+                    placeholder="Ex: 2.4100"
+                    placeholderTextColor={isDarkMode ? "#71717a" : "#a1a1aa"}
+                    keyboardType="decimal-pad"
+                    value={custLongitude}
+                    onChangeText={(v) => {
+                      setCustLongitude(v);
+                      setDeliveryPreview(null);
+                    }}
+                    style={styles.compactInput}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const lat = parseFloat(custLatitude.trim());
+                  const lng = parseFloat(custLongitude.trim());
+                  if (isNaN(lat) || isNaN(lng)) {
+                    Alert.alert("Coordonnées invalides", "Veuillez saisir une latitude et une longitude valides.");
+                    return;
+                  }
+                  const storeId = currentUser?.store_id;
+                  const result = db.calculateDeliveryFee(storeId, null, lat, lng);
+                  setDeliveryPreview(result);
+                }}
+                style={[styles.previewBtn, { backgroundColor: '#002cf7' }]}
+                activeOpacity={0.85}
+              >
+                <MapPin size={14} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, marginLeft: 6 }}>
+                  Estimer les frais de livraison
+                </Text>
+              </TouchableOpacity>
+
+              {deliveryPreview && (
+                <View style={[styles.deliveryPreviewCard, {
+                  backgroundColor: deliveryPreview.fee > 0 ? (isDarkMode ? '#0f2a1a' : '#f0fff4') : (isDarkMode ? '#1a1a2e' : '#fff8f0'),
+                  borderColor: deliveryPreview.fee > 0 ? '#22c55e' : '#f97316'
+                }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
+                      📍 Distance estimée
+                    </Text>
+                    <Text style={{ fontWeight: '700', color: isDarkMode ? '#fff' : '#0f172a', fontSize: 13 }}>
+                      {deliveryPreview.distanceKm} km
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
+                      🚚 Zone
+                    </Text>
+                    <Text style={{ fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#475569', fontSize: 12 }}>
+                      {deliveryPreview.zoneLabel}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
+                      💰 Frais de livraison
+                    </Text>
+                    <Text style={{ fontWeight: '800', fontSize: 15, color: deliveryPreview.fee > 0 ? '#22c55e' : '#f97316' }}>
+                      {deliveryPreview.fee > 0 ? `${deliveryPreview.fee.toLocaleString('fr-FR')} FCFA` : 'Hors zone'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
 
             <Text style={styles.compactLabel}>Préférence de pliage</Text>
             <View style={styles.prefSelector}>
@@ -954,6 +1131,27 @@ const baseStyles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '600',
+  },
+  deliverySectionCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 16,
+  },
+  previewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    marginTop: 6,
+  },
+  deliveryPreviewCard: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
   },
 });
 

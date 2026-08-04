@@ -29,10 +29,31 @@ export default function GestionScreen({
   closeAllModalsTrigger,
   initialSelectedClient,
   onClearInitialSelectedClient,
-  onShowSuccess
+  onShowSuccess,
+  isActive,
+  onDisableSwipeChange
 }) {
   const { orders, customers, catalog, currentUser, isDarkMode } = useDbState();
   const styles = getStyles(isDarkMode);
+  const [showClientsPage, setShowClientsPage] = useState(false);
+
+  // Notify parent to disable horizontal swipe when viewing Client page in Gestion > Client
+  useEffect(() => {
+    if (onDisableSwipeChange) {
+      onDisableSwipeChange(!!showClientsPage);
+    }
+    return () => {
+      if (onDisableSwipeChange) {
+        onDisableSwipeChange(false);
+      }
+    };
+  }, [showClientsPage, onDisableSwipeChange]);
+
+  useEffect(() => {
+    if (isActive === false) {
+      setShowClientsPage(false);
+    }
+  }, [isActive]);
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
     setRefreshing(true);
@@ -138,7 +159,6 @@ export default function GestionScreen({
     triggerFinalStatusAnimation(order.id, 'annule', performCancel);
   };
   const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
-  const [showClientsPage, setShowClientsPage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('actives'); // actives, urgentes, retard
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);

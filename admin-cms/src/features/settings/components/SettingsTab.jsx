@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Zap,
@@ -28,6 +28,11 @@ import {
   Tag,
   Shirt,
   Truck,
+  MapPin,
+  Compass,
+  Navigation,
+  Layers,
+  Globe,
   X
 } from 'lucide-react';
 import { db } from '../../../services/db';
@@ -38,7 +43,157 @@ const ModalPortal = ({ children }) => {
   return createPortal(children, document.body);
 };
 
+function LeafletZoneMap({ lat, lng, storeName, zones }) {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const [isLeafletReady, setIsLeafletReady] = useState(typeof window !== 'undefined' && !!window.L);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (window.L) {
+      setIsLeafletReady(true);
+      return;
+    }
+
+    if (!document.getElementById('leaflet-css-cdn')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css-cdn';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    if (!document.getElementById('leaflet-js-cdn')) {
+      const script = document.createElement('script');
+      script.id = 'leaflet-js-cdn';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => setIsLeafletReady(true);
+      document.body.appendChild(script);
+    } else {
+      const checkTimer = setInterval(() => {
+        if (window.L) {
+          setIsLeafletReady(true);
+          clearInterval(checkTimer);
+        }
+      }, 100);
+      return () => clearInterval(checkTimer);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLeafletReady || !mapRef.current || !window.L) return;
+
+    const parsedLat = Number(lat) || 6.374263;
+    const parsedLng = Number(lng) || 2.422933;
+
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.remove();
+      } catch (e) {
+        console.warn(e);
+      }
+      mapInstanceRef.current = null;
+    }
+
+    const L = window.L;
+    const map = L.map(mapRef.current, {
+      center: [parsedLat, parsedLng],
+      zoom: 12,
+      zoomControl: true
+    });
+    mapInstanceRef.current = map;
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }).addTo(map);
+
+    const colors = ['#002cf7', '#f97316', '#a855f7', '#10b981', '#ec4899', '#0284c7'];
+    const sortedZones = [...zones].sort((a, b) => Number(b.max_km) - Number(a.max_km));
+
+    sortedZones.forEach((z, idx) => {
+      const radiusMeters = Number(z.max_km) * 1000;
+      const color = colors[idx % colors.length];
+
+      const circle = L.circle([parsedLat, parsedLng], {
+        radius: radiusMeters,
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.15,
+        weight: 2,
+        dashArray: '6, 6'
+      }).addTo(map);
+
+      circle.bindTooltip(`<b>${z.label_zone}</b><br/>${z.min_km} km → ${z.max_km} km (${(Number(z.frais_livraison) || 0).toLocaleString('fr-FR')} FCFA)`, {
+        permanent: false,
+        direction: 'top'
+      });
+    });
+
+    const storeIcon = L.divIcon({
+      className: 'klinup-store-pin',
+      html: `<div style="
+        width: 34px;
+        height: 34px;
+        background: #002cf7;
+        border: 3px solid #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 4px 14px rgba(0,44,247,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+      ">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+      </div>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    });
+
+    L.marker([parsedLat, parsedLng], { icon: storeIcon })
+      .addTo(map)
+      .bindPopup(`<b>${storeName || 'Laverie KLIN UP'}</b><br/>📍 GPS: ${parsedLat.toFixed(6)}, ${parsedLng.toFixed(6)}`)
+      .openPopup();
+
+    return () => {
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          console.warn(e);
+        }
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [isLeafletReady, lat, lng, storeName, zones]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '300px' }}>
+      {!isLeafletReady && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          color: '#94a3b8',
+          fontSize: '0.85rem',
+          backgroundColor: '#0f172a',
+          borderRadius: '16px'
+        }}>
+          <span>Chargement de la carte interactive Leaflet...</span>
+        </div>
+      )}
+      <div ref={mapRef} style={{ width: '100%', height: '100%', minHeight: '300px', borderRadius: '16px' }} />
+    </div>
+  );
+}
+
 export default function SettingsTab({
+  activeSubTabProp,
   handleSaveSettings,
   inputExpressHours,
   setInputExpressHours,
@@ -47,7 +202,13 @@ export default function SettingsTab({
   inputNormalHours,
   setInputNormalHours
 }) {
-  const [activeSubTab, setActiveSubTab] = useState('delays'); // 'delays' | 'reward' | 'receipt' | 'cloud'
+  const [activeSubTab, setActiveSubTab] = useState(activeSubTabProp || 'delays'); // 'delays' | 'reward' | 'receipt' | 'delivery' | 'cloud'
+
+  useEffect(() => {
+    if (activeSubTabProp) {
+      setActiveSubTab(activeSubTabProp);
+    }
+  }, [activeSubTabProp]);
   const [isSavedToast, setIsSavedToast] = useState(false);
   const [receiptHeader, setReceiptHeader] = useState(() => (db.getSettings ? (db.getSettings().receipt_header || '') : 'KLIN UP - Laverie & Pressing Premium'));
   const [receiptFooter, setReceiptFooter] = useState(() => (db.getSettings ? (db.getSettings().receipt_footer || '') : 'Merci de votre confiance ! À bientôt chez KLIN UP.'));
@@ -74,11 +235,123 @@ export default function SettingsTab({
   const [rewardIcon, setRewardIcon] = useState('Gift');
   const [rewardDescription, setRewardDescription] = useState('');
 
+  // Delivery Zones & GPS Map State
+  const stores = db.getStores ? db.getStores() : [];
+  const [selectedStoreIdForZone, setSelectedStoreIdForZone] = useState(() => (stores[0]?.id || 'store_central'));
+  const currentStoreObj = stores.find(s => s.id === selectedStoreIdForZone) || stores[0] || { id: 'store_central', nom: 'KLIN UP Cotonou', latitude: 6.3703, longitude: 2.3912 };
+  
+  const [storeLatInput, setStoreLatInput] = useState(() => String(currentStoreObj.latitude || 6.3703));
+  const [storeLngInput, setStoreLngInput] = useState(() => String(currentStoreObj.longitude || 2.3912));
+
+  React.useEffect(() => {
+    if (currentStoreObj) {
+      setStoreLatInput(String(currentStoreObj.latitude || 6.3703));
+      setStoreLngInput(String(currentStoreObj.longitude || 2.3912));
+    }
+  }, [selectedStoreIdForZone]);
+
+  // Trello Integration State (Configuration Système)
+  const [trelloApiKey, setTrelloApiKey] = useState(() => localStorage.getItem('klinup_trello_api_key') || '');
+  const [trelloApiToken, setTrelloApiToken] = useState(() => localStorage.getItem('klinup_trello_api_token') || '');
+  const [trelloListId, setTrelloListId] = useState(() => localStorage.getItem('klinup_trello_list_id') || '');
+  const [trelloTestStatus, setTrelloTestStatus] = useState('');
+
+  const handleSaveTrelloConfig = () => {
+    localStorage.setItem('klinup_trello_api_key', trelloApiKey.trim());
+    localStorage.setItem('klinup_trello_api_token', trelloApiToken.trim());
+    localStorage.setItem('klinup_trello_list_id', trelloListId.trim());
+    alert("✅ Configuration Trello sauvegardée avec succès !");
+  };
+
+  const handleTestTrello = async () => {
+    if (!trelloApiKey || !trelloApiToken || !trelloListId) {
+      alert("Veuillez remplir la Clé API, le Token et l'ID de Liste Trello.");
+      return;
+    }
+    setTrelloTestStatus('Envoi de la carte de test...');
+    try {
+      const cardTitle = `[HAUTE] [Test System] TICK-TEST - Test Intégration Trello KLIN UP`;
+      const cardDesc = `### 🐞 Test Intégration Trello KLIN UP Admin\nFélicitations ! Votre intégration Trello fonctionne correctement.`;
+      const url = `https://api.trello.com/1/cards?idList=${encodeURIComponent(trelloListId.trim())}&key=${encodeURIComponent(trelloApiKey.trim())}&token=${encodeURIComponent(trelloApiToken.trim())}&name=${encodeURIComponent(cardTitle)}&desc=${encodeURIComponent(cardDesc)}`;
+      await fetch(url, { method: 'POST' });
+      setTrelloTestStatus('✅ Carte de test envoyée avec succès sur votre tableau Trello !');
+      setTimeout(() => setTrelloTestStatus(''), 4000);
+    } catch (e) {
+      setTrelloTestStatus('❌ Échec de l envoi. Vérifiez la Clé API, Token et ID de liste.');
+    }
+  };
+
+  const [deliveryZonesList, setDeliveryZonesList] = useState(() => (db.getDeliveryZones ? db.getDeliveryZones(selectedStoreIdForZone) : []));
+  const [showZoneModal, setShowZoneModal] = useState(false);
+  const [editingZone, setEditingZone] = useState(null);
+  const [zoneLabelInput, setZoneLabelInput] = useState('');
+  const [zoneMinKmInput, setZoneMinKmInput] = useState('0');
+  const [zoneMaxKmInput, setZoneMaxKmInput] = useState('3');
+  const [zoneFeeInput, setZoneFeeInput] = useState('500');
+
+  const handleOpenAddZone = () => {
+    setEditingZone(null);
+    setZoneLabelInput('Zone Proche (0 - 3 km)');
+    setZoneMinKmInput('0');
+    setZoneMaxKmInput('3');
+    setZoneFeeInput('500');
+    setShowZoneModal(true);
+  };
+
+  const handleOpenEditZone = (z) => {
+    setEditingZone(z);
+    setZoneLabelInput(z.label_zone || '');
+    setZoneMinKmInput(String(z.min_km || 0));
+    setZoneMaxKmInput(String(z.max_km || 3));
+    setZoneFeeInput(String(z.frais_livraison || 0));
+    setShowZoneModal(true);
+  };
+
+  const handleSaveZoneSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (db.saveDeliveryZone) {
+      await db.saveDeliveryZone({
+        id: editingZone ? editingZone.id : undefined,
+        store_id: selectedStoreIdForZone,
+        label_zone: zoneLabelInput.trim() || `Zone (${zoneMinKmInput} - ${zoneMaxKmInput} km)`,
+        min_km: Number(zoneMinKmInput) || 0,
+        max_km: Number(zoneMaxKmInput) || 3,
+        frais_livraison: Number(zoneFeeInput) || 0
+      });
+      if (db.getDeliveryZones) setDeliveryZonesList(db.getDeliveryZones(selectedStoreIdForZone));
+    }
+    setShowZoneModal(false);
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 3000);
+  };
+
+  const handleDeleteZone = async (id) => {
+    if (!window.confirm('Voulez-vous vraiment supprimer cette tranche de livraison ?')) return;
+    if (db.deleteDeliveryZone) {
+      await db.deleteDeliveryZone(id);
+      if (db.getDeliveryZones) setDeliveryZonesList(db.getDeliveryZones(selectedStoreIdForZone));
+    }
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 3000);
+  };
+
+  const handleSaveStoreGps = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (db.updateStoreCoordinates) {
+      await db.updateStoreCoordinates(selectedStoreIdForZone, Number(storeLatInput) || 6.3703, Number(storeLngInput) || 2.3912);
+    }
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 3000);
+  };
+
   // Sync state when DB notifies of updates (e.g. after Supabase fetch completes)
   React.useEffect(() => {
     const syncFromDb = () => {
       if (db.getRewardCatalog) {
         setRewardCatalog(db.getRewardCatalog());
+      }
+      if (db.getDeliveryZones) {
+        setDeliveryZonesList(db.getDeliveryZones(selectedStoreIdForZone));
       }
       if (db.getSettings) {
         const s = db.getSettings();
@@ -287,38 +560,6 @@ export default function SettingsTab({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: 'calc(100vh - 165px)', minHeight: '520px', maxHeight: '900px' }}>
-      
-      {/* PILLS NAVIGATION CATEGORIES (SANS LA BANNIÈRE EN-TÊTE ENCADRÉE) */}
-      <div className="filter-pills-group" style={{ alignSelf: 'flex-start', flexShrink: 0 }}>
-        <button
-          type="button"
-          className={`filter-pill-btn ${activeSubTab === 'delays' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('delays')}
-        >
-          <Zap size={15} /> Délais & Majorations
-        </button>
-        <button
-          type="button"
-          className={`filter-pill-btn ${activeSubTab === 'reward' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('reward')}
-        >
-          <Crown size={15} /> Reward & Fidélité Client
-        </button>
-        <button
-          type="button"
-          className={`filter-pill-btn ${activeSubTab === 'receipt' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('receipt')}
-        >
-          <Receipt size={15} /> Modèles de Reçus & Imprimante
-        </button>
-        <button
-          type="button"
-          className={`filter-pill-btn ${activeSubTab === 'cloud' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('cloud')}
-        >
-          <Cloud size={15} /> {isDbUnlocked ? 'Base de Données (Déverrouillée)' : '🔒 Base de Données & Cloud'}
-        </button>
-      </div>
 
       {/* MAIN CONTENT AREA WITH FORM */}
       <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.2rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -1103,10 +1344,7 @@ export default function SettingsTab({
                     <Lock size={28} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Accès Restreint — Base de Données</h4>
-                    <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      Saisissez le code PIN à 10 chiffres (ex: 0167987797) pour afficher la configuration Supabase Cloud.
-                    </p>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Accès Restreint — Configuration Système</h4>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1213,6 +1451,93 @@ export default function SettingsTab({
                     </div>
                   </div>
 
+                  {/* CARD TRELLO INTEGRATION */}
+                  <div className="card" style={{ borderRadius: '18px', padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(0, 121, 191, 0.12)', color: '#0079bf', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                          📋
+                        </div>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Intégration Trello (Kanban Bugs)</h4>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Création automatique de cartes sur votre tableau</span>
+                        </div>
+                      </div>
+                      <span className="badge" style={{ background: (trelloApiKey && trelloListId) ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)', color: (trelloApiKey && trelloListId) ? '#10b981' : '#d97706', fontWeight: 800 }}>
+                        {(trelloApiKey && trelloListId) ? 'ACTIF' : 'NON CONFIGURÉ'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div className="form-group">
+                        <label style={{ fontWeight: 700, fontSize: '0.78rem', color: 'var(--text-primary)', marginBottom: '0.25rem', display: 'block' }}>
+                          Clé API Trello (Key)
+                        </label>
+                        <input
+                          type="text"
+                          className="search-control-input"
+                          placeholder="Ex: 8f4e2a1b9c..."
+                          value={trelloApiKey}
+                          onChange={(e) => setTrelloApiKey(e.target.value)}
+                          style={{ paddingLeft: '0.75rem', fontSize: '0.82rem', height: '36px' }}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label style={{ fontWeight: 700, fontSize: '0.78rem', color: 'var(--text-primary)', marginBottom: '0.25rem', display: 'block' }}>
+                          Jeton Trello (Token API)
+                        </label>
+                        <input
+                          type="password"
+                          className="search-control-input"
+                          placeholder="Ex: ATTA..."
+                          value={trelloApiToken}
+                          onChange={(e) => setTrelloApiToken(e.target.value)}
+                          style={{ paddingLeft: '0.75rem', fontSize: '0.82rem', height: '36px' }}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label style={{ fontWeight: 700, fontSize: '0.78rem', color: 'var(--text-primary)', marginBottom: '0.25rem', display: 'block' }}>
+                          ID de Liste Trello (idList)
+                        </label>
+                        <input
+                          type="text"
+                          className="search-control-input"
+                          placeholder="Ex: 60a12b34c56789..."
+                          value={trelloListId}
+                          onChange={(e) => setTrelloListId(e.target.value)}
+                          style={{ paddingLeft: '0.75rem', fontSize: '0.82rem', height: '36px' }}
+                        />
+                      </div>
+
+                      {trelloTestStatus && (
+                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: trelloTestStatus.includes('✅') ? '#10b981' : '#ef4444' }}>
+                          {trelloTestStatus}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.6rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={handleTestTrello}
+                        style={{ flex: 1, padding: '0.5rem', fontSize: '0.78rem', borderRadius: '10px', fontWeight: 700 }}
+                      >
+                        🧪 Tester Trello
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleSaveTrelloConfig}
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.78rem', borderRadius: '10px', fontWeight: 800 }}
+                      >
+                        💾 Enregistrer
+                      </button>
+                    </div>
+                  </div>
+
                   {/* CARD CACHE ET DIAGNOSTIC */}
                   <div className="card" style={{ borderRadius: '18px', padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
@@ -1247,6 +1572,201 @@ export default function SettingsTab({
 
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ========================================================
+             SUB-TAB 4 : FRAIS DE LIVRAISON PAR ZONE (GPS & MAPVIEW)
+             ======================================================== */}
+          {activeSubTab === 'delivery' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* TOP HEADER & LAVERIE SELECTOR */}
+              <div className="card" style={{ borderRadius: '18px', padding: '1.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Truck size={22} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Tarification des Frais de Livraison par Zone (GPS)</h4>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Calcul kilométrique automatique depuis le point central de chaque laverie</span>
+                    </div>
+                  </div>
+
+                  {/* Store Selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Point de Laverie :</span>
+                    <select
+                      className="search-control-input"
+                      style={{ padding: '0.45rem 0.85rem', fontWeight: 700, fontSize: '0.85rem', borderRadius: '10px', minWidth: '180px' }}
+                      value={selectedStoreIdForZone}
+                      onChange={(e) => setSelectedStoreIdForZone(e.target.value)}
+                    >
+                      {stores.map(st => (
+                        <option key={st.id} value={st.id}>{st.nom} ({st.ville || 'Cotonou'})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* GPS Coordinates of Store */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', background: 'var(--bg-app)', padding: '1rem', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)', fontWeight: 700, fontSize: '0.85rem' }}>
+                    <MapPin size={18} /> Point GPS Central :
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Lat :</span>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input-control"
+                      style={{ width: '120px', padding: '0.35rem 0.65rem', fontWeight: 700, fontSize: '0.85rem', borderRadius: '8px' }}
+                      value={storeLatInput}
+                      onChange={(e) => setStoreLatInput(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Lng :</span>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input-control"
+                      style={{ width: '120px', padding: '0.35rem 0.65rem', fontWeight: 700, fontSize: '0.85rem', borderRadius: '8px' }}
+                      value={storeLngInput}
+                      onChange={(e) => setStoreLngInput(e.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleSaveStoreGps}
+                    style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', borderRadius: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <Save size={14} /> Mettre à jour GPS
+                  </button>
+
+                  <a
+                    href={`https://www.google.com/maps?q=${storeLatInput},${storeLngInput}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: '0.78rem', color: '#3b82f6', textDecoration: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem', marginLeft: 'auto' }}
+                  >
+                    <Globe size={14} /> Ouvrir Google Maps ↗
+                  </a>
+                </div>
+              </div>
+
+              {/* MAPVIEW VISUAL RADAR & ZONES GRID */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem' }}>
+                
+                {/* INTERACTIVE SVG RADAR MAPVIEW CARD */}
+                <div className="card" style={{ borderRadius: '18px', padding: '1.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '340px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Compass size={18} color="var(--primary)" />
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>Aperçu MapView Radar Google Maps</h4>
+                    </div>
+                    <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', fontSize: '0.7rem' }}>
+                      {deliveryZonesList.length} Zones Actives
+                    </span>
+                  </div>
+
+                  {/* REAL GEOGRAPHIC INTERACTIVE MAP WITH LEAFLET CIRCLES */}
+                  <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '320px',
+                    borderRadius: '16px',
+                    border: '1px solid var(--border-color)',
+                    overflow: 'hidden'
+                  }}>
+                    <LeafletZoneMap
+                      lat={storeLatInput}
+                      lng={storeLngInput}
+                      storeName={currentStoreObj.nom}
+                      zones={deliveryZonesList}
+                    />
+                  </div>
+                </div>
+
+                {/* TABLE DES TRANCHES DE LIVRAISON */}
+                <div className="card" style={{ borderRadius: '18px', padding: '1.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Layers size={18} color="var(--primary)" />
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>Tranches Kilométriques & Tarifs</h4>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleOpenAddZone}
+                      style={{ padding: '0.4rem 0.85rem', fontSize: '0.78rem', borderRadius: '8px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Plus size={14} /> Nouvelle Zone
+                    </button>
+                  </div>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                          <th style={{ padding: '0.6rem 0.5rem' }}>Zone</th>
+                          <th style={{ padding: '0.6rem 0.5rem' }}>Distance (km)</th>
+                          <th style={{ padding: '0.6rem 0.5rem' }}>Frais (FCFA)</th>
+                          <th style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deliveryZonesList.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                              Aucune tranche kilométrique configurée. Cliquez sur "+ Nouvelle Zone" pour ajouter.
+                            </td>
+                          </tr>
+                        ) : (
+                          deliveryZonesList.map(z => (
+                            <tr key={z.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                              <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {z.label_zone}
+                              </td>
+                              <td style={{ padding: '0.65rem 0.5rem', color: 'var(--text-secondary)' }}>
+                                {z.min_km} km → {z.max_km} km
+                              </td>
+                              <td style={{ padding: '0.65rem 0.5rem', fontWeight: 800, color: '#10b981' }}>
+                                {z.frais_livraison} FCFA
+                              </td>
+                              <td style={{ padding: '0.65rem 0.5rem', textAlign: 'right' }}>
+                                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditZone(z)}
+                                    style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', color: 'var(--primary)' }}
+                                  >
+                                    <Edit size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteZone(z.id)}
+                                    style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', color: 'var(--danger)' }}
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+
             </div>
           )}
 
@@ -1438,6 +1958,130 @@ export default function SettingsTab({
                     className="btn btn-outline"
                     style={{ flex: 1 }}
                     onClick={() => setShowRewardModal(false)}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  >
+                    <Save size={16} /> Enregistrer
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* MODAL CONFIGURATION DE ZONE DE LIVRAISON */}
+      {showZoneModal && (
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => setShowZoneModal(false)}>
+            <div
+              className="card modal-dialog-card"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '480px',
+                background: 'var(--bg-card)',
+                borderRadius: '24px',
+                padding: '24px 28px',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-lg)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.25rem',
+                margin: 'auto'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Truck size={20} color="var(--primary)" />
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {editingZone ? 'Modifier la Zone Kilométrique' : 'Nouvelle Zone de Livraison'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowZoneModal(false)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                >
+                  <X size={20} color="var(--text-muted)" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveZoneSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                    Libellé de la Zone
+                  </label>
+                  <input
+                    type="text"
+                    className="input-control"
+                    placeholder="Ex: Zone Proche (0 - 3 km)"
+                    required
+                    value={zoneLabelInput}
+                    onChange={(e) => setZoneLabelInput(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                      Distance Min (km)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input-control"
+                      placeholder="0"
+                      required
+                      min="0"
+                      value={zoneMinKmInput}
+                      onChange={(e) => setZoneMinKmInput(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                      Distance Max (km)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input-control"
+                      placeholder="3"
+                      required
+                      min="0"
+                      value={zoneMaxKmInput}
+                      onChange={(e) => setZoneMaxKmInput(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                    Frais de Livraison (FCFA)
+                  </label>
+                  <input
+                    type="number"
+                    className="input-control"
+                    placeholder="Ex: 1000"
+                    required
+                    min="0"
+                    value={zoneFeeInput}
+                    onChange={(e) => setZoneFeeInput(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ flex: 1 }}
+                    onClick={() => setShowZoneModal(false)}
                   >
                     Annuler
                   </button>

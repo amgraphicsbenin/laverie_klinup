@@ -59,6 +59,7 @@ import StaffTab from '../features/staff/components/StaffTab';
 import LogsTab from '../features/logs/components/LogsTab';
 import SettingsTab from '../features/settings/components/SettingsTab';
 import StoresTab from '../features/stores/components/StoresTab';
+import HelpTab from '../features/help/components/HelpTab';
 
 export default function AdminView({ activeTab, onManageStaff }) {
   const currentUser = db.getCurrentUser();
@@ -2336,8 +2337,15 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {/* ========================================================
          ONGLET : PARAMÈTRES SYSTÈME (SETTINGS)
          ======================================================== */}
-      {activeTab === 'settings' && (
+      {activeTab && activeTab.startsWith('settings') && (
         <SettingsTab
+          activeSubTabProp={
+            activeTab === 'settings_reward' ? 'reward' :
+            activeTab === 'settings_receipt' ? 'receipt' :
+            activeTab === 'settings_delivery' ? 'delivery' :
+            activeTab === 'settings_cloud' ? 'cloud' :
+            'delays'
+          }
           handleSaveSettings={handleSaveSettings}
           inputExpressHours={inputExpressHours}
           setInputExpressHours={setInputExpressHours}
@@ -2346,6 +2354,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
           inputNormalHours={inputNormalHours}
           setInputNormalHours={setInputNormalHours}
         />
+      )}
+
+      {/* ========================================================
+         ONGLET : AIDE & ASSISTANCE TECHNIQUE (HELP & BUG REPORT)
+         ======================================================== */}
+      {activeTab === 'help' && (
+        <HelpTab />
       )}
 
       {/* ========================================================

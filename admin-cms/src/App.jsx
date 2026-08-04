@@ -43,7 +43,7 @@ function App() {
   const [resetEmail, setResetEmail] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [customDialog, setCustomDialog] = useState(null); // { message, title, type, isConfirm, resolve }
-  const [openSubmenus, setOpenSubmenus] = useState({ staff: true });
+  const [openSubmenus, setOpenSubmenus] = useState({ staff: true, settings: true });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -921,14 +921,14 @@ function App() {
                           className={`submenu-item ${(adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'active' : ''}`}
                           onClick={() => selectMenu('staff_users')}
                         >
-                          {(adminMenu === 'staff_users' || adminMenu === 'staff_management') && <span className="sub-bullet">•</span>}
+                          <MIcon name="person" size={16} style={{ marginRight: '8px', opacity: (adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 1 : 0.7 }} />
                           <span className="menu-item-label">Gestion Utilisateurs</span>
                         </div>
                         <div 
                           className={`submenu-item ${adminMenu === 'staff_roles' ? 'active' : ''}`}
                           onClick={() => selectMenu('staff_roles')}
                         >
-                          {adminMenu === 'staff_roles' && <span className="sub-bullet">•</span>}
+                          <MIcon name="badge" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'staff_roles' ? 1 : 0.7 }} />
                           <span className="menu-item-label">Config. des Rôles</span>
                         </div>
                       </div>
@@ -953,24 +953,68 @@ function App() {
 
             <div className="menu-section-title">GÉNÉRAL</div>
             <ul className="menu-list">
-              <div className={`menu-group-block ${adminMenu === 'settings' ? 'active-block' : ''}`}>
+              <div className={`menu-group-block ${openSubmenus?.settings ? 'expanded' : ''} ${adminMenu.startsWith('settings') ? 'active-block' : ''}`}>
                 <li 
-                  className={`menu-item ${adminMenu === 'settings' ? 'active' : ''}`}
-                  onClick={() => selectMenu('settings')}
+                  className={`menu-item ${adminMenu.startsWith('settings') ? 'active' : ''}`}
+                  onClick={() => setOpenSubmenus(prev => ({ ...prev, settings: !prev.settings }))}
                   data-tooltip="Paramètres"
                 >
                   <div className="menu-item-left">
                     <MIcon name="settings" size={20} />
                     <span className="menu-item-label">Paramètres</span>
                   </div>
+                  <span className="expand-symbol">{openSubmenus?.settings ? '−' : '+'}</span>
                 </li>
+                {openSubmenus?.settings && (
+                  <div className="submenu-container">
+                    <div 
+                      className={`submenu-item ${(adminMenu === 'settings_delays' || adminMenu === 'settings') ? 'active' : ''}`}
+                      onClick={() => selectMenu('settings_delays')}
+                    >
+                      <MIcon name="bolt" size={16} style={{ marginRight: '8px', opacity: (adminMenu === 'settings_delays' || adminMenu === 'settings') ? 1 : 0.7 }} />
+                      <span className="menu-item-label">Délais & Majorations</span>
+                    </div>
+                    <div 
+                      className={`submenu-item ${adminMenu === 'settings_reward' ? 'active' : ''}`}
+                      onClick={() => selectMenu('settings_reward')}
+                    >
+                      <MIcon name="workspace_premium" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'settings_reward' ? 1 : 0.7 }} />
+                      <span className="menu-item-label">Reward & Fidélité Client</span>
+                    </div>
+                    <div 
+                      className={`submenu-item ${adminMenu === 'settings_receipt' ? 'active' : ''}`}
+                      onClick={() => selectMenu('settings_receipt')}
+                    >
+                      <MIcon name="receipt_long" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'settings_receipt' ? 1 : 0.7 }} />
+                      <span className="menu-item-label">Modèles de Reçus</span>
+                    </div>
+                    <div 
+                      className={`submenu-item ${adminMenu === 'settings_delivery' ? 'active' : ''}`}
+                      onClick={() => selectMenu('settings_delivery')}
+                    >
+                      <MIcon name="local_shipping" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'settings_delivery' ? 1 : 0.7 }} />
+                      <span className="menu-item-label">Frais de Livraison (GPS)</span>
+                    </div>
+                    <div 
+                      className={`submenu-item ${adminMenu === 'settings_cloud' ? 'active' : ''}`}
+                      onClick={() => selectMenu('settings_cloud')}
+                    >
+                      <MIcon name="cloud_sync" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'settings_cloud' ? 1 : 0.7 }} />
+                      <span className="menu-item-label">Configuration Système</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="menu-group-block">
-                <li className="menu-item" onClick={() => alert('Support KLIN UP : andre.koutomi98@gmail.com | Tél : +229 01 67 98 77 97\n\nHeures d\'ouverture : Lun-Sam, 8h-18h.')} data-tooltip="Aide">
+              <div className={`menu-group-block ${adminMenu === 'help' ? 'active-block' : ''}`}>
+                <li 
+                  className={`menu-item ${adminMenu === 'help' ? 'active' : ''}`}
+                  onClick={() => selectMenu('help')}
+                  data-tooltip="Aide & Support"
+                >
                   <div className="menu-item-left">
                     <MIcon name="help" size={20} />
-                    <span className="menu-item-label">Aide</span>
+                    <span className="menu-item-label">Aide & Support</span>
                   </div>
                 </li>
               </div>
@@ -1015,7 +1059,14 @@ function App() {
               {hasAdminAccess && (adminMenu === 'staff_management' || adminMenu === 'staff_users') && "Gestion Utilisateurs"}
               {hasAdminAccess && adminMenu === 'staff_roles' && "Configuration des Rôles"}
               {hasAdminAccess && adminMenu === 'logs' && "Journal d'Audit"}
-              {hasAdminAccess && adminMenu === 'settings' && "Paramètres Système"}
+              {hasAdminAccess && adminMenu === 'help' && "Aide & Assistance Technique"}
+              {hasAdminAccess && adminMenu.startsWith('settings') && (
+                adminMenu === 'settings_reward' ? "Paramètres - Reward & Fidélité" :
+                adminMenu === 'settings_receipt' ? "Paramètres - Reçus & Imprimante" :
+                adminMenu === 'settings_delivery' ? "Paramètres - Frais de Livraison par Zone (GPS)" :
+                adminMenu === 'settings_cloud' ? "Paramètres - Configuration Système" :
+                "Paramètres Système"
+              )}
             </h1>
             <p style={{ marginTop: '0.15rem' }}>
               {!hasAdminAccess && "Cet espace est restreint aux administrateurs."}
@@ -1027,7 +1078,14 @@ function App() {
               {hasAdminAccess && (adminMenu === 'staff_management' || adminMenu === 'staff_users') && "Habilitations du personnel, gestion des rôles et autorisations d'accès."}
               {hasAdminAccess && adminMenu === 'staff_roles' && "Définition et configuration des permissions des rôles système."}
               {hasAdminAccess && adminMenu === 'logs' && "Traçabilité des actions et sécurité des transactions."}
-              {hasAdminAccess && adminMenu === 'settings' && "Configuration globale des délais et majorations d'urgence de la laverie."}
+              {hasAdminAccess && adminMenu === 'help' && "Formulaire de demande de support, signalement de bug et suivi de tickets."}
+              {hasAdminAccess && adminMenu.startsWith('settings') && (
+                adminMenu === 'settings_reward' ? "Configuration du programme de fidélité et catalogue de récompenses." :
+                adminMenu === 'settings_receipt' ? "Personnalisation des entêtes, pieds de page et formats d'impression." :
+                adminMenu === 'settings_delivery' ? "Tarification des frais de livraison par zone kilométrique et coordonnées GPS." :
+                adminMenu === 'settings_cloud' ? "Base de données, synchronisation cloud et intégrations système (Trello, API)." :
+                "Configuration globale des délais et majorations d'urgence de la laverie."
+              )}
             </p>
           </div>
 

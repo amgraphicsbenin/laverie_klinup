@@ -25,6 +25,7 @@ export const memoryDb = {
   notifications: [],
   catalog: [],
   stores: [],
+  delivery_zones: [],
   current_user: null,
   pin_reset_requests: [],
   dark_mode: false,
@@ -572,6 +573,103 @@ export const db = {
     return newLog;
   },
 
+  // --- ZONES DE LIVRAISON & CALCUL GPS ---
+
+  /**
+   * Retourne les zones de livraison disponibles (depuis memoryDb).
+   * @returns {Array} Liste des zones de livraison.
+   */
+  getDeliveryZones: () => [...(memoryDb.delivery_zones || [])],
+
+  /**
+   * Algorithme Haversine : calcule la distance entre deux points GPS en km.
+   * @param {number} lat1 - Latitude du point 1
+   * @param {number} lon1 - Longitude du point 1
+   * @param {number} lat2 - Latitude du point 2
+   * @param {number} lon2 - Longitude du point 2
+   * @returns {number} Distance en kilomètres.
+   */
+  haversineKm: (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  },
+
+  /**
+   * Calcule les frais de livraison d'un client en fonction de ses coordonnées GPS
+   * et des zones de livraison configurées dans l'admin.
+   * @param {string} storeId - ID de la boutique (utilise les coords du store).
+   * @param {string|null} coordonneesLivraison - "lat,lng" du client.
+   * @param {number|null} clientLat - Latitude client (prioritaire si fourni).
+   * @param {number|null} clientLng - Longitude client (prioritaire si fourni).
+   * @returns {{ fee: number, distanceKm: number, zoneLabel: string, zoneId: string|null }}
+   */
+  calculateDeliveryFee: (storeId, coordonneesLivraison, clientLat, clientLng) => {
+    const NO_DELIVERY = { fee: 0, distanceKm: 0, zoneLabel: 'Pas de livraison', zoneId: null };
+
+    // 1. Résoudre les coordonnées GPS du client
+    let cLat = clientLat != null ? Number(clientLat) : null;
+    let cLng = clientLng != null ? Number(clientLng) : null;
+
+    if ((cLat == null || cLng == null) && coordonneesLivraison) {
+      const parts = String(coordonneesLivraison).split(',');
+      if (parts.length >= 2) {
+        cLat = parseFloat(parts[0].trim());
+        cLng = parseFloat(parts[1].trim());
+      }
+    }
+
+    if (cLat == null || cLng == null || isNaN(cLat) || isNaN(cLng)) {
+      return NO_DELIVERY;
+    }
+
+    // 2. Trouver les coordonnées GPS de la boutique
+    const stores = memoryDb.stores || [];
+    let store = stores.find(s => s.id === storeId || s.code === storeId);
+    if (!store) store = stores[0]; // Fallback sur le 1er store
+    const sLat = store ? Number(store.latitude) : 6.3703;
+    const sLng = store ? Number(store.longitude) : 2.3912;
+
+    // 3. Calculer la distance
+    const distanceKm = db.haversineKm(sLat, sLng, cLat, cLng);
+
+    // 4. Trouver la zone correspondante
+    const zones = (memoryDb.delivery_zones || []).filter(z => {
+      if (!z.is_active) return false;
+      // Si la zone est liée à un store_id, filtrer
+      if (z.store_id && storeId && z.store_id !== storeId) return false;
+      return true;
+    });
+
+    let matchedZone = null;
+    for (const zone of zones) {
+      const minKm = Number(zone.min_km);
+      const maxKm = Number(zone.max_km);
+      if (distanceKm >= minKm && distanceKm < maxKm) {
+        matchedZone = zone;
+        break;
+      }
+    }
+
+    if (!matchedZone) {
+      // Hors de toutes les zones configurées
+      return { fee: 0, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: 'Hors zone de livraison', zoneId: null };
+    }
+
+    return {
+      fee: Number(matchedZone.frais_livraison) || 0,
+      distanceKm: Math.round(distanceKm * 10) / 10,
+      zoneLabel: matchedZone.label_zone || `Zone ${matchedZone.id}`,
+      zoneId: matchedZone.id
+    };
+  },
+
   // --- GESTION DU CUSTOMER / CLIENTS ---
 
   /**
@@ -597,12 +695,32 @@ export const db = {
       (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
       (memoryDb.stores?.[0]?.id || '');
 
+    // Résolution des coordonnées GPS depuis les champs séparés ou le champ combiné
+    let resolvedLat = customer.latitude != null ? Number(customer.latitude) : null;
+    let resolvedLng = customer.longitude != null ? Number(customer.longitude) : null;
+    let resolvedCoords = customer.coordonnees_livraison || '';
+
+    // Si lat/lng séparés fournis, construire coordonnees_livraison
+    if (resolvedLat != null && !isNaN(resolvedLat) && resolvedLng != null && !isNaN(resolvedLng)) {
+      resolvedCoords = `${resolvedLat},${resolvedLng}`;
+    } else if (resolvedCoords && resolvedCoords.includes(',')) {
+      // Extraire lat/lng depuis coordonnees_livraison
+      const parts = resolvedCoords.split(',');
+      resolvedLat = parseFloat(parts[0]?.trim()) || null;
+      resolvedLng = parseFloat(parts[1]?.trim()) || null;
+    }
+
     const newCustomer = {
       id: 'c_' + Math.random().toString(36).substring(2, 11),
       nom: customer.nom || '',
       prenom: customer.prenom || '',
       telephone: cleanPhone,
       adresse: customer.adresse || '',
+      quartier: customer.quartier || '',
+      ville: customer.ville || 'Cotonou',
+      latitude: resolvedLat,
+      longitude: resolvedLng,
+      coordonnees_livraison: resolvedCoords || null,
       indicatif: customer.indicatif || '229',
       preferences_pliage: customer.preferences_pliage || 'Plié',
       points_fidelite: 0,
@@ -633,11 +751,32 @@ export const db = {
         }
       }
 
+      // Résolution GPS cohérente pour la mise à jour
+      let upLat = updatedFields.latitude !== undefined ? (updatedFields.latitude != null ? Number(updatedFields.latitude) : null) : customer.latitude;
+      let upLng = updatedFields.longitude !== undefined ? (updatedFields.longitude != null ? Number(updatedFields.longitude) : null) : customer.longitude;
+      let upCoords = updatedFields.coordonnees_livraison !== undefined ? updatedFields.coordonnees_livraison : customer.coordonnees_livraison;
+
+      // Si lat/lng séparés mis à jour, reconstruire coords
+      if (updatedFields.latitude !== undefined || updatedFields.longitude !== undefined) {
+        if (upLat != null && !isNaN(upLat) && upLng != null && !isNaN(upLng)) {
+          upCoords = `${upLat},${upLng}`;
+        }
+      } else if (updatedFields.coordonnees_livraison !== undefined && upCoords && upCoords.includes(',')) {
+        const parts = upCoords.split(',');
+        upLat = parseFloat(parts[0]?.trim()) || null;
+        upLng = parseFloat(parts[1]?.trim()) || null;
+      }
+
       const updateData = {
         nom: updatedFields.nom ?? customer.nom,
         prenom: updatedFields.prenom ?? customer.prenom,
         telephone: updatedFields.telephone ? updatedFields.telephone.trim() : customer.telephone,
         adresse: updatedFields.adresse ?? customer.adresse,
+        quartier: updatedFields.quartier !== undefined ? updatedFields.quartier : customer.quartier,
+        ville: updatedFields.ville !== undefined ? updatedFields.ville : customer.ville,
+        latitude: upLat,
+        longitude: upLng,
+        coordonnees_livraison: upCoords || null,
         preferences_pliage: updatedFields.preferences_pliage ?? customer.preferences_pliage,
         points_fidelite: updatedFields.points_fidelite !== undefined ? Number(updatedFields.points_fidelite) : customer.points_fidelite
       };
@@ -1573,6 +1712,46 @@ export const db = {
   getSyncQueue: () => [...memoryDb.sync_queue],
   updateStaffPin: (userId, newPin) => db.resetStaffPin(userId, newPin),
 
+  getDeliveryZones: (storeId) => {
+    const zones = memoryDb.delivery_zones || [];
+    if (!storeId || storeId === 'all') return [...zones];
+    return zones.filter(z => !z.store_id || z.store_id === storeId);
+  },
+
+  calculateDeliveryFee: (storeId, clientCoordinates) => {
+    if (!clientCoordinates) return { fee: 0, distanceKm: 0, zoneLabel: 'Non spécifié' };
+
+    let clientLat = 0, clientLng = 0;
+    if (typeof clientCoordinates === 'string') {
+      const parts = clientCoordinates.split(',').map(s => parseFloat(s.trim()));
+      if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        clientLat = parts[0];
+        clientLng = parts[1];
+      }
+    } else if (typeof clientCoordinates === 'object' && clientCoordinates.lat) {
+      clientLat = Number(clientCoordinates.lat);
+      clientLng = Number(clientCoordinates.lng);
+    }
+    if (!clientLat || !clientLng) return { fee: 0, distanceKm: 0, zoneLabel: 'Coordonnées GPS invalides' };
+
+    const store = (memoryDb.stores || []).find(s => s.id === storeId || s.code === storeId) || memoryDb.stores[0];
+    const storeLat = Number(store?.latitude || 6.3703);
+    const storeLng = Number(store?.longitude || 2.3912);
+
+    const distanceKm = calculateHaversineDistance(storeLat, storeLng, clientLat, clientLng);
+
+    const zones = (memoryDb.delivery_zones || []).filter(z => !z.store_id || z.store_id === storeId || z.store_id === store?.id);
+    const sortedZones = [...zones].sort((a, b) => Number(a.min_km) - Number(b.min_km));
+
+    const matchedZone = sortedZones.find(z => distanceKm >= Number(z.min_km) && distanceKm <= Number(z.max_km))
+      || (sortedZones.length > 0 ? sortedZones[sortedZones.length - 1] : null);
+
+    const fee = matchedZone ? Number(matchedZone.frais_livraison || 0) : (distanceKm <= 3 ? 500 : distanceKm <= 7 ? 1000 : 2000);
+    const zoneLabel = matchedZone ? matchedZone.label_zone : `Zone (${distanceKm} km)`;
+
+    return { fee, distanceKm, zoneLabel };
+  },
+
   testConnection: async () => {
     if (!supabase) {
       return { success: false, error: "Client Supabase non initialisé (clés absentes ou incorrectes)." };
@@ -1592,3 +1771,20 @@ export const db = {
     }
   }
 };
+
+/**
+ * Calcule la distance de Haversine en km entre deux coordonnées GPS.
+ */
+export function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  return Math.round(distance * 10) / 10;
+}

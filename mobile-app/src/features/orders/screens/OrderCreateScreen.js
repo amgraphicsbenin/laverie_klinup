@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Platform, Alert, RefreshControl } from 'react-native';
-import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus, Gift } from 'lucide-react-native';
+import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus, Gift, MapPin } from 'lucide-react-native';
 import { CustomSelect } from '../../../components/CustomSelect';
 import { db } from '../../../services/db';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
 import { t } from '../../../services/i18n';
 
-export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
+export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive }) {
   const { isDarkMode, customers, catalog: rawCatalog, currentUser } = useDbState();
   const catalog = useMemo(() => {
     if (!rawCatalog) return [];
@@ -31,6 +31,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
   const [momoOperator, setMomoOperator] = useState('MTN');
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
 
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
@@ -41,6 +42,11 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
   const [clientPrenom, setClientPrenom] = useState('');
   const [clientTelephone, setClientTelephone] = useState('');
   const [clientAdresse, setClientAdresse] = useState('');
+  const [clientQuartier, setClientQuartier] = useState('');
+  const [clientVille, setClientVille] = useState('Cotonou');
+  const [clientLatitude, setClientLatitude] = useState('');
+  const [clientLongitude, setClientLongitude] = useState('');
+  const [clientDeliveryPreview, setClientDeliveryPreview] = useState(null);
   const [clientPrefPliage, setClientPrefPliage] = useState('Plié');
   const [clientSubscriptionPlanId, setClientSubscriptionPlanId] = useState('');
 
@@ -61,6 +67,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
   };
 
   const resetForm = () => {
+    // Mode commande reset
     setOrderClient('');
     setSelectedArticles([]);
     setOrderAvance('0');
@@ -71,8 +78,32 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
     setPayWithSubscription(false);
     setSubscribePlanId('');
     setAppliedReward(null);
+    setMomoRefNumber('');
+    setMomoRefError('');
+    setMomoOperator('MTN');
     setClientSearchQuery('');
+    setActiveMode('commande');
+
+    // Mode nouveau client reset
+    setClientNom('');
+    setClientPrenom('');
+    setClientTelephone('');
+    setClientAdresse('');
+    setClientQuartier('');
+    setClientVille('Cotonou');
+    setClientLatitude('');
+    setClientLongitude('');
+    setClientDeliveryPreview(null);
+    setClientPrefPliage('Plié');
+    setClientSubscriptionPlanId('');
   };
+
+  // Whenever the tab becomes inactive (user switches away), format/reset the form completely
+  useEffect(() => {
+    if (isActive === false) {
+      resetForm();
+    }
+  }, [isActive]);
 
   const handleCancelOrder = () => {
     const hasData = !!orderClient || selectedArticles.length > 0 || parseFloat(orderAvance) > 0 || parseInt(orderDiscount) > 0 || !!subscribePlanId || !!appliedReward;
@@ -222,6 +253,13 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
         }
       }
 
+      const deliveryCalc = activeCustomer && activeCustomer.coordonnees_livraison
+        ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison)
+        : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+      const deliveryFee = deliveryCalc.fee || 0;
+
+      const finalTotal = Math.max(0, netTotal - rewardDiscountVal) + deliveryFee;
+
       const newOrder = {
         customer_id: orderClient,
         articles: selectedArticles.map(a => ({
@@ -230,7 +268,9 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
           quantite: a.quantity,
           prix: a.price
         })),
-        total: netTotal,
+        total: finalTotal,
+        frais_livraison: deliveryFee,
+        distance_km: deliveryCalc.distanceKm,
         avance: finalAvance,
         statut: 'attente',
         mode_paiement: finalModeReglement,
@@ -286,11 +326,22 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
     }
 
     try {
+      const lat = clientLatitude.trim() ? parseFloat(clientLatitude.trim()) : null;
+      const lng = clientLongitude.trim() ? parseFloat(clientLongitude.trim()) : null;
+      const coords = (lat != null && lng != null && !isNaN(lat) && !isNaN(lng))
+        ? `${lat},${lng}`
+        : null;
+
       const newCustomer = await db.addCustomer({
         prenom: clientPrenom.trim(),
         nom: clientNom.trim(),
         telephone: clientTelephone.trim(),
         adresse: clientAdresse.trim(),
+        quartier: clientQuartier.trim(),
+        ville: clientVille.trim() || 'Cotonou',
+        latitude: lat,
+        longitude: lng,
+        coordonnees_livraison: coords,
         preferences_pliage: clientPrefPliage,
         store_id: currentUser?.store_id
       });
@@ -304,6 +355,11 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
       setClientNom('');
       setClientTelephone('');
       setClientAdresse('');
+      setClientQuartier('');
+      setClientVille('Cotonou');
+      setClientLatitude('');
+      setClientLongitude('');
+      setClientDeliveryPreview(null);
       setClientPrefPliage('Plié');
       setClientSubscriptionPlanId('');
 
@@ -404,14 +460,154 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
               style={styles.formInput}
             />
 
-            <Text style={styles.formLabel}>Adresse / Quartier</Text>
+            <Text style={styles.formLabel}>Adresse (Rue / Domicile)</Text>
             <TextInput
               value={clientAdresse}
               onChangeText={setClientAdresse}
-              placeholder="Ex: Cotonou, Cadjehoun"
+              placeholder="Ex: Rue 123, Immeuble..."
               placeholderTextColor="#a1a1aa"
               style={styles.formInput}
             />
+
+            <View style={styles.formRowInline}>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Quartier</Text>
+                <TextInput
+                  value={clientQuartier}
+                  onChangeText={setClientQuartier}
+                  placeholder="Ex: Cadjehoun"
+                  placeholderTextColor="#a1a1aa"
+                  style={styles.formInput}
+                />
+              </View>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Ville</Text>
+                <TextInput
+                  value={clientVille}
+                  onChangeText={setClientVille}
+                  placeholder="Ex: Cotonou"
+                  placeholderTextColor="#a1a1aa"
+                  style={styles.formInput}
+                />
+              </View>
+            </View>
+
+            {/* Section Position GPS & Estimation des Frais de Livraison */}
+            <View style={{
+              borderRadius: 14,
+              borderWidth: 1,
+              padding: 12,
+              marginBottom: 16,
+              backgroundColor: isDarkMode ? '#1e293b' : '#f0f7ff',
+              borderColor: isDarkMode ? '#1d4ed8' : '#93c5fd'
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                <MapPin size={16} color="#002cf7" />
+                <Text style={[styles.formLabel, { marginLeft: 6, marginBottom: 0, color: '#002cf7', fontWeight: '700' }]}>
+                  Position GPS (Calcul de livraison)
+                </Text>
+              </View>
+              <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 11, marginBottom: 10 }}>
+                Saisissez la latitude et la longitude du domicile du client pour calculer automatiquement les frais de livraison.
+              </Text>
+
+              <View style={styles.formRowInline}>
+                <View style={styles.formFieldInline}>
+                  <Text style={styles.formLabel}>Latitude</Text>
+                  <TextInput
+                    keyboardType="decimal-pad"
+                    value={clientLatitude}
+                    onChangeText={(v) => {
+                      setClientLatitude(v);
+                      setClientDeliveryPreview(null);
+                    }}
+                    placeholder="Ex: 6.3650"
+                    placeholderTextColor="#a1a1aa"
+                    style={styles.formInput}
+                  />
+                </View>
+                <View style={styles.formFieldInline}>
+                  <Text style={styles.formLabel}>Longitude</Text>
+                  <TextInput
+                    keyboardType="decimal-pad"
+                    value={clientLongitude}
+                    onChangeText={(v) => {
+                      setClientLongitude(v);
+                      setClientDeliveryPreview(null);
+                    }}
+                    placeholder="Ex: 2.4100"
+                    placeholderTextColor="#a1a1aa"
+                    style={styles.formInput}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const lat = parseFloat(clientLatitude.trim());
+                  const lng = parseFloat(clientLongitude.trim());
+                  if (isNaN(lat) || isNaN(lng)) {
+                    Alert.alert("Coordonnées invalides", "Veuillez saisir une latitude et une longitude valides.");
+                    return;
+                  }
+                  const storeId = currentUser?.store_id;
+                  const result = db.calculateDeliveryFee(storeId, null, lat, lng);
+                  setClientDeliveryPreview(result);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 10,
+                  marginTop: 6,
+                  backgroundColor: '#002cf7'
+                }}
+                activeOpacity={0.85}
+              >
+                <MapPin size={14} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, marginLeft: 6 }}>
+                  Estimer les frais de livraison
+                </Text>
+              </TouchableOpacity>
+
+              {clientDeliveryPreview && (
+                <View style={{
+                  marginTop: 10,
+                  padding: 10,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  backgroundColor: clientDeliveryPreview.fee > 0 ? (isDarkMode ? '#0f2a1a' : '#f0fff4') : (isDarkMode ? '#1a1a2e' : '#fff8f0'),
+                  borderColor: clientDeliveryPreview.fee > 0 ? '#22c55e' : '#f97316'
+                }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
+                      📍 Distance estimée
+                    </Text>
+                    <Text style={{ fontWeight: '700', color: isDarkMode ? '#fff' : '#0f172a', fontSize: 13 }}>
+                      {clientDeliveryPreview.distanceKm} km
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
+                      🚚 Zone
+                    </Text>
+                    <Text style={{ fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#475569', fontSize: 12 }}>
+                      {clientDeliveryPreview.zoneLabel}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
+                      💰 Frais de livraison
+                    </Text>
+                    <Text style={{ fontWeight: '800', fontSize: 15, color: clientDeliveryPreview.fee > 0 ? '#22c55e' : '#f97316' }}>
+                      {clientDeliveryPreview.fee > 0 ? `${clientDeliveryPreview.fee.toLocaleString('fr-FR')} FCFA` : 'Hors zone'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
 
             <Text style={styles.formLabel}>Préférence de pliage</Text>
             <View style={styles.urgencyRow}>
@@ -985,7 +1181,12 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
               }
             }
 
-            const netTotal = Math.max(0, currentTotal - discountAmount - rewardDiscountVal);
+            const deliveryCalc = activeCustomer && activeCustomer.coordonnees_livraison
+              ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison)
+              : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+            const deliveryFee = deliveryCalc.fee || 0;
+
+            const netTotal = Math.max(0, currentTotal - discountAmount - rewardDiscountVal) + deliveryFee;
             const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
             const currentReste = netTotal - currentAvance;
             const totalClothes = selectedArticles.reduce((sum, item) => sum + item.quantity, 0);
@@ -1075,6 +1276,17 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                     </Text>
                     <Text style={[styles.receiptRowVal, { color: '#10b981', fontWeight: '700' }]}>
                       -{formatPrice(rewardDiscountVal)}
+                    </Text>
+                  </View>
+                )}
+
+                {deliveryFee > 0 && (
+                  <View style={styles.receiptRow}>
+                    <Text style={[styles.receiptRowLabel, { color: '#3b82f6', fontWeight: '700' }]}>
+                      Frais de Livraison ({deliveryCalc.zoneLabel} • {deliveryCalc.distanceKm} km)
+                    </Text>
+                    <Text style={[styles.receiptRowVal, { color: '#3b82f6', fontWeight: '700' }]}>
+                      +{formatPrice(deliveryFee)}
                     </Text>
                   </View>
                 )}

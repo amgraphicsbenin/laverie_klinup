@@ -182,6 +182,7 @@ export async function initDb(): Promise<void> {
       supabase.from('pin_reset_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('stores').select('*').order('created_at', { ascending: true }),
       supabase.from('rewards').select('*').order('created_at', { ascending: true }),
+      supabase.from('delivery_zones').select('*').order('min_km', { ascending: true }),
     ]);
 
     if (staffRes.error) throw new Error(`Erreur chargement staff : ${staffRes.error.message}`);
@@ -230,6 +231,25 @@ export async function initDb(): Promise<void> {
 
     if (!rewardRes.error && rewardRes.data) {
       memoryDb.rewards = rewardRes.data;
+    }
+
+    const deliveryRes = Promise.allSettled ? (await Promise.allSettled([supabase.from('delivery_zones').select('*')])) : null;
+    try {
+      const { data: dData, error: dErr } = await supabase.from('delivery_zones').select('*').order('min_km', { ascending: true });
+      if (!dErr && dData) {
+        memoryDb.delivery_zones = dData;
+      }
+    } catch (e) {
+      // Ignorer si la table n'existe pas encore
+    }
+
+    try {
+      const { data: tData, error: tErr } = await supabase.from('support_tickets').select('*').order('created_at', { ascending: false });
+      if (!tErr && tData) {
+        memoryDb.support_tickets = tData;
+      }
+    } catch (e) {
+      // Ignorer si la table n'existe pas encore
     }
 
     if (!reqRes.error) memoryDb.pin_reset_requests = reqRes.data || [];

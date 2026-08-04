@@ -56,13 +56,6 @@ export default function RewardFidelityCard({
       }
     };
 
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Confirmation d'échange\n\n${confirmMsg}`)) {
-        await executeRedeem();
-      }
-      return;
-    }
-
     Alert.alert(
       "Confirmation d'échange",
       confirmMsg,

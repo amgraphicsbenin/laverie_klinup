@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView, StatusBar as RNStatusBar, AppState } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView, StatusBar as RNStatusBar, AppState, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -81,6 +81,7 @@ export default function App() {
   const [initSelectedClient, setInitSelectedClient] = useState(null);
   const [successToast, setSuccessToast] = useState({ visible: false, message: '' });
   const [customAlertState, setCustomAlertState] = useState({ visible: false, title: '', message: '', buttons: [] });
+  const [isSwipeDisabled, setIsSwipeDisabled] = useState(false);
   const [, forceUpdate] = useState(0);
 
   const scrollViewRef = useRef(null);
@@ -308,6 +309,8 @@ export default function App() {
       case 'gestion':
         return (
           <GestionScreen 
+            isActive={activeTab === 'gestion'}
+            onDisableSwipeChange={setIsSwipeDisabled}
             selectedOrder={selectedOrder}
             setSelectedOrder={setSelectedOrder}
             gestionFilter={gestionFilter}
@@ -341,6 +344,7 @@ export default function App() {
       case 'creer_commande':
         return (
           <OrderCreateScreen
+            isActive={activeTab === 'creer_commande'}
             onNavigate={(tab) => { switchTab(tab); setOrderFormVisible(false); }}
             onShowSuccess={triggerSuccess}
           />
@@ -429,6 +433,7 @@ export default function App() {
               style={{ flex: 1 }}
               contentContainerStyle={{ width: containerWidth * availableTabs.length }}
               keyboardShouldPersistTaps="handled"
+              scrollEnabled={!isSwipeDisabled}
             >
               {availableTabs.map((tabKey) => (
                 <View key={tabKey} style={{ width: containerWidth, flex: 1, overflow: 'hidden' }}>
@@ -648,13 +653,23 @@ export default function App() {
         </MotiView>
       )}
       {/* GLOBAL CUSTOM PREMIUM ALERT MODAL */}
-      {customAlertState.visible && (
+      <Modal
+        visible={!!customAlertState.visible}
+        transparent={true}
+        animationType="fade"
+        statusBarTranslucent={true}
+        onRequestClose={() => {
+          if (customAlertState.buttons && customAlertState.buttons.length <= 1) {
+            setCustomAlertState(prev => ({ ...prev, visible: false }));
+          }
+        }}
+      >
         <View
           pointerEvents="auto"
-          style={[StyleSheet.absoluteFill, { zIndex: 100000, elevation: 100000, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
+          style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
         >
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => {
-            if (customAlertState.buttons.length <= 1) {
+            if (customAlertState.buttons && customAlertState.buttons.length <= 1) {
               setCustomAlertState(prev => ({ ...prev, visible: false }));
             }
           }}>
@@ -720,13 +735,13 @@ export default function App() {
             
             {/* Buttons Row */}
             <View style={{
-              flexDirection: customAlertState.buttons.length > 2 ? 'column' : 'row',
+              flexDirection: customAlertState.buttons && customAlertState.buttons.length > 2 ? 'column' : 'row',
               gap: 10,
               width: '100%',
               justifyContent: 'center',
             }}>
-              {customAlertState.buttons.map((btn, index) => {
-                const isDestructive = btn.style === 'destructive' || btn.text.toLowerCase() === 'supprimer' || btn.text.toLowerCase() === 'rÃ©silier';
+              {customAlertState.buttons && customAlertState.buttons.map((btn, index) => {
+                const isDestructive = btn.style === 'destructive' || btn.text.toLowerCase() === 'supprimer' || btn.text.toLowerCase() === 'résilier';
                 const isCancel = btn.style === 'cancel' || btn.text.toLowerCase() === 'annuler' || btn.text.toLowerCase() === 'non';
                 
                 let btnBg = '#002cf7';
@@ -774,7 +789,7 @@ export default function App() {
             </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* SPLASH SCREEN ANIMÉ — couvre le chargement DB + animation d'ouverture */}
       {isSplashVisible && (

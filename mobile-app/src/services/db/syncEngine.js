@@ -247,7 +247,7 @@ export async function initDb(isRetry = false) {
 
     try {
       const TIMEOUT_MS = 15000;
-      const [staffRes, custRes, orderRes, logsRes, catalogRes, reqsRes, storesRes, rewardsRes] = await Promise.allSettled([
+      const [staffRes, custRes, orderRes, logsRes, catalogRes, reqsRes, storesRes, rewardsRes, deliveryRes] = await Promise.allSettled([
         withTimeout(supabase.from('staff').select('*'), TIMEOUT_MS, 'staff'),
         withTimeout(supabase.from('customers').select('*'), TIMEOUT_MS, 'customers'),
         withTimeout(supabase.from('orders').select('*'), TIMEOUT_MS, 'orders'),
@@ -256,6 +256,7 @@ export async function initDb(isRetry = false) {
         withTimeout(supabase.from('pin_reset_requests').select('*'), TIMEOUT_MS, 'pin_reset_requests'),
         withTimeout(supabase.from('stores').select('*'), TIMEOUT_MS, 'stores'),
         withTimeout(supabase.from('rewards').select('*'), TIMEOUT_MS, 'rewards'),
+        withTimeout(supabase.from('delivery_zones').select('*'), TIMEOUT_MS, 'delivery_zones'),
       ]);
 
       const staffOk = staffRes.status === 'fulfilled' && !staffRes.value?.error;
@@ -327,6 +328,9 @@ export async function initDb(isRetry = false) {
       }
       if (rewardsRes && rewardsRes.status === 'fulfilled' && !rewardsRes.value?.error && rewardsRes.value?.data) {
         memoryDb.rewards = rewardsRes.value.data;
+      }
+      if (deliveryRes && deliveryRes.status === 'fulfilled' && !deliveryRes.value?.error && deliveryRes.value?.data) {
+        memoryDb.delivery_zones = deliveryRes.value.data;
       }
 
       memoryDb.current_user = await loadData(STORAGE_KEYS.CURRENT_USER, null);

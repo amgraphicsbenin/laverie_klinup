@@ -93,6 +93,87 @@ export const dbEngine = {
   // ── Getters (synchronous) ──────────────────────────────────────────────
 
   getStores: (): Store[] => memoryDb.stores ? [...memoryDb.stores] : [],
+  getDeliveryZones: (storeId?: string) => {
+    const zones = memoryDb.delivery_zones || [];
+    if (!storeId || storeId === 'all') return [...zones];
+    return zones.filter(z => !z.store_id || z.store_id === storeId);
+  },
+  saveDeliveryZone: async (zone: any) => {
+    const id = zone.id || ('zone_' + Date.now());
+    const payload = {
+      id,
+      store_id: zone.store_id || null,
+      label_zone: zone.label_zone || `Zone (${zone.min_km} - ${zone.max_km} km)`,
+      min_km: Number(zone.min_km) || 0,
+      max_km: Number(zone.max_km) || 3,
+      frais_livraison: Number(zone.frais_livraison) || 0,
+      is_active: zone.is_active !== false,
+      created_at: zone.created_at || new Date().toISOString()
+    };
+    await performMutation('upsert', 'delivery_zones', id, payload);
+    const existingIdx = (memoryDb.delivery_zones || []).findIndex(z => z.id === id);
+    if (existingIdx > -1) {
+      memoryDb.delivery_zones[existingIdx] = payload;
+    } else {
+      memoryDb.delivery_zones = [...(memoryDb.delivery_zones || []), payload];
+    }
+    notifyListeners();
+    return payload;
+  },
+  deleteDeliveryZone: async (id: string) => {
+    await performMutation('delete', 'delivery_zones', id);
+    memoryDb.delivery_zones = (memoryDb.delivery_zones || []).filter(z => z.id !== id);
+    notifyListeners();
+  },
+  getSupportTickets: () => memoryDb.support_tickets ? [...memoryDb.support_tickets] : [],
+  createSupportTicket: async (ticketData: any) => {
+    const id = ticketData.id || `TICK-${Math.floor(1000 + Math.random() * 9000)}`;
+    const payload = {
+      id,
+      ticket_type: ticketData.ticket_type || 'bug',
+      subject: ticketData.subject,
+      module_name: ticketData.module_name || 'Autre',
+      priority: ticketData.priority || 'Moyenne',
+      status: ticketData.status || 'Ouvert',
+      description: ticketData.description,
+      steps_to_reproduce: ticketData.steps_to_reproduce || '',
+      contact_phone: ticketData.contact_phone || '',
+      contact_email: ticketData.contact_email || '',
+      user_id: ticketData.user_id || memoryDb.current_user?.id || null,
+      user_name: ticketData.user_name || `${memoryDb.current_user?.prenom || ''} ${memoryDb.current_user?.nom || 'Utilisateur'}`.trim(),
+      store_id: ticketData.store_id || memoryDb.current_user?.store_id || null,
+      attached_files: ticketData.attached_files || [],
+      created_at: ticketData.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    try {
+      await performMutation('upsert', 'support_tickets', id, payload);
+    } catch (e) {
+      console.warn('[KLIN UP DB] Sauvegarde distante ticket en repli local:', e);
+    }
+    memoryDb.support_tickets = [payload, ...(memoryDb.support_tickets || []).filter(t => t.id !== id)];
+    notifyListeners();
+    return payload;
+  },
+  deleteSupportTicket: async (ticketId: string) => {
+    try {
+      await performMutation('delete', 'support_tickets', ticketId);
+    } catch (e) {
+      console.warn('[KLIN UP DB] Suppression distante ticket en repli local:', e);
+    }
+    memoryDb.support_tickets = (memoryDb.support_tickets || []).filter(t => t.id !== ticketId);
+    notifyListeners();
+  },
+  updateStoreCoordinates: async (storeId: string, latitude: number, longitude: number) => {
+    const store = memoryDb.stores.find(s => s.id === storeId || s.code === storeId);
+    if (!store) return;
+    const payload = { latitude: Number(latitude), longitude: Number(longitude) };
+    await performMutation('update', 'stores', store.id, payload);
+    store.latitude = Number(latitude);
+    store.longitude = Number(longitude);
+    notifyListeners();
+    return store;
+  },
   getSelectedStoreId: (): string => {
     const user = memoryDb.current_user;
     if (user && user.role !== 'super_admin') {
