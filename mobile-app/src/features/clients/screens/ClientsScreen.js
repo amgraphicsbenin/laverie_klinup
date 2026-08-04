@@ -122,10 +122,9 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
     }
     return true;
   }).sort((a, b) => {
-    if (filterType === "fidelite") {
-      return (b.points_fidelite || 0) - (a.points_fidelite || 0);
-    }
-    return 0;
+    const ptsDiff = (b.points_fidelite || 0) - (a.points_fidelite || 0);
+    if (ptsDiff !== 0) return ptsDiff;
+    return (a.prenom || '').localeCompare(b.prenom || '');
   });
 
   const handleCloseCustomerModal = () => {

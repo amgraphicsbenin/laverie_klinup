@@ -520,9 +520,11 @@ export default function CustomersTab({
                 return true;
               });
 
-              if (filterMode === 'fidelite') {
-                filteredCrm = filteredCrm.sort((a, b) => (b.points_fidelite || 0) - (a.points_fidelite || 0));
-              }
+              filteredCrm = filteredCrm.sort((a, b) => {
+                const ptsDiff = (b.points_fidelite || 0) - (a.points_fidelite || 0);
+                if (ptsDiff !== 0) return ptsDiff;
+                return (a.prenom || '').localeCompare(b.prenom || '');
+              });
 
               if (filteredCrm.length === 0) {
                 return (

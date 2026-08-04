@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl, Modal, TextInput, Linking, Alert, Image } from 'react-native';
-import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check, MapPin } from 'lucide-react-native';
+import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check, MapPin, Trophy, Crown, Star, Award, ShieldCheck, Sparkles } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { MotiView } from '../../../components/SafeView';
 import Svg, { Rect, Path, Circle } from 'react-native-svg';
@@ -11,12 +11,13 @@ import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
 import NotificationModal from '../../../components/NotificationModal';
 import { t } from '../../../services/i18n';
+import { getFidelityTier } from '../../../utils/fidelityUtils';
 
 export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { orders, customers, notifications, currentUser, isDarkMode } = useDbState();
   const [refreshing, setRefreshing] = useState(false);
 
-  const userInitials = currentUser 
+  const userInitials = currentUser
     ? `${(currentUser.prenom || 'K')[0].toUpperCase()}${(currentUser.nom || 'U')[0].toUpperCase()}`
     : 'KU';
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
@@ -131,7 +132,14 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   // Filter orders by active statuses
   const activeOrders = orders.filter(o => o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule');
   const readyOrders = orders.filter(o => o.statut === 'pret' || o.statut === 'a_recuperer' || o.statut === 'a_livrer');
-  
+
+  // Top 5 clients avec les plus hauts statuts de reward / fidélité
+  const topClients = React.useMemo(() => {
+    return [...(customers || [])]
+      .sort((a, b) => (b.points_fidelite || 0) - (a.points_fidelite || 0))
+      .slice(0, 5);
+  }, [customers]);
+
   // Calculate revenue of the day
   const todayStr = new Date().toISOString().split('T')[0];
   const todayOrders = orders.filter(o => o.created_at?.startsWith(todayStr));
@@ -148,7 +156,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   const monthlyRevenue = monthlyOrders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0);
 
   // Average Basket
-  const averageBasket = orders.length > 0 
+  const averageBasket = orders.length > 0
     ? Math.round(orders.reduce((sum, o) => sum + (o.prix_total || o.total || 0), 0) / orders.length)
     : 0;
 
@@ -441,13 +449,13 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
     if (!kpiToRender) return null;
     const theme = kpiThemes[kpiToRender];
     const isVisible = activeKpiDetail !== null;
-    
+
     let heroValue = '';
     let heroLabel = '';
     let subStats = [];
     let listTitle = '';
     let listItems = [];
-    
+
     switch (kpiToRender) {
       case 'ca_mensuel':
         heroValue = formatPrice(monthlyRevenue);
@@ -461,7 +469,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listTitle = "Top 5 Commandes ce Mois";
         listItems = [...monthlyOrders].sort((a, b) => (b.prix_total || b.total || 0) - (a.prix_total || a.total || 0)).slice(0, 5);
         break;
-        
+
       case 'panier_moyen': {
         heroValue = formatPrice(averageBasket);
         heroLabel = "Valeur moyenne d'une commande";
@@ -477,7 +485,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listItems = [...orders].sort((a, b) => Math.abs((a.prix_total || a.total || 0) - averageBasket) - Math.abs((b.prix_total || b.total || 0) - averageBasket)).slice(0, 5);
         break;
       }
-        
+
       case 'recouvrement': {
         heroValue = `${recoveryRate}%`;
         heroLabel = "Taux de recouvrement du chiffre d'affaires";
@@ -492,7 +500,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listItems = orders.filter(o => (o.reste || 0) > 0).slice(0, 8);
         break;
       }
-        
+
       case 'part_express':
         heroValue = `${expressRate}%`;
         heroLabel = "Part des commandes urgentes";
@@ -505,7 +513,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listTitle = "Commandes Express Actives";
         listItems = activeOrders.filter(o => o.niveau_urgence === 'Express').slice(0, 8);
         break;
-        
+
       case 'en_cours':
         heroValue = String(activeOrders.length);
         heroLabel = "Commandes en cours de traitement";
@@ -518,7 +526,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listTitle = "Suivi des Commandes Actives";
         listItems = activeOrders.slice(0, 8);
         break;
-        
+
       case 'pretes': {
         heroValue = String(readyOrders.length);
         heroLabel = "Commandes prêtes à être récupérées";
@@ -527,13 +535,13 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           { label: "Valeur à récupérer", val: formatPrice(readyValue) },
           { label: "Restes à payer", val: formatPrice(readyOrders.reduce((sum, o) => sum + (o.reste || 0), 0)) },
           { label: "Commandes prêtes", val: readyOrders.length },
-          { label: "Part des encours", val: activeOrders.length > 0 ? `${Math.round((readyOrders.length / activeOrders.length)*100)}%` : '0%' }
+          { label: "Part des encours", val: activeOrders.length > 0 ? `${Math.round((readyOrders.length / activeOrders.length) * 100)}%` : '0%' }
         ];
         listTitle = "Commandes Prêtes en Attente";
         listItems = readyOrders.slice(0, 8);
         break;
       }
-        
+
       case 'retards':
         heroValue = String(lateOrders.length);
         heroLabel = "Commandes en retard ou urgentes";
@@ -541,12 +549,12 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           { label: "Retards", val: lateOrders.filter(o => (o.due_date && new Date(o.due_date) < new Date())).length },
           { label: "Urgences Actives", val: activeOrders.filter(o => o.niveau_urgence === 'Express').length },
           { label: "Total à traiter", val: activeOrders.length },
-          { label: "Taux de retard", val: activeOrders.length > 0 ? `${Math.round((lateOrders.length / activeOrders.length)*100)}%` : '0%' }
+          { label: "Taux de retard", val: activeOrders.length > 0 ? `${Math.round((lateOrders.length / activeOrders.length) * 100)}%` : '0%' }
         ];
         listTitle = "Commandes en Retard / Urgences";
         listItems = [...lateOrders, ...activeOrders.filter(o => o.niveau_urgence === 'Express' && !lateOrders.some(l => l.id === o.id))].slice(0, 8);
         break;
-        
+
       case 'ca_jour':
         heroValue = formatPrice(todayRevenue);
         heroLabel = "Chiffre d'affaires encaissé aujourd'hui";
@@ -559,7 +567,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listTitle = "Ventes du Jour";
         listItems = todayOrders;
         break;
-        
+
       case 'volume_jour':
         heroValue = String(todayOrders.length);
         heroLabel = "Nombre de commandes enregistrées aujourd'hui";
@@ -572,7 +580,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         listTitle = "Liste des Commandes du Jour";
         listItems = todayOrders;
         break;
-        
+
       default:
         return null;
     }
@@ -586,7 +594,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         transition={{ type: 'timing', duration: 250 }}
         style={[
           StyleSheet.absoluteFill,
-          { 
+          {
             zIndex: 9999,
             justifyContent: 'center',
             alignItems: 'center',
@@ -594,9 +602,9 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           }
         ]}
       >
-        <TouchableOpacity 
-          activeOpacity={1} 
-          style={StyleSheet.absoluteFill} 
+        <TouchableOpacity
+          activeOpacity={1}
+          style={StyleSheet.absoluteFill}
           onPress={() => setActiveKpiDetail(null)}
         >
           <BlurView tint={isDarkMode ? "dark" : "light"} intensity={85} style={StyleSheet.absoluteFill} />
@@ -621,9 +629,9 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             </TouchableOpacity>
           </View>
 
-          <ScrollView 
+          <ScrollView
             style={{ flexShrink: 1, width: '100%' }}
-            showsVerticalScrollIndicator={false} 
+            showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 24 }}
           >
             {/* Hero Banner Section with glass texture */}
@@ -744,239 +752,239 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         }
       >
         {/* ADVANCED KPI CAROUSEL */}
-        <ScrollView 
-            horizontal 
-            nestedScrollEnabled={true}
-            showsHorizontalScrollIndicator={false} 
-            style={{ marginHorizontal: -20 }}
-            contentContainerStyle={styles.kpiContainer}
-            onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
-            onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
-          >
-            {/* KPI 1: CA Mensuel */}
-            <View style={{ borderRadius: 24, overflow: 'hidden' }}>
-              <MotiView
-                from={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 150 }}
-                style={[
-                  styles.newKpiCard, 
-                  { 
-                    backgroundColor: isDarkMode ? '#09153d' : '#002cf7', 
-                    borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#002cf7' 
-                  }
-                ]}
-              >
-                <View style={styles.cardHeaderRow}>
-                  <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>CA Mensuel</Text>
-                  <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
-                    <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>Mois</Text>
-                  </View>
-                </View>
-                <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.85)' }]}>Mois en cours</Text>
-                
-                <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(monthlyRevenue)}</Text>
-                
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start', marginTop: 4 }}>
-                  <TrendingUp size={12} color="#ffffff" style={{ marginRight: 3 }} />
-                  <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>+12.4% ce mois</Text>
-                </View>
-              </MotiView>
-            </View>
-
-            {/* KPI 2: Panier Moyen */}
-            <View style={{ borderRadius: 24, overflow: 'hidden' }}>
-              <MotiView
-                from={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 150, delay: 30 }}
-                style={[
-                  styles.newKpiCard, 
-                  { 
-                    backgroundColor: isDarkMode ? '#0d1b4c' : '#2E54FF', 
-                    borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#2E54FF' 
-                  }
-                ]}
-              >
-                <View style={styles.cardHeaderRow}>
-                  <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>Panier Moyen</Text>
-                </View>
-                <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(averageBasket)}</Text>
-
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 26, marginVertical: 4 }}>
-                  <View style={{ flex: 1, height: '40%', backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 4 }} />
-                  <View style={{ flex: 1, height: '65%', backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 4 }} />
-                  <View style={{ flex: 1, height: '45%', backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 4 }} />
-                  <View style={{ flex: 1, height: '90%', backgroundColor: isDarkMode ? '#38bdf8' : '#ffffff', borderRadius: 4 }} />
-                </View>
-
-                <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.85)' }]}>Par commande</Text>
-              </MotiView>
-            </View>
-
-            {/* KPI 3: Volume total encaissé */}
-            <View style={{ borderRadius: 24, overflow: 'hidden' }}>
-              <MotiView
-                from={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 150, delay: 60 }}
-                style={[
-                  styles.newKpiCard, 
-                  { 
-                    backgroundColor: isDarkMode ? '#12225c' : '#5C7AFF', 
-                    borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#5C7AFF' 
-                  }
-                ]}
-              >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View>
-                    <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{recoveryRate}%</Text>
-                    <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.85)' }]}>Recouvrement</Text>
-                  </View>
-
-                  {/* Dynamic Svg Ring Gauge */}
-                  <View style={{ position: 'relative', width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                    <Svg height="48" width="48" viewBox="0 0 36 36">
-                      <Circle
-                        cx="18"
-                        cy="18"
-                        r="15.9155"
-                        fill="none"
-                        stroke="rgba(255, 255, 255, 0.25)"
-                        strokeWidth="3.8"
-                      />
-                      <Circle
-                        cx="18"
-                        cy="18"
-                        r="15.9155"
-                        fill="none"
-                        stroke={isDarkMode ? '#38bdf8' : '#ffffff'}
-                        strokeWidth="3.8"
-                        strokeDasharray={[recoveryRate, Math.max(0, 100 - recoveryRate)]}
-                        strokeLinecap="round"
-                        rotation={-90}
-                        origin="18, 18"
-                      />
-                    </Svg>
-                  </View>
-                </View>
-
-                <Text style={[styles.newCardSub, { color: '#ffffff', fontWeight: '700', marginTop: 6 }]}>Volume total encaissé</Text>
-              </MotiView>
-            </View>
-
-            {/* KPI 4: Part Express */}
-            <View style={{ borderRadius: 24, overflow: 'hidden' }}>
-              <MotiView
-                from={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'timing', duration: 150, delay: 90 }}
-                style={[
-                  styles.newKpiCard, 
-                  { 
-                    backgroundColor: isDarkMode ? '#18296e' : '#8A9FFF', 
-                    borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#8A9FFF' 
-                  }
-                ]}
-              >
-                <View style={styles.cardHeaderRow}>
-                  <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>Part Express</Text>
-                </View>
-                <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.9)' }]}>{expressOrdersCount} commandes urgentes</Text>
-
-                <View style={{ marginVertical: 6, gap: 5 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: 'rgba(255, 255, 255, 0.9)' }}>Express</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>{expressRate}%</Text>
-                  </View>
-                  <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 3, overflow: 'hidden' }}>
-                    <View style={{ width: `${Math.min(100, expressRate)}%`, height: '100%', backgroundColor: isDarkMode ? '#38bdf8' : '#ffffff', borderRadius: 3 }} />
-                  </View>
-                </View>
-              </MotiView>
-            </View>
-          </ScrollView>
-
-          {/* CARTE CHIFFRE D'AFFAIRES DYNAMIQUE AVEC FILTRE */}
-          <View style={{ width: '100%', borderRadius: 24, zIndex: 500 }}>
+        <ScrollView
+          horizontal
+          nestedScrollEnabled={true}
+          showsHorizontalScrollIndicator={false}
+          style={{ marginHorizontal: -20 }}
+          contentContainerStyle={styles.kpiContainer}
+          onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
+          onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
+        >
+          {/* KPI 1: CA Mensuel */}
+          <View style={{ borderRadius: 24, overflow: 'hidden' }}>
             <MotiView
-              from={{ opacity: 0, translateY: 4 }}
-              animate={{ opacity: 1, translateY: 0 }}
+              from={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
               transition={{ type: 'timing', duration: 150 }}
-              style={[styles.newMainCard, { overflow: 'visible', zIndex: 500 }]}
+              style={[
+                styles.newKpiCard,
+                {
+                  backgroundColor: isDarkMode ? '#09153d' : '#002cf7',
+                  borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#002cf7'
+                }
+              ]}
             >
-              {/* Header Row: Title & Filter Pill Dropdown */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
+              <View style={styles.cardHeaderRow}>
+                <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>CA Mensuel</Text>
+                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                  <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>Mois</Text>
+                </View>
+              </View>
+              <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.85)' }]}>Mois en cours</Text>
 
-                <TouchableOpacity
-                  ref={filterPillRef}
-                  onPress={handleFilterPillPress}
-                  activeOpacity={0.8}
-                  style={styles.filterPill}
-                >
-                  <Text style={styles.filterPillText}>{revenuePeriodData.label} ▾</Text>
-                </TouchableOpacity>
+              <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(monthlyRevenue)}</Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start', marginTop: 4 }}>
+                <TrendingUp size={12} color="#ffffff" style={{ marginRight: 3 }} />
+                <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>+12.4% ce mois</Text>
+              </View>
+            </MotiView>
+          </View>
+
+          {/* KPI 2: Panier Moyen */}
+          <View style={{ borderRadius: 24, overflow: 'hidden' }}>
+            <MotiView
+              from={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'timing', duration: 150, delay: 30 }}
+              style={[
+                styles.newKpiCard,
+                {
+                  backgroundColor: isDarkMode ? '#0d1b4c' : '#2E54FF',
+                  borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#2E54FF'
+                }
+              ]}
+            >
+              <View style={styles.cardHeaderRow}>
+                <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>Panier Moyen</Text>
+              </View>
+              <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(averageBasket)}</Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 26, marginVertical: 4 }}>
+                <View style={{ flex: 1, height: '40%', backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 4 }} />
+                <View style={{ flex: 1, height: '65%', backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 4 }} />
+                <View style={{ flex: 1, height: '45%', backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 4 }} />
+                <View style={{ flex: 1, height: '90%', backgroundColor: isDarkMode ? '#38bdf8' : '#ffffff', borderRadius: 4 }} />
               </View>
 
-              {/* Card Body */}
-              <View style={{ width: '100%' }}>
-                <Text style={styles.newMainBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  {formatPrice(revenuePeriodData.totalRevenue)}
-                </Text>
-                
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                  <View style={[styles.greenPillBadge, !revenuePeriodData.isPositive && { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
-                    {revenuePeriodData.isPositive ? (
-                      <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
-                    ) : (
-                      <TrendingDown size={12} color="#ef4444" style={{ marginRight: 3 }} />
-                    )}
-                    <Text style={[styles.greenPillText, !revenuePeriodData.isPositive && { color: '#ef4444' }]}>
-                      {revenuePeriodData.growthText}
-                    </Text>
-                  </View>
+              <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.85)' }]}>Par commande</Text>
+            </MotiView>
+          </View>
+
+          {/* KPI 3: Volume total encaissé */}
+          <View style={{ borderRadius: 24, overflow: 'hidden' }}>
+            <MotiView
+              from={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'timing', duration: 150, delay: 60 }}
+              style={[
+                styles.newKpiCard,
+                {
+                  backgroundColor: isDarkMode ? '#12225c' : '#5C7AFF',
+                  borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#5C7AFF'
+                }
+              ]}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{recoveryRate}%</Text>
+                  <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.85)' }]}>Recouvrement</Text>
                 </View>
 
-                {/* Dynamic Bar Chart matching selected period */}
-                <View style={styles.barChartContainer}>
-                  {revenuePeriodData.chartData.map((d, index) => {
-                    const maxVal = Math.max(...revenuePeriodData.chartData.map(c => c.revenue), 1000);
-                    const barHeight = maxVal > 0 ? (d.revenue / maxVal) * 45 : 3;
-                    const barWidth = revenuePeriodData.chartData.length > 7 ? 10 : 12;
+                {/* Dynamic Svg Ring Gauge */}
+                <View style={{ position: 'relative', width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                  <Svg height="48" width="48" viewBox="0 0 36 36">
+                    <Circle
+                      cx="18"
+                      cy="18"
+                      r="15.9155"
+                      fill="none"
+                      stroke="rgba(255, 255, 255, 0.25)"
+                      strokeWidth="3.8"
+                    />
+                    <Circle
+                      cx="18"
+                      cy="18"
+                      r="15.9155"
+                      fill="none"
+                      stroke={isDarkMode ? '#38bdf8' : '#ffffff'}
+                      strokeWidth="3.8"
+                      strokeDasharray={[recoveryRate, Math.max(0, 100 - recoveryRate)]}
+                      strokeLinecap="round"
+                      rotation={-90}
+                      origin="18, 18"
+                    />
+                  </Svg>
+                </View>
+              </View>
 
-                    return (
-                      <View key={`${d.label}-${index}`} style={styles.barColumn}>
-                        <View style={styles.barWrapper}>
-                          <Svg height="55" width={barWidth + 8} style={{ alignSelf: 'center' }}>
-                            <Rect
-                              x="4"
-                              y="5"
-                              width={barWidth}
-                              height="45"
-                              rx="5"
-                              fill={isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(9, 9, 11, 0.04)'}
-                            />
-                            <Rect
-                              x="4"
-                              y={50 - barHeight}
-                              width={barWidth}
-                              height={barHeight}
-                              rx="5"
-                              fill={d.isActive ? '#002cf7' : (isDarkMode ? 'rgba(56, 189, 248, 0.4)' : 'rgba(0, 44, 247, 0.35)')}
-                            />
-                          </Svg>
-                        </View>
-                        <Text style={[styles.barDayText, d.isActive && styles.barDayTextActive]} numberOfLines={1}>
-                          {d.label}
-                        </Text>
-                      </View>
-                    );
-                  })}
+              <Text style={[styles.newCardSub, { color: '#ffffff', fontWeight: '700', marginTop: 6 }]}>Volume total encaissé</Text>
+            </MotiView>
+          </View>
+
+          {/* KPI 4: Part Express */}
+          <View style={{ borderRadius: 24, overflow: 'hidden' }}>
+            <MotiView
+              from={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'timing', duration: 150, delay: 90 }}
+              style={[
+                styles.newKpiCard,
+                {
+                  backgroundColor: isDarkMode ? '#18296e' : '#8A9FFF',
+                  borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#8A9FFF'
+                }
+              ]}
+            >
+              <View style={styles.cardHeaderRow}>
+                <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>Part Express</Text>
+              </View>
+              <Text style={[styles.newCardSub, { color: 'rgba(255, 255, 255, 0.9)' }]}>{expressOrdersCount} commandes urgentes</Text>
+
+              <View style={{ marginVertical: 6, gap: 5 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: 'rgba(255, 255, 255, 0.9)' }}>Express</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>{expressRate}%</Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: 'rgba(255, 255, 255, 0.35)', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{ width: `${Math.min(100, expressRate)}%`, height: '100%', backgroundColor: isDarkMode ? '#38bdf8' : '#ffffff', borderRadius: 3 }} />
                 </View>
               </View>
             </MotiView>
           </View>
+        </ScrollView>
+
+        {/* CARTE CHIFFRE D'AFFAIRES DYNAMIQUE AVEC FILTRE */}
+        <View style={{ width: '100%', borderRadius: 24, zIndex: 500 }}>
+          <MotiView
+            from={{ opacity: 0, translateY: 4 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ type: 'timing', duration: 150 }}
+            style={[styles.newMainCard, { overflow: 'visible', zIndex: 500 }]}
+          >
+            {/* Header Row: Title & Filter Pill Dropdown */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
+
+              <TouchableOpacity
+                ref={filterPillRef}
+                onPress={handleFilterPillPress}
+                activeOpacity={0.8}
+                style={styles.filterPill}
+              >
+                <Text style={styles.filterPillText}>{revenuePeriodData.label} ▾</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Card Body */}
+            <View style={{ width: '100%' }}>
+              <Text style={styles.newMainBigValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {formatPrice(revenuePeriodData.totalRevenue)}
+              </Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <View style={[styles.greenPillBadge, !revenuePeriodData.isPositive && { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                  {revenuePeriodData.isPositive ? (
+                    <TrendingUp size={12} color="#10b981" style={{ marginRight: 3 }} />
+                  ) : (
+                    <TrendingDown size={12} color="#ef4444" style={{ marginRight: 3 }} />
+                  )}
+                  <Text style={[styles.greenPillText, !revenuePeriodData.isPositive && { color: '#ef4444' }]}>
+                    {revenuePeriodData.growthText}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Dynamic Bar Chart matching selected period */}
+              <View style={styles.barChartContainer}>
+                {revenuePeriodData.chartData.map((d, index) => {
+                  const maxVal = Math.max(...revenuePeriodData.chartData.map(c => c.revenue), 1000);
+                  const barHeight = maxVal > 0 ? (d.revenue / maxVal) * 45 : 3;
+                  const barWidth = revenuePeriodData.chartData.length > 7 ? 10 : 12;
+
+                  return (
+                    <View key={`${d.label}-${index}`} style={styles.barColumn}>
+                      <View style={styles.barWrapper}>
+                        <Svg height="55" width={barWidth + 8} style={{ alignSelf: 'center' }}>
+                          <Rect
+                            x="4"
+                            y="5"
+                            width={barWidth}
+                            height="45"
+                            rx="5"
+                            fill={isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(9, 9, 11, 0.04)'}
+                          />
+                          <Rect
+                            x="4"
+                            y={50 - barHeight}
+                            width={barWidth}
+                            height={barHeight}
+                            rx="5"
+                            fill={d.isActive ? '#002cf7' : (isDarkMode ? 'rgba(56, 189, 248, 0.4)' : 'rgba(0, 44, 247, 0.35)')}
+                          />
+                        </Svg>
+                      </View>
+                      <Text style={[styles.barDayText, d.isActive && styles.barDayTextActive]} numberOfLines={1}>
+                        {d.label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </MotiView>
+        </View>
 
         {/* 2X2 GRID STATS (DESIGN FIRST MODEL WITH ICON-MATCHED BACKGROUNDS) */}
         <View style={styles.gridRow}>
@@ -1084,6 +1092,182 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             </MotiView>
           </View>
         </View>
+
+        {/* MEILLEURS CLIENTS / TOP REWARDS SECTION */}
+        <View style={styles.sectionHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{
+              width: 28,
+              height: 28,
+              borderRadius: 10,
+              backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.12)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.35)' : 'rgba(245, 158, 11, 0.25)'
+            }}>
+              <Trophy size={15} color="#f59e0b" />
+            </View>
+            <Text style={styles.sectionTitle}>Meilleurs Clients</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => {
+              if (setGestionFilter) setGestionFilter('clients');
+              if (onNavigate) onNavigate('gestion');
+            }}
+            activeOpacity={0.7}
+            style={styles.seeAllPillBtn}
+          >
+            <Text style={styles.seeAllPillText}>Voir plus</Text>
+          </TouchableOpacity>
+        </View>
+
+        {topClients.length === 0 ? (
+          <View style={[styles.emptyContainer, { marginBottom: 16 }]}>
+            <Text style={styles.emptyText}>Aucun client dans le programme fidélité</Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -20, marginBottom: 20 }}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+          >
+            {topClients.map((client, index) => {
+              const tier = getFidelityTier(client.points_fidelite || 0);
+              const rank = index + 1;
+
+              // Rank styling setup
+              let rankBg = isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fffbe6';
+              let rankBorder = 'rgba(245, 158, 11, 0.4)';
+              let rankColor = '#f59e0b';
+              let RankIcon = Crown;
+
+              if (rank === 2) {
+                rankBg = isDarkMode ? 'rgba(56, 189, 248, 0.18)' : '#f0f9ff';
+                rankBorder = 'rgba(56, 189, 248, 0.35)';
+                rankColor = isDarkMode ? '#38bdf8' : '#0284c7';
+                RankIcon = ShieldCheck;
+              } else if (rank === 3) {
+                rankBg = isDarkMode ? 'rgba(217, 119, 6, 0.18)' : '#fff7ed';
+                rankBorder = 'rgba(217, 119, 6, 0.35)';
+                rankColor = '#d97706';
+                RankIcon = Award;
+              } else if (rank >= 4) {
+                rankBg = isDarkMode ? '#1e1e24' : '#f8fafc';
+                rankBorder = isDarkMode ? '#27272a' : '#e2e8f0';
+                rankColor = isDarkMode ? '#a1a1aa' : '#64748b';
+                RankIcon = Star;
+              }
+
+              const clientOrders = (orders || []).filter(o => o.customer_id === client.id);
+              const initials = `${(client.prenom || 'C')[0].toUpperCase()}${(client.nom || 'L')[0].toUpperCase()}`;
+
+              return (
+                <MotiView
+                  key={client.id || index}
+                  from={{ opacity: 0, scale: 0.92, translateY: 10 }}
+                  animate={{ opacity: 1, scale: 1, translateY: 0 }}
+                  transition={{ type: 'spring', damping: 18, stiffness: 140, delay: index * 40 }}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.82}
+                    onPress={() => setSelectedClient(client)}
+                    style={[
+                      styles.topClientCard,
+                      {
+                        backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+                        borderColor: rank === 1 ? rankBorder : (isDarkMode ? '#27272a' : '#e2e8f0'),
+                        borderWidth: rank === 1 ? 1.5 : 1,
+                      }
+                    ]}
+                  >
+                    {/* Top Header Row: Rank Badge + Points Tag */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 12 }}>
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 3,
+                        backgroundColor: rankBg,
+                        borderColor: rankBorder,
+                        borderWidth: 1,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 12
+                      }}>
+                        {rank <= 3 ? <RankIcon size={11} color={rankColor} fill={rank === 1 ? rankColor : 'transparent'} /> : null}
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: rankColor }}>#{rank}</Text>
+                      </View>
+
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        backgroundColor: tier.bgLight,
+                        borderColor: tier.border,
+                        borderWidth: 1,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 12
+                      }}>
+                        <Sparkles size={10} color={tier.color} />
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: tier.color }}>
+                          {client.points_fidelite || 0} pts
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Main Client Profile Row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, width: '100%' }}>
+                      <View style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 21,
+                        backgroundColor: tier.bgLight,
+                        borderColor: tier.border,
+                        borderWidth: 1.5,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        overflow: 'hidden'
+                      }}>
+                        {client.photo_url || client.user_picture ? (
+                          <Image
+                            source={{ uri: client.photo_url || client.user_picture }}
+                            style={{ width: 42, height: 42, borderRadius: 21 }}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: tier.color }}>{initials}</Text>
+                        )}
+                      </View>
+
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#0f172a' }} numberOfLines={1}>
+                          {client.prenom} {client.nom}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: tier.color, marginTop: 1 }} numberOfLines={1}>
+                          {tier.name}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Bottom Row: Number of orders only (Ex: 07 commandes) */}
+                    <View style={{
+                      width: '100%',
+                      paddingTop: 8,
+                      borderTopWidth: 1,
+                      borderTopColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9'
+                    }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#64748b' }}>
+                        {String(clientOrders.length).padStart(2, '0')} commande{clientOrders.length > 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </MotiView>
+              );
+            })}
+          </ScrollView>
+        )}
 
         {/* ACTIVE ORDERS FEED */}
         <View style={styles.sectionHeader}>
@@ -1356,7 +1540,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#3f3f46', marginBottom: 6 }}>
                 {t('dashboard.date_debut', {}, 'Date de début')}
               </Text>
-              
+
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setActiveCalendarField(activeCalendarField === 'start' ? null : 'start')}
@@ -1383,7 +1567,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
               <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#3f3f46', marginBottom: 6 }}>
                 {t('dashboard.date_fin', {}, 'Date de fin')}
               </Text>
-              
+
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setActiveCalendarField(activeCalendarField === 'end' ? null : 'end')}
@@ -1833,6 +2017,20 @@ const baseStyles = StyleSheet.create({
     fontSize: 12,
     color: '#a1a1aa',
     fontWeight: '500',
+  },
+  topClientCard: {
+    width: 205,
+    borderRadius: 20,
+    padding: 12,
+    alignItems: 'flex-start',
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
   },
   orderCard: {
     flexDirection: 'row',
@@ -2427,7 +2625,7 @@ const baseStyles = StyleSheet.create({
 
 function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
-  
+
   const overrides = {
     container: { backgroundColor: '#000000' },
     header: { backgroundColor: '#000000' },
@@ -2465,6 +2663,7 @@ function getStyles(isDarkMode) {
     viewAllText: { color: '#38bdf8' },
     seeAllPillBtn: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.35)' },
     seeAllPillText: { color: '#38bdf8' },
+    topClientCard: { backgroundColor: '#121212', borderColor: '#27272a', shadowOpacity: 0, elevation: 0 },
     orderCard: { backgroundColor: '#121212', borderColor: '#27272a' },
     clientPillBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
     clientPillBtnText: { color: '#38bdf8' },

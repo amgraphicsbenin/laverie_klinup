@@ -189,9 +189,12 @@ export default function GestionScreen({
 
 
 
-  // Switch to orders tab if a dashboard filter is applied
+  // Switch to orders or clients tab if a dashboard filter is applied
   useEffect(() => {
-    if (gestionFilter) {
+    if (gestionFilter === 'clients') {
+      setShowClientsPage(true);
+    } else if (gestionFilter) {
+      setShowClientsPage(false);
       setSubTab('orders');
     }
   }, [gestionFilter]);
@@ -1048,9 +1051,13 @@ export default function GestionScreen({
         style={{ flex: 1 }}
       >
         <ClientsScreen
-          onBack={() => setShowClientsPage(false)}
+          onBack={() => {
+            setShowClientsPage(false);
+            if (setGestionFilter) setGestionFilter(null);
+          }}
           onSelectClient={(client) => {
             setShowClientsPage(false);
+            if (setGestionFilter) setGestionFilter(null);
             setSelectedClient(client);
           }}
           onShowSuccess={onShowSuccess}
@@ -1074,6 +1081,7 @@ export default function GestionScreen({
             onPress={() => {
               setShowClientsPage(false);
               setSubTab('orders');
+              if (setGestionFilter) setGestionFilter(null);
             }}
             style={styles.topActionBtnBlue}
             activeOpacity={0.8}
@@ -1082,7 +1090,10 @@ export default function GestionScreen({
             <Text style={styles.topActionBtnTextBlue}>Commandes</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => setShowClientsPage(true)}
+            onPress={() => {
+              setShowClientsPage(true);
+              if (setGestionFilter) setGestionFilter(null);
+            }}
             style={styles.topActionBtnWhite}
             activeOpacity={0.8}
           >
@@ -1168,13 +1179,14 @@ export default function GestionScreen({
       </View>
 
       {/* FILTER PILL */}
-      {subTab === 'orders' && gestionFilter && (
+      {subTab === 'orders' && gestionFilter && gestionFilter !== 'clients' && (
         <View style={styles.filterPillSection}>
           <View style={styles.filterPill}>
             <Text style={styles.filterPillText}>
               Filtre : {
                 gestionFilter === 'en_cours' ? 'En Cours' :
-                gestionFilter === 'pretes' ? 'Prêtes' : 'Retards / Urgences'
+                gestionFilter === 'pretes' ? 'Prêtes' :
+                gestionFilter === 'retards' ? 'Retards / Urgences' : gestionFilter
               }
             </Text>
             <TouchableOpacity onPress={() => setGestionFilter(null)} style={styles.clearFilterBtn}>
