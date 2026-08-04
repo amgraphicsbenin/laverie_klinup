@@ -35,6 +35,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
+  const [withDelivery, setWithDelivery] = useState(false);
 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
   const isSubscriptionMode = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -69,6 +70,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     setExpandedArticles([]);
     setPayWithSubscription(false);
     setSubscribePlanId('');
+    setWithDelivery(false);
     setClothingSearchQuery('');
     setMomoRefNumber('');
     setMomoRefError('');
@@ -185,6 +187,11 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
     try {
       const currentUser = db.getCurrentUser();
+      const deliveryCalc = (withDelivery && activeCustomer)
+        ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+        : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+      const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
+      const finalNetTotal = netTotal + deliveryFee;
       const newOrder = {
         customer_id: orderClient,
         store_id: selectedOrderStoreId,
@@ -200,8 +207,10 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
           quantite: a.quantity,
           prix: a.price
         })),
-        total: netTotal,
-        prix_total: netTotal,
+        total: finalNetTotal,
+        prix_total: finalNetTotal,
+        frais_livraison: deliveryFee,
+        distance_km: deliveryCalc.distanceKm,
         avance: finalAvance,
         avance_payee: finalAvance,
         statut: 'attente',
@@ -776,6 +785,27 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
             })}
           </div>
 
+          {/* Option Livraison */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '14px', border: `1px solid ${withDelivery ? '#3b82f6' : 'var(--border-color)'}`, backgroundColor: withDelivery ? 'rgba(59, 130, 246, 0.07)' : 'var(--bg-app)', marginBottom: '14px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: withDelivery ? '#3b82f6' : 'var(--text-primary)' }}>
+                🚚 Livraison à domicile
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                {withDelivery && activeCustomer?.coordonnees_livraison
+                  ? 'Frais calculés selon la zone GPS du client'
+                  : 'Le client récupère sa commande en boutique'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWithDelivery(!withDelivery)}
+              style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', backgroundColor: withDelivery ? '#3b82f6' : 'var(--border-color)', color: withDelivery ? '#ffffff' : 'var(--text-secondary)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+            >
+              {withDelivery ? '✓ Oui' : 'Non'}
+            </button>
+          </div>
+
           {/* Avance, Mode de règlement & Réduction (%) en grille alignée */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '14px' }}>
             <div>
@@ -990,7 +1020,11 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
             const discountPercent = Number(orderDiscount) || 0;
             const discountAmount = Math.round(currentTotal * (discountPercent / 100));
-            const netTotal = currentTotal - discountAmount;
+            const deliveryCalcPreview = (withDelivery && activeCustomer)
+              ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+              : { fee: 0, distanceKm: 0 };
+            const deliveryFeePreview = withDelivery ? (deliveryCalcPreview.fee || 0) : 0;
+            const netTotal = currentTotal - discountAmount + deliveryFeePreview;
             
             const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
             const currentReste = netTotal - currentAvance;
@@ -1024,6 +1058,19 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Réduction ({discountPercent}%)</span>
                     <span style={{ fontSize: '12px', color: 'var(--danger)', fontWeight: 700 }}>-{formatPrice(discountAmount)}</span>
+                  </div>
+                )}
+
+                {withDelivery && deliveryFeePreview > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 700 }}>🚚 Frais de Livraison ({deliveryCalcPreview.distanceKm} km)</span>
+                    <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 700 }}>+{formatPrice(deliveryFeePreview)}</span>
+                  </div>
+                )}
+                {withDelivery && deliveryFeePreview === 0 && activeCustomer && !activeCustomer.coordonnees_livraison && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>⚠️ Livraison</span>
+                    <span style={{ fontSize: '11px', color: '#f59e0b' }}>GPS client non renseigné</span>
                   </div>
                 )}
 

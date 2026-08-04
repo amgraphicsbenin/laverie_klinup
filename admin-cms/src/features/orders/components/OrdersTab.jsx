@@ -556,6 +556,13 @@ export default function OrdersTab({
                                 </div>
                               )}
 
+                              {Number(order.frais_livraison || 0) > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#3b82f6' }}>
+                                  <span>🚚 Frais de Livraison{order.distance_km ? ` (${order.distance_km} km)` : ''} :</span>
+                                  <strong>+{Number(order.frais_livraison).toLocaleString()} FCFA</strong>
+                                </div>
+                              )}
+
                               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(0,0,0,0.1)', paddingTop: '0.2rem', fontWeight: 800 }}>
                                 <span>Net à payer :</span>
                                 <span style={{ color: 'var(--text-primary)' }}>{netPrice.toLocaleString()} FCFA</span>

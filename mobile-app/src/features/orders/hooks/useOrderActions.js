@@ -150,6 +150,19 @@ export default function useOrderActions({
    * @param {String} nextStatus - Le statut cible.
    */
   const updateStatusDirect = async (order, nextStatus) => {
+    const total = Number(order.prix_total || order.total || 0);
+    const avance = Number(order.avance_payee || order.avance || 0);
+    const remainingToPay = Math.max(0, total - avance);
+    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
+    const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'livre', 'restitue'].includes(nextStatus);
+
+    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
+      setPaymentOrder(order);
+      setPaymentNextStatus(nextStatus);
+      setPaymentModalVisible(true);
+      return;
+    }
+
     try {
       await db.updateOrderStatus(order.id, nextStatus);
       const updated = db.getOrders().find(o => o.id === order.id);
@@ -162,7 +175,7 @@ export default function useOrderActions({
 
   /**
    * Transitionne une commande vers son statut logique suivant.
-   * Gère l'affichage automatique de la modale de paiement si le statut cible est final.
+   * Gère l'affichage automatique de la modale de paiement si le solde n'est pas réglé avant le lavage.
    * @param {Object} order - La commande à traiter.
    * @param {Boolean} updateSelected - Si vrai, met à jour la commande sélectionnée dans les détails.
    */
@@ -181,9 +194,14 @@ export default function useOrderActions({
     else nextStatus = 'traitement';
 
     const isFinal = nextStatus === 'livre' || nextStatus === 'restitue';
+    const total = Number(order.prix_total || order.total || 0);
+    const avance = Number(order.avance_payee || order.avance || 0);
+    const remainingToPay = Math.max(0, total - avance);
+    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
 
-    // Si la commande est finalisée et n'est pas un forfait, exiger le paiement du solde restant
-    if (isFinal && !order.is_subscription_order) {
+    // Exiger le règlement du solde avant le lavage (ou pour tout statut post-traitement)
+    const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'livre', 'restitue'].includes(nextStatus);
+    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
       setPaymentOrder(order);
       setPaymentNextStatus(nextStatus);
       setPaymentModalVisible(true);

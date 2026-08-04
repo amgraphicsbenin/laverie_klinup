@@ -1954,19 +1954,28 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
   const handleStartDelivery = async (order, finalStatus = 'restitue') => {
     setDelivFinalStatus(finalStatus);
-    const remainingToPay = order.prix_total - order.avance_payee;
-    if (remainingToPay <= 0) {
-      if (await confirm(`Confirmer la finalisation de la commande ${order.identifiant_unique_marquage} ?`)) {
+    const total = Number(order.prix_total || order.total || 0);
+    const avance = Number(order.avance_payee || order.avance || 0);
+    const remainingToPay = Math.max(0, total - avance);
+    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
+
+    if (remainingToPay <= 0 || isSubscriptionOrder) {
+      if (await confirm(`Confirmer le passage de la commande ${order.identifiant_unique_marquage} vers le statut "${getOrderStatusLabel(finalStatus)}"?`)) {
         try {
           await db.updateOrderStatus(order.id, finalStatus);
           refreshAdminData();
 
-          // Notification WhatsApp livraison directe (déjà payé)
+          // Notification WhatsApp
           const customer = customers.find(c => c.id === order.customer_id);
           if (customer) {
-            const finalStatusLabel = finalStatus === 'a_livrer' ? 'mise en livraison' : finalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
-            const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${finalStatusLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
-            sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+            let text = '';
+            if (finalStatus === 'en_cours_lavage') {
+              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est entièrement réglée et passe en cours de lavage chez KLIN UP.`;
+            } else {
+              const finalStatusLabel = finalStatus === 'a_livrer' ? 'mise en livraison' : finalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
+              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${finalStatusLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+            }
+            if (text) sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
           }
         } catch (err) {
           alert("Erreur de mise à jour du statut : " + err.message);
@@ -2008,11 +2017,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
       refreshAdminData();
       setShowDeliveryPaymentModal(false);
 
-      // Notification WhatsApp solde livraison
+      // Notification WhatsApp solde
       const customer = customers.find(c => c.id === delivOrder.customer_id);
       if (customer) {
-        const finalStatusLabel = delivFinalStatus === 'a_livrer' ? 'mise en livraison' : delivFinalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
-        const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons la ${finalStatusLabel} de votre commande ${delivOrder.identifiant_unique_marquage} et le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA.\nVotre commande est entièrement soldée. Merci pour votre fidélité !`;
+        const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA pour votre commande ${delivOrder.identifiant_unique_marquage}.\nVotre commande est entièrement soldée et passe au statut suivant. Merci pour votre confiance !`;
         sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
       }
 
@@ -2020,9 +2028,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setMomoRefNumber('');
       setMomoRefError('');
       setMomoOperator('MTN');
-      alert("Livraison et paiement enregistrés avec succès dans la base de données !");
+      alert("Paiement du solde et mise à jour du statut enregistrés avec succès !");
     } catch (err) {
-      alert("Erreur lors de la livraison : " + err.message);
+      alert("Erreur lors du traitement du paiement : " + err.message);
     }
   };
 
@@ -2056,6 +2064,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
   const handleStatusChange = async (orderId, nextStatus) => {
     const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const total = Number(order.prix_total || order.total || 0);
+    const avance = Number(order.avance_payee || order.avance || 0);
+    const remainingToPay = Math.max(0, total - avance);
+    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
+
+    const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'restitue'].includes(nextStatus);
+
+    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
+      handleStartDelivery(order, nextStatus);
+      return;
+    }
+
     try {
       await db.updateOrderStatus(orderId, nextStatus);
       refreshAdminData();
@@ -2073,7 +2095,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
             text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est en cours de repassage chez KLIN UP.`;
           } else if (nextStatus === 'pret') {
             const remaining = order.prix_total - order.avance_payee;
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer.\nReste à payer: ${remaining.toLocaleString()} FCFA.\nÀ bientôt chez KLIN UP !`;
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer.`;
           } else if (nextStatus === 'a_livrer') {
             text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en cours de livraison à votre adresse.`;
           } else if (nextStatus === 'a_recuperer') {
@@ -3512,7 +3534,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           <div className="modal-backdrop" onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); setMomoOperator('MTN'); }}>
             <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
               <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                Livrer & Encaisser
+                {delivFinalStatus === 'en_cours_lavage' ? 'Règlement Obligatoire Avant Lavage' : 'Règlement du Solde & Validation'}
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '10px' }}>
@@ -3604,7 +3626,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 )}
 
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--success)', border: 'none' }}>Confirmer la Livraison</button>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--success)', border: 'none' }}>
+                    {delivFinalStatus === 'en_cours_lavage' ? 'Valider & Lancer le lavage' : 'Valider le Règlement'}
+                  </button>
                   <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); setMomoOperator('MTN'); }}>Annuler</button>
                 </div>
               </form>

@@ -36,6 +36,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
   const [appliedReward, setAppliedReward] = useState(null);
+  const [withDelivery, setWithDelivery] = useState(false);
 
   // Mode Nouveau Client state
   const [clientNom, setClientNom] = useState('');
@@ -78,6 +79,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
     setPayWithSubscription(false);
     setSubscribePlanId('');
     setAppliedReward(null);
+    setWithDelivery(false);
     setMomoRefNumber('');
     setMomoRefError('');
     setMomoOperator('MTN');
@@ -253,10 +255,10 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         }
       }
 
-      const deliveryCalc = activeCustomer && activeCustomer.coordonnees_livraison
-        ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison)
+      const deliveryCalc = (withDelivery && activeCustomer)
+        ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
-      const deliveryFee = deliveryCalc.fee || 0;
+      const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
       const finalTotal = Math.max(0, netTotal - rewardDiscountVal) + deliveryFee;
 
@@ -928,6 +930,29 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               })}
             </View>
 
+            {/* Option Livraison */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: withDelivery ? '#3b82f6' : (isDarkMode ? '#27272a' : '#e2e8f0'), backgroundColor: withDelivery ? (isDarkMode ? '#0f1f3d' : '#eff6ff') : (isDarkMode ? '#121212' : '#f8fafc'), marginBottom: 14 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: withDelivery ? '#3b82f6' : (isDarkMode ? '#ffffff' : '#0f172a') }}>
+                  🚚 Livraison à domicile
+                </Text>
+                <Text style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                  {withDelivery && activeCustomer?.coordonnees_livraison
+                    ? `Frais calculés selon la zone GPS du client`
+                    : 'Le client récupère sa commande en boutique'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setWithDelivery(!withDelivery)}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: withDelivery ? '#3b82f6' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: withDelivery ? '#ffffff' : (isDarkMode ? '#a1a1aa' : '#64748b') }}>
+                  {withDelivery ? '✓ Oui' : 'Non'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Avance & Mode de paiement */}
             <View style={[styles.formRowInline, { zIndex: 20, elevation: 20 }]}>
               <View style={styles.formFieldInline}>
@@ -1181,10 +1206,10 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               }
             }
 
-            const deliveryCalc = activeCustomer && activeCustomer.coordonnees_livraison
-              ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison)
+            const deliveryCalc = (withDelivery && activeCustomer)
+              ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
               : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
-            const deliveryFee = deliveryCalc.fee || 0;
+            const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
             const netTotal = Math.max(0, currentTotal - discountAmount - rewardDiscountVal) + deliveryFee;
             const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
@@ -1283,7 +1308,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
                 {deliveryFee > 0 && (
                   <View style={styles.receiptRow}>
                     <Text style={[styles.receiptRowLabel, { color: '#3b82f6', fontWeight: '700' }]}>
-                      Frais de Livraison ({deliveryCalc.zoneLabel} • {deliveryCalc.distanceKm} km)
+                      Frais de Livraison ({deliveryCalc.distanceKm} km)
                     </Text>
                     <Text style={[styles.receiptRowVal, { color: '#3b82f6', fontWeight: '700' }]}>
                       +{formatPrice(deliveryFee)}

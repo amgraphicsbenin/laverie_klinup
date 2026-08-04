@@ -727,6 +727,29 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
                         {activeClient.adresse ? (
                           <View style={styles.ficheInfoRow}><MapPin size={13} color="#71717a" /><Text style={styles.ficheInfoText}>{activeClient.adresse}</Text></View>
                         ) : null}
+                        {(activeClient.quartier || activeClient.ville) ? (
+                          <View style={styles.ficheInfoRow}>
+                            <MapPin size={13} color="#3b82f6" />
+                            <Text style={[styles.ficheInfoText, { color: '#3b82f6', fontWeight: '600' }]}>
+                              {[activeClient.quartier, activeClient.ville].filter(Boolean).join(', ')}
+                            </Text>
+                          </View>
+                        ) : null}
+                        {(activeClient.latitude != null && activeClient.longitude != null) ? (
+                          <View style={styles.ficheInfoRow}>
+                            <MapPin size={13} color="#22c55e" />
+                            <Text style={[styles.ficheInfoText, { color: '#22c55e', fontWeight: '500', fontSize: 11 }]}>
+                              GPS : {Number(activeClient.latitude).toFixed(5)}, {Number(activeClient.longitude).toFixed(5)}
+                            </Text>
+                          </View>
+                        ) : (activeClient.coordonnees_livraison ? (
+                          <View style={styles.ficheInfoRow}>
+                            <MapPin size={13} color="#22c55e" />
+                            <Text style={[styles.ficheInfoText, { color: '#22c55e', fontWeight: '500', fontSize: 11 }]}>
+                              GPS : {activeClient.coordonnees_livraison}
+                            </Text>
+                          </View>
+                        ) : null)}
                         <View style={styles.ficheInfoRow}>
                           <Text style={styles.ficheInfoLabel}>Preferences :</Text>
                           <Text style={styles.ficheInfoValue}>
@@ -847,7 +870,14 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
                       <Text style={styles.ficheDeleteBtnText}>Supprimer</Text>
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity onPress={() => handleEditCustomer(selectedClient)} style={styles.ficheEditBtn}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      // Utilise la version fraîche du client (avec latitude/longitude) depuis la liste customers
+                      const freshClient = customers.find(c => c.id === selectedClient.id) || selectedClient;
+                      handleEditCustomer(freshClient);
+                    }}
+                    style={styles.ficheEditBtn}
+                  >
                     <Edit3 size={14} color="#ffffff" style={{ marginRight: 4 }} />
                     <Text style={styles.ficheEditBtnText}>Modifier</Text>
                   </TouchableOpacity>

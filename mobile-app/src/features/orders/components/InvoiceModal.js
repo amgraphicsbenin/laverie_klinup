@@ -48,8 +48,11 @@ export default function InvoiceModal({
   if (!order) return null;
 
   const netPrice = order.prix_total || order.total || 0;
-  const displayBrut = order.prix_base_avant_remise || netPrice;
-  const displayRemiseMontant = order.remise_montant || Math.max(0, displayBrut - netPrice);
+  const fraisLivraison = Number(order.frais_livraison || 0);
+  const distanceKm = order.distance_km || null;
+  const brutAvantLivraison = netPrice - fraisLivraison;
+  const displayBrut = order.prix_base_avant_remise || Math.max(brutAvantLivraison, 0);
+  const displayRemiseMontant = order.remise_montant || Math.max(0, displayBrut - brutAvantLivraison);
   const displayRemisePourcent = order.remise_pourcentage || (displayBrut > 0 ? Math.round((displayRemiseMontant / displayBrut) * 100) : 0);
   const hasDiscount = displayRemiseMontant > 0;
 
@@ -170,6 +173,17 @@ export default function InvoiceModal({
                     </Text>
                     <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>
                       -{formatPrice(displayRemiseMontant)}
+                    </Text>
+                  </View>
+                )}
+
+                {fraisLivraison > 0 && (
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={[styles.tpeTotalLabel, { color: '#3b82f6' }]}>
+                      LIVRAISON{distanceKm ? ` (${distanceKm} km)` : ''}
+                    </Text>
+                    <Text style={[styles.tpeTotalVal, { color: '#3b82f6' }]}>
+                      +{formatPrice(fraisLivraison)}
                     </Text>
                   </View>
                 )}

@@ -421,8 +421,14 @@ export default function GestionScreen({
     else nextStatus = 'traitement';
 
     const isFinal = nextStatus === 'livre' || nextStatus === 'restitue';
+    const total = Number(order.prix_total || order.total || 0);
+    const avance = Number(order.avance_payee || order.avance || 0);
+    const remainingToPay = Math.max(0, total - avance);
+    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
 
-    if (isFinal && !order.is_subscription_order) {
+    // Exiger le règlement du solde avant le lavage (ou pour tout statut post-traitement)
+    const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'livre', 'restitue'].includes(nextStatus);
+    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
       setPaymentOrder(order);
       setPaymentNextStatus(nextStatus);
       setPaymentMethod('Espèces');
@@ -473,7 +479,8 @@ export default function GestionScreen({
     const total = Number(paymentOrder.prix_total || paymentOrder.total || 0);
     const avance = Number(paymentOrder.avance_payee || paymentOrder.avance || 0);
     const soldeRestant = Math.max(0, total - avance);
-    const targetStatus = paymentNextStatus || 'restitue';
+    const targetStatus = paymentNextStatus || 'en_cours_lavage';
+    const isFinal = targetStatus === 'livre' || targetStatus === 'restitue';
 
     const performUpdate = async () => {
       try {
@@ -486,7 +493,7 @@ export default function GestionScreen({
           paymentMethod === 'Mobile Money' ? momoOperator : null
         );
         if (onShowSuccess) {
-          onShowSuccess("Paiement enregistré et commande finalisée.");
+          onShowSuccess(targetStatus === 'en_cours_lavage' ? "Solde réglé. Commande transmise au lavage !" : "Paiement enregistré et commande mise à jour.");
         }
       } catch (e) {
         console.error("Error validating payment:", e);
@@ -500,10 +507,31 @@ export default function GestionScreen({
       setSelectedOrder(null);
     }
     
-    triggerFinalStatusAnimation(paymentOrder.id, targetStatus, performUpdate);
+    if (isFinal) {
+      triggerFinalStatusAnimation(paymentOrder.id, targetStatus, performUpdate);
+    } else {
+      await performUpdate();
+    }
   };
 
   const handleUpdateStatusDirect = async (order, nextStatus) => {
+    const total = Number(order.prix_total || order.total || 0);
+    const avance = Number(order.avance_payee || order.avance || 0);
+    const remainingToPay = Math.max(0, total - avance);
+    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
+    const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'livre', 'restitue'].includes(nextStatus);
+
+    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
+      setPaymentOrder(order);
+      setPaymentNextStatus(nextStatus);
+      setPaymentMethod('Espèces');
+      setMomoRefNumber('');
+      setMomoRefError('');
+      setMomoOperator('MTN');
+      setPaymentModalVisible(true);
+      return;
+    }
+
     try {
       await db.updateOrderStatus(order.id, nextStatus);
       const updated = db.getOrders().find(o => o.id === order.id);
@@ -514,6 +542,23 @@ export default function GestionScreen({
   };
 
   const handleNextStatusDirectList = async (order, nextStatus) => {
+    const total = Number(order.prix_total || order.total || 0);
+    const avance = Number(order.avance_payee || order.avance || 0);
+    const remainingToPay = Math.max(0, total - avance);
+    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
+    const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'livre', 'restitue'].includes(nextStatus);
+
+    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
+      setPaymentOrder(order);
+      setPaymentNextStatus(nextStatus);
+      setPaymentMethod('Espèces');
+      setMomoRefNumber('');
+      setMomoRefError('');
+      setMomoOperator('MTN');
+      setPaymentModalVisible(true);
+      return;
+    }
+
     try {
       await db.updateOrderStatus(order.id, nextStatus);
     } catch (e) {
@@ -794,6 +839,15 @@ export default function GestionScreen({
       </div>
     ` : '';
 
+    const fraisLivraison = Number(order.frais_livraison || 0);
+    const distanceKmLiv = order.distance_km || null;
+    const livraisonHtml = fraisLivraison > 0 ? `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #3b82f6;">
+        <div style="font-weight: bold;">LIVRAISON${distanceKmLiv ? ` (${distanceKmLiv} km)` : ''}</div>
+        <div style="font-weight: bold;">+${formatPrice(fraisLivraison)}</div>
+      </div>
+    ` : '';
+
     return `
       <html>
         <head>
@@ -953,6 +1007,7 @@ export default function GestionScreen({
             ${expressHtml}
             ${remiseHtml}
             ${rewardHtml}
+            ${livraisonHtml}
             <div class="total-row total-bold">
               <div>NET A PAYER</div>
               <div>${formatPrice(netPrice)}</div>
@@ -2171,6 +2226,15 @@ export default function GestionScreen({
                             REMISE ({displayRemisePourcent}%)
                           </Text>
                           <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(displayRemiseMontant)}</Text>
+                        </View>
+                      )}
+
+                      {Number(invoiceOrder.frais_livraison || 0) > 0 && (
+                        <View style={styles.tpeTotalRow}>
+                          <Text style={[styles.tpeTotalLabel, { color: '#3b82f6' }]}>
+                            LIVRAISON{invoiceOrder.distance_km ? ` (${invoiceOrder.distance_km} km)` : ''}
+                          </Text>
+                          <Text style={[styles.tpeTotalVal, { color: '#3b82f6' }]}>+{formatPrice(Number(invoiceOrder.frais_livraison))}</Text>
                         </View>
                       )}
 

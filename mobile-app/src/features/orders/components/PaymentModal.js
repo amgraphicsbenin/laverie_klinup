@@ -114,9 +114,14 @@ export default function PaymentModal({
             
             {/* En-tête de la modale */}
             <View style={styles.compactModalHeader || { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-              <Text style={styles.compactModalTitle || { fontSize: 16, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>
-                Enregistrer le Règlement
-              </Text>
+              <View>
+                <Text style={styles.compactModalTitle || { fontSize: 16, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>
+                  Enregistrer le Règlement
+                </Text>
+                <Text style={{ fontSize: 11, color: '#3b82f6', fontWeight: '600', marginTop: 2 }}>
+                  Règlement du solde requis avant le lavage
+                </Text>
+              </View>
               <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
                 <X size={20} color={isDarkMode ? '#94a3b8' : '#71717a'} />
               </TouchableOpacity>

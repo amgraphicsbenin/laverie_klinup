@@ -30,6 +30,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
 
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
+  const [withDelivery, setWithDelivery] = useState(false);
 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
   const isSubscriptionMode = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -191,10 +192,10 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
     }
 
     try {
-      const deliveryCalc = activeCustomer
+      const deliveryCalc = (withDelivery && activeCustomer)
         ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
-      const deliveryFee = deliveryCalc.fee || 0;
+      const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
       const finalTotal = netTotal + deliveryFee;
 
@@ -226,15 +227,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
       // Clean state
       setOrderClient('');
       setSelectedArticles([]);
-      setOrderAvance('0');
-      setOrderDiscount('0');
-      setOrderUrgency('Normal');
-      setExpandedArticles([]);
-      setPayWithSubscription(false);
-      setSubscribePlanId('');
-      setMomoRefNumber('');
-      setMomoRefError('');
-      setMomoOperator('MTN');
+      resetForm();
       onClose();
       if (onShowSuccess) onShowSuccess("Commande créée avec succès !");
     } catch (e) {
@@ -544,6 +537,29 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                 })}
               </View>
 
+              {/* Option Livraison */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: withDelivery ? '#3b82f6' : (isDarkMode ? '#27272a' : '#e2e8f0'), backgroundColor: withDelivery ? (isDarkMode ? '#0f1f3d' : '#eff6ff') : (isDarkMode ? '#121212' : '#f8fafc'), marginBottom: 14 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: withDelivery ? '#3b82f6' : (isDarkMode ? '#ffffff' : '#0f172a') }}>
+                    🚚 Livraison à domicile
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                    {withDelivery && activeCustomer?.coordonnees_livraison
+                      ? 'Frais calculés selon la zone GPS du client'
+                      : 'Le client récupère sa commande en boutique'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setWithDelivery(!withDelivery)}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: withDelivery ? '#3b82f6' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: withDelivery ? '#ffffff' : (isDarkMode ? '#a1a1aa' : '#64748b') }}>
+                    {withDelivery ? '✓ Oui' : 'Non'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Avance et Mode de règlement (same line) */}
               <View style={[styles.formRowInline, { zIndex: 20, elevation: 20 }]}>
                 <View style={styles.formFieldInline}>
@@ -696,10 +712,10 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                 const discountPercent = Number(orderDiscount) || 0;
                 const discountAmount = Math.round(currentTotal * (discountPercent / 100));
 
-                const deliveryCalc = activeCustomer
+                const deliveryCalc = (withDelivery && activeCustomer)
                   ? db.calculateDeliveryFee(db.getCurrentUser()?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
                   : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
-                const deliveryFee = deliveryCalc.fee || 0;
+                const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
                 const netTotal = currentTotal - discountAmount + deliveryFee;
                 
