@@ -283,6 +283,7 @@ export default function GestionScreen({
   const [custTelephone, setCustTelephone] = useState('');
   const [custAdresse, setCustAdresse] = useState('');
   const [custPreferences, setCustPreferences] = useState('Plié');
+  const [custSubscriptionPlanId, setCustSubscriptionPlanId] = useState('');
 
 
 
@@ -298,6 +299,7 @@ export default function GestionScreen({
     setCustTelephone('');
     setCustAdresse('');
     setCustPreferences('Plié');
+    setCustSubscriptionPlanId('');
     if (wasEditingFromFiche) {
       const origClient = db.getCustomers().find(c => c.id === wasEditingFromFiche);
       if (origClient) {
@@ -559,7 +561,7 @@ export default function GestionScreen({
           }
         }
       } else {
-        await db.addCustomer({
+        const newCustomer = await db.addCustomer({
           nom: custNom,
           prenom: custPrenom,
           telephone: custTelephone,
@@ -567,6 +569,9 @@ export default function GestionScreen({
           preferences_pliage: custPreferences,
           store_id: currentUser?.store_id
         });
+        if (newCustomer && custSubscriptionPlanId) {
+          await db.subscribeCustomer(newCustomer.id, custSubscriptionPlanId);
+        }
       }
 
       setCustNom('');
@@ -574,6 +579,7 @@ export default function GestionScreen({
       setCustTelephone('');
       setCustAdresse('');
       setCustPreferences('Plié');
+      setCustSubscriptionPlanId('');
       setEditingCustomer(null);
       setWasEditingFromFiche(null);
       setShowCustomerModal(false);
@@ -1962,6 +1968,39 @@ export default function GestionScreen({
                 <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
               </TouchableOpacity>
             </View>
+
+            {!editingCustomer && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.compactLabel}>Forfait d'abonnement (Facultatif)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => setCustSubscriptionPlanId("")}
+                    style={[
+                      styles.planChip,
+                      !custSubscriptionPlanId && styles.planChipActive
+                    ]}
+                  >
+                    <Text style={[styles.planChipText, !custSubscriptionPlanId && styles.planChipTextActive]}>
+                      Aucun
+                    </Text>
+                  </TouchableOpacity>
+                  {((catalog || []).filter(c => (c.categorie === 'abonnement' || c.service === 'abonnement') && c.is_active !== false && c.statut !== 'inactif')).map((p) => {
+                    const isSelected = custSubscriptionPlanId === p.id;
+                    return (
+                      <TouchableOpacity
+                        key={p.id}
+                        onPress={() => setCustSubscriptionPlanId(isSelected ? "" : p.id)}
+                        style={[styles.planChip, isSelected && styles.planChipActive]}
+                      >
+                        <Text style={[styles.planChipText, isSelected && styles.planChipTextActive]}>
+                          {p.article} ({(p.prix || 0).toLocaleString('fr-FR')} FCFA)
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
 
             <TouchableOpacity
               onPress={handleSaveCustomer}
@@ -4331,12 +4370,39 @@ const baseStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  planChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planChipActive: {
+    backgroundColor: 'rgba(0, 44, 247, 0.08)',
+    borderColor: '#002cf7',
+  },
+  planChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  planChipTextActive: {
+    color: '#002cf7',
+    fontWeight: '700',
+  },
 });
 
 function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
+    planChip: { backgroundColor: '#18181b', borderColor: '#27272a' },
+    planChipActive: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8' },
+    planChipText: { color: '#d4d4d8' },
+    planChipTextActive: { color: '#38bdf8', fontWeight: '700' },
     fullPageContainer: { backgroundColor: '#000000' },
     fullPageHeader: { backgroundColor: '#09090b', borderBottomColor: '#1f2937' },
     backBtnText: { color: '#ffffff' },

@@ -1119,5 +1119,50 @@ export const dbEngine = {
     dbEngine.logAction('SUPPRESSION_CATALOGUE', `Article catalogue supprimé : ${item.article}`);
     notifyListeners();
     return true;
+  },
+
+  // --- GESTION DES ABONNEMENTS CLIENTS ---
+  subscribeCustomer: async (customerId: string, catalogItemId: string): Promise<Customer | undefined> => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    const subPlan = memoryDb.catalog.find(c => c.id === catalogItemId && (c.service === 'abonnement' || c.categorie === 'abonnement'));
+    if (customer && subPlan) {
+      let clothesCount = (subPlan as any).nombre_vetements || 25;
+      if (!(subPlan as any).nombre_vetements) {
+        if (subPlan.article.includes('Premium') || subPlan.id === 'sub2') clothesCount = 50;
+        else if (subPlan.article.includes('Prestige') || subPlan.id === 'sub3') clothesCount = 100;
+        else if (subPlan.article.includes('VIP') || subPlan.id === 'sub4') clothesCount = 200;
+      }
+
+      const now = new Date();
+      const expires = new Date();
+      expires.setMonth(now.getMonth() + 1);
+
+      const activeSub = {
+        catalog_item_id: subPlan.id,
+        name: subPlan.article,
+        total_clothes: clothesCount,
+        remaining_clothes: clothesCount,
+        subscribed_at: now.toISOString(),
+        expires_at: expires.toISOString()
+      };
+
+      await performMutation('update', 'customers', customerId, { active_subscription: activeSub });
+      (customer as any).active_subscription = activeSub;
+      dbEngine.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subPlan.article} (${clothesCount} vêtements, ${subPlan.prix} FCFA)`);
+      notifyListeners();
+      return customer;
+    }
+  },
+
+  unsubscribeCustomer: async (customerId: string): Promise<Customer | undefined> => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if ((customer as any)?.active_subscription) {
+      const oldName = (customer as any).active_subscription.name;
+      await performMutation('update', 'customers', customerId, { active_subscription: null });
+      delete (customer as any).active_subscription;
+      dbEngine.logAction('DESABONNEMENT', `Client ${customer.prenom} ${customer.nom} s'est désabonné de ${oldName}`);
+      notifyListeners();
+      return customer;
+    }
   }
 };

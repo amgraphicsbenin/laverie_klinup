@@ -42,6 +42,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
   const [clientTelephone, setClientTelephone] = useState('');
   const [clientAdresse, setClientAdresse] = useState('');
   const [clientPrefPliage, setClientPrefPliage] = useState('Plié');
+  const [clientSubscriptionPlanId, setClientSubscriptionPlanId] = useState('');
 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
   const isSubscriptionMode = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -294,12 +295,17 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
         store_id: currentUser?.store_id
       });
 
+      if (newCustomer && clientSubscriptionPlanId) {
+        await db.subscribeCustomer(newCustomer.id, clientSubscriptionPlanId);
+      }
+
       // Clear new client form state
       setClientPrenom('');
       setClientNom('');
       setClientTelephone('');
       setClientAdresse('');
       setClientPrefPliage('Plié');
+      setClientSubscriptionPlanId('');
 
       if (onShowSuccess) onShowSuccess(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès !`);
 
@@ -428,6 +434,35 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess }) {
                 );
               })}
             </View>
+
+            <Text style={[styles.formLabel, { marginTop: 14 }]}>Forfait d'abonnement (Facultatif)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => setClientSubscriptionPlanId("")}
+                style={[
+                  styles.planChip,
+                  !clientSubscriptionPlanId && styles.planChipActive
+                ]}
+              >
+                <Text style={[styles.planChipText, !clientSubscriptionPlanId && styles.planChipTextActive]}>
+                  Aucun
+                </Text>
+              </TouchableOpacity>
+              {((catalog || []).filter(c => (c.categorie === 'abonnement' || c.service === 'abonnement') && c.is_active !== false && c.statut !== 'inactif')).map((p) => {
+                const isSelected = clientSubscriptionPlanId === p.id;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    onPress={() => setClientSubscriptionPlanId(isSelected ? "" : p.id)}
+                    style={[styles.planChip, isSelected && styles.planChipActive]}
+                  >
+                    <Text style={[styles.planChipText, isSelected && styles.planChipTextActive]}>
+                      {p.article} ({(p.prix || 0).toLocaleString('fr-FR')} FCFA)
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
           <TouchableOpacity
@@ -1477,6 +1512,29 @@ function getStyles(isDarkMode) {
     },
     fixedArticleScrollView: {
       flex: 1,
+    },
+    planChip: {
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+      borderWidth: 1.5,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    planChipActive: {
+      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0, 44, 247, 0.08)',
+      borderColor: isDarkMode ? '#38bdf8' : '#002cf7',
+    },
+    planChipText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDarkMode ? '#d4d4d8' : '#64748b',
+    },
+    planChipTextActive: {
+      color: isDarkMode ? '#38bdf8' : '#002cf7',
+      fontWeight: '700',
     },
   });
 }

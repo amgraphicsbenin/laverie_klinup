@@ -168,6 +168,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const [newCustPref, setNewCustPref] = useState('Plié');
   const [newCustIndicatif, setNewCustIndicatif] = useState('229');
   const [newCustAdresse, setNewCustAdresse] = useState('');
+  const [newCustSubPlanId, setNewCustSubPlanId] = useState('');
   const [delivFinalStatus, setDelivFinalStatus] = useState('a_livrer');
 
 
@@ -1842,6 +1843,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
         adresse: newCustAdresse
       });
 
+      if (newCustomer && newCustSubPlanId) {
+        await db.subscribeCustomer(newCustomer.id, newCustSubPlanId);
+      }
+
       refreshAdminData();
       setSelectedCustomerId(newCustomer.id);
       setShowNewCustomerModal(false);
@@ -1850,6 +1855,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setNewCustTel('');
       setNewCustIndicatif('229');
       setNewCustAdresse('');
+      setNewCustSubPlanId('');
       alert(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès dans la base de données !`);
     } catch (err) {
       alert("Erreur de création du client : " + err.message);
@@ -3371,6 +3377,22 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     value={newCustAdresse}
                     onChange={(e) => setNewCustAdresse(e.target.value)}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>Forfait d'abonnement (Facultatif)</label>
+                  <CustomSelect
+                    className="input-control"
+                    value={newCustSubPlanId}
+                    onChange={(e) => setNewCustSubPlanId(e.target.value)}
+                  >
+                    <option value="">-- Aucun abonnement --</option>
+                    {catalog.filter(c => (c.categorie === 'abonnement' || c.service === 'abonnement') && c.is_active !== false && c.statut !== 'inactif').map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.article} ({(p.prix || 0).toLocaleString('fr-FR')} FCFA)
+                      </option>
+                    ))}
+                  </CustomSelect>
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>

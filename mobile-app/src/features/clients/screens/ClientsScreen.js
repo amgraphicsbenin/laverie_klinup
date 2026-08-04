@@ -34,6 +34,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
   const [custTelephone, setCustTelephone] = useState("");
   const [custAdresse, setCustAdresse] = useState("");
   const [custPreferences, setCustPreferences] = useState("Plié");
+  const [custSubscriptionPlanId, setCustSubscriptionPlanId] = useState("");
 
   const scrollPaddingBottom = useScrollPaddingBottom();
 
@@ -130,18 +131,18 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
   const handleCloseCustomerModal = () => {
     setShowCustomerModal(false);
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié");
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié"); setCustSubscriptionPlanId("");
   };
 
   const handleCloseEditModal = () => {
     setShowEditModal(false);
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié");
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié"); setCustSubscriptionPlanId("");
   };
 
   const handleOpenAddCustomer = () => {
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié");
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustPreferences("Plié"); setCustSubscriptionPlanId("");
     setShowCustomerModal(true);
   };
 
@@ -161,7 +162,10 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
         db.updateCustomer(editingCustomer.id, { nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences });
         handleCloseEditModal();
       } else {
-        db.addCustomer({ nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences, store_id: currentUser?.store_id });
+        const newCust = await db.addCustomer({ nom: custNom, prenom: custPrenom, telephone: custTelephone, adresse: custAdresse, preferences_pliage: custPreferences, store_id: currentUser?.store_id });
+        if (newCust && custSubscriptionPlanId) {
+          await db.subscribeCustomer(newCust.id, custSubscriptionPlanId);
+        }
         handleCloseCustomerModal();
       }
       refreshCustomers();
@@ -283,6 +287,39 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess })
                 <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
               </TouchableOpacity>
             </View>
+
+            {!isEditing && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.compactLabel}>Forfait d'abonnement (Facultatif)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => setCustSubscriptionPlanId("")}
+                    style={[
+                      styles.planChip,
+                      !custSubscriptionPlanId && styles.planChipActive
+                    ]}
+                  >
+                    <Text style={[styles.planChipText, !custSubscriptionPlanId && styles.planChipTextActive]}>
+                      Aucun
+                    </Text>
+                  </TouchableOpacity>
+                  {((db.getCatalog() || []).filter(c => (c.categorie === 'abonnement' || c.service === 'abonnement') && c.is_active !== false && c.statut !== 'inactif')).map((p) => {
+                    const isSelected = custSubscriptionPlanId === p.id;
+                    return (
+                      <TouchableOpacity
+                        key={p.id}
+                        onPress={() => setCustSubscriptionPlanId(isSelected ? "" : p.id)}
+                        style={[styles.planChip, isSelected && styles.planChipActive]}
+                      >
+                        <Text style={[styles.planChipText, isSelected && styles.planChipTextActive]}>
+                          {p.article} ({(p.prix || 0).toLocaleString('fr-FR')} FCFA)
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
 
             <TouchableOpacity
               onPress={handleSaveCustomer}
@@ -725,22 +762,14 @@ const baseStyles = StyleSheet.create({
   cardProgressBarFill: { height: "100%", backgroundColor: "#002cf7", borderRadius: 3 },
   fullPageContainer: {
     flex: 1,
-    backgroundColor: '#0c0c10',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#ffffff',
     width: '100%',
   },
   fullPageInnerWrapper: {
     flex: 1,
     width: '100%',
-    maxWidth: 393,
     backgroundColor: '#ffffff',
     paddingTop: Platform.OS === 'ios' ? 48 : 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 5,
   },
   fullPageHeader: {
     flexDirection: 'row',
@@ -859,6 +888,29 @@ const baseStyles = StyleSheet.create({
     color: '#2563eb',
     fontWeight: '600',
   },
+  planChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planChipActive: {
+    backgroundColor: 'rgba(0, 44, 247, 0.08)',
+    borderColor: '#002cf7',
+  },
+  planChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  planChipTextActive: {
+    color: '#002cf7',
+    fontWeight: '700',
+  },
   compactSubmitBtn: {
     backgroundColor: '#2563eb',
     borderRadius: 14,
@@ -940,7 +992,7 @@ function getStyles(isDarkMode) {
     noResultsText: { color: '#a1a1aa' },
     
     // Modal & Form overrides
-    fullPageContainer: { backgroundColor: '#0c0c10' },
+    fullPageContainer: { backgroundColor: '#000000' },
     fullPageInnerWrapper: { backgroundColor: '#000000' },
     fullPageHeader: { backgroundColor: '#09090b', borderBottomColor: '#1f2937' },
     backBtnText: { color: '#ffffff' },
@@ -957,6 +1009,10 @@ function getStyles(isDarkMode) {
     compactModalTitle: { color: '#ffffff' },
     compactLabel: { color: '#d4d4d8' },
     compactInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
+    planChip: { backgroundColor: '#18181b', borderColor: '#27272a' },
+    planChipActive: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8' },
+    planChipText: { color: '#d4d4d8' },
+    planChipTextActive: { color: '#38bdf8', fontWeight: '700' },
     
     // Fiche client details card overrides
     clientMetaPill: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.3)' },

@@ -393,21 +393,17 @@ export default function App() {
     localModalOpen || 
     orderFormVisible;
 
+  const isSplashVisible = !dbReady || showSplash;
+
   const appContent = (
-    <View style={{ flex: 1, backgroundColor: showSplash ? '#002cf7' : (isDarkMode ? '#000000' : '#ffffff') }}>
+    <View style={{ flex: 1, backgroundColor: isSplashVisible ? '#002cf7' : (isDarkMode ? '#000000' : '#ffffff') }}>
       <ExpoStatusBar 
-        style={showSplash ? 'light' : (isDarkMode ? 'light' : 'dark')} 
-        backgroundColor={showSplash ? '#002cf7' : (isDarkMode ? '#000000' : '#ffffff')}
+        style={isSplashVisible ? 'light' : (isDarkMode ? 'light' : 'dark')} 
+        backgroundColor={isSplashVisible ? '#002cf7' : (isDarkMode ? '#000000' : '#ffffff')}
         translucent={Platform.OS === 'android'}
       />
-      {!dbReady ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#000000' : '#ffffff' }}>
-          <ActivityIndicator size="large" color="#002cf7" />
-          <Text style={{ marginTop: 14, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
-            {t('app.loading')}
-          </Text>
-        </View>
-      ) : !currentUser ? (
+      {/* Pré-chargement de l'app sous le Splash Screen dès que la DB est prête */}
+      {!dbReady ? null : (!currentUser ? (
         <LoginScreen />
       ) : (
         <View style={[styles.container, { backgroundColor: isDarkMode ? '#000000' : '#ffffff', paddingTop: insets.top }]}>
@@ -620,7 +616,8 @@ export default function App() {
       <OrderFormModal key={orderFormKey} visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
 
         </View>
-      )}
+      ))}{/* fin (!dbReady || showSplash) ? null : (...) */}
+
       {/* GLOBAL FLOATING SUCCESS TOAST */}
       {successToast.visible && (
         <MotiView
@@ -779,8 +776,8 @@ export default function App() {
         </View>
       )}
 
-      {/* OPENING ANIMATED SPLASH SCREEN OVERLAY */}
-      {showSplash && (
+      {/* SPLASH SCREEN ANIMÉ — couvre le chargement DB + animation d'ouverture */}
+      {isSplashVisible && (
         <SplashScreen
           isReady={dbReady}
           onAnimationFinish={() => setShowSplash(false)}

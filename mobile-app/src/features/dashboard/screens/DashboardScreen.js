@@ -1129,9 +1129,12 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         ) : (
           <ScrollView
             horizontal
+            nestedScrollEnabled={true}
             showsHorizontalScrollIndicator={false}
             style={{ marginHorizontal: -20, marginBottom: 20 }}
             contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+            onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
+            onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
           >
             {topClients.map((client, index) => {
               const tier = getFidelityTier(client.points_fidelite || 0);

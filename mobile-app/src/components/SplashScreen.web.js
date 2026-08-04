@@ -1,13 +1,8 @@
-// SplashScreen.js — Dynamic Antigravity Morphing Splash Screen (Continuous Fluid Motion)
-// 1. Initial lockup: [ (Icon Badge)  KLIN UP ]
-// 2. Text slides left behind badge & fades out -> leaves centered badge
-// 3. Badge pulses with an elastic breathing animation while loading
-// 4. Text slides back out from behind badge -> restores [ (Icon Badge)  KLIN UP ]
-// 5. Seamlessly scale up + fade out into home page (zero pauses, zero freezing)
+// SplashScreen.web.js — Dynamic Antigravity Morphing Splash Screen (Continuous Fluid Web Version)
 import React, { useEffect, useRef } from 'react';
 import {
   StyleSheet, View, Text, Image,
-  Animated, Easing, Platform, StatusBar,
+  Animated, Easing,
 } from 'react-native';
 
 export default function SplashScreen({ isReady, onAnimationFinish }) {
@@ -15,27 +10,21 @@ export default function SplashScreen({ isReady, onAnimationFinish }) {
   const pulseLoopRef   = useRef(null);
   const isCollapsedRef = useRef(false);
 
-  // Animation values
   const containerOpacity = useRef(new Animated.Value(1)).current;
   const containerScale   = useRef(new Animated.Value(1)).current;
 
-  // Text slide & opacity (0 = expanded, -90 = hidden behind badge)
   const textTranslateX   = useRef(new Animated.Value(0)).current;
   const textOpacity      = useRef(new Animated.Value(1)).current;
 
-  // Badge spring scale
   const badgeScale       = useRef(new Animated.Value(1)).current;
   const badgeOpacity     = useRef(new Animated.Value(0)).current;
 
-  /* ── 1. Sequence Orchestration ── */
   useEffect(() => {
-    // Initial entrance: badge & text fade in
     Animated.timing(badgeOpacity, {
       toValue: 1, duration: 350,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(() => {
-      // Step 2: Collapse text behind badge
       setTimeout(() => {
         collapseText();
       }, 300);
@@ -48,32 +37,29 @@ export default function SplashScreen({ isReady, onAnimationFinish }) {
     };
   }, []);
 
-  /* ── 2. Collapse text behind icon ── */
   const collapseText = () => {
     Animated.parallel([
       Animated.timing(textTranslateX, {
         toValue: -90,
         duration: 500,
         easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(textOpacity, {
         toValue: 0,
         duration: 400,
         easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start(() => {
       isCollapsedRef.current = true;
       startPulse();
-      // If DB is already ready, initiate exit sequence smoothly after 1 pulse cycle
       if (isReady && !hasFinishedRef.current) {
         setTimeout(() => finishSequence(), 700);
       }
     });
   };
 
-  /* ── 3. Gentle elastic pulse loop ── */
   const startPulse = () => {
     if (hasFinishedRef.current) return;
     pulseLoopRef.current = Animated.loop(
@@ -82,65 +68,61 @@ export default function SplashScreen({ isReady, onAnimationFinish }) {
           toValue: 0.92,
           duration: 600,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(badgeScale, {
           toValue: 1.05,
           duration: 600,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(badgeScale, {
           toValue: 1.0,
           duration: 350,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ])
     );
     pulseLoopRef.current.start();
   };
 
-  /* ── 4. Finish sequence: unbroken continuous exit into home page ── */
   const finishSequence = () => {
     if (hasFinishedRef.current) return;
     hasFinishedRef.current = true;
 
-    // Stop pulse loop and spring badge cleanly back to 1.0
     if (pulseLoopRef.current) pulseLoopRef.current.stop();
 
-    // Step A: Slide text back out & spring badge simultaneously
     Animated.parallel([
       Animated.spring(badgeScale, {
         toValue: 1, friction: 7, tension: 45,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(textTranslateX, {
         toValue: 0,
         duration: 450,
         easing: Easing.out(Easing.back(1.2)),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(textOpacity, {
         toValue: 1,
         duration: 350,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start(() => {
-      // Step B: IMMEDIATELY transition into smooth fade out + scale up (NO pause gap!)
       Animated.parallel([
         Animated.timing(containerOpacity, {
           toValue: 0,
           duration: 350,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(containerScale, {
           toValue: 1.06,
           duration: 350,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ]).start(() => {
         if (onAnimationFinish) onAnimationFinish();
@@ -148,7 +130,6 @@ export default function SplashScreen({ isReady, onAnimationFinish }) {
     });
   };
 
-  /* ── Trigger exit when DB/app is ready ── */
   useEffect(() => {
     if (isReady && isCollapsedRef.current && !hasFinishedRef.current) {
       const t = setTimeout(() => {
@@ -168,14 +149,7 @@ export default function SplashScreen({ isReady, onAnimationFinish }) {
         },
       ]}
     >
-      {Platform.OS === 'android' && (
-        <StatusBar backgroundColor="#002cf7" barStyle="light-content" translucent />
-      )}
-
-      {/* Main centered lockup row */}
       <Animated.View style={[styles.lockupRow, { opacity: badgeOpacity }]}>
-
-        {/* Badge Icon — elevated zIndex so text slides underneath */}
         <Animated.View
           style={[
             styles.badgeWrapper,
@@ -191,7 +165,6 @@ export default function SplashScreen({ isReady, onAnimationFinish }) {
           </View>
         </Animated.View>
 
-        {/* Text Label Container — masked underneath badge */}
         <Animated.View
           style={[
             styles.textWrapper,
@@ -203,7 +176,6 @@ export default function SplashScreen({ isReady, onAnimationFinish }) {
         >
           <Text style={styles.brandText}>KLIN UP</Text>
         </Animated.View>
-
       </Animated.View>
     </Animated.View>
   );
@@ -221,18 +193,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#002cf7',
   },
-
   lockupRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   badgeWrapper: {
     zIndex: 10,
     elevation: 10,
   },
-
   badgeInner: {
     width: BADGE_SIZE,
     height: BADGE_SIZE,
@@ -245,17 +214,14 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-
   badgeImage: {
     width: BADGE_SIZE,
     height: BADGE_SIZE,
   },
-
   textWrapper: {
     zIndex: 5,
     marginLeft: 14,
   },
-
   brandText: {
     fontSize: 28,
     fontWeight: '800',
