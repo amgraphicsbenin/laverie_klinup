@@ -81,6 +81,31 @@ function App() {
     setIsDarkMode(prev => !prev);
   };
 
+  // SEC-08: Inactivity Timeout - Verrouillage automatique après 15 minutes d'inactivité
+  useEffect(() => {
+    if (!currentUser) return;
+    const TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+    let timer = null;
+
+    const resetTimer = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        console.warn('[SÉCURITÉ] Session verrouillée après 15 minutes d inactivité');
+        setCurrentUser(null);
+        localStorage.removeItem('klinup_current_user');
+      }, TIMEOUT_MS);
+    };
+
+    const events = ['mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach(evt => window.addEventListener(evt, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      events.forEach(evt => window.removeEventListener(evt, resetTimer));
+    };
+  }, [currentUser]);
+
   // Notifications states & helper functions
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [dbTick, setDbTick] = useState(0);

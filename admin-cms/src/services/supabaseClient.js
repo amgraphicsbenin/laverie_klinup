@@ -1,15 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL) || 'https://ucnqwqkjnlsrbdbmukvz.supabase.co';
-const supabaseAnonKey = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjbnF3cWtqbmxzcmJkYm11a3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzA1NzEsImV4cCI6MjA5Njg0NjU3MX0.8RdoITBg_AXDqN2DxuZlarrF_sx-ya1DCSyS-FLy0mo';
+const supabaseUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL) || '';
+const supabaseAnonKey = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || '';
 
 let supabaseInstance = null;
 
-if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('votre-project-id')) {
+if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
-    "[SUPABASE] Identifiants Supabase non configurés ou invalides dans le fichier .env. " +
-    "Veuillez renseigner VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans votre fichier .env. " +
-    "Repli sur le localStorage local."
+    "[SUPABASE SÉCURITÉ] Identifiants Supabase non configurés dans le fichier .env. " +
+    "Veuillez définir VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY pour activer la synchronisation serveur."
   );
 } else {
   try {
