@@ -805,6 +805,13 @@ export const dbEngine = {
     return member;
   },
 
+  resetStaffPin: async (staffId: string, newPin?: string): Promise<string> => {
+    const pin = newPin || Math.floor(100000 + Math.random() * 900000).toString();
+    await dbEngine.updateStaff(staffId, { code_pin: pin });
+    dbEngine.logAction('RESET_PIN_PERSONNEL', `Code PIN réinitialisé pour l'utilisateur ID: ${staffId}`);
+    return pin;
+  },
+
   deleteStaff: async (staffId: string): Promise<boolean> => {
     const idx = memoryDb.staff.findIndex(s => s.id === staffId);
     if (idx === -1) return false;

@@ -1723,35 +1723,27 @@ export default function StaffTab({
                   3. Authentification par Code PIN
                 </h5>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    className="input-control"
-                    readOnly
-                    disabled
-                    value={editingPin || (editingStaffMember ? editingStaffMember.code_pin : (selectedMember.code_pin || '000000'))}
-                    style={{
-                      background: 'var(--bg-app)',
-                      fontWeight: 800,
-                      letterSpacing: '4px',
-                      textAlign: 'center',
-                      fontSize: '1.05rem',
-                      height: '40px'
-                    }}
-                  />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', background: 'var(--bg-app)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Réinitialisation du code PIN
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Générez un nouveau code PIN sécurisé à 6 chiffres pour cet utilisateur.
+                    </span>
+                  </div>
 
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    style={{ padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-                    onClick={() => {
+                    style={{ padding: '0.55rem 1rem', fontSize: '0.78rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
+                    onClick={async () => {
                       const targetMember = editingStaffMember || selectedMember;
                       if (!targetMember) return;
-                      const newPin = Math.floor(100000 + Math.random() * 900000).toString();
-                      db.resetStaffPin(targetMember.id, newPin);
+                      const newPin = await db.resetStaffPin(targetMember.id);
                       setEditingPin(newPin);
-                      alert(`Code PIN réinitialisé pour ${targetMember.prenom} ${targetMember.nom} !\n\nNouveau PIN : ${newPin}`);
-                      refreshAdminData();
+                      alert(`✅ Code PIN réinitialisé pour ${targetMember.prenom} ${targetMember.nom} !\n\nNouveau Code PIN : ${newPin}`);
+                      if (refreshAdminData) refreshAdminData();
                     }}
                   >
                     <RefreshCw size={14} /> Régénérer un nouveau PIN
