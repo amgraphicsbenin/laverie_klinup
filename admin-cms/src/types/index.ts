@@ -66,8 +66,10 @@ export interface ActiveSubscription {
   name: string;
   total_clothes: number;
   remaining_clothes: number;
+  duree_jours?: number;
   subscribed_at: string;
   expires_at: string;
+  end_date?: string;
 }
 
 export interface Customer {
@@ -133,6 +135,12 @@ export interface CatalogItem {
   is_active?: boolean;
   statut?: 'actif' | 'inactif';
   store_id?: string | null;
+  nombre_vetements?: number | null;
+  duree_jours?: number | null;
+  ramassage?: boolean;
+  nombre_ramassages?: number | null;
+  ramassage_gratuit?: boolean;
+  livraison_gratuite?: boolean;
 }
 
 export interface ActivityLog {

@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS public.catalog (
   categorie TEXT DEFAULT 'individuel',
   description TEXT,
   nombre_vetements INTEGER,
+  duree_jours INTEGER,
   ramassage BOOLEAN DEFAULT FALSE,
   nombre_ramassages INTEGER,
   ramassage_gratuit BOOLEAN DEFAULT FALSE,
@@ -95,6 +96,7 @@ CREATE TABLE IF NOT EXISTS public.catalog (
 -- Migrations idempotentes : ajout des colonnes si la table existait déjà antérieurement
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS nombre_vetements INTEGER;
+ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS duree_jours INTEGER;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS ramassage BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS nombre_ramassages INTEGER;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS ramassage_gratuit BOOLEAN DEFAULT FALSE;
@@ -102,6 +104,9 @@ ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS livraison_gratuite BOOLEAN D
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS store_id TEXT;
 ALTER TABLE public.catalog ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_catalog_store_id ON public.catalog(store_id);
+
+-- Nettoyage : duree_jours est réservée exclusivement aux abonnements (NULL pour la catégorie individuel)
+UPDATE public.catalog SET duree_jours = NULL WHERE categorie = 'individuel' OR (categorie != 'abonnement' AND service != 'abonnement');
 
 -- 6. Table: pin_reset_requests
 CREATE TABLE IF NOT EXISTS public.pin_reset_requests (

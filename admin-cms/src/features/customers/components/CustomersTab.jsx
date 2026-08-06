@@ -789,9 +789,21 @@ export default function CustomersTab({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <strong style={{ fontSize: '0.95rem', color: 'var(--primary)', fontWeight: 800 }}>{selectedCrmCustomer.active_subscription.name}</strong>
-                      <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
-                        Solde : {selectedCrmCustomer.active_subscription.remaining_clothes} / {selectedCrmCustomer.active_subscription.total_clothes} vêtements
-                      </span>
+                      {(() => {
+                        const isExpired = selectedCrmCustomer.active_subscription.expires_at && new Date(selectedCrmCustomer.active_subscription.expires_at) < new Date();
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            {isExpired && (
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ef4444', background: 'rgba(239, 68, 68, 0.12)', padding: '0.1rem 0.4rem', borderRadius: '6px' }}>
+                                ⚠️ Expiré
+                              </span>
+                            )}
+                            <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                              Solde : {selectedCrmCustomer.active_subscription.remaining_clothes} / {selectedCrmCustomer.active_subscription.total_clothes} vêtements
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Progress Bar */}
@@ -814,7 +826,9 @@ export default function CustomersTab({
 
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', marginTop: '0.1rem' }}>
                       <span>Souscrit le : <strong>{new Date(selectedCrmCustomer.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}</strong></span>
-                      <span>Expire le : <strong>{new Date(selectedCrmCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}</strong></span>
+                      <span style={{ color: selectedCrmCustomer.active_subscription.expires_at && new Date(selectedCrmCustomer.active_subscription.expires_at) < new Date() ? '#ef4444' : 'var(--text-secondary)' }}>
+                        Expire le : <strong>{new Date(selectedCrmCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}</strong>
+                      </span>
                     </div>
 
                     <button

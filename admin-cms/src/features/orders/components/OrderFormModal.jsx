@@ -49,13 +49,17 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
   }, [isSubscriptionMode]);
 
   useEffect(() => {
-    if (activeCustomer && activeCustomer.active_subscription) {
+    const isSubValid = activeCustomer?.active_subscription && 
+      activeCustomer.active_subscription.remaining_clothes > 0 && 
+      (!activeCustomer.active_subscription.expires_at || new Date(activeCustomer.active_subscription.expires_at) > new Date());
+
+    if (isSubValid) {
       setPayWithSubscription(true);
     } else {
       setPayWithSubscription(false);
     }
     setSubscribePlanId('');
-  }, [orderClient]);
+  }, [orderClient, activeCustomer]);
 
   const resetForm = () => {
     setOrderClient('');

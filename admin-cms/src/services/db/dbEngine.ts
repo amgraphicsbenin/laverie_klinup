@@ -1149,29 +1149,43 @@ export const dbEngine = {
   ): Promise<CatalogItem> => {
     let itemData: Partial<CatalogItem>;
     if (typeof itemDataOrArticle === 'string') {
+      const cat = categorie || (service === 'abonnement' ? 'abonnement' : 'individuel');
       itemData = {
         article: itemDataOrArticle,
         service: service || 'lavage_simple',
         prix: Number(prix || 0),
-        categorie: categorie || 'individuel',
+        prix_urgent: prix_urgent ? Number(prix_urgent) : Math.round(Number(prix || 0) * 1.5),
+        categorie: cat,
         description: description || '',
         store_id: store_id !== undefined ? store_id : (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null)
       };
     } else {
       itemData = itemDataOrArticle || {};
+      if (!itemData.categorie) {
+        itemData.categorie = itemData.service === 'abonnement' ? 'abonnement' : 'individuel';
+      }
     }
 
     const effectiveStoreId = itemData.store_id !== undefined 
       ? itemData.store_id 
       : (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null);
 
+    const calculatedCat = itemData.categorie || (itemData.service === 'abonnement' ? 'abonnement' : 'individuel');
+
     const newItem: CatalogItem = {
       id: 'cat_' + Math.random().toString(36).substr(2, 9),
       article: itemData.article || 'Article',
       service: itemData.service || 'lavage_simple',
       prix: Number(itemData.prix || 0),
-      categorie: itemData.categorie || 'individuel',
+      prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : (prix_urgent ? Number(prix_urgent) : Math.round(Number(itemData.prix || 0) * 1.5)),
+      categorie: calculatedCat,
       description: itemData.description || '',
+      nombre_vetements: itemData.nombre_vetements !== undefined ? itemData.nombre_vetements : (nombre_vetements || null),
+      duree_jours: calculatedCat === 'abonnement' ? (itemData.duree_jours !== undefined && itemData.duree_jours !== null ? Number(itemData.duree_jours) : 30) : null,
+      ramassage: itemData.ramassage !== undefined ? itemData.ramassage : (ramassage || false),
+      nombre_ramassages: itemData.nombre_ramassages !== undefined ? itemData.nombre_ramassages : (nombre_ramassages || null),
+      ramassage_gratuit: itemData.ramassage_gratuit !== undefined ? itemData.ramassage_gratuit : (ramassage_gratuit || false),
+      livraison_gratuite: itemData.livraison_gratuite !== undefined ? itemData.livraison_gratuite : (livraison_gratuite || false),
       is_active: itemData.is_active !== false,
       statut: itemData.is_active !== false ? 'actif' : 'inactif',
       store_id: effectiveStoreId
@@ -1191,6 +1205,11 @@ export const dbEngine = {
     const updateData: Partial<CatalogItem> = { ...updatedFields };
     delete updateData.id;
 
+    const finalCategory = updateData.categorie || item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel');
+    if (finalCategory === 'individuel') {
+      updateData.duree_jours = null as any;
+    }
+
     await performMutation('update', 'catalog', itemId, updateData);
     Object.assign(item, updateData);
     dbEngine.logAction('MODIFICATION_CATALOGUE', `Article catalogue mis à jour : ${item.article}`);
@@ -1209,6 +1228,36 @@ export const dbEngine = {
     return true;
   },
 
+  deleteCatalogItemsBatch: async (itemIds: string[]): Promise<boolean> => {
+    if (!itemIds || itemIds.length === 0) return true;
+    for (const id of itemIds) {
+      const idx = memoryDb.catalog.findIndex(c => c.id === id);
+      if (idx !== -1) {
+        const item = memoryDb.catalog[idx];
+        await performMutation('delete', 'catalog', id).catch(e => console.warn('[DB] delete error:', e));
+        memoryDb.catalog.splice(idx, 1);
+        dbEngine.logAction('SUPPRESSION_CATALOGUE', `Article catalogue supprimé : ${item.article}`);
+      }
+    }
+    notifyListeners();
+    return true;
+  },
+
+  toggleCatalogItemActive: async (articleOrId: string): Promise<boolean> => {
+    const matchingItems = memoryDb.catalog.filter(c => c.id === articleOrId || c.article === articleOrId);
+    if (matchingItems.length === 0) return false;
+    const currentActive = matchingItems[0].is_active !== false && matchingItems[0].statut !== 'inactif';
+    const newActive = !currentActive;
+    const newStatut = newActive ? 'actif' : 'inactif';
+
+    for (const item of matchingItems) {
+      await dbEngine.updateCatalogItem(item.id, { is_active: newActive, statut: newStatut });
+    }
+    dbEngine.logAction('STATUT_CATALOGUE', `Statut catalogue de ${matchingItems[0].article} changé à ${newStatut}`);
+    notifyListeners();
+    return true;
+  },
+
   // --- GESTION DES ABONNEMENTS CLIENTS ---
   subscribeCustomer: async (customerId: string, catalogItemId: string): Promise<Customer | undefined> => {
     const customer = memoryDb.customers.find(c => c.id === customerId);
@@ -1221,22 +1270,24 @@ export const dbEngine = {
         else if (subPlan.article.includes('VIP') || subPlan.id === 'sub4') clothesCount = 200;
       }
 
+      const dureeJours = Number((subPlan as any).duree_jours || (subPlan as any).duration_days || 30);
       const now = new Date();
-      const expires = new Date();
-      expires.setMonth(now.getMonth() + 1);
+      const expires = new Date(now.getTime() + dureeJours * 24 * 60 * 60 * 1000);
 
       const activeSub = {
         catalog_item_id: subPlan.id,
         name: subPlan.article,
         total_clothes: clothesCount,
         remaining_clothes: clothesCount,
+        duree_jours: dureeJours,
         subscribed_at: now.toISOString(),
-        expires_at: expires.toISOString()
+        expires_at: expires.toISOString(),
+        end_date: expires.toISOString()
       };
 
       await performMutation('update', 'customers', customerId, { active_subscription: activeSub });
       (customer as any).active_subscription = activeSub;
-      dbEngine.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subPlan.article} (${clothesCount} vêtements, ${subPlan.prix} FCFA)`);
+      dbEngine.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subPlan.article} (${clothesCount} vêtements, validité ${dureeJours} jours, ${subPlan.prix} FCFA)`);
       notifyListeners();
       return customer;
     }

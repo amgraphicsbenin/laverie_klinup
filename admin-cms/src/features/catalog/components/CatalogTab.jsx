@@ -422,7 +422,7 @@ export default function CatalogTab({
                           {item.article}
                         </h4>
                         <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-primary)' }}>
-                          {item.prix.toLocaleString()} F <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>/ mois</span>
+                          {item.prix.toLocaleString()} F <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>/ {item.duree_jours || 30} jours</span>
                         </span>
                       </div>
 

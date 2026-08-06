@@ -299,6 +299,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
   // Subscription config states (Add Modal)
   const [newArtNombreVetements, setNewArtNombreVetements] = useState('');
+  const [newArtDureeJours, setNewArtDureeJours] = useState('30');
   const [newArtRamassage, setNewArtRamassage] = useState(false);
   const [newArtNombreRamassages, setNewArtNombreRamassages] = useState('');
   const [newArtRamassageGratuit, setNewArtRamassageGratuit] = useState(false);
@@ -306,6 +307,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
   // Subscription config states (Edit Modal)
   const [editArtNombreVetements, setEditArtNombreVetements] = useState('');
+  const [editArtDureeJours, setEditArtDureeJours] = useState('30');
   const [editArtRamassage, setEditArtRamassage] = useState(false);
   const [editArtNombreRamassages, setEditArtNombreRamassages] = useState('');
   const [editArtRamassageGratuit, setEditArtRamassageGratuit] = useState(false);
@@ -1168,7 +1170,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
       if (selectedStoreId !== 'all' && item.store_id && item.store_id !== 'all' && item.store_id !== selectedStoreId) {
         return;
       }
-      if (item.categorie === 'individuel') {
+      
+      const itemCat = item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel');
+
+      if (itemCat === 'individuel') {
         const articleKey = item.article.trim().toLowerCase();
         if (!groups[articleKey]) {
           groups[articleKey] = {
@@ -1186,20 +1191,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
         if (item.is_active !== false && item.statut !== 'inactif') {
           groups[articleKey].is_active = true;
         }
-        if (item.service === 'lavage_simple') {
-          groups[articleKey].traitement = {
-            id: item.id,
-            prix: item.prix,
-            prix_urgent: item.prix_urgent || Math.round(item.prix * 1.5)
-          };
-        } else if (item.service === 'repassage') {
+        if (item.service === 'repassage') {
           groups[articleKey].repassage = {
             id: item.id,
             prix: item.prix,
             prix_urgent: item.prix_urgent || Math.round(item.prix * 1.5)
           };
+        } else {
+          groups[articleKey].traitement = {
+            id: item.id,
+            prix: item.prix,
+            prix_urgent: item.prix_urgent || Math.round(item.prix * 1.5)
+          };
         }
-      } else if (item.categorie === 'abonnement' && catalogCategory === 'abonnement') {
+      } else if (itemCat === 'abonnement' && catalogCategory === 'abonnement') {
         rawGroupedCatalog.push(item);
       }
     });
@@ -1412,6 +1417,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       // Subscription case
       setEditArtPrice(groupedItem.prix.toString());
       setEditArtNombreVetements(groupedItem.nombre_vetements !== undefined && groupedItem.nombre_vetements !== null ? groupedItem.nombre_vetements.toString() : '');
+      setEditArtDureeJours(groupedItem.duree_jours !== undefined && groupedItem.duree_jours !== null ? groupedItem.duree_jours.toString() : '30');
       setEditArtRamassage(!!groupedItem.ramassage);
       setEditArtNombreRamassages(groupedItem.nombre_ramassages !== undefined && groupedItem.nombre_ramassages !== null ? groupedItem.nombre_ramassages.toString() : '');
       setEditArtRamassageGratuit(!!groupedItem.ramassage_gratuit);
@@ -1518,6 +1524,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           prix: Number(editArtPrice),
           description: finalDescription,
           nombre_vetements: editArtNombreVetements ? Number(editArtNombreVetements) : null,
+          duree_jours: editArtDureeJours ? Number(editArtDureeJours) : 30,
           ramassage: editArtRamassage,
           nombre_ramassages: editArtRamassage && editArtNombreRamassages ? Number(editArtNombreRamassages) : null,
           ramassage_gratuit: editArtRamassage ? editArtRamassageGratuit : false,
@@ -1533,6 +1540,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setEditArtDescription('');
       setEditArtAdvantages(['']);
       setEditArtNombreVetements('');
+      setEditArtDureeJours('30');
       setEditArtRamassage(false);
       setEditArtNombreRamassages('');
       setEditArtRamassageGratuit(false);
@@ -1654,22 +1662,26 @@ export default function AdminView({ activeTab, onManageStaff }) {
         }
       } else {
         const finalDescription = newArtAdvantages.map(a => a.trim()).filter(Boolean).join(' | ');
-        await db.addCatalogItem(
-          newArtName.trim(),
-          'abonnement',
-          Number(newArtPrice),
-          newArtCategory,
-          finalDescription,
-          null, // prix_urgent
-          newArtNombreVetements ? Number(newArtNombreVetements) : null,
-          newArtRamassage,
-          newArtRamassage && newArtNombreRamassages ? Number(newArtNombreRamassages) : null,
-          newArtRamassage ? newArtRamassageGratuit : false,
-          newArtLivraisonGratuite,
-          targetStoreId
-        );
+        await db.addCatalogItem({
+          article: newArtName.trim(),
+          service: 'abonnement',
+          prix: Number(newArtPrice),
+          categorie: newArtCategory,
+          description: finalDescription,
+          nombre_vetements: newArtNombreVetements ? Number(newArtNombreVetements) : null,
+          duree_jours: newArtDureeJours ? Number(newArtDureeJours) : 30,
+          ramassage: newArtRamassage,
+          nombre_ramassages: newArtRamassage && newArtNombreRamassages ? Number(newArtNombreRamassages) : null,
+          ramassage_gratuit: newArtRamassage ? newArtRamassageGratuit : false,
+          livraison_gratuite: newArtLivraisonGratuite,
+          store_id: targetStoreId
+        });
       }
 
+      setCatalogCategory(newArtCategory);
+      setCatalogSearchText('');
+      setCatalogServiceFilter('all');
+      setCatalogPriceFilter('all');
       refreshAdminData();
       setShowAddCatalogModal(false);
       setNewArtName('');
@@ -1677,6 +1689,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setNewArtDescription('');
       setNewArtAdvantages(['']);
       setNewArtNombreVetements('');
+      setNewArtDureeJours('30');
       setNewArtRamassage(false);
       setNewArtNombreRamassages('');
       setNewArtRamassageGratuit(false);
@@ -2682,9 +2695,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
               ) : (
                 // Input elements for Subscriptions
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                     <div className="form-group" style={{ margin: 0 }}>
-                      <label>Tarif mensuel (FCFA)</label>
+                      <label>Tarif abonnement (FCFA)</label>
                       <input
                         type="number"
                         className="input-control"
@@ -2696,7 +2709,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     </div>
 
                     <div className="form-group" style={{ margin: 0 }}>
-                      <label>Nombre de vêtements inclus</label>
+                      <label>Vêtements inclus</label>
                       <input
                         type="number"
                         className="input-control"
@@ -2704,6 +2717,19 @@ export default function AdminView({ activeTab, onManageStaff }) {
                         required
                         value={newArtNombreVetements}
                         onChange={(e) => setNewArtNombreVetements(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Durée (en jours)</label>
+                      <input
+                        type="number"
+                        className="input-control"
+                        placeholder="Ex: 30"
+                        required
+                        min="1"
+                        value={newArtDureeJours}
+                        onChange={(e) => setNewArtDureeJours(e.target.value)}
                       />
                     </div>
                   </div>
@@ -3090,9 +3116,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 ) : (
                   // Input elements for Subscriptions
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                       <div className="form-group" style={{ margin: 0 }}>
-                        <label>Tarif mensuel (FCFA)</label>
+                        <label>Tarif abonnement (FCFA)</label>
                         <input
                           type="number"
                           className="input-control"
@@ -3103,7 +3129,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       </div>
 
                       <div className="form-group" style={{ margin: 0 }}>
-                        <label>Nombre de vêtements inclus</label>
+                        <label>Vêtements inclus</label>
                         <input
                           type="number"
                           className="input-control"
@@ -3111,6 +3137,19 @@ export default function AdminView({ activeTab, onManageStaff }) {
                           required
                           value={editArtNombreVetements}
                           onChange={(e) => setEditArtNombreVetements(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label>Durée (en jours)</label>
+                        <input
+                          type="number"
+                          className="input-control"
+                          placeholder="Ex: 30"
+                          required
+                          min="1"
+                          value={editArtDureeJours}
+                          onChange={(e) => setEditArtDureeJours(e.target.value)}
                         />
                       </div>
                     </div>

@@ -974,31 +974,39 @@ export const db = {
 
     let subscribedPlan = null;
     if (orderData.subscribe_plan_id && customer) {
-      subscribedPlan = memoryDb.catalog.find(c => c.id === orderData.subscribe_plan_id && c.service === 'abonnement');
+      subscribedPlan = memoryDb.catalog.find(c => c.id === orderData.subscribe_plan_id && (c.service === 'abonnement' || c.categorie === 'abonnement'));
       if (subscribedPlan) {
-        let clothesCount = 25;
-        if (subscribedPlan.article.includes('Premium') || subscribedPlan.id === 'sub2') clothesCount = 50;
-        else if (subscribedPlan.article.includes('Prestige') || subscribedPlan.id === 'sub3') clothesCount = 100;
-        else if (subscribedPlan.article.includes('VIP') || subscribedPlan.id === 'sub4') clothesCount = 200;
+        let clothesCount = subscribedPlan.nombre_vetements || 25;
+        if (!subscribedPlan.nombre_vetements) {
+          if (subscribedPlan.article.includes('Premium') || subscribedPlan.id === 'sub2') clothesCount = 50;
+          else if (subscribedPlan.article.includes('Prestige') || subscribedPlan.id === 'sub3') clothesCount = 100;
+          else if (subscribedPlan.article.includes('VIP') || subscribedPlan.id === 'sub4') clothesCount = 200;
+        }
 
+        const dureeJours = Number(subscribedPlan.duree_jours || subscribedPlan.duration_days || 30);
         const now = new Date();
-        const expires = new Date();
-        expires.setMonth(now.getMonth() + 1);
+        const expires = new Date(now.getTime() + dureeJours * 24 * 60 * 60 * 1000);
 
         customer.active_subscription = {
           catalog_item_id: subscribedPlan.id,
           name: subscribedPlan.article,
           total_clothes: clothesCount,
           remaining_clothes: clothesCount,
+          duree_jours: dureeJours,
           subscribed_at: now.toISOString(),
-          expires_at: expires.toISOString()
+          expires_at: expires.toISOString(),
+          end_date: expires.toISOString()
         };
 
-        db.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subscribedPlan.article} (${clothesCount} vêtements, ${subscribedPlan.prix} FCFA) lors de la création de commande`);
+        db.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subscribedPlan.article} (${clothesCount} vêtements, validité ${dureeJours} jours, ${subscribedPlan.prix} FCFA) lors de la création de commande`);
       }
     }
 
-    const isSubscriptionOrder = (!!orderData.pay_with_subscription || !!orderData.subscribe_plan_id) && customer && !!customer.active_subscription;
+    const isSubValid = customer?.active_subscription && 
+      customer.active_subscription.remaining_clothes > 0 && 
+      (!customer.active_subscription.expires_at || new Date(customer.active_subscription.expires_at) > new Date());
+
+    const isSubscriptionOrder = (!!orderData.pay_with_subscription || !!orderData.subscribe_plan_id) && customer && isSubValid;
 
     let totalPrice = 0;
     let totalClothes = 0;
@@ -1530,29 +1538,33 @@ export const db = {
 
   subscribeCustomer: async (customerId, catalogItemId) => {
     const customer = memoryDb.customers.find(c => c.id === customerId);
-    const subPlan = memoryDb.catalog.find(c => c.id === catalogItemId && c.service === 'abonnement');
+    const subPlan = memoryDb.catalog.find(c => c.id === catalogItemId && (c.service === 'abonnement' || c.categorie === 'abonnement'));
     if (customer && subPlan) {
-      let clothesCount = 25;
-      if (subPlan.article.includes('Premium') || subPlan.id === 'sub2') clothesCount = 50;
-      else if (subPlan.article.includes('Prestige') || subPlan.id === 'sub3') clothesCount = 100;
-      else if (subPlan.article.includes('VIP') || subPlan.id === 'sub4') clothesCount = 200;
+      let clothesCount = subPlan.nombre_vetements || 25;
+      if (!subPlan.nombre_vetements) {
+        if (subPlan.article.includes('Premium') || subPlan.id === 'sub2') clothesCount = 50;
+        else if (subPlan.article.includes('Prestige') || subPlan.id === 'sub3') clothesCount = 100;
+        else if (subPlan.article.includes('VIP') || subPlan.id === 'sub4') clothesCount = 200;
+      }
 
+      const dureeJours = Number(subPlan.duree_jours || subPlan.duration_days || 30);
       const now = new Date();
-      const expires = new Date();
-      expires.setMonth(now.getMonth() + 1);
+      const expires = new Date(now.getTime() + dureeJours * 24 * 60 * 60 * 1000);
 
       const activeSub = {
         catalog_item_id: subPlan.id,
         name: subPlan.article,
         total_clothes: clothesCount,
         remaining_clothes: clothesCount,
+        duree_jours: dureeJours,
         subscribed_at: now.toISOString(),
-        expires_at: expires.toISOString()
+        expires_at: expires.toISOString(),
+        end_date: expires.toISOString()
       };
 
       await performMutation('update', 'customers', customerId, { active_subscription: activeSub });
       customer.active_subscription = activeSub;
-      db.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subPlan.article} (${clothesCount} vêtements, ${subPlan.prix} FCFA)`);
+      db.logAction('SOUSCRIPTION_ABONNEMENT', `Client ${customer.prenom} ${customer.nom} a souscrit à l'abonnement ${subPlan.article} (${clothesCount} vêtements, validité ${dureeJours} jours, ${subPlan.prix} FCFA)`);
       db.notify();
       return customer;
     }
