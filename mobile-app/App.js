@@ -17,7 +17,7 @@ const BlurView = SafeBlurView;
 import { MotiView } from './src/components/SafeView';
 import { OrderFormModal } from './src/components/OrderFormModal';
 import { registerAlertHandler } from './src/services/alert';
-import SplashScreen from './src/components/SplashScreen';
+
 import FlaticonIcon from './src/components/FlaticonIcon';
 import { initSystemNotifications, savePushTokenToSupabase } from './src/services/notificationService';
 import { initLanguage, t, subscribeToLangChange } from './src/services/i18n';
@@ -67,7 +67,7 @@ export default function App() {
   const isDarkMode = dbState.isDarkMode;
 
   const [dbReady, setDbReady] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('accueil');
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -397,17 +397,20 @@ export default function App() {
     localModalOpen || 
     orderFormVisible;
 
-  const isSplashVisible = !dbReady || showSplash;
-
   const appContent = (
-    <View style={{ flex: 1, backgroundColor: isSplashVisible ? '#002cf7' : (isDarkMode ? '#000000' : '#ffffff') }}>
-      <ExpoStatusBar 
-        style={isSplashVisible ? 'light' : (isDarkMode ? 'light' : 'dark')} 
-        backgroundColor={isSplashVisible ? '#002cf7' : (isDarkMode ? '#000000' : '#ffffff')}
+    <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000000' : '#ffffff' }}>
+      <ExpoStatusBar
+        style={isDarkMode ? 'light' : 'dark'}
+        backgroundColor={isDarkMode ? '#000000' : '#ffffff'}
         translucent={Platform.OS === 'android'}
       />
-      {/* Pré-chargement de l'app sous le Splash Screen dès que la DB est prête */}
-      {!dbReady ? null : (!currentUser ? (
+      {!dbReady ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#002cf7" />
+          <Text style={styles.loadingText}>Chargement</Text>
+          <Text style={styles.loadingSubtext}>Préparation de votre espace</Text>
+        </View>
+      ) : (!currentUser ? (
         <LoginScreen />
       ) : (
         <View style={[styles.container, { backgroundColor: isDarkMode ? '#000000' : '#ffffff', paddingTop: insets.top }]}>
@@ -621,7 +624,7 @@ export default function App() {
       <OrderFormModal key={orderFormKey} visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
 
         </View>
-      ))}{/* fin (!dbReady || showSplash) ? null : (...) */}
+      ))}
 
       {/* GLOBAL FLOATING SUCCESS TOAST */}
       {successToast.visible && (
@@ -791,13 +794,7 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* SPLASH SCREEN ANIMÉ — couvre le chargement DB + animation d'ouverture */}
-      {isSplashVisible && (
-        <SplashScreen
-          isReady={dbReady}
-          onAnimationFinish={() => setShowSplash(false)}
-        />
-      )}
+
     </View>
   );
 
@@ -980,4 +977,3 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
 });
-
