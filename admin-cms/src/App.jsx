@@ -53,7 +53,6 @@ function App() {
     }
   });
   const [pinActionLoading, setPinActionLoading] = useState(null);
-  const [sidebarSearch, setSidebarSearch] = useState('');
 
   // Dark mode state & theme switcher persistent
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -844,17 +843,7 @@ function App() {
             </div>
           </div>
 
-          {/* ── Search bar ── */}
-          <div className="sidebar-search-wrap">
-            <MIcon name="search" size={16} className="sidebar-search-icon" />
-            <input
-              type="text"
-              className="sidebar-search-input"
-              placeholder="Rechercher..."
-              value={sidebarSearch}
-              onChange={e => setSidebarSearch(e.target.value)}
-            />
-          </div>
+
 
           {/* ── Scrollable nav ── */}
           <nav className="sidebar-nav">
@@ -1352,20 +1341,6 @@ function App() {
                 </div>
               </div>
 
-              {/* Profil Utilisateur Donezo Header Style */}
-              <div className="topbar-profile">
-                <div className="topbar-profile-avatar" role="img" aria-label={`Avatar de ${currentUser?.prenom || ''} ${currentUser?.nom || 'Utilisateur'}`}>
-                  <div className="user-avatar" style={{ margin: 0, width: '36px', height: '36px', fontSize: '0.8rem' }}>
-                    {(currentUser?.prenom?.charAt(0) || 'U')}{(currentUser?.nom?.charAt(0) || '')}
-                  </div>
-                </div>
-                <div className="topbar-profile-info">
-                  <span className="topbar-profile-name">{currentUser?.prenom || ''} {currentUser?.nom || 'Utilisateur'}</span>
-                  <span className="topbar-profile-email">
-                    {currentUser?.email || `${(currentUser?.prenom || 'user').toLowerCase()}.${(currentUser?.nom || 'admin').toLowerCase()}@klinup.com`}
-                  </span>
-                </div>
-              </div>
             </div>
           )}
         </div>
