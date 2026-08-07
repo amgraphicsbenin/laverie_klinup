@@ -50,6 +50,7 @@ import {
   GripVertical
 } from 'lucide-react';
 import CustomSelect from './CustomSelect';
+import { validatePhoneNumber } from '../utils/phoneUtils';
 
 import DashboardTab from '../features/dashboard/components/DashboardTab';
 import OrdersTab from '../features/orders/components/OrdersTab';
@@ -164,11 +165,16 @@ export default function AdminView({ activeTab, onManageStaff }) {
   // Nouveau Client
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [newCustNom, setNewCustNom] = useState('');
+  const [newCustStoreId, setNewCustStoreId] = useState(() => (currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : ''));
   const [newCustPrenom, setNewCustPrenom] = useState('');
   const [newCustTel, setNewCustTel] = useState('');
   const [newCustPref, setNewCustPref] = useState('Plié');
   const [newCustIndicatif, setNewCustIndicatif] = useState('229');
   const [newCustAdresse, setNewCustAdresse] = useState('');
+  const [newCustQuartier, setNewCustQuartier] = useState('');
+  const [newCustVille, setNewCustVille] = useState('Cotonou');
+  const [newCustLatitude, setNewCustLatitude] = useState('');
+  const [newCustLongitude, setNewCustLongitude] = useState('');
   const [newCustSubPlanId, setNewCustSubPlanId] = useState('');
   const [delivFinalStatus, setDelivFinalStatus] = useState('a_livrer');
 
@@ -1847,14 +1853,31 @@ export default function AdminView({ activeTab, onManageStaff }) {
     e.preventDefault();
     if (!newCustNom || !newCustPrenom || !newCustTel || !newCustAdresse) return;
 
+    if (!validatePhoneNumber(newCustTel, newCustIndicatif)) {
+      alert("Le format du numéro de téléphone n'est pas valide pour l'indicatif choisi.");
+      return;
+    }
+
     try {
+      const lat = newCustLatitude.trim() ? parseFloat(newCustLatitude.trim()) : null;
+      const lng = newCustLongitude.trim() ? parseFloat(newCustLongitude.trim()) : null;
+      const coords = (lat != null && lng != null && !isNaN(lat) && !isNaN(lng))
+        ? `${lat},${lng}`
+        : null;
+
       const newCustomer = await db.addCustomer({
         nom: newCustNom,
         prenom: newCustPrenom,
         telephone: newCustTel,
         indicatif: newCustIndicatif,
         preferences_pliage: newCustPref,
-        adresse: newCustAdresse
+        adresse: newCustAdresse,
+        quartier: newCustQuartier,
+        ville: newCustVille,
+        latitude: lat,
+        longitude: lng,
+        coordonnees_livraison: coords,
+        store_id: newCustStoreId || null
       });
 
       if (newCustomer && newCustSubPlanId) {
@@ -1869,7 +1892,12 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setNewCustTel('');
       setNewCustIndicatif('229');
       setNewCustAdresse('');
+      setNewCustQuartier('');
+      setNewCustVille('Cotonou');
+      setNewCustLatitude('');
+      setNewCustLongitude('');
       setNewCustSubPlanId('');
+      setNewCustStoreId(currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : '');
       alert(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès dans la base de données !`);
     } catch (err) {
       alert("Erreur de création du client : " + err.message);
@@ -3374,7 +3402,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {showNewCustomerModal && (
         <ModalPortal>
           <div className="modal-backdrop" onClick={() => setShowNewCustomerModal(false)}>
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
               <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                 Nouveau Client
               </h3>
@@ -3424,7 +3452,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   <input
                     type="tel"
                     className="input-control"
-                    placeholder="Ex: 97979797"
+                    placeholder="Ex: 0197979797"
                     required
                     value={newCustTel}
                     onChange={(e) => setNewCustTel(e.target.value)}
@@ -3453,6 +3481,78 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     value={newCustAdresse}
                     onChange={(e) => setNewCustAdresse(e.target.value)}
                   />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>Quartier</label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      placeholder="Ex: Akpakpa..."
+                      value={newCustQuartier}
+                      onChange={(e) => setNewCustQuartier(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>Ville</label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      placeholder="Ex: Cotonou"
+                      value={newCustVille}
+                      onChange={(e) => setNewCustVille(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Point de laverie rattaché</label>
+                  <CustomSelect
+                    className="input-control"
+                    value={newCustStoreId}
+                    onChange={(e) => setNewCustStoreId(e.target.value)}
+                    disabled={currentUser?.store_id && currentUser.store_id !== 'all'}
+                  >
+                    <option value="">-- Aucun point de laverie spécifique --</option>
+                    {stores.map(st => (
+                      <option key={st.id} value={st.id}>{st.nom} ({st.ville || 'Cotonou'})</option>
+                    ))}
+                  </CustomSelect>
+                </div>
+
+                <div style={{ backgroundColor: 'var(--bg-accent, #f0f7ff)', border: '1px solid var(--accent-color, #93c5fd)', borderRadius: '12px', padding: '12px', marginTop: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '6px' }}>
+                    <MapPin size={16} color="var(--primary-color, #002cf7)" />
+                    <label style={{ margin: 0, color: 'var(--primary-color, #002cf7)', fontWeight: '700' }}>Position GPS (Calcul de livraison)</label>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #64748b)', margin: '0 0 10px 0' }}>
+                    Saisissez la latitude et la longitude du domicile du client pour calculer automatiquement les frais de livraison.
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        className="input-control"
+                        placeholder="Ex: 6.3650"
+                        value={newCustLatitude}
+                        onChange={(e) => setNewCustLatitude(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        className="input-control"
+                        placeholder="Ex: 2.4183"
+                        value={newCustLongitude}
+                        onChange={(e) => setNewCustLongitude(e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="form-group">

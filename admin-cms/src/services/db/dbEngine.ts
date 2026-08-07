@@ -92,6 +92,138 @@ export const dbEngine = {
 
   // ── Getters (synchronous) ──────────────────────────────────────────────
 
+  haversineKm: (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  },
+
+  calculateDeliveryFee: (storeId: string, coordonneesLivraison: string | null, clientLat: number | null, clientLng: number | null) => {
+    const NO_DELIVERY = { fee: 0, distanceKm: 0, zoneLabel: 'Pas de livraison', zoneId: null };
+
+    // 1. Résoudre les coordonnées GPS du client
+    let cLat = clientLat != null ? Number(clientLat) : null;
+    let cLng = clientLng != null ? Number(clientLng) : null;
+
+    if ((cLat == null || cLng == null) && coordonneesLivraison) {
+      const parts = String(coordonneesLivraison).split(',');
+      if (parts.length >= 2) {
+        cLat = parseFloat(parts[0].trim());
+        cLng = parseFloat(parts[1].trim());
+      }
+    }
+
+    if (cLat == null || cLng == null || isNaN(cLat) || isNaN(cLng)) {
+      return NO_DELIVERY;
+    }
+
+    // 2. Trouver les coordonnées GPS de la boutique
+    const stores = memoryDb.stores || [];
+    let store = stores.find(s => s.id === storeId || s.code === storeId);
+    if (!store) store = stores[0]; // Fallback sur le 1er store
+    const sLat = store ? Number(store.latitude) : 6.3703;
+    const sLng = store ? Number(store.longitude) : 2.3912;
+
+    // 3. Calculer la distance
+    const distanceKm = dbEngine.haversineKm(sLat, sLng, cLat, cLng);
+
+    // 4. Trouver la zone correspondante
+    const zones = (memoryDb.delivery_zones || []).filter(z => {
+      if (!z.is_active) return false;
+      // Si la zone est liée à un store_id, filtrer
+      if (z.store_id && storeId && z.store_id !== storeId) return false;
+      return true;
+    });
+
+    let matchedZone = null;
+    for (const zone of zones) {
+      const minKm = Number(zone.min_km);
+      const maxKm = Number(zone.max_km);
+      if (distanceKm >= minKm && distanceKm < maxKm) {
+        matchedZone = zone;
+        break;
+      }
+    }
+
+    if (!matchedZone) {
+      // Hors de toutes les zones configurées
+      return { fee: 0, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: 'Hors zone de livraison', zoneId: null };
+    }
+
+    return {
+      fee: Number(matchedZone.frais_livraison) || 0,
+      distanceKm: Math.round(distanceKm * 10) / 10,
+      zoneLabel: matchedZone.label_zone || `Zone ${matchedZone.id}`,
+      zoneId: matchedZone.id
+    };
+  },
+
+  calculatePickupFee: (storeId: string, coordonneesLivraison: string | null, clientLat: number | null, clientLng: number | null) => {
+    const NO_PICKUP = { fee: 0, distanceKm: 0, zoneLabel: 'Pas de récupération', zoneId: null };
+
+    // 1. Résoudre les coordonnées GPS du client
+    let cLat = clientLat != null ? Number(clientLat) : null;
+    let cLng = clientLng != null ? Number(clientLng) : null;
+
+    if ((cLat == null || cLng == null) && coordonneesLivraison) {
+      const parts = String(coordonneesLivraison).split(',');
+      if (parts.length >= 2) {
+        cLat = parseFloat(parts[0].trim());
+        cLng = parseFloat(parts[1].trim());
+      }
+    }
+
+    if (cLat == null || cLng == null || isNaN(cLat) || isNaN(cLng)) {
+      return NO_PICKUP;
+    }
+
+    // 2. Trouver les coordonnées GPS de la boutique
+    const stores = memoryDb.stores || [];
+    let store = stores.find(s => s.id === storeId || s.code === storeId);
+    if (!store) store = stores[0]; // Fallback sur le 1er store
+    const sLat = store ? Number(store.latitude) : 6.3703;
+    const sLng = store ? Number(store.longitude) : 2.3912;
+
+    // 3. Calculer la distance
+    const distanceKm = dbEngine.haversineKm(sLat, sLng, cLat, cLng);
+
+    // 4. Trouver la zone correspondante
+    const zones = (memoryDb.pickup_zones || []).filter(z => {
+      if (!z.is_active) return false;
+      // Si la zone est liée à un store_id, filtrer
+      if (z.store_id && storeId && z.store_id !== storeId) return false;
+      return true;
+    });
+
+    let matchedZone = null;
+    for (const zone of zones) {
+      const minKm = Number(zone.min_km);
+      const maxKm = Number(zone.max_km);
+      if (distanceKm >= minKm && distanceKm < maxKm) {
+        matchedZone = zone;
+        break;
+      }
+    }
+
+    if (!matchedZone) {
+      // Hors de toutes les zones configurées
+      return { fee: 0, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: 'Hors zone de récupération', zoneId: null };
+    }
+
+    return {
+      fee: Number(matchedZone.frais_livraison) || 0,
+      distanceKm: Math.round(distanceKm * 10) / 10,
+      zoneLabel: matchedZone.label_zone || `Zone ${matchedZone.id}`,
+      zoneId: matchedZone.id
+    };
+  },
+
   getStores: (): Store[] => memoryDb.stores ? [...memoryDb.stores] : [],
   getDeliveryZones: (storeId?: string) => {
     const zones = memoryDb.delivery_zones || [];
@@ -102,7 +234,7 @@ export const dbEngine = {
     const id = zone.id || ('zone_' + Date.now());
     const payload = {
       id,
-      store_id: zone.store_id || null,
+      store_id: (zone.store_id === 'all' || zone.store_id === 'store_central') ? null : (zone.store_id || null),
       label_zone: zone.label_zone || `Zone (${zone.min_km} - ${zone.max_km} km)`,
       min_km: Number(zone.min_km) || 0,
       max_km: Number(zone.max_km) || 3,
@@ -123,6 +255,45 @@ export const dbEngine = {
   deleteDeliveryZone: async (id: string) => {
     await performMutation('delete', 'delivery_zones', id);
     memoryDb.delivery_zones = (memoryDb.delivery_zones || []).filter(z => z.id !== id);
+    notifyListeners();
+  },
+  getPickupZones: (storeId?: string) => {
+    const zones = memoryDb.pickup_zones || [];
+    if (!storeId || storeId === 'all') return [...zones];
+    return zones.filter(z => !z.store_id || z.store_id === storeId);
+  },
+  savePickupZone: async (zone: any) => {
+    const generateUUID = () => {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+    const id = zone.id || generateUUID();
+    const payload = {
+      id,
+      store_id: (zone.store_id === 'all' || zone.store_id === 'store_central') ? null : (zone.store_id || null),
+      label_zone: zone.label_zone || `Zone (${zone.min_km} - ${zone.max_km} km)`,
+      min_km: Number(zone.min_km) || 0,
+      max_km: Number(zone.max_km) || 3,
+      frais_livraison: Number(zone.frais_livraison) || 0,
+      is_active: zone.is_active !== false,
+      created_at: zone.created_at || new Date().toISOString()
+    };
+    await performMutation('upsert', 'pickup_zones', id, payload);
+    const existingIdx = (memoryDb.pickup_zones || []).findIndex(z => z.id === id);
+    if (existingIdx > -1) {
+      memoryDb.pickup_zones[existingIdx] = payload;
+    } else {
+      memoryDb.pickup_zones = [...(memoryDb.pickup_zones || []), payload];
+    }
+    notifyListeners();
+    return payload;
+  },
+  deletePickupZone: async (id: string) => {
+    await performMutation('delete', 'pickup_zones', id);
+    memoryDb.pickup_zones = (memoryDb.pickup_zones || []).filter(z => z.id !== id);
     notifyListeners();
   },
   getSupportTickets: () => memoryDb.support_tickets ? [...memoryDb.support_tickets] : [],
@@ -517,7 +688,7 @@ export const dbEngine = {
   },
   getRewardCatalog: () => {
     // Priority 1: read from memoryDb.rewards (dedicated table `public.rewards` synced from Supabase)
-    if (memoryDb.rewards && Array.isArray(memoryDb.rewards) && memoryDb.rewards.length > 0) {
+    if (memoryDb.rewards && Array.isArray(memoryDb.rewards)) {
       return memoryDb.rewards.map((r: any) => ({
         id: r.id,
         title: r.title || r.article,
@@ -543,14 +714,7 @@ export const dbEngine = {
       }));
     }
 
-    // Priority 3: fallback defaults
-    return [
-      { id: 'remise_1000', title: 'Remise de 1 000 FCFA', cost: 30, discountAmount: 1000, iconName: 'Tag', description: 'Réduction de 1 000 FCFA sur la prochaine commande.' },
-      { id: 'lavage_offert', title: 'Lavage 1 Vêtement Offert', cost: 50, discountAmount: 2000, iconName: 'Shirt', description: 'Un lavage gratuit pour une pièce au choix.' },
-      { id: 'livraison_offerte', title: 'Livraison Offerte', cost: 60, discountAmount: 1500, iconName: 'Truck', description: 'Frais de livraison 100% offerts.' },
-      { id: 'repassage_offert', title: 'Repassage Offert', cost: 100, discountAmount: 4000, iconName: 'Sparkles', description: 'Repassage complet offert sur vos vêtements.' },
-      { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: "Réduction de 5 000 FCFA lors du renouvellement d'abonnement." }
-    ];
+    return [];
   },
   updateRewardCatalog: async (catalog: any[]) => {
     if (!memoryDb.settings) {

@@ -134,13 +134,7 @@ export default function LoginScreen() {
           // ECRAN 1 : SAISIE EMAIL
           <View>
             <View style={styles.logoContainer}>
-              <View style={styles.logoCircle}>
-                <Image 
-                  source={require('../../../../assets/android-icon-foreground.png')} 
-                  style={styles.logo}
-                  resizeMode="contain"
-                />
-              </View>
+              <Text style={styles.logoText}>Laverie - App</Text>
             </View>
 
             <Text style={styles.title}>{t('auth.login_title')}</Text>
@@ -271,23 +265,14 @@ const baseStyles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  logoCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(37, 99, 235, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(37, 99, 235, 0.15)',
-    overflow: 'hidden',
-  },
-  logo: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  logoText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#2563eb',
+    letterSpacing: -0.5,
+    textAlign: 'center',
   },
   title: {
     fontSize: 22,

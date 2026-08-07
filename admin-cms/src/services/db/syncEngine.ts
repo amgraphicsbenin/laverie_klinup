@@ -244,6 +244,15 @@ export async function initDb(): Promise<void> {
     }
 
     try {
+      const { data: pData, error: pErr } = await supabase.from('pickup_zones').select('*').order('min_km', { ascending: true });
+      if (!pErr && pData) {
+        memoryDb.pickup_zones = pData;
+      }
+    } catch (e) {
+      // Ignorer si la table n'existe pas encore
+    }
+
+    try {
       const { data: tData, error: tErr } = await supabase.from('support_tickets').select('*').order('created_at', { ascending: false });
       if (!tErr && tData) {
         memoryDb.support_tickets = tData;

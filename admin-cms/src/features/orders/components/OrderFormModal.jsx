@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Search, Smartphone } from 'lucide-react';
+import { X, Plus, Search, Smartphone, Check } from 'lucide-react';
 import { db } from '../../../services/db';
 
 const ModalPortal = ({ children }) => {
@@ -28,6 +28,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
   const [orderDiscount, setOrderDiscount] = useState('0');
   const [orderUrgency, setOrderUrgency] = useState('Normal');
   const [expandedArticles, setExpandedArticles] = useState([]);
+  const [editQtys, setEditQtys] = useState({});
   const [clothingSearchQuery, setClothingSearchQuery] = useState('');
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
@@ -36,6 +37,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
   const [withDelivery, setWithDelivery] = useState(false);
+  const [withPickup, setWithPickup] = useState(false);
 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
   const isSubscriptionMode = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -75,6 +77,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     setPayWithSubscription(false);
     setSubscribePlanId('');
     setWithDelivery(false);
+    setWithPickup(false);
     setClothingSearchQuery('');
     setMomoRefNumber('');
     setMomoRefError('');
@@ -133,6 +136,32 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     }
   };
 
+  const setArticleQuantity = (item, qtyStr) => {
+    const quantity = parseInt(qtyStr, 10);
+    if (isNaN(quantity) || quantity < 0) return;
+
+    if (quantity === 0) {
+      setSelectedArticles(prev => prev.filter(a => a.id !== item.id));
+      return;
+    }
+    
+    setSelectedArticles(prev => {
+      const existingIndex = prev.findIndex(a => a.id === item.id);
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        updated[existingIndex].quantity = quantity;
+        return updated;
+      }
+      return [...prev, {
+        id: item.id,
+        article: item.article,
+        service: item.service,
+        price: item.prix,
+        quantity: quantity
+      }];
+    });
+  };
+
   const isArticleExpanded = (articleName, items) => {
     if (expandedArticles.includes(articleName)) return true;
     return items.some(item => selectedArticles.some(cart => cart.id === item.id));
@@ -166,8 +195,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     }
 
     const currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const discountPercent = Number(orderDiscount) || 0;
-    const discountAmount = Math.round(currentTotal * (discountPercent / 100));
+    const discountAmount = Math.min(Number(orderDiscount) || 0, currentTotal);
     const netTotal = currentTotal - discountAmount;
 
     const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -195,7 +223,13 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
       const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
-      const finalNetTotal = netTotal + deliveryFee;
+      
+      const pickupCalc = (withPickup && activeCustomer)
+        ? db.calculatePickupFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+        : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+      const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
+      
+      const finalNetTotal = netTotal + deliveryFee + pickupFee;
       const newOrder = {
         customer_id: orderClient,
         store_id: selectedOrderStoreId,
@@ -214,14 +248,17 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         total: finalNetTotal,
         prix_total: finalNetTotal,
         frais_livraison: deliveryFee,
-        distance_km: deliveryCalc.distanceKm,
+        frais_recuperation: pickupFee,
+        with_pickup: withPickup,
+        distance_km: Math.max(deliveryCalc.distanceKm || 0, pickupCalc.distanceKm || 0),
         avance: finalAvance,
         avance_payee: finalAvance,
         statut: 'attente',
         mode_paiement: finalModeReglement,
         mode_reglement: finalModeReglement,
         niveau_urgence: orderUrgency,
-        remise_pourcentage: discountPercent,
+        remise_pourcentage: 0,
+        remise_montant: discountAmount,
         created_by_id: currentUser ? currentUser.id : 'u1',
         pay_with_subscription: payWithSubscription,
         subscribe_plan_id: subscribePlanId,
@@ -695,51 +732,46 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                                   <span>Ajouter</span>
                                 </button>
                               ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                  <input 
+                                    type="number" 
+                                    min="0"
+                                    value={editQtys[item.id] !== undefined ? editQtys[item.id] : qty} 
+                                    onChange={(e) => setEditQtys({...editQtys, [item.id]: e.target.value})}
+                                    style={{
+                                      width: '46px',
+                                      height: '30px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #d4d4d8',
+                                      textAlign: 'center',
+                                      fontSize: '14px',
+                                      fontWeight: 600,
+                                      backgroundColor: '#ffffff'
+                                    }}
+                                  />
                                   <button
                                     type="button"
-                                    onClick={() => removeArticleFromOrder(item.id)}
+                                    onClick={() => {
+                                      const val = editQtys[item.id] !== undefined ? editQtys[item.id] : qty;
+                                      setArticleQuantity(item, val);
+                                      const newEdits = {...editQtys};
+                                      delete newEdits[item.id];
+                                      setEditQtys(newEdits);
+                                    }}
                                     style={{
-                                      width: '26px',
-                                      height: '26px',
-                                      borderRadius: '13px',
-                                      backgroundColor: '#002cf7',
+                                      width: '30px',
+                                      height: '30px',
+                                      borderRadius: '6px',
+                                      backgroundColor: '#10b981',
                                       color: '#ffffff',
                                       border: 'none',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      fontSize: '15px',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      flexShrink: 0
+                                      cursor: 'pointer'
                                     }}
                                   >
-                                    -
-                                  </button>
-                                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#09090b', minWidth: '18px', textAlign: 'center' }}>
-                                    {qty}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => addArticleToOrder(item)}
-                                    style={{
-                                      width: '26px',
-                                      height: '26px',
-                                      borderRadius: '13px',
-                                      backgroundColor: '#002cf7',
-                                      color: '#ffffff',
-                                      border: 'none',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '15px',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      flexShrink: 0
-                                    }}
-                                  >
-                                    +
+                                    <Check size={16} />
                                   </button>
                                 </div>
                               )}
@@ -810,7 +842,28 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
             </button>
           </div>
 
-          {/* Avance, Mode de règlement & Réduction (%) en grille alignée */}
+          {/* Option Récupération */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '14px', border: `1px solid ${withPickup ? '#8b5cf6' : 'var(--border-color)'}`, backgroundColor: withPickup ? 'rgba(139, 92, 246, 0.07)' : 'var(--bg-app)', marginBottom: '14px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: withPickup ? '#8b5cf6' : 'var(--text-primary)' }}>
+                🧺 Récupération à domicile
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                {withPickup && activeCustomer?.coordonnees_livraison
+                  ? 'Frais calculés selon la zone GPS du client'
+                  : 'Le client dépose sa commande en boutique'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWithPickup(!withPickup)}
+              style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', backgroundColor: withPickup ? '#8b5cf6' : 'var(--border-color)', color: withPickup ? '#ffffff' : 'var(--text-secondary)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+            >
+              {withPickup ? '✓ Oui' : 'Non'}
+            </button>
+          </div>
+
+          {/* Avance, Mode de règlement & Réduction en grille alignée */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '14px' }}>
             <div>
               <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'block' }}>
@@ -865,19 +918,19 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
             <div>
               <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'block' }}>
-                Réduction (%)
+                Réduction (Montant)
               </label>
               <div style={{ position: 'relative' }}>
                 <input
                   type="number"
                   min="0"
-                  max="100"
+                  max="1000000"
                   value={isSubscriptionMode ? '0' : orderDiscount}
                   onChange={(e) => {
                     const val = e.target.value;
                     const num = parseInt(val, 10);
                     if (val === '') setOrderDiscount('0');
-                    else if (!isNaN(num) && num >= 0 && num <= 100) setOrderDiscount(num.toString());
+                    else if (!isNaN(num) && num >= 0) setOrderDiscount(num.toString());
                   }}
                   disabled={isSubscriptionMode}
                   placeholder="0"
@@ -888,7 +941,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                     border: '1px solid var(--border-color)',
                     borderRadius: '12px',
                     paddingLeft: '12px',
-                    paddingRight: '28px',
+                    paddingRight: '45px',
                     fontSize: '13px',
                     color: isSubscriptionMode ? 'var(--text-muted)' : 'var(--text-primary)',
                     fontWeight: 500,
@@ -898,14 +951,14 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                 />
                 <span style={{
                   position: 'absolute',
-                  right: '10px',
+                  right: '12px',
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  fontSize: '12px',
+                  fontSize: '11px',
                   fontWeight: 700,
                   color: isSubscriptionMode ? 'var(--text-muted)' : 'var(--text-secondary)',
                   pointerEvents: 'none'
-                }}>%</span>
+                }}>FCFA</span>
               </div>
             </div>
           </div>
@@ -1022,13 +1075,18 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
               currentTotal = Math.round(currentTotal * (1 + expressMarkup / 100));
             }
 
-            const discountPercent = Number(orderDiscount) || 0;
-            const discountAmount = Math.round(currentTotal * (discountPercent / 100));
+            const discountAmount = Math.min(Number(orderDiscount) || 0, currentTotal);
             const deliveryCalcPreview = (withDelivery && activeCustomer)
               ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
               : { fee: 0, distanceKm: 0 };
             const deliveryFeePreview = withDelivery ? (deliveryCalcPreview.fee || 0) : 0;
-            const netTotal = currentTotal - discountAmount + deliveryFeePreview;
+
+            const pickupCalcPreview = (withPickup && activeCustomer)
+              ? db.calculatePickupFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+              : { fee: 0, distanceKm: 0 };
+            const pickupFeePreview = withPickup ? (pickupCalcPreview.fee || 0) : 0;
+
+            const netTotal = currentTotal - discountAmount + deliveryFeePreview + pickupFeePreview;
             
             const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
             const currentReste = netTotal - currentAvance;
@@ -1060,7 +1118,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                 
                 {discountAmount > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Réduction ({discountPercent}%)</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Réduction (Montant)</span>
                     <span style={{ fontSize: '12px', color: 'var(--danger)', fontWeight: 700 }}>-{formatPrice(discountAmount)}</span>
                   </div>
                 )}
@@ -1074,6 +1132,19 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                 {withDelivery && deliveryFeePreview === 0 && activeCustomer && !activeCustomer.coordonnees_livraison && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>⚠️ Livraison</span>
+                    <span style={{ fontSize: '11px', color: '#f59e0b' }}>GPS client non renseigné</span>
+                  </div>
+                )}
+
+                {withPickup && pickupFeePreview > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>📦 Frais de Récupération ({pickupCalcPreview.distanceKm} km)</span>
+                    <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>+{formatPrice(pickupFeePreview)}</span>
+                  </div>
+                )}
+                {withPickup && pickupFeePreview === 0 && activeCustomer && !activeCustomer.coordonnees_livraison && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>⚠️ Récupération</span>
                     <span style={{ fontSize: '11px', color: '#f59e0b' }}>GPS client non renseigné</span>
                   </div>
                 )}

@@ -38,6 +38,17 @@ export interface DeliveryZone {
   created_at?: string;
 }
 
+export interface PickupZone {
+  id: string;
+  store_id?: string | null;
+  label_zone: string;
+  min_km: number;
+  max_km: number;
+  frais_livraison: number;
+  is_active?: boolean;
+  created_at?: string;
+}
+
 export interface StaffPermissions {
   can_view_dashboard?: boolean;
   can_manage_orders?: boolean;
@@ -114,6 +125,8 @@ export interface Order {
   avance_payee: number;
   prix_total: number;
   frais_livraison?: number;
+  frais_recuperation?: number;
+  with_pickup?: boolean;
   distance_km?: number;
   identifiant_unique_marquage: string;
   created_at?: string;
@@ -211,6 +224,7 @@ export interface MemoryStore {
   catalog: CatalogItem[];
   rewards?: RewardItem[];
   delivery_zones?: DeliveryZone[];
+  pickup_zones?: PickupZone[];
   support_tickets?: SupportTicket[];
   current_user: Staff | null;
   pin_reset_requests: PinResetRequest[];

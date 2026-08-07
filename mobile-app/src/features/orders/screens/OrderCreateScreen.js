@@ -6,9 +6,10 @@ import { db } from '../../../services/db';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
 import { t } from '../../../services/i18n';
+import { SUPPORTED_COUNTRIES, validatePhoneNumber } from '../../../utils/phoneUtils';
 
 export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive }) {
-  const { isDarkMode, customers, catalog: rawCatalog, currentUser } = useDbState();
+  const { isDarkMode, customers, catalog: rawCatalog, currentUser, stores } = useDbState();
   const catalog = useMemo(() => {
     if (!rawCatalog) return [];
     if (!currentUser?.store_id || currentUser?.store_id === 'all') return rawCatalog;
@@ -28,6 +29,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
   const [orderDiscount, setOrderDiscount] = useState('0');
   const [orderUrgency, setOrderUrgency] = useState('Normal');
   const [expandedArticles, setExpandedArticles] = useState([]);
+  const [editQtys, setEditQtys] = useState({});
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
   const [momoOperator, setMomoOperator] = useState('MTN');
@@ -37,16 +39,19 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
   const [subscribePlanId, setSubscribePlanId] = useState('');
   const [appliedReward, setAppliedReward] = useState(null);
   const [withDelivery, setWithDelivery] = useState(false);
+  const [withPickup, setWithPickup] = useState(false);
 
   // Mode Nouveau Client state
   const [clientNom, setClientNom] = useState('');
   const [clientPrenom, setClientPrenom] = useState('');
   const [clientTelephone, setClientTelephone] = useState('');
+  const [clientIndicatif, setClientIndicatif] = useState('229');
   const [clientAdresse, setClientAdresse] = useState('');
   const [clientQuartier, setClientQuartier] = useState('');
   const [clientVille, setClientVille] = useState('Cotonou');
   const [clientLatitude, setClientLatitude] = useState('');
   const [clientLongitude, setClientLongitude] = useState('');
+  const [clientStoreId, setClientStoreId] = useState(currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : '');
   const [clientDeliveryPreview, setClientDeliveryPreview] = useState(null);
   const [clientPrefPliage, setClientPrefPliage] = useState('Plié');
   const [clientSubscriptionPlanId, setClientSubscriptionPlanId] = useState('');
@@ -80,6 +85,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
     setSubscribePlanId('');
     setAppliedReward(null);
     setWithDelivery(false);
+    setWithPickup(false);
     setMomoRefNumber('');
     setMomoRefError('');
     setMomoOperator('MTN');
@@ -90,6 +96,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
     setClientNom('');
     setClientPrenom('');
     setClientTelephone('');
+    setClientIndicatif('229');
     setClientAdresse('');
     setClientQuartier('');
     setClientVille('Cotonou');
@@ -98,6 +105,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
     setClientDeliveryPreview(null);
     setClientPrefPliage('Plié');
     setClientSubscriptionPlanId('');
+    setClientStoreId(currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : '');
   };
 
   // Whenever the tab becomes inactive (user switches away), format/reset the form completely
@@ -180,6 +188,32 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
     }
   };
 
+  const setArticleQuantity = (item, qtyStr) => {
+    const quantity = parseInt(qtyStr, 10);
+    if (isNaN(quantity) || quantity < 0) return;
+
+    if (quantity === 0) {
+      setSelectedArticles(prev => prev.filter(a => a.id !== item.id));
+      return;
+    }
+    
+    setSelectedArticles(prev => {
+      const existingIndex = prev.findIndex(a => a.id === item.id);
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        updated[existingIndex].quantity = quantity;
+        return updated;
+      }
+      return [...prev, {
+        id: item.id,
+        article: item.article,
+        service: item.service,
+        price: item.prix,
+        quantity: quantity
+      }];
+    });
+  };
+
   const isArticleExpanded = (articleName, items) => {
     if (expandedArticles.includes(articleName)) return true;
     return items.some(item => selectedArticles.some(cart => cart.id === item.id));
@@ -216,8 +250,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
     }
 
     const currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const discountPercent = Number(orderDiscount) || 0;
-    const discountAmount = Math.round(currentTotal * (discountPercent / 100));
+    const discountAmount = Math.min(Number(orderDiscount) || 0, currentTotal);
     const netTotal = currentTotal - discountAmount;
 
     const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -260,7 +293,12 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
       const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
-      const finalTotal = Math.max(0, netTotal - rewardDiscountVal) + deliveryFee;
+      const pickupCalc = (withPickup && activeCustomer)
+        ? db.calculatePickupFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+        : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+      const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
+
+      const finalTotal = Math.max(0, netTotal - rewardDiscountVal) + deliveryFee + pickupFee;
 
       const newOrder = {
         customer_id: orderClient,
@@ -272,12 +310,15 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         })),
         total: finalTotal,
         frais_livraison: deliveryFee,
-        distance_km: deliveryCalc.distanceKm,
+        frais_recuperation: pickupFee,
+        with_pickup: withPickup,
+        distance_km: Math.max(deliveryCalc.distanceKm || 0, pickupCalc.distanceKm || 0),
         avance: finalAvance,
         statut: 'attente',
         mode_paiement: finalModeReglement,
         niveau_urgence: orderUrgency,
-        remise_pourcentage: discountPercent,
+        remise_pourcentage: 0,
+        remise_montant: discountAmount,
         applied_reward_id: appliedReward ? appliedReward.id : null,
         applied_reward_title: appliedReward ? appliedReward.title : null,
         applied_reward_discount: rewardDiscountVal,
@@ -306,6 +347,8 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
       setPayWithSubscription(false);
       setSubscribePlanId('');
       setAppliedReward(null);
+      setWithDelivery(false);
+      setWithPickup(false);
       setMomoRefNumber('');
       setMomoRefError('');
       setMomoOperator('MTN');
@@ -323,7 +366,12 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
       return;
     }
     if (!clientTelephone.trim()) {
-      Alert.alert("Champ requis", "Veuillez saisir le numéro de téléphone.");
+      Alert.alert('Erreur', 'Veuillez saisir le numéro de téléphone.');
+      return;
+    }
+
+    if (!validatePhoneNumber(clientTelephone, clientIndicatif)) {
+      Alert.alert("Erreur", "Le format du numéro de téléphone n'est pas valide pour l'indicatif choisi.");
       return;
     }
 
@@ -335,9 +383,10 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         : null;
 
       const newCustomer = await db.addCustomer({
-        prenom: clientPrenom.trim(),
         nom: clientNom.trim(),
+        prenom: clientPrenom.trim(),
         telephone: clientTelephone.trim(),
+        indicatif: clientIndicatif,
         adresse: clientAdresse.trim(),
         quartier: clientQuartier.trim(),
         ville: clientVille.trim() || 'Cotonou',
@@ -345,7 +394,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         longitude: lng,
         coordonnees_livraison: coords,
         preferences_pliage: clientPrefPliage,
-        store_id: currentUser?.store_id
+        store_id: clientStoreId || null
       });
 
       if (newCustomer && clientSubscriptionPlanId) {
@@ -363,6 +412,8 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
       setClientLongitude('');
       setClientDeliveryPreview(null);
       setClientPrefPliage('Plié');
+      setClientSubscriptionPlanId('');
+      setClientStoreId(currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : '');
       setClientSubscriptionPlanId('');
 
       if (onShowSuccess) onShowSuccess(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès !`);
@@ -452,15 +503,26 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               </View>
             </View>
 
-            <Text style={styles.formLabel}>Numéro de Téléphone *</Text>
-            <TextInput
-              keyboardType="phone-pad"
-              value={clientTelephone}
-              onChangeText={setClientTelephone}
-              placeholder="Ex: 97000000"
-              placeholderTextColor="#a1a1aa"
-              style={styles.formInput}
-            />
+            <Text style={styles.formLabel}>Téléphone</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flex: 0.4, marginRight: 8 }}>
+                <CustomSelect
+                  value={clientIndicatif}
+                  onChange={setClientIndicatif}
+                  options={SUPPORTED_COUNTRIES.map(c => ({ label: `${c.flag} +${c.code}`, value: c.code }))}
+                />
+              </View>
+              <View style={{ flex: 0.6 }}>
+                <TextInput
+                  style={[styles.formInput, { marginBottom: 0 }]}
+                  placeholder="Ex: 0197979797"
+                  placeholderTextColor={isDarkMode ? '#52525b' : '#a1a1aa'}
+                  keyboardType="phone-pad"
+                  value={clientTelephone}
+                  onChangeText={setClientTelephone}
+                />
+              </View>
+            </View>
 
             <Text style={styles.formLabel}>Adresse (Rue / Domicile)</Text>
             <TextInput
@@ -494,12 +556,28 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               </View>
             </View>
 
+            <View style={{ marginTop: 16 }}>
+              <Text style={styles.formLabel}>Point de laverie rattaché</Text>
+              <CustomSelect
+                value={clientStoreId}
+                onChange={setClientStoreId}
+                options={[
+                  { label: "-- Aucun point spécifique --", value: "" },
+                  ...(stores || []).map(st => ({ label: `${st.nom} (${st.ville || 'Cotonou'})`, value: st.id }))
+                ]}
+                placeholder="-- Choisir un point --"
+                isDarkMode={isDarkMode}
+                disabled={currentUser?.store_id && currentUser.store_id !== 'all'}
+              />
+            </View>
+
             {/* Section Position GPS & Estimation des Frais de Livraison */}
             <View style={{
               borderRadius: 14,
               borderWidth: 1,
               padding: 12,
               marginBottom: 16,
+              marginTop: 16,
               backgroundColor: isDarkMode ? '#1e293b' : '#f0f7ff',
               borderColor: isDarkMode ? '#1d4ed8' : '#93c5fd'
             }}>
@@ -865,13 +943,42 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
                                       <Text style={styles.serviceAddBtnText}>Ajouter</Text>
                                     </TouchableOpacity>
                                   ) : (
-                                    <View style={styles.serviceQtyRow}>
-                                      <TouchableOpacity onPress={() => removeArticleFromOrder(item.id)} style={styles.serviceQtyBtn}>
-                                        <Text style={styles.serviceQtyBtnText}>-</Text>
-                                      </TouchableOpacity>
-                                      <Text style={styles.serviceQtyText}>{qty}</Text>
-                                      <TouchableOpacity onPress={() => addArticleToOrder(item)} style={styles.serviceQtyBtn}>
-                                        <Text style={styles.serviceQtyBtnText}>+</Text>
+                                    <View style={[styles.serviceQtyRow, { gap: 6 }]}>
+                                      <TextInput
+                                        keyboardType="numeric"
+                                        value={editQtys[item.id] !== undefined ? editQtys[item.id] : qty.toString()}
+                                        onChangeText={(val) => setEditQtys({...editQtys, [item.id]: val})}
+                                        style={{
+                                          width: 46,
+                                          height: 30,
+                                          borderRadius: 6,
+                                          borderWidth: 1,
+                                          borderColor: '#d4d4d8',
+                                          textAlign: 'center',
+                                          fontSize: 14,
+                                          fontWeight: '600',
+                                          backgroundColor: '#ffffff',
+                                          padding: 0
+                                        }}
+                                      />
+                                      <TouchableOpacity
+                                        onPress={() => {
+                                          const val = editQtys[item.id] !== undefined ? editQtys[item.id] : qty;
+                                          setArticleQuantity(item, val);
+                                          const newEdits = {...editQtys};
+                                          delete newEdits[item.id];
+                                          setEditQtys(newEdits);
+                                        }}
+                                        style={{
+                                          width: 30,
+                                          height: 30,
+                                          borderRadius: 6,
+                                          backgroundColor: '#10b981',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                      >
+                                        <Check size={16} color="#ffffff" />
                                       </TouchableOpacity>
                                     </View>
                                   )}
@@ -949,6 +1056,29 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               >
                 <Text style={{ fontSize: 13, fontWeight: '700', color: withDelivery ? '#ffffff' : (isDarkMode ? '#a1a1aa' : '#64748b') }}>
                   {withDelivery ? '✓ Oui' : 'Non'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Option Récupération */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: withPickup ? '#8b5cf6' : (isDarkMode ? '#27272a' : '#e2e8f0'), backgroundColor: withPickup ? (isDarkMode ? '#2e1065' : '#f3e8ff') : (isDarkMode ? '#121212' : '#f8fafc'), marginBottom: 14 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: withPickup ? '#8b5cf6' : (isDarkMode ? '#ffffff' : '#0f172a') }}>
+                  🧺 Récupération à domicile
+                </Text>
+                <Text style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                  {withPickup && activeCustomer?.coordonnees_livraison
+                    ? `Frais calculés selon la zone GPS du client`
+                    : 'Le client dépose sa commande en boutique'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setWithPickup(!withPickup)}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: withPickup ? '#8b5cf6' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: withPickup ? '#ffffff' : (isDarkMode ? '#a1a1aa' : '#64748b') }}>
+                  {withPickup ? '✓ Oui' : 'Non'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1051,9 +1181,9 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               </View>
             )}
 
-            {/* Réduction (%) */}
+            {/* Réduction (Montant) */}
             <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
-              Réduction (%)
+              Réduction (Montant FCFA)
             </Text>
             <TextInput
               keyboardType="numeric"
@@ -1061,7 +1191,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               onChangeText={(val) => {
                 const num = parseInt(val, 10);
                 if (val === '') setOrderDiscount('0');
-                else if (!isNaN(num) && num >= 0 && num <= 100) setOrderDiscount(num.toString());
+                else if (!isNaN(num) && num >= 0) setOrderDiscount(num.toString());
               }}
               editable={!isSubscriptionMode}
               style={[
@@ -1073,7 +1203,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
                   opacity: 0.7
                 }
               ]}
-              placeholder="Ex: 10"
+              placeholder="Ex: 500"
               placeholderTextColor={isDarkMode ? '#52525b' : '#a1a1aa'}
             />
           </View>
@@ -1189,8 +1319,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               currentTotal = Math.round(currentTotal * (1 + expressMarkup / 100));
             }
 
-            const discountPercent = Number(orderDiscount) || 0;
-            const discountAmount = Math.round(currentTotal * (discountPercent / 100));
+            const discountAmount = Math.min(Number(orderDiscount) || 0, currentTotal);
 
             let rewardDiscountVal = 0;
             if (appliedReward) {
@@ -1211,7 +1340,12 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
             const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
-            const netTotal = Math.max(0, currentTotal - discountAmount - rewardDiscountVal) + deliveryFee;
+            const pickupCalc = (withPickup && activeCustomer)
+              ? db.calculatePickupFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+              : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+            const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
+
+            const netTotal = Math.max(0, currentTotal - discountAmount - rewardDiscountVal) + deliveryFee + pickupFee;
             const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
             const currentReste = netTotal - currentAvance;
             const totalClothes = selectedArticles.reduce((sum, item) => sum + item.quantity, 0);
@@ -1289,7 +1423,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
 
                 {discountAmount > 0 && (
                   <View style={styles.receiptRow}>
-                    <Text style={styles.receiptRowLabel}>Réduction ({discountPercent}%)</Text>
+                    <Text style={styles.receiptRowLabel}>Réduction (Montant)</Text>
                     <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
                   </View>
                 )}
@@ -1312,6 +1446,17 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
                     </Text>
                     <Text style={[styles.receiptRowVal, { color: '#3b82f6', fontWeight: '700' }]}>
                       +{formatPrice(deliveryFee)}
+                    </Text>
+                  </View>
+                )}
+
+                {pickupFee > 0 && (
+                  <View style={styles.receiptRow}>
+                    <Text style={[styles.receiptRowLabel, { color: '#10b981', fontWeight: '700' }]}>
+                      Frais de Récupération ({pickupCalc.distanceKm} km)
+                    </Text>
+                    <Text style={[styles.receiptRowVal, { color: '#10b981', fontWeight: '700' }]}>
+                      +{formatPrice(pickupFee)}
                     </Text>
                   </View>
                 )}

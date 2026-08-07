@@ -37,13 +37,13 @@ function App() {
   const [pinCode, setPinCode] = useState('');
   const [pinError, setPinError] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
-  
+
   const [loginEmail, setLoginEmail] = useState('');
   const [showResetPinModal, setShowResetPinModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [customDialog, setCustomDialog] = useState(null); // { message, title, type, isConfirm, resolve }
-  const [openSubmenus, setOpenSubmenus] = useState({ staff: true, settings: true });
+  const [openSubmenus, setOpenSubmenus] = useState({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -53,6 +53,7 @@ function App() {
     }
   });
   const [pinActionLoading, setPinActionLoading] = useState(null);
+  const [sidebarSearch, setSidebarSearch] = useState('');
 
   // Dark mode state & theme switcher persistent
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -129,7 +130,7 @@ function App() {
   // Unified notifications stream
   const allNotifications = (() => {
     const list = [];
-    
+
     // 1. PIN reset requests
     const pinReqs = (db.getPinResetRequests ? db.getPinResetRequests() : []) || [];
     pinReqs.forEach(req => {
@@ -182,7 +183,7 @@ function App() {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
-      
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -291,13 +292,13 @@ function App() {
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return "À l'instant";
     if (diffMins < 60) return `Il y a ${diffMins} min`;
-    
+
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `Il y a ${diffHours} h`;
-    
+
     return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
@@ -308,19 +309,19 @@ function App() {
     window.alert = (message) => {
       const msgStr = typeof message === 'object' ? JSON.stringify(message) : String(message);
       return new Promise((resolve) => {
-        const isError = msgStr.toLowerCase().includes('erreur') || 
-                        msgStr.toLowerCase().includes('impossible') || 
-                        msgStr.toLowerCase().includes('invalide') || 
-                        msgStr.toLowerCase().includes('suspendu') ||
-                        msgStr.toLowerCase().includes('insuffisant') ||
-                        msgStr.toLowerCase().includes('incorrect');
-        const isSuccess = msgStr.toLowerCase().includes('succès') || 
-                          msgStr.toLowerCase().includes('enregistré') || 
-                          msgStr.toLowerCase().includes('mis à jour') || 
-                          msgStr.toLowerCase().includes('réinitialisé') || 
-                          msgStr.toLowerCase().includes('synchronisés') ||
-                          msgStr.toLowerCase().includes('démarré');
-        
+        const isError = msgStr.toLowerCase().includes('erreur') ||
+          msgStr.toLowerCase().includes('impossible') ||
+          msgStr.toLowerCase().includes('invalide') ||
+          msgStr.toLowerCase().includes('suspendu') ||
+          msgStr.toLowerCase().includes('insuffisant') ||
+          msgStr.toLowerCase().includes('incorrect');
+        const isSuccess = msgStr.toLowerCase().includes('succès') ||
+          msgStr.toLowerCase().includes('enregistré') ||
+          msgStr.toLowerCase().includes('mis à jour') ||
+          msgStr.toLowerCase().includes('réinitialisé') ||
+          msgStr.toLowerCase().includes('synchronisés') ||
+          msgStr.toLowerCase().includes('démarré');
+
         setCustomDialog(prev => {
           if (prev && typeof prev.resolve === 'function') {
             prev.resolve(false);
@@ -398,10 +399,10 @@ function App() {
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     if (!loginEmail) return;
-    
+
     const currentStaff = db.getAllStaff ? db.getAllStaff() : db.getStaff();
     let matchedUser = currentStaff.find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
-    
+
     if (!matchedUser) {
       try {
         await db.refreshStaff();
@@ -427,7 +428,7 @@ function App() {
   const handleRequestPinResetSubmit = (e) => {
     e.preventDefault();
     if (!resetEmail) return;
-    
+
     db.createPinResetRequest(resetEmail.trim());
     alert(`Demande de réinitialisation envoyée pour ${resetEmail} ! Veuillez demander à un administrateur d'approuver votre demande.`);
     setShowResetPinModal(false);
@@ -473,17 +474,17 @@ function App() {
 
   const handleKeypadPress = (val) => {
     if (pinError || isUnlocking) return;
-    
+
     if (val === 'delete') {
       setPinCode(prev => prev.slice(0, -1));
       return;
     }
-    
+
     if (pinCode.length >= 6) return;
-    
+
     const newCode = pinCode + val;
     setPinCode(newCode);
-    
+
     if (newCode.length === 6) {
       if (selectedLoginUser.code_pin === newCode) {
         setIsUnlocking(true);
@@ -508,7 +509,7 @@ function App() {
 
   useEffect(() => {
     if (!selectedLoginUser) return;
-    
+
     const handleKeyDown = (e) => {
       if (e.key >= '0' && e.key <= '9') {
         handleKeypadPress(e.key);
@@ -518,7 +519,7 @@ function App() {
         setSelectedLoginUser(null);
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedLoginUser, pinCode, pinError, isUnlocking]);
@@ -615,12 +616,10 @@ function App() {
   if (!currentUser) {
     return (
       <div className="lockscreen-container">
-        <div className="lockscreen-logo-area" style={{ textAlign: 'center', marginBottom: '0.4rem' }}>
-          <img 
-            src={logoGold} 
-            alt="KLIN UP Logo" 
-            style={{ width: '220px', objectFit: 'contain', display: 'block', margin: '0 auto 0.75rem' }} 
-          />
+        <div className="lockscreen-logo-area" style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
+          <h1 style={{ color: '#ffffff', fontSize: '2.2rem', fontWeight: 800, margin: '0 0 0.25rem', letterSpacing: '-0.5px' }}>
+            Laverie - Admin
+          </h1>
           <p className="lockscreen-subtitle" style={{ color: 'rgba(255, 255, 255, 0.6)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
             Plateforme Laverie Admin CMS
           </p>
@@ -631,9 +630,9 @@ function App() {
             <div style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.7)', fontWeight: 600, textAlign: 'center', marginBottom: '0.5rem' }}>
               Connexion Administration
             </div>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <input 
+              <input
                 type="email"
                 required
                 placeholder="Email de l'administrateur"
@@ -656,7 +655,7 @@ function App() {
               />
             </div>
 
-            <button 
+            <button
               type="submit"
               className="btn"
               style={{
@@ -696,44 +695,44 @@ function App() {
           </form>
         ) : (
           <div className="pin-view-container" style={{ maxWidth: '320px' }}>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="pin-view-back"
               onClick={() => setSelectedLoginUser(null)}
             >
               ← Retour
             </button>
 
-            <div 
-              className="pin-user-avatar" 
-              style={{ 
-                background: selectedLoginUser.role === 'super_admin' ? 'hsl(224, 76%, 48%)' : selectedLoginUser.role === 'manager' ? 'hsl(271, 76%, 53%)' : 'hsl(162, 76%, 38%)' 
+            <div
+              className="pin-user-avatar"
+              style={{
+                background: selectedLoginUser.role === 'super_admin' ? 'hsl(224, 76%, 48%)' : selectedLoginUser.role === 'manager' ? 'hsl(271, 76%, 53%)' : 'hsl(162, 76%, 38%)'
               }}
             >
               {selectedLoginUser.prenom[0]}{selectedLoginUser.nom[0]}
             </div>
             <h3 className="pin-user-name">{selectedLoginUser.prenom} {selectedLoginUser.nom}</h3>
             <p className="pin-user-role">
-              {selectedLoginUser.role === 'super_admin' ? 'Super Administrateur' 
-                : selectedLoginUser.role === 'manager' ? 'Gestionnaire' 
-                : selectedLoginUser.role === 'livreur' ? 'Livreur' 
-                : selectedLoginUser.role === 'agent_lavage_repassage' ? 'Agent de lavage / Repassage' 
-                : "Agent d'accueil"}
+              {selectedLoginUser.role === 'super_admin' ? 'Super Administrateur'
+                : selectedLoginUser.role === 'manager' ? 'Gestionnaire'
+                  : selectedLoginUser.role === 'livreur' ? 'Livreur'
+                    : selectedLoginUser.role === 'agent_lavage_repassage' ? 'Agent de lavage / Repassage'
+                      : "Agent d'accueil"}
             </p>
 
             <div className={`pin-dots-row ${pinError ? 'shake' : ''}`}>
               {[0, 1, 2, 3, 4, 5].map(idx => (
-                <div 
-                  key={idx} 
+                <div
+                  key={idx}
                   className={`pin-dot ${pinCode.length > idx ? 'filled' : ''} ${pinError ? 'error' : ''}`}
                 />
               ))}
             </div>
 
-            <p style={{ 
-              color: 'rgba(255, 255, 255, 0.65)', 
-              fontSize: '0.85rem', 
-              textAlign: 'center', 
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.65)',
+              fontSize: '0.85rem',
+              textAlign: 'center',
               marginTop: '1.5rem',
               marginBottom: '1rem',
               lineHeight: 1.4
@@ -741,7 +740,7 @@ function App() {
               Saisissez votre code PIN à 6 chiffres à l'aide de votre clavier physique.
             </p>
 
-            <button 
+            <button
               type="button"
               onClick={() => setSelectedLoginUser(null)}
               style={{
@@ -786,12 +785,12 @@ function App() {
                   <MIcon name="close" size={20} />
                 </button>
               </div>
-              
+
               <form onSubmit={handleRequestPinResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                   Saisissez votre email professionnel. Une demande de réinitialisation sera envoyée à l'administrateur pour approbation.
                 </p>
-                <input 
+                <input
                   type="email"
                   required
                   placeholder="votre.email@klinup.com"
@@ -828,7 +827,7 @@ function App() {
 
   return (
     <div className="app-container">
-      
+
       {/* ================= OVERLAY MOBILE SIDEBAR ================= */}
       {hasAdminAccess && sidebarOpen && (
         <div className="sidebar-mobile-overlay sidebar-overlay-open" onClick={() => setSidebarOpen(false)} />
@@ -836,235 +835,221 @@ function App() {
 
       {/* ================= SIDEBAR DESKTOP & MOBILE ================= */}
       {hasAdminAccess && (
-        <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-          <div>
-            <div className="sidebar-logo" style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              padding: '0', 
-              marginTop: '1.25rem', 
-              marginBottom: '1.25rem' 
-            }}>
-              <img 
-                src={logoDark} 
-                alt="KLIN UP Logo" 
-                style={{ 
-                  width: '100%', 
-                  maxWidth: '130px', 
-                  height: 'auto', 
-                  objectFit: 'contain', 
-                  display: 'block',
-                  filter: isDarkMode ? 'invert(1) hue-rotate(180deg)' : 'none',
-                  transition: 'filter 0.3s ease'
-                }} 
-              />
+        <aside className={`sidebar theme-dark-blue${sidebarOpen ? ' sidebar-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+
+          {/* ── Header: Title ── */}
+          <div className="sidebar-header">
+            <div className="sidebar-title-text">
+              Laverie - Admin
             </div>
+          </div>
 
-            <ul className="menu-list">
-              <div className={`menu-group-block ${adminMenu === 'dashboard' ? 'active-block' : ''}`}>
-                <li 
-                  className={`menu-item ${adminMenu === 'dashboard' ? 'active' : ''}`}
-                  onClick={() => selectMenu('dashboard')}
-                  data-tooltip="Vue d'Ensemble"
-                >
-                  <div className="menu-item-left">
-                    <MIcon name="dashboard" size={20} />
-                    <span className="menu-item-label">Vue d'Ensemble</span>
-                  </div>
-                </li>
-              </div>
+          {/* ── Search bar ── */}
+          <div className="sidebar-search-wrap">
+            <MIcon name="search" size={16} className="sidebar-search-icon" />
+            <input
+              type="text"
+              className="sidebar-search-input"
+              placeholder="Rechercher..."
+              value={sidebarSearch}
+              onChange={e => setSidebarSearch(e.target.value)}
+            />
+          </div>
 
-              <div className={`menu-group-block ${adminMenu === 'orders_management' ? 'active-block' : ''}`}>
-                <li 
-                  className={`menu-item ${adminMenu === 'orders_management' ? 'active' : ''}`}
-                  onClick={() => selectMenu('orders_management')}
-                  data-tooltip="Gestion Commandes"
-                >
-                  <div className="menu-item-left">
-                    <MIcon name="shopping_bag" size={20} />
-                    <span className="menu-item-label">Gestion Commandes</span>
-                  </div>
-                </li>
-              </div>
+          {/* ── Scrollable nav ── */}
+          <nav className="sidebar-nav">
 
-              <div className={`menu-group-block ${adminMenu === 'crm_management' ? 'active-block' : ''}`}>
-                <li 
-                  className={`menu-item ${adminMenu === 'crm_management' ? 'active' : ''}`}
-                  onClick={() => selectMenu('crm_management')}
-                  data-tooltip="Clients CRM"
-                >
-                  <div className="menu-item-left">
-                    <MIcon name="group" size={20} />
-                    <span className="menu-item-label">Clients CRM</span>
-                  </div>
-                </li>
-              </div>
+            {/* Section PRINCIPAL */}
+            <div className="sidebar-section-label">PRINCIPAL</div>
+            <ul className="sidebar-menu">
 
-              <div className={`menu-group-block ${adminMenu === 'catalog' ? 'active-block' : ''}`}>
-                <li 
-                  className={`menu-item ${adminMenu === 'catalog' ? 'active' : ''}`}
-                  onClick={() => selectMenu('catalog')}
-                  data-tooltip="Catalogue Tarifs"
-                >
-                  <div className="menu-item-left">
-                    <MIcon name="price_change" size={20} />
-                    <span className="menu-item-label">Catalogue Tarifs</span>
-                  </div>
-                </li>
-              </div>
+              <li className={`sidebar-nav-item${adminMenu === 'dashboard' ? ' active' : ''}`}
+                onClick={() => selectMenu('dashboard')}
+                data-tooltip="Vue d'Ensemble">
+                <div className="sidebar-nav-icon"><MIcon name="dashboard" size={19} /></div>
+                <span className="sidebar-nav-label">Vue d'Ensemble</span>
+              </li>
+
+              <li className={`sidebar-nav-item${adminMenu === 'orders_management' ? ' active' : ''}`}
+                onClick={() => selectMenu('orders_management')}
+                data-tooltip="Gestion Commandes">
+                <div className="sidebar-nav-icon"><MIcon name="shopping_bag" size={19} /></div>
+                <span className="sidebar-nav-label">Gestion Commandes</span>
+              </li>
+
+              <li className={`sidebar-nav-item${adminMenu === 'crm_management' ? ' active' : ''}`}
+                onClick={() => selectMenu('crm_management')}
+                data-tooltip="Clients CRM">
+                <div className="sidebar-nav-icon"><MIcon name="group" size={19} /></div>
+                <span className="sidebar-nav-label">Clients CRM</span>
+              </li>
+
+              <li className={`sidebar-nav-item${adminMenu === 'catalog' ? ' active' : ''}`}
+                onClick={() => selectMenu('catalog')}
+                data-tooltip="Catalogue Tarifs">
+                <div className="sidebar-nav-icon"><MIcon name="price_change" size={19} /></div>
+                <span className="sidebar-nav-label">Catalogue Tarifs</span>
+              </li>
 
               {isSuperAdmin && (
                 <>
-                  <div className={`menu-group-block ${adminMenu === 'laundry_points' ? 'active-block' : ''}`}>
-                    <li 
-                      className={`menu-item ${adminMenu === 'laundry_points' ? 'active' : ''}`}
-                      onClick={() => selectMenu('laundry_points')}
-                      data-tooltip="Points de Laverie"
-                    >
-                      <div className="menu-item-left">
-                        <MIcon name="store" size={20} />
-                        <span className="menu-item-label">Points de Laverie</span>
-                      </div>
-                    </li>
-                  </div>
-                  <div className={`menu-group-block ${openSubmenus?.staff ? 'expanded' : ''} ${['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) ? 'active-block' : ''}`}>
-                    <li 
-                      className={`menu-item ${['staff_management', 'staff_users', 'staff_roles'].includes(adminMenu) ? 'active' : ''}`}
+                  <li className={`sidebar-nav-item${adminMenu === 'laundry_points' ? ' active' : ''}`}
+                    onClick={() => selectMenu('laundry_points')}
+                    data-tooltip="Points de Laverie">
+                    <div className="sidebar-nav-icon"><MIcon name="store" size={19} /></div>
+                    <span className="sidebar-nav-label">Points de Laverie</span>
+                  </li>
+
+                  {/* Gestion des Accès — expandable + flyout for collapsed mode */}
+                  <div className="sidebar-nav-group">
+                    <li className={`sidebar-nav-item sidebar-nav-expandable${['staff_management','staff_users','staff_roles'].includes(adminMenu) ? ' active' : ''}${openSubmenus?.staff ? ' open' : ''}`}
                       onClick={() => setOpenSubmenus(prev => ({ ...prev, staff: !prev.staff }))}
-                      data-tooltip="Gestion des Accès"
-                    >
-                      <div className="menu-item-left">
-                        <MIcon name="admin_panel_settings" size={20} />
-                        <span className="menu-item-label">Gestion des Accès</span>
-                      </div>
-                      <span className="expand-symbol">{openSubmenus?.staff ? '−' : '+'}</span>
+                      data-tooltip="Gestion des Accès">
+                      <div className="sidebar-nav-icon"><MIcon name="admin_panel_settings" size={19} /></div>
+                      <span className="sidebar-nav-label">Gestion des Accès</span>
+                      <MIcon name="keyboard_arrow_down" size={16} className="sidebar-nav-chevron" />
                     </li>
+                    {/* Flyout: always rendered, visible on hover in collapsed mode */}
+                    <div className="sidebar-flyout">
+                      <div className="sidebar-flyout-title">Gestion des Accès</div>
+                      <div className={`sidebar-flyout-item${(adminMenu === 'staff_users' || adminMenu === 'staff_management') ? ' active' : ''}`}
+                        onClick={() => selectMenu('staff_users')}>
+                        Gestion Utilisateurs
+                      </div>
+                      <div className={`sidebar-flyout-item${adminMenu === 'staff_roles' ? ' active' : ''}`}
+                        onClick={() => selectMenu('staff_roles')}>
+                        Config. des Rôles
+                      </div>
+                    </div>
+                    {/* Inline submenu: visible in expanded mode */}
                     {openSubmenus?.staff && (
-                      <div className="submenu-container">
-                        <div 
-                          className={`submenu-item ${(adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 'active' : ''}`}
-                          onClick={() => selectMenu('staff_users')}
-                        >
-                          <MIcon name="person" size={16} style={{ marginRight: '8px', opacity: (adminMenu === 'staff_users' || adminMenu === 'staff_management') ? 1 : 0.7 }} />
-                          <span className="menu-item-label">Gestion Utilisateurs</span>
-                        </div>
-                        <div 
-                          className={`submenu-item ${adminMenu === 'staff_roles' ? 'active' : ''}`}
-                          onClick={() => selectMenu('staff_roles')}
-                        >
-                          <MIcon name="badge" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'staff_roles' ? 1 : 0.7 }} />
-                          <span className="menu-item-label">Config. des Rôles</span>
+                      <div className="sidebar-submenu">
+                        <div className="sidebar-submenu-rail" />
+                        <div className="sidebar-submenu-items">
+                          <div className={`sidebar-submenu-item${(adminMenu === 'staff_users' || adminMenu === 'staff_management') ? ' active' : ''}`}
+                            onClick={() => selectMenu('staff_users')}>
+                            Gestion Utilisateurs
+                          </div>
+                          <div className={`sidebar-submenu-item${adminMenu === 'staff_roles' ? ' active' : ''}`}
+                            onClick={() => selectMenu('staff_roles')}>
+                            Config. des Rôles
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div className={`menu-group-block ${adminMenu === 'logs' ? 'active-block' : ''}`}>
-                    <li 
-                      className={`menu-item ${adminMenu === 'logs' ? 'active' : ''}`}
-                      onClick={() => selectMenu('logs')}
-                      data-tooltip="Journal d'Audit"
-                    >
-                      <div className="menu-item-left">
-                        <MIcon name="history" size={20} />
-                        <span className="menu-item-label">Journal d'Audit</span>
-                      </div>
-                    </li>
-                  </div>
+                  <li className={`sidebar-nav-item${adminMenu === 'logs' ? ' active' : ''}`}
+                    onClick={() => selectMenu('logs')}
+                    data-tooltip="Journal d'Audit">
+                    <div className="sidebar-nav-icon"><MIcon name="history" size={19} /></div>
+                    <span className="sidebar-nav-label">Journal d'Audit</span>
+                  </li>
                 </>
               )}
             </ul>
 
-            <div className="menu-section-title">GÉNÉRAL</div>
-            <ul className="menu-list">
-              <div className={`menu-group-block ${openSubmenus?.settings ? 'expanded' : ''} ${adminMenu.startsWith('settings') ? 'active-block' : ''}`}>
-                <li 
-                  className={`menu-item ${adminMenu.startsWith('settings') ? 'active' : ''}`}
+            {/* Section GÉNÉRAL */}
+            <div className="sidebar-section-label">GÉNÉRAL</div>
+            <ul className="sidebar-menu">
+
+              {/* Paramètres — expandable + flyout for collapsed mode */}
+              <div className="sidebar-nav-group">
+                <li className={`sidebar-nav-item sidebar-nav-expandable${adminMenu.startsWith('settings') ? ' active' : ''}${openSubmenus?.settings ? ' open' : ''}`}
                   onClick={() => setOpenSubmenus(prev => ({ ...prev, settings: !prev.settings }))}
-                  data-tooltip="Paramètres"
-                >
-                  <div className="menu-item-left">
-                    <MIcon name="settings" size={20} />
-                    <span className="menu-item-label">Paramètres</span>
-                  </div>
-                  <span className="expand-symbol">{openSubmenus?.settings ? '−' : '+'}</span>
+                  data-tooltip="Paramètres">
+                  <div className="sidebar-nav-icon"><MIcon name="settings" size={19} /></div>
+                  <span className="sidebar-nav-label">Paramètres</span>
+                  <MIcon name="keyboard_arrow_down" size={16} className="sidebar-nav-chevron" />
                 </li>
+                {/* Flyout: always rendered, visible on hover in collapsed mode */}
+                <div className="sidebar-flyout">
+                  <div className="sidebar-flyout-title">Paramètres</div>
+                  <div className={`sidebar-flyout-item${(adminMenu === 'settings_delays' || adminMenu === 'settings') ? ' active' : ''}`}
+                    onClick={() => selectMenu('settings_delays')}>
+                    Délais &amp; Majorations
+                  </div>
+                  <div className={`sidebar-flyout-item${adminMenu === 'settings_reward' ? ' active' : ''}`}
+                    onClick={() => selectMenu('settings_reward')}>
+                    Reward &amp; Fidélité
+                  </div>
+                  <div className={`sidebar-flyout-item${adminMenu === 'settings_receipt' ? ' active' : ''}`}
+                    onClick={() => selectMenu('settings_receipt')}>
+                    Modèles de Reçus
+                  </div>
+                  <div className={`sidebar-flyout-item${adminMenu === 'settings_delivery' ? ' active' : ''}`}
+                    onClick={() => selectMenu('settings_delivery')}>
+                    Frais Récupération &amp; Livraison
+                  </div>
+                  <div className={`sidebar-flyout-item${adminMenu === 'settings_cloud' ? ' active' : ''}`}
+                    onClick={() => selectMenu('settings_cloud')}>
+                    Configuration Système
+                  </div>
+                </div>
+                {/* Inline submenu: visible in expanded mode */}
                 {openSubmenus?.settings && (
-                  <div className="submenu-container">
-                    <div 
-                      className={`submenu-item ${(adminMenu === 'settings_delays' || adminMenu === 'settings') ? 'active' : ''}`}
-                      onClick={() => selectMenu('settings_delays')}
-                    >
-                      <MIcon name="bolt" size={16} style={{ marginRight: '8px', opacity: (adminMenu === 'settings_delays' || adminMenu === 'settings') ? 1 : 0.7 }} />
-                      <span className="menu-item-label">Délais & Majorations</span>
-                    </div>
-                    <div 
-                      className={`submenu-item ${adminMenu === 'settings_reward' ? 'active' : ''}`}
-                      onClick={() => selectMenu('settings_reward')}
-                    >
-                      <MIcon name="workspace_premium" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'settings_reward' ? 1 : 0.7 }} />
-                      <span className="menu-item-label">Reward & Fidélité Client</span>
-                    </div>
-                    <div 
-                      className={`submenu-item ${adminMenu === 'settings_receipt' ? 'active' : ''}`}
-                      onClick={() => selectMenu('settings_receipt')}
-                    >
-                      <MIcon name="receipt_long" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'settings_receipt' ? 1 : 0.7 }} />
-                      <span className="menu-item-label">Modèles de Reçus</span>
-                    </div>
-                    <div 
-                      className={`submenu-item ${adminMenu === 'settings_delivery' ? 'active' : ''}`}
-                      onClick={() => selectMenu('settings_delivery')}
-                    >
-                      <MIcon name="local_shipping" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'settings_delivery' ? 1 : 0.7 }} />
-                      <span className="menu-item-label">Frais de Livraison (GPS)</span>
-                    </div>
-                    <div 
-                      className={`submenu-item ${adminMenu === 'settings_cloud' ? 'active' : ''}`}
-                      onClick={() => selectMenu('settings_cloud')}
-                    >
-                      <MIcon name="cloud_sync" size={16} style={{ marginRight: '8px', opacity: adminMenu === 'settings_cloud' ? 1 : 0.7 }} />
-                      <span className="menu-item-label">Configuration Système</span>
+                  <div className="sidebar-submenu">
+                    <div className="sidebar-submenu-rail" />
+                    <div className="sidebar-submenu-items">
+                      <div className={`sidebar-submenu-item${(adminMenu === 'settings_delays' || adminMenu === 'settings') ? ' active' : ''}`}
+                        onClick={() => selectMenu('settings_delays')}>
+                        Délais & Majorations
+                      </div>
+                      <div className={`sidebar-submenu-item${adminMenu === 'settings_reward' ? ' active' : ''}`}
+                        onClick={() => selectMenu('settings_reward')}>
+                        Reward & Fidélité
+                      </div>
+                      <div className={`sidebar-submenu-item${adminMenu === 'settings_receipt' ? ' active' : ''}`}
+                        onClick={() => selectMenu('settings_receipt')}>
+                        Modèles de Reçus
+                      </div>
+                      <div className={`sidebar-submenu-item${adminMenu === 'settings_delivery' ? ' active' : ''}`}
+                        onClick={() => selectMenu('settings_delivery')}>
+                        Frais Récupération & Livraison
+                      </div>
+                      <div className={`sidebar-submenu-item${adminMenu === 'settings_cloud' ? ' active' : ''}`}
+                        onClick={() => selectMenu('settings_cloud')}>
+                        Configuration Système
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className={`menu-group-block ${adminMenu === 'help' ? 'active-block' : ''}`}>
-                <li 
-                  className={`menu-item ${adminMenu === 'help' ? 'active' : ''}`}
-                  onClick={() => selectMenu('help')}
-                  data-tooltip="Aide & Support"
-                >
-                  <div className="menu-item-left">
-                    <MIcon name="help" size={20} />
-                    <span className="menu-item-label">Aide & Support</span>
-                  </div>
-                </li>
-              </div>
+              <li className={`sidebar-nav-item${adminMenu === 'help' ? ' active' : ''}`}
+                onClick={() => selectMenu('help')}
+                data-tooltip="Aide & Support">
+                <div className="sidebar-nav-icon"><MIcon name="help" size={19} /></div>
+                <span className="sidebar-nav-label">Aide & Support</span>
+              </li>
 
-              <div className="menu-group-block">
-                <li className="menu-item" onClick={() => setShowLogoutConfirm(true)} data-tooltip="Déconnexion">
-                  <div className="menu-item-left">
-                    <MIcon name="logout" size={20} />
-                    <span className="menu-item-label">Déconnexion</span>
-                  </div>
-                </li>
-              </div>
+              <li className="sidebar-nav-item sidebar-nav-logout"
+                onClick={() => setShowLogoutConfirm(true)}
+                data-tooltip="Déconnexion">
+                <div className="sidebar-nav-icon"><MIcon name="logout" size={19} /></div>
+                <span className="sidebar-nav-label">Déconnexion</span>
+              </li>
             </ul>
+          </nav>
+
+          {/* ── User Profile Card at bottom ── */}
+          <div className="sidebar-user-card">
+            <div className="sidebar-user-avatar">
+              {currentUser?.prenom?.[0]?.toUpperCase() || currentUser?.nom?.[0]?.toUpperCase() || 'K'}
+            </div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{currentUser?.prenom} {currentUser?.nom}</div>
+              <div className="sidebar-user-role">{currentUser?.role?.replace('_', ' ')}</div>
+            </div>
+            <MIcon name="unfold_more" size={16} className="sidebar-user-expand" />
           </div>
 
-          {/* D-003: Indicateur de version */}
-          <div className="sidebar-version" style={{ marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-            KLIN UP Admin CMS v1.0.0
-          </div>
         </aside>
       )}
 
       {/* ================= CONTENU PRINCIPAL DESKTOP ================= */}
       <main className="main-content">
-        
+
         {/* Topbar Donezo Style */}
         <div className="topbar">
           {/* B-002: Bouton hamburger pour mobile */}
@@ -1087,10 +1072,10 @@ function App() {
               {hasAdminAccess && adminMenu === 'help' && "Aide & Assistance Technique"}
               {hasAdminAccess && adminMenu.startsWith('settings') && (
                 adminMenu === 'settings_reward' ? "Paramètres - Reward & Fidélité" :
-                adminMenu === 'settings_receipt' ? "Paramètres - Reçus & Imprimante" :
-                adminMenu === 'settings_delivery' ? "Paramètres - Frais de Livraison par Zone (GPS)" :
-                adminMenu === 'settings_cloud' ? "Paramètres - Configuration Système" :
-                "Paramètres Système"
+                  adminMenu === 'settings_receipt' ? "Paramètres - Reçus & Imprimante" :
+                    adminMenu === 'settings_delivery' ? "Paramètres - Frais de Livraison par Zone (GPS)" :
+                      adminMenu === 'settings_cloud' ? "Paramètres - Configuration Système" :
+                        "Paramètres Système"
               )}
             </h1>
             <p style={{ marginTop: '0.15rem' }}>
@@ -1106,10 +1091,10 @@ function App() {
               {hasAdminAccess && adminMenu === 'help' && "Formulaire de demande de support, signalement de bug et suivi de tickets."}
               {hasAdminAccess && adminMenu.startsWith('settings') && (
                 adminMenu === 'settings_reward' ? "Configuration du programme de fidélité et catalogue de récompenses." :
-                adminMenu === 'settings_receipt' ? "Personnalisation des entêtes, pieds de page et formats d'impression." :
-                adminMenu === 'settings_delivery' ? "Tarification des frais de livraison par zone kilométrique et coordonnées GPS." :
-                adminMenu === 'settings_cloud' ? "Base de données, synchronisation cloud et intégrations système (Trello, API)." :
-                "Configuration globale des délais et majorations d'urgence de la laverie."
+                  adminMenu === 'settings_receipt' ? "Personnalisation des entêtes, pieds de page et formats d'impression." :
+                    adminMenu === 'settings_delivery' ? "Tarification des frais de livraison par zone kilométrique et coordonnées GPS." :
+                      adminMenu === 'settings_cloud' ? "Base de données, synchronisation cloud et intégrations système (Trello, API)." :
+                        "Configuration globale des délais et majorations d'urgence de la laverie."
               )}
             </p>
           </div>
@@ -1168,11 +1153,11 @@ function App() {
               {/* Raccourcis Icônes (Bouton Mode Sombre & Notifications) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {/* Bouton Mode Sombre */}
-                <div 
-                  className="topbar-icon-btn" 
-                  title={isDarkMode ? "Activer le mode clair" : "Activer le mode sombre"} 
+                <div
+                  className="topbar-icon-btn"
+                  title={isDarkMode ? "Activer le mode clair" : "Activer le mode sombre"}
                   onClick={toggleDarkMode}
-                  style={{ 
+                  style={{
                     borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.4)' : 'var(--border-color)',
                     background: isDarkMode ? 'rgba(251, 191, 36, 0.12)' : 'transparent',
                     cursor: 'pointer',
@@ -1182,190 +1167,190 @@ function App() {
                     transition: 'all 0.25s var(--ease-emphasized)'
                   }}
                 >
-                  <MIcon 
-                    name={isDarkMode ? 'light_mode' : 'dark_mode'} 
-                    size={18} 
-                    style={{ color: isDarkMode ? '#fbbf24' : 'var(--text-secondary)', transition: 'color 0.25s ease' }} 
+                  <MIcon
+                    name={isDarkMode ? 'light_mode' : 'dark_mode'}
+                    size={18}
+                    style={{ color: isDarkMode ? '#fbbf24' : 'var(--text-secondary)', transition: 'color 0.25s ease' }}
                   />
                 </div>
 
                 <div style={{ position: 'relative' }}>
-                  <div 
-                    className="topbar-icon-btn" 
-                    title="Notifications" 
+                  <div
+                    className="topbar-icon-btn"
+                    title="Notifications"
                     onClick={handleToggleNotifDropdown}
                     style={{ borderColor: showNotifDropdown ? 'var(--primary)' : 'var(--border-color)', position: 'relative' }}
                   >
-                  <MIcon name="notifications" size={18} />
-                  {unreadCount > 0 && (
-                    <span style={{
-                      position: 'absolute',
-                      top: '-2px',
-                      right: '-2px',
-                      background: 'var(--accent)',
-                      color: 'white',
-                      fontSize: '0.62rem',
-                      fontWeight: 700,
-                      width: '14px',
-                      height: '14px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '1.5px solid var(--bg-card)'
-                    }}>
-                      {unreadCount}
-                    </span>
-                  )}
-                </div>
+                    <MIcon name="notifications" size={18} />
+                    {unreadCount > 0 && (
+                      <span style={{
+                        position: 'absolute',
+                        top: '-2px',
+                        right: '-2px',
+                        background: 'var(--accent)',
+                        color: 'white',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        width: '14px',
+                        height: '14px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '1.5px solid var(--bg-card)'
+                      }}>
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
 
-                {showNotifDropdown && (
-                  <>
-                    <div 
-                      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, cursor: 'default' }} 
-                      onClick={() => setShowNotifDropdown(false)}
-                    />
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ 
-                        position: 'absolute', 
-                        top: '48px', 
-                        right: 0, 
-                        width: '360px', 
-                        maxWidth: 'calc(100vw - 2rem)',
-                        background: 'var(--bg-card)', 
-                        border: '1px solid rgba(0, 0, 0, 0.08)', 
-                        borderRadius: '16px', 
-                        boxShadow: '0 20px 50px -10px rgba(15, 23, 42, 0.25), 0 10px 20px -5px rgba(15, 23, 42, 0.12)', 
-                        zIndex: 9999, 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-app)' }}>
-                        <span style={{ fontWeight: 800, fontSize: '0.85rem', fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Notifications</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {notifications.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={handleClearAllNotifications}
-                              style={{
-                                background: 'rgba(239, 68, 68, 0.08)',
-                                border: '1px solid rgba(239, 68, 68, 0.2)',
-                                color: 'var(--danger)',
-                                fontSize: '0.68rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                padding: '0.2rem 0.5rem',
-                                borderRadius: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                transition: 'all 0.15s ease'
-                              }}
-                              title="Effacer toutes les notifications"
-                            >
-                              <MIcon name="delete_sweep" size={15} /> Effacer tout
-                            </button>
+                  {showNotifDropdown && (
+                    <>
+                      <div
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, cursor: 'default' }}
+                        onClick={() => setShowNotifDropdown(false)}
+                      />
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          top: '48px',
+                          right: 0,
+                          width: '360px',
+                          maxWidth: 'calc(100vw - 2rem)',
+                          background: 'var(--bg-card)',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          borderRadius: '16px',
+                          boxShadow: '0 20px 50px -10px rgba(15, 23, 42, 0.25), 0 10px 20px -5px rgba(15, 23, 42, 0.12)',
+                          zIndex: 9999,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-app)' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.85rem', fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Notifications</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {notifications.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={handleClearAllNotifications}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.08)',
+                                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                                  color: 'var(--danger)',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '6px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                title="Effacer toutes les notifications"
+                              >
+                                <MIcon name="delete_sweep" size={15} /> Effacer tout
+                              </button>
+                            )}
+                            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                              {notifications.length} au total
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                          {notifications.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                              <MIcon name="notifications_off" size={24} style={{ color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block' }} />
+                              Aucune notification importante pour le moment.
+                            </div>
+                          ) : (
+                            notifications.map(n => {
+                              const config = getNotifIconConfig(n.action);
+                              const isUnread = !readNotifIds.includes(n.id);
+                              return (
+                                <div
+                                  key={n.id}
+                                  style={{
+                                    padding: '0.75rem 1rem',
+                                    borderBottom: '1px solid var(--border-color)',
+                                    display: 'flex',
+                                    gap: '0.75rem',
+                                    background: isUnread ? 'rgba(var(--primary-rgb), 0.03)' : 'transparent',
+                                    transition: 'background 0.2s ease',
+                                    textAlign: 'left'
+                                  }}
+                                >
+                                  <div style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    background: config.bg,
+                                    color: config.color,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                  }}>
+                                    <MIcon name={config.name} size={18} />
+                                  </div>
+                                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
+                                      <span style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-primary)' }}>{n.title}</span>
+                                      <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatNotifDate(n.timestamp)}</span>
+                                    </div>
+                                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.25' }}>{n.message}</p>
+
+                                    {/* Direct Actions inside Dropdown for PIN reset requests */}
+                                    {n.action === 'DEMANDE_RESET_PIN' && n.raw.status === 'pending' && (
+                                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                                        <button
+                                          onClick={() => handleApprovePin(n.raw.id)}
+                                          className={`btn btn-primary${pinActionLoading === n.raw.id ? ' btn-loading' : ''}`}
+                                          disabled={pinActionLoading === n.raw.id}
+                                          style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '6px', flex: 1, height: 'auto', minHeight: 'unset' }}
+                                        >
+                                          Approuver
+                                        </button>
+                                        <button
+                                          onClick={() => handleRejectPin(n.raw.id)}
+                                          className={`btn btn-outline${pinActionLoading === n.raw.id ? ' btn-loading' : ''}`}
+                                          disabled={pinActionLoading === n.raw.id}
+                                          style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '6px', flex: 1, borderColor: '#ef4444', color: '#ef4444', height: 'auto', minHeight: 'unset' }}
+                                        >
+                                          Rejeter
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {n.action === 'DEMANDE_RESET_PIN' && n.raw.status !== 'pending' && (
+                                      <div style={{
+                                        fontSize: '0.68rem',
+                                        marginTop: '0.25rem',
+                                        fontWeight: 600,
+                                        color: n.raw.status === 'approved' ? '#10b981' : '#ef4444',
+                                        background: n.raw.status === 'approved' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                                        padding: '0.2rem 0.4rem',
+                                        borderRadius: '4px',
+                                        display: 'inline-block',
+                                        alignSelf: 'flex-start'
+                                      }}>
+                                        {n.raw.status === 'approved' ? `Approuvée (Nouveau PIN: ${n.raw.resolved_pin})` : 'Rejetée'}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
                           )}
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                            {notifications.length} au total
-                          </span>
                         </div>
                       </div>
-
-                      <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-                        {notifications.length === 0 ? (
-                          <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-                            <MIcon name="notifications_off" size={24} style={{ color: 'var(--text-muted)', marginBottom: '0.4rem', display: 'block' }} />
-                            Aucune notification importante pour le moment.
-                          </div>
-                        ) : (
-                          notifications.map(n => {
-                            const config = getNotifIconConfig(n.action);
-                            const isUnread = !readNotifIds.includes(n.id);
-                            return (
-                              <div 
-                                key={n.id} 
-                                style={{ 
-                                  padding: '0.75rem 1rem', 
-                                  borderBottom: '1px solid var(--border-color)', 
-                                  display: 'flex', 
-                                  gap: '0.75rem',
-                                  background: isUnread ? 'rgba(var(--primary-rgb), 0.03)' : 'transparent',
-                                  transition: 'background 0.2s ease',
-                                  textAlign: 'left'
-                                }}
-                              >
-                                <div style={{ 
-                                  width: '32px', 
-                                  height: '32px', 
-                                  borderRadius: '8px', 
-                                  background: config.bg, 
-                                  color: config.color, 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center',
-                                  flexShrink: 0
-                                }}>
-                                  <MIcon name={config.name} size={18} />
-                                </div>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-primary)' }}>{n.title}</span>
-                                    <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatNotifDate(n.timestamp)}</span>
-                                  </div>
-                                  <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: '1.25' }}>{n.message}</p>
-                                  
-                                  {/* Direct Actions inside Dropdown for PIN reset requests */}
-                                  {n.action === 'DEMANDE_RESET_PIN' && n.raw.status === 'pending' && (
-                                    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
-                                      <button 
-                                        onClick={() => handleApprovePin(n.raw.id)}
-                                        className={`btn btn-primary${pinActionLoading === n.raw.id ? ' btn-loading' : ''}`}
-                                        disabled={pinActionLoading === n.raw.id}
-                                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '6px', flex: 1, height: 'auto', minHeight: 'unset' }}
-                                      >
-                                        Approuver
-                                      </button>
-                                      <button 
-                                        onClick={() => handleRejectPin(n.raw.id)}
-                                        className={`btn btn-outline${pinActionLoading === n.raw.id ? ' btn-loading' : ''}`}
-                                        disabled={pinActionLoading === n.raw.id}
-                                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '6px', flex: 1, borderColor: '#ef4444', color: '#ef4444', height: 'auto', minHeight: 'unset' }}
-                                      >
-                                        Rejeter
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {n.action === 'DEMANDE_RESET_PIN' && n.raw.status !== 'pending' && (
-                                    <div style={{ 
-                                      fontSize: '0.68rem', 
-                                      marginTop: '0.25rem', 
-                                      fontWeight: 600, 
-                                      color: n.raw.status === 'approved' ? '#10b981' : '#ef4444',
-                                      background: n.raw.status === 'approved' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-                                      padding: '0.2rem 0.4rem',
-                                      borderRadius: '4px',
-                                      display: 'inline-block',
-                                      alignSelf: 'flex-start'
-                                    }}>
-                                      {n.raw.status === 'approved' ? `Approuvée (Nouveau PIN: ${n.raw.resolved_pin})` : 'Rejetée'}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
 
               {/* Profil Utilisateur Donezo Header Style */}
               <div className="topbar-profile">
@@ -1397,8 +1382,8 @@ function App() {
                 Désolé <strong>{currentUser?.prenom} {currentUser?.nom}</strong>, votre rôle <strong>{currentUser?.role}</strong> ne vous autorise pas à accéder au CMS Administrateur.<br />
                 Veuillez utiliser l'application de terrain sur le port <strong>5174</strong>.
               </p>
-              <button 
-                className="btn btn-outline" 
+              <button
+                className="btn btn-outline"
                 style={{ marginTop: '1rem', width: '100%' }}
                 onClick={() => db.setCurrentUser(null)}
               >

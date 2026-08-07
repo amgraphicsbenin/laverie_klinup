@@ -26,6 +26,7 @@ export const memoryDb = {
   catalog: [],
   stores: [],
   delivery_zones: [],
+  pickup_zones: [],
   current_user: null,
   pin_reset_requests: [],
   dark_mode: false,
@@ -281,7 +282,7 @@ export const db = {
   },
 
   getRewardCatalog: () => {
-    if (memoryDb.rewards && Array.isArray(memoryDb.rewards) && memoryDb.rewards.length > 0) {
+    if (memoryDb.rewards && Array.isArray(memoryDb.rewards)) {
       return memoryDb.rewards.map(r => ({
         id: r.id,
         title: r.title || r.article,
@@ -304,13 +305,7 @@ export const db = {
         is_active: c.is_active !== false
       }));
     }
-    return [
-      { id: 'remise_1000', title: 'Remise de 1 000 FCFA', cost: 30, discountAmount: 1000, iconName: 'Tag', description: 'Réduction de 1 000 FCFA sur la prochaine commande.' },
-      { id: 'lavage_offert', title: 'Lavage 1 Vêtement Offert', cost: 50, discountAmount: 2000, iconName: 'Shirt', description: 'Un lavage gratuit pour une pièce au choix.' },
-      { id: 'livraison_offerte', title: 'Livraison Offerte', cost: 60, discountAmount: 1500, iconName: 'Truck', description: 'Frais de livraison 100% offerts.' },
-      { id: 'repassage_offert', title: 'Repassage Offert', cost: 100, discountAmount: 4000, iconName: 'Sparkles', description: 'Repassage complet offert sur vos vêtements.' },
-      { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: "Réduction de 5 000 FCFA lors du renouvellement d'abonnement." }
-    ];
+    return [];
   },
 
   updateRewardCatalog: async (catalog) => {
@@ -582,6 +577,13 @@ export const db = {
   getDeliveryZones: () => [...(memoryDb.delivery_zones || [])],
 
   /**
+   * Retourne les zones de récupération disponibles (depuis memoryDb).
+   * @returns {Array} Liste des zones de récupération.
+   */
+  getPickupZones: () => [...(memoryDb.pickup_zones || [])],
+
+
+  /**
    * Algorithme Haversine : calcule la distance entre deux points GPS en km.
    * @param {number} lat1 - Latitude du point 1
    * @param {number} lon1 - Longitude du point 1
@@ -670,6 +672,66 @@ export const db = {
     };
   },
 
+  calculatePickupFee: (storeId, coordonneesLivraison, clientLat, clientLng) => {
+    const NO_PICKUP = { fee: 0, distanceKm: 0, zoneLabel: 'Pas de récupération', zoneId: null };
+
+    // 1. Résoudre les coordonnées GPS du client
+    let cLat = clientLat != null ? Number(clientLat) : null;
+    let cLng = clientLng != null ? Number(clientLng) : null;
+
+    if ((cLat == null || cLng == null) && coordonneesLivraison) {
+      const parts = String(coordonneesLivraison).split(',');
+      if (parts.length >= 2) {
+        cLat = parseFloat(parts[0].trim());
+        cLng = parseFloat(parts[1].trim());
+      }
+    }
+
+    if (cLat == null || cLng == null || isNaN(cLat) || isNaN(cLng)) {
+      return NO_PICKUP;
+    }
+
+    // 2. Trouver les coordonnées GPS de la boutique
+    const stores = memoryDb.stores || [];
+    let store = stores.find(s => s.id === storeId || s.code === storeId);
+    if (!store) store = stores[0]; // Fallback sur le 1er store
+    const sLat = store ? Number(store.latitude) : 6.3703;
+    const sLng = store ? Number(store.longitude) : 2.3912;
+
+    // 3. Calculer la distance
+    const distanceKm = db.haversineKm(sLat, sLng, cLat, cLng);
+
+    // 4. Trouver la zone correspondante
+    const zones = (memoryDb.pickup_zones || []).filter(z => {
+      if (!z.is_active) return false;
+      // Si la zone est liée à un store_id, filtrer
+      if (z.store_id && storeId && z.store_id !== storeId) return false;
+      return true;
+    });
+
+    let matchedZone = null;
+    for (const zone of zones) {
+      const minKm = Number(zone.min_km);
+      const maxKm = Number(zone.max_km);
+      if (distanceKm >= minKm && distanceKm < maxKm) {
+        matchedZone = zone;
+        break;
+      }
+    }
+
+    if (!matchedZone) {
+      // Hors de toutes les zones configurées
+      return { fee: 0, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: 'Hors zone de récupération', zoneId: null };
+    }
+
+    return {
+      fee: Number(matchedZone.frais_livraison) || 0,
+      distanceKm: Math.round(distanceKm * 10) / 10,
+      zoneLabel: matchedZone.label_zone || `Zone ${matchedZone.id}`,
+      zoneId: matchedZone.id
+    };
+  },
+
   // --- GESTION DU CUSTOMER / CLIENTS ---
 
   /**
@@ -679,12 +741,15 @@ export const db = {
    */
   addCustomer: async (customer) => {
     const cleanPhone = customer.telephone ? customer.telephone.trim() : '';
+    const indicatif = customer.indicatif || '229';
     if (!cleanPhone) {
       throw new Error("Téléphone obligatoire.");
     }
-    const phoneExists = memoryDb.customers.some(c => c.telephone && c.telephone.trim() === cleanPhone);
+    const phoneExists = memoryDb.customers.some(c => 
+      c.telephone && c.telephone.trim() === cleanPhone && (c.indicatif || '229') === indicatif
+    );
     if (phoneExists) {
-      throw new Error("Ce numéro de téléphone est déjà associé à un autre client actif.");
+      throw new Error(`Ce numéro de téléphone est déjà associé à un autre client actif (Indicatif +${indicatif}).`);
     }
     const currentUser = db.getCurrentUser() || memoryDb.current_user;
     const staffMatch = currentUser ? memoryDb.staff?.find(s => s.id === currentUser.id || (s.email && currentUser.email && s.email.toLowerCase() === currentUser.email.toLowerCase())) : null;
@@ -743,11 +808,14 @@ export const db = {
   updateCustomer: async (id, updatedFields) => {
     const customer = memoryDb.customers.find(c => c.id === id);
     if (customer) {
-      if (updatedFields.telephone) {
-        const cleanPhone = updatedFields.telephone.trim();
-        const phoneExists = memoryDb.customers.some(c => c.id !== id && c.telephone.trim() === cleanPhone);
+      if (updatedFields.telephone || updatedFields.indicatif) {
+        const cleanPhone = (updatedFields.telephone || customer.telephone).trim();
+        const indicatif = updatedFields.indicatif || customer.indicatif || '229';
+        const phoneExists = memoryDb.customers.some(c => 
+          c.id !== id && c.telephone.trim() === cleanPhone && (c.indicatif || '229') === indicatif
+        );
         if (phoneExists) {
-          throw new Error("Ce numéro de téléphone est déjà associé à un autre client actif.");
+          throw new Error(`Ce numéro de téléphone est déjà associé à un autre client actif (Indicatif +${indicatif}).`);
         }
       }
 
@@ -1726,6 +1794,12 @@ export const db = {
 
   getDeliveryZones: (storeId) => {
     const zones = memoryDb.delivery_zones || [];
+    if (!storeId || storeId === 'all') return [...zones];
+    return zones.filter(z => !z.store_id || z.store_id === storeId);
+  },
+
+  getPickupZonesByStore: (storeId) => {
+    const zones = memoryDb.pickup_zones || [];
     if (!storeId || storeId === 'all') return [...zones];
     return zones.filter(z => !z.store_id || z.store_id === storeId);
   },

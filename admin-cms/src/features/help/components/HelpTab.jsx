@@ -528,7 +528,7 @@ ${payload.steps_to_reproduce ? `#### 🔄 Étapes pour reproduire :\n${payload.s
                   className="input-control"
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="Ex: 97000000"
+                  placeholder="Ex: 0197000000"
                   style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.82rem', borderRadius: '8px' }}
                 />
               </div>

@@ -282,7 +282,9 @@ export default function SettingsTab({
   };
 
   const [deliveryZonesList, setDeliveryZonesList] = useState(() => (db.getDeliveryZones ? db.getDeliveryZones(selectedStoreIdForZone) : []));
+  const [pickupZonesList, setPickupZonesList] = useState(() => (db.getPickupZones ? db.getPickupZones(selectedStoreIdForZone) : []));
   const [showZoneModal, setShowZoneModal] = useState(false);
+  const [showPickupZoneModal, setShowPickupZoneModal] = useState(false);
   const [editingZone, setEditingZone] = useState(null);
   const [zoneLabelInput, setZoneLabelInput] = useState('');
   const [zoneMinKmInput, setZoneMinKmInput] = useState('0');
@@ -298,13 +300,32 @@ export default function SettingsTab({
     setShowZoneModal(true);
   };
 
+  const handleOpenAddPickupZone = () => {
+    setEditingZone(null);
+    setZoneLabelInput('Zone Proche Récup (0 - 3 km)');
+    setZoneMinKmInput('0');
+    setZoneMaxKmInput('3');
+    setZoneFeeInput('500');
+    setShowPickupZoneModal(true);
+  };
+
   const handleOpenEditZone = (z) => {
     setEditingZone(z);
     setZoneLabelInput(z.label_zone || '');
     setZoneMinKmInput(String(z.min_km || 0));
     setZoneMaxKmInput(String(z.max_km || 3));
     setZoneFeeInput(String(z.frais_livraison || 0));
+    setZoneFeeInput(String(z.frais_livraison || 0));
     setShowZoneModal(true);
+  };
+
+  const handleOpenEditPickupZone = (z) => {
+    setEditingZone(z);
+    setZoneLabelInput(z.label_zone || '');
+    setZoneMinKmInput(String(z.min_km || 0));
+    setZoneMaxKmInput(String(z.max_km || 3));
+    setZoneFeeInput(String(z.frais_livraison || 0));
+    setShowPickupZoneModal(true);
   };
 
   const handleSaveZoneSubmit = async (e) => {
@@ -325,11 +346,39 @@ export default function SettingsTab({
     setTimeout(() => setIsSavedToast(false), 3000);
   };
 
+  const handleSavePickupZoneSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (db.savePickupZone) {
+      await db.savePickupZone({
+        id: editingZone ? editingZone.id : undefined,
+        store_id: selectedStoreIdForZone,
+        label_zone: zoneLabelInput.trim() || `Zone Récup (${zoneMinKmInput} - ${zoneMaxKmInput} km)`,
+        min_km: Number(zoneMinKmInput) || 0,
+        max_km: Number(zoneMaxKmInput) || 3,
+        frais_livraison: Number(zoneFeeInput) || 0
+      });
+      if (db.getPickupZones) setPickupZonesList(db.getPickupZones(selectedStoreIdForZone));
+    }
+    setShowPickupZoneModal(false);
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 3000);
+  };
+
   const handleDeleteZone = async (id) => {
     if (!window.confirm('Voulez-vous vraiment supprimer cette tranche de livraison ?')) return;
     if (db.deleteDeliveryZone) {
       await db.deleteDeliveryZone(id);
       if (db.getDeliveryZones) setDeliveryZonesList(db.getDeliveryZones(selectedStoreIdForZone));
+    }
+    setIsSavedToast(true);
+    setTimeout(() => setIsSavedToast(false), 3000);
+  };
+
+  const handleDeletePickupZone = async (id) => {
+    if (!window.confirm('Voulez-vous vraiment supprimer cette zone de récupération ?')) return;
+    if (db.deletePickupZone) {
+      await db.deletePickupZone(id);
+      if (db.getPickupZones) setPickupZonesList(db.getPickupZones(selectedStoreIdForZone));
     }
     setIsSavedToast(true);
     setTimeout(() => setIsSavedToast(false), 3000);
@@ -352,6 +401,9 @@ export default function SettingsTab({
       }
       if (db.getDeliveryZones) {
         setDeliveryZonesList(db.getDeliveryZones(selectedStoreIdForZone));
+      }
+      if (db.getPickupZones) {
+        setPickupZonesList(db.getPickupZones(selectedStoreIdForZone));
       }
       if (db.getSettings) {
         const s = db.getSettings();
@@ -1581,7 +1633,17 @@ export default function SettingsTab({
           {activeSubTab === 'delivery' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
-              {/* TOP HEADER & LAVERIE SELECTOR */}
+              {stores.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'var(--bg-app)', borderRadius: '18px', border: '1px dashed var(--border-color)' }}>
+                  <Truck size={48} color="var(--text-muted)" style={{ marginBottom: '1rem' }} />
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)', fontSize: '1.1rem' }}>Aucun point de laverie disponible</h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '400px', marginLeft: 'auto', marginRight: 'auto' }}>
+                    Vous devez d'abord créer au moins un point de laverie dans la section "Points de Laverie" pour pouvoir configurer les zones de livraison.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* TOP HEADER & LAVERIE SELECTOR */}
               <div className="card" style={{ borderRadius: '18px', padding: '1.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
@@ -1767,6 +1829,94 @@ export default function SettingsTab({
 
               </div>
 
+              {/* SECTION ZONES DE RÉCUPÉRATION */}
+              <div className="card" style={{ borderRadius: '18px', padding: '1.4rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <MapPin size={22} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Tarification des Frais de Récupération par Zone (GPS)</h4>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Frais appliqués lorsque le client demande une récupération à domicile</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TABLE DES TRANCHES DE RÉCUPÉRATION */}
+                <div className="card" style={{ borderRadius: '18px', padding: '1.4rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Layers size={18} color="var(--primary)" />
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>Tranches Kilométriques (Récupération) & Tarifs</h4>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleOpenAddPickupZone}
+                      style={{ padding: '0.4rem 0.85rem', fontSize: '0.78rem', borderRadius: '8px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Plus size={14} /> Nouvelle Zone
+                    </button>
+                  </div>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                          <th style={{ padding: '0.6rem 0.5rem' }}>Zone de Récupération</th>
+                          <th style={{ padding: '0.6rem 0.5rem' }}>Distance (km)</th>
+                          <th style={{ padding: '0.6rem 0.5rem' }}>Frais (FCFA)</th>
+                          <th style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pickupZonesList.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                              Aucune tranche kilométrique configurée. Cliquez sur "+ Nouvelle Zone" pour ajouter.
+                            </td>
+                          </tr>
+                        ) : (
+                          pickupZonesList.map(z => (
+                            <tr key={z.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                              <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {z.label_zone}
+                              </td>
+                              <td style={{ padding: '0.65rem 0.5rem', color: 'var(--text-secondary)' }}>
+                                {z.min_km} km → {z.max_km} km
+                              </td>
+                              <td style={{ padding: '0.65rem 0.5rem', fontWeight: 800, color: '#10b981' }}>
+                                {z.frais_livraison} FCFA
+                              </td>
+                              <td style={{ padding: '0.65rem 0.5rem', textAlign: 'right' }}>
+                                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditPickupZone(z)}
+                                    style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', color: 'var(--primary)' }}
+                                  >
+                                    <Edit size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeletePickupZone(z.id)}
+                                    style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', color: 'var(--danger)' }}
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+                </>
+              )}
             </div>
           )}
 
@@ -2082,6 +2232,130 @@ export default function SettingsTab({
                     className="btn btn-outline"
                     style={{ flex: 1 }}
                     onClick={() => setShowZoneModal(false)}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  >
+                    <Save size={16} /> Enregistrer
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* MODAL CONFIGURATION DE ZONE DE RÉCUPÉRATION */}
+      {showPickupZoneModal && (
+        <ModalPortal>
+          <div className="modal-backdrop" onClick={() => setShowPickupZoneModal(false)}>
+            <div
+              className="card modal-dialog-card"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '480px',
+                background: 'var(--bg-card)',
+                borderRadius: '24px',
+                padding: '24px 28px',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-lg)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.25rem',
+                margin: 'auto'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <MapPin size={20} color="var(--primary)" />
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {editingZone ? 'Modifier la Zone de Récupération' : 'Nouvelle Zone de Récupération'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPickupZoneModal(false)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                >
+                  <X size={20} color="var(--text-muted)" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSavePickupZoneSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                    Libellé de la Zone
+                  </label>
+                  <input
+                    type="text"
+                    className="input-control"
+                    placeholder="Ex: Zone Proche Récup (0 - 3 km)"
+                    required
+                    value={zoneLabelInput}
+                    onChange={(e) => setZoneLabelInput(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                      Distance Min (km)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input-control"
+                      placeholder="0"
+                      required
+                      min="0"
+                      value={zoneMinKmInput}
+                      onChange={(e) => setZoneMinKmInput(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                      Distance Max (km)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input-control"
+                      placeholder="3"
+                      required
+                      min="0"
+                      value={zoneMaxKmInput}
+                      onChange={(e) => setZoneMaxKmInput(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                    Frais de Récupération (FCFA)
+                  </label>
+                  <input
+                    type="number"
+                    className="input-control"
+                    placeholder="Ex: 1000"
+                    required
+                    min="0"
+                    value={zoneFeeInput}
+                    onChange={(e) => setZoneFeeInput(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ flex: 1 }}
+                    onClick={() => setShowPickupZoneModal(false)}
                   >
                     Annuler
                   </button>

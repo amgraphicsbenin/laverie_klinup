@@ -194,14 +194,7 @@ export const DEFAULT_CATALOG = [
   { id: 'setting_normal_hours', article: 'Délai Normal (heures)', service: 'system', prix: 48, categorie: 'system_setting', description: 'Configuration système', is_active: true, statut: 'actif' },
   { id: 'setting_express_markup', article: 'Majoration Express (%)', service: 'system', prix: 50, categorie: 'system_setting', description: 'Configuration système', is_active: true, statut: 'actif' },
   { id: 'setting_fidelity_spend_per_point', article: 'Tranche Dépense par Point (FCFA)', service: 'system', prix: 1000, categorie: 'system_setting', description: 'Montant en FCFA requis pour gagner 1 point de fidélité', is_active: true, statut: 'actif' },
-  { id: 'setting_fidelity_active', article: 'Programme Fidélité Actif', service: 'system', prix: 1, categorie: 'system_setting', description: '1 = activé, 0 = désactivé', is_active: true, statut: 'actif' },
-
-  // Catalogue de récompenses (syncé avec Supabase)
-  { id: 'remise_1000', article: 'Remise de 1 000 FCFA', service: 'Tag', prix: 30, categorie: 'reward_catalog', description: 'Réduction de 1 000 FCFA sur la prochaine commande.', discount_amount: 1000, is_active: true, statut: 'actif' },
-  { id: 'lavage_offert', article: 'Lavage 1 Vêtement Offert', service: 'Shirt', prix: 50, categorie: 'reward_catalog', description: 'Un lavage gratuit pour une pièce au choix.', discount_amount: 2000, is_active: true, statut: 'actif' },
-  { id: 'livraison_offerte', article: 'Livraison Offerte', service: 'Truck', prix: 60, categorie: 'reward_catalog', description: 'Frais de livraison 100% offerts.', discount_amount: 1500, is_active: true, statut: 'actif' },
-  { id: 'repassage_offert', article: 'Repassage Offert', service: 'Sparkles', prix: 100, categorie: 'reward_catalog', description: 'Repassage complet offert sur vos vêtements.', discount_amount: 4000, is_active: true, statut: 'actif' },
-  { id: 'remise_5000', article: 'Remise 5 000 FCFA Abonnement', service: 'Gift', prix: 150, categorie: 'reward_catalog', description: "Réduction de 5 000 FCFA lors du renouvellement d'abonnement.", discount_amount: 5000, is_active: true, statut: 'actif' }
+  { id: 'setting_fidelity_active', article: 'Programme Fidélité Actif', service: 'system', prix: 1, categorie: 'system_setting', description: '1 = activé, 0 = désactivé', is_active: true, statut: 'actif' }
 ];
 
 export const STORAGE_KEYS = {

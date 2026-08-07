@@ -13,6 +13,7 @@ import { CustomSelect } from "../../../components/CustomSelect";
 import { useDbState } from "../../../hooks/useDbState";
 import { t } from "../../../services/i18n";
 import { getFidelityTier, FIDELITY_TIERS, renderTierIcon } from "../../../utils/fidelityUtils";
+import { SUPPORTED_COUNTRIES, validatePhoneNumber } from "../../../utils/phoneUtils";
 import RewardFidelityCard from "../../../components/RewardFidelityCard";
 
 export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, isActive }) {
@@ -32,6 +33,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
   const [custNom, setCustNom] = useState("");
   const [custPrenom, setCustPrenom] = useState("");
   const [custTelephone, setCustTelephone] = useState("");
+  const [custIndicatif, setCustIndicatif] = useState("229");
   const [custAdresse, setCustAdresse] = useState("");
   const [custQuartier, setCustQuartier] = useState("");
   const [custVille, setCustVille] = useState("Cotonou");
@@ -40,7 +42,9 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
   const [custCoordonneesLivraison, setCustCoordonneesLivraison] = useState("");
   const [custPreferences, setCustPreferences] = useState("Plié");
   const [custSubscriptionPlanId, setCustSubscriptionPlanId] = useState("");
+  const [custStoreId, setCustStoreId] = useState(() => (currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : ""));
   const [deliveryPreview, setDeliveryPreview] = useState(null);
+  const stores = db.getStores ? db.getStores() : [];
 
   const scrollPaddingBottom = useScrollPaddingBottom();
 
@@ -105,8 +109,8 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
       "Êtes-vous sûr de vouloir résilier cet abonnement ?",
       [
         { text: "Annuler", style: "cancel" },
-        { 
-          text: "Résilier", 
+        {
+          text: "Résilier",
           style: "destructive",
           onPress: () => {
             const updatedCust = db.unsubscribeCustomer(customerId);
@@ -161,24 +165,24 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
   const handleCloseCustomerModal = () => {
     setShowCustomerModal(false);
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustQuartier(""); setCustVille("Cotonou"); setCustLatitude(""); setCustLongitude(""); setCustCoordonneesLivraison(""); setCustPreferences("Plié"); setCustSubscriptionPlanId(""); setDeliveryPreview(null);
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustIndicatif("229"); setCustAdresse(""); setCustQuartier(""); setCustVille("Cotonou"); setCustLatitude(""); setCustLongitude(""); setCustCoordonneesLivraison(""); setCustPreferences("Plié"); setCustSubscriptionPlanId(""); setCustStoreId(currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : ""); setDeliveryPreview(null);
   };
 
   const handleCloseEditModal = () => {
     setShowEditModal(false);
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustQuartier(""); setCustVille("Cotonou"); setCustLatitude(""); setCustLongitude(""); setCustCoordonneesLivraison(""); setCustPreferences("Plié"); setCustSubscriptionPlanId(""); setDeliveryPreview(null);
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustQuartier(""); setCustVille("Cotonou"); setCustLatitude(""); setCustLongitude(""); setCustCoordonneesLivraison(""); setCustPreferences("Plié"); setCustSubscriptionPlanId(""); setCustStoreId(currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : ""); setDeliveryPreview(null);
   };
 
   const handleOpenAddCustomer = () => {
     setEditingCustomer(null);
-    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustQuartier(""); setCustVille("Cotonou"); setCustLatitude(""); setCustLongitude(""); setCustCoordonneesLivraison(""); setCustPreferences("Plié"); setCustSubscriptionPlanId(""); setDeliveryPreview(null);
+    setCustNom(""); setCustPrenom(""); setCustTelephone(""); setCustAdresse(""); setCustQuartier(""); setCustVille("Cotonou"); setCustLatitude(""); setCustLongitude(""); setCustCoordonneesLivraison(""); setCustPreferences("Plié"); setCustSubscriptionPlanId(""); setCustStoreId(currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : ""); setDeliveryPreview(null);
     setShowCustomerModal(true);
   };
 
   const handleEditCustomer = (client) => {
     setEditingCustomer(client);
-    setCustNom(client.nom); setCustPrenom(client.prenom); setCustTelephone(client.telephone);
+    setCustNom(client.nom); setCustPrenom(client.prenom); setCustTelephone(client.telephone); setCustIndicatif(client.indicatif || "229");
     setCustAdresse(client.adresse || "");
     setCustQuartier(client.quartier || "");
     setCustVille(client.ville || "Cotonou");
@@ -186,6 +190,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
     setCustLongitude(client.longitude != null ? String(client.longitude) : "");
     setCustCoordonneesLivraison(client.coordonnees_livraison || "");
     setCustPreferences(client.preferences_pliage || "Plié");
+    setCustStoreId(client.store_id || "");
     setDeliveryPreview(null);
     setSelectedClient(null);
     setShowEditModal(true);
@@ -193,6 +198,12 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
 
   const handleSaveCustomer = async () => {
     if (!custNom || !custTelephone) { Alert.alert("Erreur", "Le nom et le telephone sont obligatoires."); return; }
+
+    if (!validatePhoneNumber(custTelephone, custIndicatif)) {
+      Alert.alert("Erreur", "Le format du numéro de téléphone n'est pas valide pour l'indicatif choisi.");
+      return;
+    }
+
     try {
       const isEditing = !!editingCustomer;
       // Résolution GPS : priorité aux champs lat/lng séparés
@@ -206,20 +217,22 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
         nom: custNom,
         prenom: custPrenom,
         telephone: custTelephone,
+        indicatif: custIndicatif,
         adresse: custAdresse,
         quartier: custQuartier,
         ville: custVille,
         latitude: lat,
         longitude: lng,
         coordonnees_livraison: coords,
-        preferences_pliage: custPreferences
+        preferences_pliage: custPreferences,
+        store_id: custStoreId || null
       };
 
       if (isEditing) {
         db.updateCustomer(editingCustomer.id, customerPayload);
         handleCloseEditModal();
       } else {
-        const newCust = await db.addCustomer({ ...customerPayload, store_id: currentUser?.store_id });
+        const newCust = await db.addCustomer(customerPayload);
         if (newCust && custSubscriptionPlanId) {
           await db.subscribeCustomer(newCust.id, custSubscriptionPlanId);
         }
@@ -236,18 +249,20 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
   const handleDeleteCustomer = (id) => {
     Alert.alert("Confirmation", "Voulez-vous vraiment supprimer ce client ?", [
       { text: "Annuler", style: "cancel" },
-      { text: "Supprimer", style: "destructive", onPress: () => {
-        try {
-          db.deleteCustomer(id);
-          setSelectedClient(null);
-          refreshCustomers();
-          if (onShowSuccess) onShowSuccess("Profil client supprimé avec succès.");
+      {
+        text: "Supprimer", style: "destructive", onPress: () => {
+          try {
+            db.deleteCustomer(id);
+            setSelectedClient(null);
+            refreshCustomers();
+            if (onShowSuccess) onShowSuccess("Profil client supprimé avec succès.");
+          }
+          catch (e) {
+            console.error("Error deleting customer:", e);
+            Alert.alert("Erreur", "Impossible de supprimer ce client.");
+          }
         }
-        catch (e) {
-          console.error("Error deleting customer:", e);
-          Alert.alert("Erreur", "Impossible de supprimer ce client.");
-        }
-      }}
+      }
     ]);
   };
 
@@ -311,14 +326,25 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
             </View>
 
             <Text style={styles.compactLabel}>Téléphone</Text>
-            <TextInput
-              placeholder="Ex: 97000000"
-              placeholderTextColor={isDarkMode ? "#71717a" : "#a1a1aa"}
-              keyboardType="phone-pad"
-              value={custTelephone}
-              onChangeText={setCustTelephone}
-              style={styles.compactInput}
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 0.4, marginRight: 8 }}>
+                <CustomSelect
+                  value={custIndicatif}
+                  onChange={setCustIndicatif}
+                  options={SUPPORTED_COUNTRIES.map(c => ({ label: `${c.flag} +${c.code}`, value: c.code }))}
+                />
+              </View>
+              <View style={{ flex: 0.6 }}>
+                <TextInput
+                  placeholder="Ex: 0197000000"
+                  placeholderTextColor={isDarkMode ? "#71717a" : "#a1a1aa"}
+                  keyboardType="phone-pad"
+                  value={custTelephone}
+                  onChangeText={setCustTelephone}
+                  style={[styles.compactInput, { marginBottom: 0 }]}
+                />
+              </View>
+            </View>
 
             <Text style={styles.compactLabel}>Adresse (Rue / Domicile)</Text>
             <TextInput
@@ -352,8 +378,23 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
               </View>
             </View>
 
+            <View style={{ marginTop: 16 }}>
+              <Text style={styles.compactLabel}>Point de laverie rattaché</Text>
+              <CustomSelect
+                value={custStoreId}
+                onChange={setCustStoreId}
+                options={[
+                  { label: "-- Aucun point spécifique --", value: "" },
+                  ...stores.map(st => ({ label: `${st.nom} (${st.ville || 'Cotonou'})`, value: st.id }))
+                ]}
+                placeholder="-- Choisir un point --"
+                isDarkMode={isDarkMode}
+                disabled={currentUser?.store_id && currentUser.store_id !== 'all'}
+              />
+            </View>
+
             {/* Section coordonnées GPS pour livraison */}
-            <View style={[styles.deliverySectionCard, { backgroundColor: isDarkMode ? '#1e293b' : '#f0f7ff', borderColor: isDarkMode ? '#1d4ed8' : '#93c5fd' }]}>
+            <View style={[styles.deliverySectionCard, { backgroundColor: isDarkMode ? '#1e293b' : '#f0f7ff', borderColor: isDarkMode ? '#1d4ed8' : '#93c5fd', marginTop: 20 }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                 <MapPin size={16} color="#002cf7" />
                 <Text style={[styles.compactLabel, { marginLeft: 6, marginBottom: 0, color: '#002cf7', fontWeight: '700' }]}>
@@ -451,13 +492,13 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
 
             <Text style={styles.compactLabel}>Préférence de pliage</Text>
             <View style={styles.prefSelector}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setCustPreferences('Plié')}
                 style={[styles.prefOption, custPreferences === 'Plié' && styles.prefOptionActive]}
               >
                 <Text style={[styles.prefText, custPreferences === 'Plié' && styles.prefTextActive]}>Plié</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setCustPreferences('Cintre')}
                 style={[styles.prefOption, custPreferences === 'Cintre' && styles.prefOptionActive]}
               >
@@ -542,10 +583,10 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
           )}
         </View>
         {/* Horizontal filter chips */}
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           nestedScrollEnabled={true}
-          showsHorizontalScrollIndicator={false} 
+          showsHorizontalScrollIndicator={false}
           style={styles.chipRow}
           onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
           onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
@@ -622,7 +663,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
                         <Text style={styles.clientName}>{client.prenom} {client.nom}</Text>
                         {hasActiveSub && <View style={styles.subBadge}><Text style={styles.subBadgeText}>Abonne</Text></View>}
                       </View>
-                      
+
                       {/* BADGE DE FIDÉLITÉ TIER AVEC ICONE VECTORIELLE */}
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
                         <View style={[styles.tierBadgeTag, { backgroundColor: tier.bgLight, borderColor: tier.border }]}>
@@ -792,7 +833,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
                           const rem = activeClient.active_subscription.remaining_clothes;
                           const tot = activeClient.active_subscription.total_clothes;
                           const pct = Math.max(0, Math.min(100, Math.round(((tot - rem) / tot) * 100)));
-                          
+
                           subscriptionForm = (
                             <View style={{ gap: 8 }}>
                               <Text style={styles.subPlanName}>{activeClient.active_subscription.name}</Text>
@@ -1187,7 +1228,7 @@ const baseStyles = StyleSheet.create({
 
 function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
-  
+
   const overrides = {
     container: { backgroundColor: '#000000' },
     header: { backgroundColor: '#000000' },
@@ -1218,7 +1259,7 @@ function getStyles(isDarkMode) {
     emptyStateContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
     emptyStateText: { color: '#a1a1aa' },
     noResultsText: { color: '#a1a1aa' },
-    
+
     // Modal & Form overrides
     fullPageContainer: { backgroundColor: '#000000' },
     fullPageInnerWrapper: { backgroundColor: '#000000' },
@@ -1230,7 +1271,7 @@ function getStyles(isDarkMode) {
     modalTitle: { color: '#ffffff' },
     modalLabel: { color: '#d4d4d8' },
     modalInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
-    
+
     // Compact Modal & Form overrides
     compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
     compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
@@ -1241,7 +1282,7 @@ function getStyles(isDarkMode) {
     planChipActive: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8' },
     planChipText: { color: '#d4d4d8' },
     planChipTextActive: { color: '#38bdf8', fontWeight: '700' },
-    
+
     // Fiche client details card overrides
     clientMetaPill: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.3)' },
     clientOrderCountPill: { color: '#38bdf8' },
@@ -1262,13 +1303,13 @@ function getStyles(isDarkMode) {
     unsubscribeBtnText: { color: '#f87171' },
     ficheDeleteBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444' },
     ficheDeleteBtnText: { color: '#f87171' },
-    
+
     // Segmented controller overrides
     prefSelector: { backgroundColor: '#09090b' },
     prefOptActive: { backgroundColor: '#18181b' },
     prefOptText: { color: '#d4d4d8' },
     prefOptTextActive: { color: '#ffffff' },
-    
+
     // Subscriptions overrides
     subContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
     subActiveTitle: { color: '#ffffff' },

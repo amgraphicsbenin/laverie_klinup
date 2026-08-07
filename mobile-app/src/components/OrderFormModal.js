@@ -31,6 +31,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
   const [withDelivery, setWithDelivery] = useState(false);
+  const [withPickup, setWithPickup] = useState(false);
 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
   const isSubscriptionMode = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -197,7 +198,12 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
       const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
-      const finalTotal = netTotal + deliveryFee;
+      const pickupCalc = (withPickup && activeCustomer)
+        ? db.calculatePickupFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+        : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+      const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
+
+      const finalTotal = netTotal + deliveryFee + pickupFee;
 
       const newOrder = {
         customer_id: orderClient,
@@ -209,7 +215,9 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
         })),
         total: finalTotal,
         frais_livraison: deliveryFee,
-        distance_km: deliveryCalc.distanceKm,
+        frais_recuperation: pickupFee,
+        with_pickup: withPickup,
+        distance_km: Math.max(deliveryCalc.distanceKm || 0, pickupCalc.distanceKm || 0),
         avance: finalAvance,
         statut: 'attente',
         mode_paiement: finalModeReglement,
@@ -560,6 +568,29 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                 </TouchableOpacity>
               </View>
 
+              {/* Option Récupération */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: withPickup ? '#10b981' : (isDarkMode ? '#27272a' : '#e2e8f0'), backgroundColor: withPickup ? (isDarkMode ? '#064e3b' : '#ecfdf5') : (isDarkMode ? '#121212' : '#f8fafc'), marginBottom: 14 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: withPickup ? '#10b981' : (isDarkMode ? '#ffffff' : '#0f172a') }}>
+                    📦 Récupération à domicile
+                  </Text>
+                  <Text style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                    {withPickup && activeCustomer?.coordonnees_livraison
+                      ? 'Frais calculés selon la zone GPS du client'
+                      : 'Le client dépose sa commande en boutique'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setWithPickup(!withPickup)}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: withPickup ? '#10b981' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: withPickup ? '#ffffff' : (isDarkMode ? '#a1a1aa' : '#64748b') }}>
+                    {withPickup ? '✓ Oui' : 'Non'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Avance et Mode de règlement (same line) */}
               <View style={[styles.formRowInline, { zIndex: 20, elevation: 20 }]}>
                 <View style={styles.formFieldInline}>
@@ -717,7 +748,12 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                   : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
                 const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
-                const netTotal = currentTotal - discountAmount + deliveryFee;
+                const pickupCalc = (withPickup && activeCustomer)
+                  ? db.calculatePickupFee(db.getCurrentUser()?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+                  : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
+                const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
+
+                const netTotal = currentTotal - discountAmount + deliveryFee + pickupFee;
                 
                 // Avance behaves differently for active sub vs sub purchase
                 const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
@@ -752,6 +788,17 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                         </Text>
                         <Text style={[styles.receiptRowVal, { color: '#3b82f6', fontWeight: '700' }]}>
                           +{formatPrice(deliveryFee)}
+                        </Text>
+                      </View>
+                    )}
+
+                    {pickupFee > 0 && (
+                      <View style={styles.receiptRow}>
+                        <Text style={[styles.receiptRowLabel, { color: '#10b981', fontWeight: '700' }]}>
+                          Frais de Récupération ({pickupCalc.zoneLabel} • {pickupCalc.distanceKm} km)
+                        </Text>
+                        <Text style={[styles.receiptRowVal, { color: '#10b981', fontWeight: '700' }]}>
+                          +{formatPrice(pickupFee)}
                         </Text>
                       </View>
                     )}
