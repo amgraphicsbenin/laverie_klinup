@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
 import { db } from '../../../services/db';
+import { sendOrderStatusWhatsAppNotification } from '../../../utils/phoneUtils';
 
 /**
  * Hook personnalisé pour orchestrer les actions sur les commandes.
@@ -165,6 +166,10 @@ export default function useOrderActions({
 
     try {
       await db.updateOrderStatus(order.id, nextStatus);
+      const customer = db.getCustomers().find(c => c.id === order.customer_id);
+      if (customer) {
+        sendOrderStatusWhatsAppNotification(order, customer, nextStatus);
+      }
       const updated = db.getOrders().find(o => o.id === order.id);
       if (updated && setSelectedOrder) setSelectedOrder(updated);
     } catch (e) {
@@ -211,6 +216,10 @@ export default function useOrderActions({
     const performUpdate = async () => {
       try {
         await db.updateOrderStatus(order.id, nextStatus);
+        const customer = db.getCustomers().find(c => c.id === order.customer_id);
+        if (customer) {
+          sendOrderStatusWhatsAppNotification(order, customer, nextStatus);
+        }
         if (updateSelected) {
           const updated = db.getOrders().find(o => o.id === order.id);
           if (updated && setSelectedOrder) setSelectedOrder(updated);

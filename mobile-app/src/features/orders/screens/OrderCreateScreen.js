@@ -6,7 +6,7 @@ import { db } from '../../../services/db';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
 import { t } from '../../../services/i18n';
-import { SUPPORTED_COUNTRIES, validatePhoneNumber } from '../../../utils/phoneUtils';
+import { SUPPORTED_COUNTRIES, validatePhoneNumber, sendOrderCreatedWhatsAppNotification } from '../../../utils/phoneUtils';
 
 export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive }) {
   const { isDarkMode, customers, catalog: rawCatalog, currentUser, stores } = useDbState();
@@ -288,13 +288,13 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         }
       }
 
-      const deliveryCalc = (withDelivery && activeCustomer)
-        ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+      const deliveryCalc = withDelivery
+        ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
       const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
-      const pickupCalc = (withPickup && activeCustomer)
-        ? db.calculatePickupFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+      const pickupCalc = withPickup
+        ? db.calculatePickupFee(currentUser?.store_id || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
       const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
 
@@ -338,6 +338,12 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         if (db.markCustomerRewardUsed) {
           await db.markCustomerRewardUsed(activeCustomer.id, appliedReward.id, created.id);
         }
+      }
+
+      // Notification WhatsApp automatique à la création de la commande
+      const targetCustomer = activeCustomer || (customers ? customers.find(c => c.id === orderClient) : null) || (db.getCustomers ? db.getCustomers().find(c => c.id === orderClient) : null);
+      if (targetCustomer) {
+        sendOrderCreatedWhatsAppNotification(created || newOrder, targetCustomer);
       }
 
       // Clean state
@@ -1338,13 +1344,13 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               }
             }
 
-            const deliveryCalc = (withDelivery && activeCustomer)
-              ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+            const deliveryCalc = withDelivery
+              ? db.calculateDeliveryFee(currentUser?.store_id || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
               : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
             const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
 
-            const pickupCalc = (withPickup && activeCustomer)
-              ? db.calculatePickupFee(currentUser?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+            const pickupCalc = withPickup
+              ? db.calculatePickupFee(currentUser?.store_id || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
               : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
             const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
 

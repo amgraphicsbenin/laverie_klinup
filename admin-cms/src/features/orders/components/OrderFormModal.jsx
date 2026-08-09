@@ -221,13 +221,13 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
     try {
       const currentUser = db.getCurrentUser();
-      const deliveryCalc = (withDelivery && activeCustomer)
-        ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+      const deliveryCalc = withDelivery
+        ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
       const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
       
-      const pickupCalc = (withPickup && activeCustomer)
-        ? db.calculatePickupFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+      const pickupCalc = withPickup
+        ? db.calculatePickupFee(selectedOrderStoreId || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
       const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
       
@@ -269,7 +269,38 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         operateur_momo: finalModeReglement === 'Mobile Money' ? momoOperator : null
       };
 
-      await db.createOrder(newOrder);
+      const created = await db.createOrder(newOrder);
+
+      // Notification WhatsApp automatique à la création de la commande
+      const targetCustomer = activeCustomer || (db.getCustomers ? db.getCustomers().find(c => c.id === orderClient) : null);
+      if (targetCustomer && targetCustomer.telephone) {
+        const targetOrder = created || newOrder;
+        const formattedDueDate = targetOrder.due_date ? new Date(targetOrder.due_date).toLocaleDateString('fr-FR') : 'N/A';
+        const totalVal = Number(targetOrder.prix_total !== undefined ? targetOrder.prix_total : (targetOrder.total || finalNetTotal || 0));
+        const avanceVal = Number(targetOrder.avance_payee !== undefined ? targetOrder.avance_payee : (targetOrder.avance || finalAvance || 0));
+        const remainingVal = Math.max(0, totalVal - avanceVal);
+        const orderCode = targetOrder.identifiant_unique_marquage || targetOrder.id || 'KLIN-0';
+        const typeArticlesStr = targetOrder.type_article || (selectedArticles.map(a => `${a.quantity}x ${a.article}`).join(', ')) || 'Articles divers';
+
+        let text = '';
+        if (targetOrder.is_subscription_order && targetOrder.subscription_details) {
+          const det = targetOrder.subscription_details;
+          if (det.immediate_subscription) {
+            text = `Bonjour ${targetCustomer.prenom} ${targetCustomer.nom}, votre commande ${orderCode} (${typeArticlesStr}) a bien été enregistrée chez KLIN UP avec souscription immédiate au forfait ${det.immediate_subscription.name} (${Number(det.immediate_subscription.prix || 0).toLocaleString()} FCFA).\nArticles déposés: ${det.clothes_deducted} vêtements\nNouveau solde restant: ${det.new_balance} vêt.\nAcompte payé: ${avanceVal.toLocaleString()} FCFA\nReste à payer sur l'abonnement: ${remainingVal.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          } else {
+            text = `Bonjour ${targetCustomer.prenom} ${targetCustomer.nom}, votre commande ${orderCode} (${typeArticlesStr}) a bien été enregistrée chez KLIN UP via votre forfait ${det.name}.\nArticles déposés: ${det.clothes_deducted} vêtements\nSolde précédent: ${det.previous_balance} vêt.\nNouveau solde restant: ${det.new_balance} vêt.\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          }
+        } else {
+          text = `Bonjour ${targetCustomer.prenom} ${targetCustomer.nom}, votre commande ${orderCode} (${typeArticlesStr}) a bien été enregistrée chez KLIN UP.\nTotal: ${totalVal.toLocaleString()} FCFA\nAcompte payé: ${avanceVal.toLocaleString()} FCFA\nReste à payer: ${remainingVal.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+        }
+
+        const cleanIndicatif = String(targetCustomer.indicatif || '229').replace(/\D/g, '');
+        let cleanedPhone = String(targetCustomer.telephone).replace(/\D/g, '');
+        if (cleanedPhone.startsWith('0') && cleanIndicatif !== '229') cleanedPhone = cleanedPhone.substring(1);
+        const formattedPhone = cleanedPhone.startsWith(cleanIndicatif) && cleanedPhone.length > cleanIndicatif.length + 5 ? cleanedPhone : cleanIndicatif + cleanedPhone;
+        const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+      }
 
       if (refreshAdminData) refreshAdminData();
       resetForm();
@@ -1079,13 +1110,13 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
             }
 
             const discountAmount = Math.min(Number(orderDiscount) || 0, currentTotal);
-            const deliveryCalcPreview = (withDelivery && activeCustomer)
-              ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+            const deliveryCalcPreview = withDelivery
+              ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
               : { fee: 0, distanceKm: 0 };
             const deliveryFeePreview = withDelivery ? (deliveryCalcPreview.fee || 0) : 0;
 
-            const pickupCalcPreview = (withPickup && activeCustomer)
-              ? db.calculatePickupFee(selectedOrderStoreId || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
+            const pickupCalcPreview = withPickup
+              ? db.calculatePickupFee(selectedOrderStoreId || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
               : { fee: 0, distanceKm: 0 };
             const pickupFeePreview = withPickup ? (pickupCalcPreview.fee || 0) : 0;
 

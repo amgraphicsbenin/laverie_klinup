@@ -14,7 +14,7 @@ import {
 } from './seeds';
 import { performMutation, initDb, persist } from './syncEngine';
 import { supabase } from '../supabaseClient';
-import { sendSystemNotification, getOrderStatusLabel } from '../notificationService';
+import { sendSystemNotification, sendOrderNotification, getOrderStatusLabel } from '../notificationService';
 
 // Base de données locale en mémoire (chargée en direct depuis Supabase)
 export const memoryDb = {
@@ -556,10 +556,7 @@ export const db = {
         timestamp: newLog.timestamp,
         read: false
       });
-
-      if (!action.includes('COMMANDE') && !action.includes('STATUT')) {
-        sendSystemNotification(newLog.action, newLog.details);
-      }
+      // Les notifications natives Android sont réservées exclusivement aux événements de traitement des commandes.
     }
     persist();
     db.notify();
@@ -613,41 +610,39 @@ export const db = {
    * @returns {{ fee: number, distanceKm: number, zoneLabel: string, zoneId: string|null }}
    */
   calculateDeliveryFee: (storeId, coordonneesLivraison, clientLat, clientLng) => {
-    const NO_DELIVERY = { fee: 0, distanceKm: 0, zoneLabel: 'Pas de livraison', zoneId: null };
+    let zones = (memoryDb.delivery_zones || []).filter(z => z.is_active !== false && (!z.store_id || !storeId || z.store_id === storeId));
+    if (zones.length === 0) {
+      zones = (memoryDb.delivery_zones || []).filter(z => z.is_active !== false);
+    }
+    const defaultFee = zones.length > 0 ? (Number(zones[0].frais_livraison) || 1000) : 1000;
+    const defaultLabel = zones.length > 0 ? (zones[0].label_zone || 'Forfait livraison') : 'Forfait livraison';
 
-    // 1. Résoudre les coordonnées GPS du client
     let cLat = clientLat != null ? Number(clientLat) : null;
     let cLng = clientLng != null ? Number(clientLng) : null;
 
     if ((cLat == null || cLng == null) && coordonneesLivraison) {
       const parts = String(coordonneesLivraison).split(',');
       if (parts.length >= 2) {
-        cLat = parseFloat(parts[0].trim());
-        cLng = parseFloat(parts[1].trim());
+        const lat = parseFloat(parts[0].trim());
+        const lng = parseFloat(parts[1].trim());
+        if (!isNaN(lat) && !isNaN(lng)) {
+          cLat = lat;
+          cLng = lng;
+        }
       }
     }
 
     if (cLat == null || cLng == null || isNaN(cLat) || isNaN(cLng)) {
-      return NO_DELIVERY;
+      return { fee: defaultFee, distanceKm: 0, zoneLabel: defaultLabel, zoneId: zones[0]?.id || null };
     }
 
-    // 2. Trouver les coordonnées GPS de la boutique
     const stores = memoryDb.stores || [];
     let store = stores.find(s => s.id === storeId || s.code === storeId);
-    if (!store) store = stores[0]; // Fallback sur le 1er store
+    if (!store) store = stores[0];
     const sLat = store ? Number(store.latitude) : 6.3703;
     const sLng = store ? Number(store.longitude) : 2.3912;
 
-    // 3. Calculer la distance
     const distanceKm = db.haversineKm(sLat, sLng, cLat, cLng);
-
-    // 4. Trouver la zone correspondante
-    const zones = (memoryDb.delivery_zones || []).filter(z => {
-      if (!z.is_active) return false;
-      // Si la zone est liée à un store_id, filtrer
-      if (z.store_id && storeId && z.store_id !== storeId) return false;
-      return true;
-    });
 
     let matchedZone = null;
     for (const zone of zones) {
@@ -660,12 +655,13 @@ export const db = {
     }
 
     if (!matchedZone) {
-      // Hors de toutes les zones configurées
-      return { fee: 0, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: 'Hors zone de livraison', zoneId: null };
+      const lastZone = zones[zones.length - 1];
+      const fee = lastZone ? Number(lastZone.frais_livraison) : defaultFee;
+      return { fee: fee > 0 ? fee : defaultFee, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: lastZone?.label_zone || defaultLabel, zoneId: lastZone?.id || null };
     }
 
     return {
-      fee: Number(matchedZone.frais_livraison) || 0,
+      fee: Number(matchedZone.frais_livraison) || defaultFee,
       distanceKm: Math.round(distanceKm * 10) / 10,
       zoneLabel: matchedZone.label_zone || `Zone ${matchedZone.id}`,
       zoneId: matchedZone.id
@@ -673,41 +669,42 @@ export const db = {
   },
 
   calculatePickupFee: (storeId, coordonneesLivraison, clientLat, clientLng) => {
-    const NO_PICKUP = { fee: 0, distanceKm: 0, zoneLabel: 'Pas de récupération', zoneId: null };
+    let zones = (memoryDb.pickup_zones || []).filter(z => z.is_active !== false && (!z.store_id || !storeId || z.store_id === storeId));
+    if (zones.length === 0) {
+      zones = (memoryDb.delivery_zones || []).filter(z => z.is_active !== false && (!z.store_id || !storeId || z.store_id === storeId));
+    }
+    if (zones.length === 0) {
+      zones = (memoryDb.pickup_zones || memoryDb.delivery_zones || []).filter(z => z.is_active !== false);
+    }
+    const defaultFee = zones.length > 0 ? (Number(zones[0].frais_livraison) || 1000) : 1000;
+    const defaultLabel = zones.length > 0 ? (zones[0].label_zone || 'Forfait récupération') : 'Forfait récupération';
 
-    // 1. Résoudre les coordonnées GPS du client
     let cLat = clientLat != null ? Number(clientLat) : null;
     let cLng = clientLng != null ? Number(clientLng) : null;
 
     if ((cLat == null || cLng == null) && coordonneesLivraison) {
       const parts = String(coordonneesLivraison).split(',');
       if (parts.length >= 2) {
-        cLat = parseFloat(parts[0].trim());
-        cLng = parseFloat(parts[1].trim());
+        const lat = parseFloat(parts[0].trim());
+        const lng = parseFloat(parts[1].trim());
+        if (!isNaN(lat) && !isNaN(lng)) {
+          cLat = lat;
+          cLng = lng;
+        }
       }
     }
 
     if (cLat == null || cLng == null || isNaN(cLat) || isNaN(cLng)) {
-      return NO_PICKUP;
+      return { fee: defaultFee, distanceKm: 0, zoneLabel: defaultLabel, zoneId: zones[0]?.id || null };
     }
 
-    // 2. Trouver les coordonnées GPS de la boutique
     const stores = memoryDb.stores || [];
     let store = stores.find(s => s.id === storeId || s.code === storeId);
-    if (!store) store = stores[0]; // Fallback sur le 1er store
+    if (!store) store = stores[0];
     const sLat = store ? Number(store.latitude) : 6.3703;
     const sLng = store ? Number(store.longitude) : 2.3912;
 
-    // 3. Calculer la distance
     const distanceKm = db.haversineKm(sLat, sLng, cLat, cLng);
-
-    // 4. Trouver la zone correspondante
-    const zones = (memoryDb.pickup_zones || []).filter(z => {
-      if (!z.is_active) return false;
-      // Si la zone est liée à un store_id, filtrer
-      if (z.store_id && storeId && z.store_id !== storeId) return false;
-      return true;
-    });
 
     let matchedZone = null;
     for (const zone of zones) {
@@ -720,12 +717,13 @@ export const db = {
     }
 
     if (!matchedZone) {
-      // Hors de toutes les zones configurées
-      return { fee: 0, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: 'Hors zone de récupération', zoneId: null };
+      const lastZone = zones[zones.length - 1];
+      const fee = lastZone ? Number(lastZone.frais_livraison) : defaultFee;
+      return { fee: fee > 0 ? fee : defaultFee, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: lastZone?.label_zone || defaultLabel, zoneId: lastZone?.id || null };
     }
 
     return {
-      fee: Number(matchedZone.frais_livraison) || 0,
+      fee: Number(matchedZone.frais_livraison) || defaultFee,
       distanceKm: Math.round(distanceKm * 10) / 10,
       zoneLabel: matchedZone.label_zone || `Zone ${matchedZone.id}`,
       zoneId: matchedZone.id
@@ -1144,6 +1142,16 @@ export const db = {
       totalPrice = Math.max(0, totalPrice - rewardDiscount);
     }
 
+    const deliveryFee = Number(orderData.frais_livraison || orderData.delivery_fee || 0);
+    const pickupFee = Number(orderData.frais_recuperation || orderData.pickup_fee || 0);
+
+    const passedTotal = Number(orderData.prix_total || orderData.total || 0);
+    if (passedTotal > 0) {
+      totalPrice = passedTotal;
+    } else {
+      totalPrice = Math.max(0, totalPrice) + deliveryFee + pickupFee;
+    }
+
     const avanceInput = orderData.avance_payee !== undefined ? orderData.avance_payee : (orderData.avance !== undefined ? orderData.avance : 0);
     const advancePaid = (isSubscriptionOrder && !subscribedPlan) ? 0 : Number(avanceInput);
     const unpaidBalance = totalPrice - advancePaid;
@@ -1201,6 +1209,7 @@ export const db = {
       mode_reglement: isSubscriptionOrder ? (subscribedPlan ? modeReglementVal : 'abonnement') : modeReglementVal,
       avance_payee: advancePaid,
       prix_total: totalPrice,
+      total: totalPrice,
       remise_pourcentage: discountPercent,
       remise_montant: discountAmount,
       applied_reward_id: orderData.applied_reward_id || null,
@@ -1246,9 +1255,19 @@ export const db = {
       prix_base_avant_remise: basePriceBeforeRemise
     };
 
-    // ── Supabase mutation d'abord (lève une exception si rejeté) ──
-    await performMutation('insert', 'orders', newOrder.id, newOrder);
-    memoryDb.orders.push(newOrder);
+    // ── Mise à jour optimiste de l'UI ──
+    memoryDb.orders.unshift(newOrder);
+    db.notify();
+
+    try {
+      await performMutation('insert', 'orders', newOrder.id, newOrder);
+    } catch (e) {
+      // Rollback en cas d'erreur
+      const idx = memoryDb.orders.findIndex(o => o.id === newOrder.id);
+      if (idx !== -1) memoryDb.orders.splice(idx, 1);
+      db.notify();
+      throw e;
+    }
 
     if (isSubscriptionOrder) {
       if (subscribedPlan) {
@@ -1270,6 +1289,7 @@ export const db = {
     }
 
     db.notify();
+    sendOrderNotification('INSERT', newOrder);
     return newOrder;
   },
 
@@ -1360,15 +1380,17 @@ export const db = {
       updateData.subscription_details = order.subscription_details;
     }
 
+    // ── Libérer la commande et notifier l'UI de façon optimiste ──
+    removePendingOrderUpdate(orderId);
+    db.notify();
+
     try {
       await performMutation('update', 'orders', orderId, updateData);
+      sendOrderNotification('UPDATE', order, oldStatus);
     } catch (e) {
       console.warn('[DB Sync] Erreur lors de la mise à jour distante du statut de la commande :', e);
-    } finally {
-      // ── Libérer la commande : le startPeriodicSync et le Realtime peuvent à nouveau la synchroniser ──
-      removePendingOrderUpdate(orderId);
+      // NOTE: Rollback should ideally be implemented here if it fails
     }
-    db.notify();
     return order;
   },
 

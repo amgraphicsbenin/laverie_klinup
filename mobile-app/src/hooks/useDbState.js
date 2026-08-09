@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../services/db';
-import { sendSystemNotification } from '../services/notificationService';
 import { getCurrentLang, subscribeToLangChange } from '../services/i18n';
 
 export function useDbState() {
@@ -37,10 +36,6 @@ export function useDbState() {
       setNotifications(newNotifs);
 
       const unreadCount = newNotifs.filter(n => !n.read).length;
-      if (!isInitialMount.current && unreadCount > prevUnreadCountRef.current) {
-        const latestNotif = newNotifs.find(n => !n.read);
-        sendSystemNotification(latestNotif?.action || 'KLIN UP', latestNotif?.details || 'Nouvelle notification');
-      }
       prevUnreadCountRef.current = unreadCount;
       if (isInitialMount.current) {
         isInitialMount.current = false;

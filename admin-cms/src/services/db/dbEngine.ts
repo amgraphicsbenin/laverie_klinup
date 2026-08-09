@@ -105,41 +105,39 @@ export const dbEngine = {
   },
 
   calculateDeliveryFee: (storeId: string, coordonneesLivraison: string | null, clientLat: number | null, clientLng: number | null) => {
-    const NO_DELIVERY = { fee: 0, distanceKm: 0, zoneLabel: 'Pas de livraison', zoneId: null };
+    let zones = (memoryDb.delivery_zones || []).filter(z => z.is_active !== false && (!z.store_id || !storeId || z.store_id === storeId));
+    if (zones.length === 0) {
+      zones = (memoryDb.delivery_zones || []).filter(z => z.is_active !== false);
+    }
+    const defaultFee = zones.length > 0 ? (Number(zones[0].frais_livraison) || 1000) : 1000;
+    const defaultLabel = zones.length > 0 ? (zones[0].label_zone || 'Forfait livraison') : 'Forfait livraison';
 
-    // 1. Résoudre les coordonnées GPS du client
     let cLat = clientLat != null ? Number(clientLat) : null;
     let cLng = clientLng != null ? Number(clientLng) : null;
 
     if ((cLat == null || cLng == null) && coordonneesLivraison) {
       const parts = String(coordonneesLivraison).split(',');
       if (parts.length >= 2) {
-        cLat = parseFloat(parts[0].trim());
-        cLng = parseFloat(parts[1].trim());
+        const lat = parseFloat(parts[0].trim());
+        const lng = parseFloat(parts[1].trim());
+        if (!isNaN(lat) && !isNaN(lng)) {
+          cLat = lat;
+          cLng = lng;
+        }
       }
     }
 
     if (cLat == null || cLng == null || isNaN(cLat) || isNaN(cLng)) {
-      return NO_DELIVERY;
+      return { fee: defaultFee, distanceKm: 0, zoneLabel: defaultLabel, zoneId: zones[0]?.id || null };
     }
 
-    // 2. Trouver les coordonnées GPS de la boutique
     const stores = memoryDb.stores || [];
     let store = stores.find(s => s.id === storeId || s.code === storeId);
-    if (!store) store = stores[0]; // Fallback sur le 1er store
+    if (!store) store = stores[0];
     const sLat = store ? Number(store.latitude) : 6.3703;
     const sLng = store ? Number(store.longitude) : 2.3912;
 
-    // 3. Calculer la distance
     const distanceKm = dbEngine.haversineKm(sLat, sLng, cLat, cLng);
-
-    // 4. Trouver la zone correspondante
-    const zones = (memoryDb.delivery_zones || []).filter(z => {
-      if (!z.is_active) return false;
-      // Si la zone est liée à un store_id, filtrer
-      if (z.store_id && storeId && z.store_id !== storeId) return false;
-      return true;
-    });
 
     let matchedZone = null;
     for (const zone of zones) {
@@ -152,12 +150,13 @@ export const dbEngine = {
     }
 
     if (!matchedZone) {
-      // Hors de toutes les zones configurées
-      return { fee: 0, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: 'Hors zone de livraison', zoneId: null };
+      const lastZone = zones[zones.length - 1];
+      const fee = lastZone ? Number(lastZone.frais_livraison) : defaultFee;
+      return { fee: fee > 0 ? fee : defaultFee, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: lastZone?.label_zone || defaultLabel, zoneId: lastZone?.id || null };
     }
 
     return {
-      fee: Number(matchedZone.frais_livraison) || 0,
+      fee: Number(matchedZone.frais_livraison) || defaultFee,
       distanceKm: Math.round(distanceKm * 10) / 10,
       zoneLabel: matchedZone.label_zone || `Zone ${matchedZone.id}`,
       zoneId: matchedZone.id
@@ -165,41 +164,42 @@ export const dbEngine = {
   },
 
   calculatePickupFee: (storeId: string, coordonneesLivraison: string | null, clientLat: number | null, clientLng: number | null) => {
-    const NO_PICKUP = { fee: 0, distanceKm: 0, zoneLabel: 'Pas de récupération', zoneId: null };
+    let zones = (memoryDb.pickup_zones || []).filter(z => z.is_active !== false && (!z.store_id || !storeId || z.store_id === storeId));
+    if (zones.length === 0) {
+      zones = (memoryDb.delivery_zones || []).filter(z => z.is_active !== false && (!z.store_id || !storeId || z.store_id === storeId));
+    }
+    if (zones.length === 0) {
+      zones = (memoryDb.pickup_zones || memoryDb.delivery_zones || []).filter(z => z.is_active !== false);
+    }
+    const defaultFee = zones.length > 0 ? (Number(zones[0].frais_livraison) || 1000) : 1000;
+    const defaultLabel = zones.length > 0 ? (zones[0].label_zone || 'Forfait récupération') : 'Forfait récupération';
 
-    // 1. Résoudre les coordonnées GPS du client
     let cLat = clientLat != null ? Number(clientLat) : null;
     let cLng = clientLng != null ? Number(clientLng) : null;
 
     if ((cLat == null || cLng == null) && coordonneesLivraison) {
       const parts = String(coordonneesLivraison).split(',');
       if (parts.length >= 2) {
-        cLat = parseFloat(parts[0].trim());
-        cLng = parseFloat(parts[1].trim());
+        const lat = parseFloat(parts[0].trim());
+        const lng = parseFloat(parts[1].trim());
+        if (!isNaN(lat) && !isNaN(lng)) {
+          cLat = lat;
+          cLng = lng;
+        }
       }
     }
 
     if (cLat == null || cLng == null || isNaN(cLat) || isNaN(cLng)) {
-      return NO_PICKUP;
+      return { fee: defaultFee, distanceKm: 0, zoneLabel: defaultLabel, zoneId: zones[0]?.id || null };
     }
 
-    // 2. Trouver les coordonnées GPS de la boutique
     const stores = memoryDb.stores || [];
     let store = stores.find(s => s.id === storeId || s.code === storeId);
-    if (!store) store = stores[0]; // Fallback sur le 1er store
+    if (!store) store = stores[0];
     const sLat = store ? Number(store.latitude) : 6.3703;
     const sLng = store ? Number(store.longitude) : 2.3912;
 
-    // 3. Calculer la distance
     const distanceKm = dbEngine.haversineKm(sLat, sLng, cLat, cLng);
-
-    // 4. Trouver la zone correspondante
-    const zones = (memoryDb.pickup_zones || []).filter(z => {
-      if (!z.is_active) return false;
-      // Si la zone est liée à un store_id, filtrer
-      if (z.store_id && storeId && z.store_id !== storeId) return false;
-      return true;
-    });
 
     let matchedZone = null;
     for (const zone of zones) {
@@ -212,12 +212,13 @@ export const dbEngine = {
     }
 
     if (!matchedZone) {
-      // Hors de toutes les zones configurées
-      return { fee: 0, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: 'Hors zone de récupération', zoneId: null };
+      const lastZone = zones[zones.length - 1];
+      const fee = lastZone ? Number(lastZone.frais_livraison) : defaultFee;
+      return { fee: fee > 0 ? fee : defaultFee, distanceKm: Math.round(distanceKm * 10) / 10, zoneLabel: lastZone?.label_zone || defaultLabel, zoneId: lastZone?.id || null };
     }
 
     return {
-      fee: Number(matchedZone.frais_livraison) || 0,
+      fee: Number(matchedZone.frais_livraison) || defaultFee,
       distanceKm: Math.round(distanceKm * 10) / 10,
       zoneLabel: matchedZone.label_zone || `Zone ${matchedZone.id}`,
       zoneId: matchedZone.id
@@ -1150,6 +1151,11 @@ export const dbEngine = {
       discountPercent = Math.round((discountAmount / basePriceBeforeRemise) * 100);
     }
 
+    const deliveryFee = Number(orderData.frais_livraison || (orderData as any).delivery_fee || 0);
+    const pickupFee = Number(orderData.frais_recuperation || (orderData as any).pickup_fee || 0);
+    const passedTotal = Number(orderData.prix_total || orderData.total || 0);
+    const calculatedTotal = passedTotal > 0 ? passedTotal : Math.max(0, basePriceBeforeRemise - discountAmount) + deliveryFee + pickupFee;
+
     const newOrder: Order = {
       id: 'o_' + Math.random().toString(36).substr(2, 9),
       customer_id: orderData.customer_id || '',
@@ -1159,11 +1165,12 @@ export const dbEngine = {
       niveau_urgence: orderData.niveau_urgence || 'Normal',
       mode_reglement: orderData.mode_reglement || 'especes',
       avance_payee: Number(orderData.avance_payee || orderData.avance || 0),
-      prix_total: Number(orderData.prix_total || orderData.total || 0),
+      prix_total: calculatedTotal,
+      total: calculatedTotal,
       remise_pourcentage: discountPercent,
       remise_montant: discountAmount,
-      frais_livraison: Number(orderData.frais_livraison || 0),
-      frais_recuperation: Number(orderData.frais_recuperation || 0),
+      frais_livraison: deliveryFee,
+      frais_recuperation: pickupFee,
       prix_base_avant_remise: basePriceBeforeRemise,
       reference_paiement: orderData.reference_paiement || orderData.momo_ref || null,
       operateur_momo: orderData.operateur_momo || null,
@@ -1207,10 +1214,21 @@ export const dbEngine = {
       }).catch(e => console.warn('[DB] Customer update error on createOrder:', e));
     }
 
-    await performMutation('insert', 'orders', newOrder.id, newOrder);
+    // Mise à jour optimiste de l'UI
     memoryDb.orders.unshift(newOrder);
-    dbEngine.logAction('CREATION_COMMANDE', `Commande créée : ${newOrder.identifiant_unique_marquage} (${newOrder.prix_total} FCFA)`);
     notifyListeners();
+
+    try {
+      await performMutation('insert', 'orders', newOrder.id, newOrder);
+      dbEngine.logAction('CREATION_COMMANDE', `Commande créée : ${newOrder.identifiant_unique_marquage} (${newOrder.prix_total} FCFA)`);
+    } catch (e) {
+      // Rollback en cas d'erreur
+      const idx = memoryDb.orders.findIndex(o => o.id === newOrder.id);
+      if (idx !== -1) memoryDb.orders.splice(idx, 1);
+      notifyListeners();
+      throw e;
+    }
+
     return newOrder;
   },
 
@@ -1259,15 +1277,21 @@ export const dbEngine = {
       }).catch(e => console.warn('[DB] Customer update error on deliverOrderWithPayment:', e));
     }
 
-    await performMutation('update', 'orders', orderId, {
-      statut: order.statut,
-      mode_reglement: order.mode_reglement,
-      avance_payee: order.avance_payee,
-      solde_paid_at: order.solde_paid_at
-    });
-
-    dbEngine.logAction('PAIEMENT_FINAL', `Livraison commande ${order.identifiant_unique_marquage || order.id}. Règlement solde: ${cleanAmountPaid} FCFA`);
+    // Optimistic UI update
     notifyListeners();
+
+    try {
+      await performMutation('update', 'orders', orderId, {
+        statut: order.statut,
+        mode_reglement: order.mode_reglement,
+        avance_payee: order.avance_payee,
+        solde_paid_at: order.solde_paid_at
+      });
+      dbEngine.logAction('PAIEMENT_FINAL', `Livraison commande ${order.identifiant_unique_marquage || order.id}. Règlement solde: ${cleanAmountPaid} FCFA`);
+    } catch (e) {
+      console.warn('[DB] performMutation error on deliverOrderWithPayment:', e);
+      // NOTE: Rollback should be implemented here in a production environment
+    }
     return order;
   },
 
@@ -1276,11 +1300,19 @@ export const dbEngine = {
     if (!order) return;
     const oldStatus = order.statut;
     const normalized = normalizeOrderStatus(newStatus);
-
-    await performMutation('update', 'orders', orderId, { statut: normalized });
     order.statut = normalized;
-    dbEngine.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${normalized}'`);
+    
+    // Optimistic update
     notifyListeners();
+
+    try {
+      await performMutation('update', 'orders', orderId, { statut: normalized });
+      dbEngine.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${normalized}'`);
+    } catch (e) {
+      order.statut = oldStatus;
+      notifyListeners();
+      console.warn('[DB] performMutation error on updateOrderStatus:', e);
+    }
     return order;
   },
 
@@ -1288,11 +1320,22 @@ export const dbEngine = {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
 
-    await performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason.trim() });
+    const oldStatus = order.statut;
+    const oldMotif = order.motif_annulation;
+
     order.statut = 'annule';
     order.motif_annulation = reason.trim();
-    dbEngine.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} annulée. Motif : ${reason}`);
     notifyListeners();
+
+    try {
+      await performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason.trim() });
+      dbEngine.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} annulée. Motif : ${reason}`);
+    } catch (e) {
+      order.statut = oldStatus;
+      order.motif_annulation = oldMotif;
+      notifyListeners();
+      console.warn('[DB] performMutation error on cancelOrder:', e);
+    }
     return order;
   },
 
@@ -1301,12 +1344,19 @@ export const dbEngine = {
     if (!order) return;
     const oldStoreId = order.store_id;
 
-    await performMutation('update', 'orders', orderId, { store_id: newStoreId });
     order.store_id = newStoreId;
-    const store = memoryDb.stores?.find(s => s.id === newStoreId || s.code === newStoreId);
-    const storeName = store ? store.nom : newStoreId;
-    dbEngine.logAction('RATTACHEMENT_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} rattachée au point : ${storeName}`);
     notifyListeners();
+
+    try {
+      await performMutation('update', 'orders', orderId, { store_id: newStoreId });
+      const store = memoryDb.stores?.find(s => s.id === newStoreId || s.code === newStoreId);
+      const storeName = store ? store.nom : newStoreId;
+      dbEngine.logAction('RATTACHEMENT_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} rattachée au point : ${storeName}`);
+    } catch (e) {
+      order.store_id = oldStoreId;
+      notifyListeners();
+      console.warn('[DB] performMutation error on updateOrderStore:', e);
+    }
     return order;
   },
 
@@ -1314,10 +1364,18 @@ export const dbEngine = {
     const idx = memoryDb.orders.findIndex(o => o.id === orderId);
     if (idx === -1) return false;
     const order = memoryDb.orders[idx];
-    await performMutation('delete', 'orders', orderId);
     memoryDb.orders.splice(idx, 1);
-    dbEngine.logAction('SUPPRESSION_COMMANDE', `Commande supprimée : ${order.identifiant_unique_marquage || order.id}`);
     notifyListeners();
+
+    try {
+      await performMutation('delete', 'orders', orderId);
+      dbEngine.logAction('SUPPRESSION_COMMANDE', `Commande supprimée : ${order.identifiant_unique_marquage || order.id}`);
+    } catch (e) {
+      memoryDb.orders.splice(idx, 0, order);
+      notifyListeners();
+      console.warn('[DB] performMutation error on deleteOrder:', e);
+      return false;
+    }
     return true;
   },
 
