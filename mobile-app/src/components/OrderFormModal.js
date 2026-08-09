@@ -164,10 +164,12 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
       }
     }
 
+    const currentUser = db.getCurrentUser();
     const currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const discountPercent = Number(orderDiscount) || 0;
-    const discountAmount = Math.round(currentTotal * (discountPercent / 100));
-    const netTotal = currentTotal - discountAmount;
+    // orderDiscount is now treated as a FCFA amount, not a percentage
+    const discountAmountFCFA = Math.min(Math.max(Number(orderDiscount) || 0, 0), currentTotal);
+    const discountPercent = currentTotal > 0 && discountAmountFCFA > 0 ? Math.round((discountAmountFCFA / currentTotal) * 100) : 0;
+    const netTotal = currentTotal - discountAmountFCFA;
     
     // Calculate final parameters to send to db.createOrder
     const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -214,6 +216,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
           prix: a.price
         })),
         total: finalTotal,
+        prix_base_avant_remise: currentTotal,
         frais_livraison: deliveryFee,
         frais_recuperation: pickupFee,
         with_pickup: withPickup,
@@ -223,6 +226,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
         mode_paiement: finalModeReglement,
         niveau_urgence: orderUrgency,
         remise_pourcentage: discountPercent,
+        remise_montant: discountAmountFCFA,
         created_by_id: currentUser ? currentUser.id : 'u1',
         pay_with_subscription: payWithSubscription,
         subscribe_plan_id: subscribePlanId,
@@ -689,17 +693,19 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                 </View>
               )}
 
-              {/* Réduction (%) */}
+              {/* Réduction (FCFA) */}
               <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
-                Réduction (%)
+                Réduction (FCFA)
               </Text>
               <TextInput
                 keyboardType="numeric"
                 value={isSubscriptionMode ? '0' : orderDiscount}
                 onChangeText={(val) => {
-                  const num = parseInt(val, 10);
-                  if (val === '') setOrderDiscount('0');
-                  else if (!isNaN(num) && num >= 0 && num <= 100) setOrderDiscount(num.toString());
+                  if (val === '' || val === '0') setOrderDiscount('0');
+                  else {
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num) && num >= 0) setOrderDiscount(num.toString());
+                  }
                 }}
                 editable={!isSubscriptionMode}
                 style={[
@@ -711,7 +717,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                     opacity: 0.7
                   }
                 ]}
-                placeholder="Ex: 10"
+                placeholder="Ex: 500"
                 placeholderTextColor={isDarkMode ? '#52525b' : '#a1a1aa'}
               />
 
@@ -740,8 +746,9 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                   currentTotal = Math.round(currentTotal * (1 + expressMarkup / 100));
                 }
 
-                const discountPercent = Number(orderDiscount) || 0;
-                const discountAmount = Math.round(currentTotal * (discountPercent / 100));
+                // orderDiscount is FCFA, not percentage
+                const discountAmountPreview = Math.min(Math.max(Number(orderDiscount) || 0, 0), currentTotal);
+                const discountPercentPreview = currentTotal > 0 && discountAmountPreview > 0 ? Math.round((discountAmountPreview / currentTotal) * 100) : 0;
 
                 const deliveryCalc = (withDelivery && activeCustomer)
                   ? db.calculateDeliveryFee(db.getCurrentUser()?.store_id || 'store_central', activeCustomer.coordonnees_livraison, activeCustomer.latitude, activeCustomer.longitude)
@@ -753,7 +760,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                   : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
                 const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
 
-                const netTotal = currentTotal - discountAmount + deliveryFee + pickupFee;
+                const netTotal = currentTotal - discountAmountPreview + deliveryFee + pickupFee;
                 
                 // Avance behaves differently for active sub vs sub purchase
                 const currentAvance = (isSubscriptionActive && !isImmediateSub) ? 0 : (parseFloat(orderAvance) || 0);
@@ -774,10 +781,12 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                       </Text>
                     </View>
                     
-                    {discountAmount > 0 && (
+                    {discountAmountPreview > 0 && (
                       <View style={styles.receiptRow}>
-                        <Text style={styles.receiptRowLabel}>Réduction ({discountPercent}%)</Text>
-                        <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
+                        <Text style={styles.receiptRowLabel}>
+                          Réduction{discountPercentPreview > 0 ? ` (${discountPercentPreview}%)` : ''}
+                        </Text>
+                        <Text style={[styles.receiptRowVal, { color: '#ef4444' }]}>-{formatPrice(discountAmountPreview)}</Text>
                       </View>
                     )}
 

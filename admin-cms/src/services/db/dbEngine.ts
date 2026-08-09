@@ -1139,6 +1139,17 @@ export const dbEngine = {
       (currentUser && currentUser.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : null) ||
       (memoryDb.stores?.[0]?.id || '');
 
+    const basePriceBeforeRemise = Number(orderData.prix_base_avant_remise || orderData.prix_total || orderData.total || 0);
+    let discountAmount = Number(orderData.remise_montant || 0);
+    let discountPercent = Number(orderData.remise_pourcentage || 0);
+
+    if (!discountAmount && discountPercent > 0 && discountPercent <= 100 && basePriceBeforeRemise > 0) {
+      discountAmount = Math.round(basePriceBeforeRemise * (discountPercent / 100));
+    }
+    if (!discountPercent && discountAmount > 0 && basePriceBeforeRemise > 0) {
+      discountPercent = Math.round((discountAmount / basePriceBeforeRemise) * 100);
+    }
+
     const newOrder: Order = {
       id: 'o_' + Math.random().toString(36).substr(2, 9),
       customer_id: orderData.customer_id || '',
@@ -1149,13 +1160,28 @@ export const dbEngine = {
       mode_reglement: orderData.mode_reglement || 'especes',
       avance_payee: Number(orderData.avance_payee || orderData.avance || 0),
       prix_total: Number(orderData.prix_total || orderData.total || 0),
+      remise_pourcentage: discountPercent,
+      remise_montant: discountAmount,
+      frais_livraison: Number(orderData.frais_livraison || 0),
+      frais_recuperation: Number(orderData.frais_recuperation || 0),
+      prix_base_avant_remise: basePriceBeforeRemise,
+      reference_paiement: orderData.reference_paiement || orderData.momo_ref || null,
+      operateur_momo: orderData.operateur_momo || null,
+      distance_km: Number(orderData.distance_km || 0),
+      with_pickup: !!orderData.with_pickup,
       identifiant_unique_marquage: orderData.identifiant_unique_marquage || ('KLIN-' + (memoryDb.orders ? memoryDb.orders.length : 0)),
       created_at: new Date().toISOString(),
       due_date: orderData.due_date || new Date(Date.now() + 48 * 3600000).toISOString(),
       items: orderData.items || [],
       created_by_id: currentUser ? currentUser.id : null,
       created_by_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : null,
-      store_id: currentStoreId
+      store_id: currentStoreId,
+      subscription_details: {
+        ...(orderData.subscription_details || {}),
+        remise_pourcentage: discountPercent,
+        remise_montant: discountAmount,
+        prix_base_avant_remise: basePriceBeforeRemise
+      }
     };
 
     const customer = memoryDb.customers.find(c => c.id === newOrder.customer_id);

@@ -1124,11 +1124,18 @@ export const db = {
       }
     }
 
-    let basePriceBeforeRemise = totalPrice;
+    let basePriceBeforeRemise = Number(orderData.prix_base_avant_remise || totalPrice);
+    let discountAmount = Number(orderData.remise_montant || 0);
     let discountPercent = Number(orderData.remise_pourcentage || 0);
-    let discountAmount = 0;
-    if (discountPercent > 0 && discountPercent <= 100) {
-      discountAmount = Math.round(totalPrice * (discountPercent / 100));
+
+    if (!discountAmount && discountPercent > 0 && discountPercent <= 100 && basePriceBeforeRemise > 0) {
+      discountAmount = Math.round(basePriceBeforeRemise * (discountPercent / 100));
+    }
+    if (!discountPercent && discountAmount > 0 && basePriceBeforeRemise > 0) {
+      discountPercent = Math.round((discountAmount / basePriceBeforeRemise) * 100);
+    }
+
+    if (discountAmount > 0 && totalPrice === basePriceBeforeRemise) {
       totalPrice = Math.max(0, totalPrice - discountAmount);
     }
 
@@ -1205,7 +1212,11 @@ export const db = {
       due_date: dueDate,
       acompte_paid_at: advancePaid > 0 ? nowStr : null,
       solde_paid_at: unpaidBalance <= 0 ? nowStr : null,
-      reference_paiement: orderData.reference_paiement || orderData.momo_ref || orderData.momo_ref_number || null,
+      frais_livraison: Number(orderData.frais_livraison || orderData.delivery_fee || 0),
+      frais_recuperation: Number(orderData.frais_recuperation || orderData.pickup_fee || 0),
+      with_pickup: !!orderData.with_pickup,
+      distance_km: Number(orderData.distance_km || 0),
+      operateur_momo: orderData.operateur_momo || null,
       items: inputItems,
       created_by_id: currentUser ? currentUser.id : null,
       created_by_name: currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : null

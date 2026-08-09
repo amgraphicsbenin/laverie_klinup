@@ -195,7 +195,9 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     }
 
     const currentTotal = selectedArticles.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const discountAmount = Math.min(Number(orderDiscount) || 0, currentTotal);
+    // orderDiscount is treated as a FCFA amount in the admin form
+    const discountAmount = Math.min(Math.max(Number(orderDiscount) || 0, 0), currentTotal);
+    const discountPercent = currentTotal > 0 && discountAmount > 0 ? Math.round((discountAmount / currentTotal) * 100) : 0;
     const netTotal = currentTotal - discountAmount;
 
     const isSubscriptionActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -247,6 +249,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         })),
         total: finalNetTotal,
         prix_total: finalNetTotal,
+        prix_base_avant_remise: currentTotal,
         frais_livraison: deliveryFee,
         frais_recuperation: pickupFee,
         with_pickup: withPickup,
@@ -257,7 +260,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         mode_paiement: finalModeReglement,
         mode_reglement: finalModeReglement,
         niveau_urgence: orderUrgency,
-        remise_pourcentage: 0,
+        remise_pourcentage: discountPercent,
         remise_montant: discountAmount,
         created_by_id: currentUser ? currentUser.id : 'u1',
         pay_with_subscription: payWithSubscription,

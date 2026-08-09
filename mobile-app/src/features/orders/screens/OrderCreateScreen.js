@@ -300,6 +300,8 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
 
       const finalTotal = Math.max(0, netTotal - rewardDiscountVal) + deliveryFee + pickupFee;
 
+      const discountPercent = currentTotal > 0 && discountAmount > 0 ? Math.round((discountAmount / currentTotal) * 100) : 0;
+
       const newOrder = {
         customer_id: orderClient,
         articles: selectedArticles.map(a => ({
@@ -309,6 +311,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
           prix: a.price
         })),
         total: finalTotal,
+        prix_base_avant_remise: currentTotal,
         frais_livraison: deliveryFee,
         frais_recuperation: pickupFee,
         with_pickup: withPickup,
@@ -317,7 +320,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         statut: 'attente',
         mode_paiement: finalModeReglement,
         niveau_urgence: orderUrgency,
-        remise_pourcentage: 0,
+        remise_pourcentage: discountPercent,
         remise_montant: discountAmount,
         applied_reward_id: appliedReward ? appliedReward.id : null,
         applied_reward_title: appliedReward ? appliedReward.title : null,

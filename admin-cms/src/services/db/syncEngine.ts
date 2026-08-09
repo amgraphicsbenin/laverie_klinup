@@ -30,7 +30,7 @@ function loadSession(key: string, defaultVal: any): any {
 const STRIP_FROM_ALL = ['est_en_retard'];
 const STRIP_BY_TABLE: Record<string, string[]> = {
   orders: ['remise_pourcentage', 'remise_montant', 'prix_base_avant_remise',
-           'motif_annulation', 'solde_paid_at', 'subscription_details',
+           'motif_annulation', 'solde_paid_at',
            'reference_paiement', 'reference_momo', 'acompte_paid_at', 'is_subscription_order'],
   catalog: ['sku', 'prix_urgent', 'is_active'],
 };

@@ -277,9 +277,9 @@ const translations = {
       pret: 'Prête',
       a_livrer: 'Prête à livrer',
       a_recuperer: 'À récupérer',
-      en_cours_livraison: 'En cours de livraison',
-      restitue: 'Livrée / Restituée',
-      livre: 'Livrée / Restituée',
+      en_cours_livraison: 'Livraison en cours',
+      restitue: 'Commande livrée / récupérée',
+      livre: 'Commande livrée / récupérée',
       annule: 'Annulée',
     },
     // ── Logs d'activité ──

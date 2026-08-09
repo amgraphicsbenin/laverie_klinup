@@ -185,7 +185,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(99, 102, 241, 0.18)' : '#e0e7ff', 
           text: isDarkMode ? '#818cf8' : '#4338ca', 
           border: isDarkMode ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe', 
-          label: t('status_labels.en_cours_livraison', {}, 'En livraison'), 
+          label: t('status_labels.en_cours_livraison', {}, 'Livraison en cours'), 
           accent: '#6366f1' 
         };
       case 'restitue':
@@ -193,7 +193,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#e6f4ea', 
           text: isDarkMode ? '#34d399' : '#137333', 
           border: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : '#a8dab5', 
-          label: t('status_labels.restitue', {}, 'Restituée'), 
+          label: t('status_labels.restitue', {}, 'Commande récupérée'), 
           accent: '#10b981' 
         };
       case 'livre':
@@ -201,7 +201,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
           bg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#e6f4ea', 
           text: isDarkMode ? '#34d399' : '#137333', 
           border: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : '#a8dab5', 
-          label: t('status_labels.livre', {}, 'Livrée'), 
+          label: t('status_labels.livre', {}, 'Commande livrée'), 
           accent: '#10b981' 
         };
       case 'lavage_cours':
@@ -862,6 +862,9 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   const discountPercent = selectedOrder.remise_pourcentage || 0;
                   const discountAmount = selectedOrder.remise_montant || (discountPercent > 0 ? Math.round(displayBrut * (discountPercent / 100)) : 0);
 
+                  const fraisLivraison = Number(selectedOrder.frais_livraison || selectedOrder.frais_transport || selectedOrder.delivery_fee || 0);
+                  const fraisRecuperation = Number(selectedOrder.frais_recuperation || selectedOrder.pickup_fee || 0);
+
                   const rewardTitle = selectedOrder.applied_reward_title;
                   const rewardDiscount = Number(selectedOrder.applied_reward_discount || selectedOrder.reward_discount || 0);
 
@@ -897,6 +900,20 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                           <Text style={[styles.subValue, { color: '#10b981', fontWeight: '700' }]}>
                             -{formatPrice(rewardDiscount)}
                           </Text>
+                        </View>
+                      )}
+
+                      {fraisLivraison > 0 && (
+                        <View style={styles.articleRow}>
+                          <Text style={[styles.subLabel, { color: '#3b82f6', fontWeight: '600' }]}>Frais de livraison</Text>
+                          <Text style={[styles.subValue, { color: '#3b82f6', fontWeight: '600' }]}>+{formatPrice(fraisLivraison)}</Text>
+                        </View>
+                      )}
+
+                      {fraisRecuperation > 0 && (
+                        <View style={styles.articleRow}>
+                          <Text style={[styles.subLabel, { color: '#3b82f6', fontWeight: '600' }]}>Frais de récupération</Text>
+                          <Text style={[styles.subValue, { color: '#3b82f6', fontWeight: '600' }]}>+{formatPrice(fraisRecuperation)}</Text>
                         </View>
                       )}
 

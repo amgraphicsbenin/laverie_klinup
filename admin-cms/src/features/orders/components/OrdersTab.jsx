@@ -67,8 +67,8 @@ export default function OrdersTab({
     pret: 'Prêt',
     a_livrer: 'À livrer',
     a_recuperer: 'À récupérer',
-    en_cours_livraison: 'En livraison',
-    restitue: 'Récupéré / Livré',
+    en_cours_livraison: 'Livraison en cours',
+    restitue: 'Commande livrée / récupérée',
     annule: 'Annulée'
   };
 
@@ -80,8 +80,8 @@ export default function OrdersTab({
     pret: { bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.25)', label: 'Prêt' },
     a_livrer: { bg: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.25)', label: 'À livrer' },
     a_recuperer: { bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: 'rgba(217, 119, 6, 0.25)', label: 'À récupérer' },
-    en_cours_livraison: { bg: 'rgba(79, 70, 229, 0.10)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.22)', label: 'En livraison' },
-    restitue: { bg: 'rgba(16, 185, 129, 0.08)', color: '#059669', border: 'rgba(16, 185, 129, 0.2)', label: 'Livré / Récupéré' },
+    en_cours_livraison: { bg: 'rgba(79, 70, 229, 0.10)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.22)', label: 'Livraison en cours' },
+    restitue: { bg: 'rgba(16, 185, 129, 0.08)', color: '#059669', border: 'rgba(16, 185, 129, 0.2)', label: 'Commande livrée / récupérée' },
     annule: { bg: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.2)', label: 'Annulée' }
   };
 
@@ -93,7 +93,7 @@ export default function OrdersTab({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
+
       {/* BANNIÈRE DE STATISTIQUES EN TÊTE (KPI BAR) */}
       <div style={{
         display: 'grid',
@@ -239,10 +239,10 @@ export default function OrdersTab({
 
       {/* DISPOSITION PRINCIPALE DU FLUX (ATELIER A GAUCHE, HISTORIQUE A DROITE) */}
       <div className="grid-2" style={{ gridTemplateColumns: '1.25fr 0.75fr', gap: '1.5rem', alignItems: 'start' }}>
-        
+
         {/* COLONNE GAUCHE : SUIVI D'ATELIER & CAISSE TERRAIN */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem', borderRadius: '20px' }}>
-          
+
           {/* Header Suivi Atelier */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.9rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
@@ -266,69 +266,69 @@ export default function OrdersTab({
               </button>
               {/* Filter Pills */}
               <div style={{ display: 'flex', background: 'var(--bg-app)', padding: '0.25rem', borderRadius: '10px', border: '1px solid var(--border-color)', gap: '0.25rem' }}>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setAtelierFilter('all')}
-                style={{
-                  padding: '0.35rem 0.75rem',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  borderRadius: '7px',
-                  border: 'none',
-                  background: atelierFilter === 'all' ? 'var(--primary)' : 'transparent',
-                  color: atelierFilter === 'all' ? '#fff' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                Toutes ({activeOrders.length})
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setAtelierFilter('urgent')}
-                style={{
-                  padding: '0.35rem 0.75rem',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  borderRadius: '7px',
-                  border: 'none',
-                  background: atelierFilter === 'urgent' ? '#d97706' : 'transparent',
-                  color: atelierFilter === 'urgent' ? '#fff' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem'
-                }}
-              >
-                ⚡ Urgent ({expressOrdersCount})
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setAtelierFilter('retard')}
-                style={{
-                  padding: '0.35rem 0.75rem',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  borderRadius: '7px',
-                  border: 'none',
-                  background: atelierFilter === 'retard' ? '#ef4444' : 'transparent',
-                  color: atelierFilter === 'retard' ? '#fff' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem'
-                }}
-              >
-                ⚠️ Retard ({lateOrdersCount})
-              </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setAtelierFilter('all')}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    borderRadius: '7px',
+                    border: 'none',
+                    background: atelierFilter === 'all' ? 'var(--primary)' : 'transparent',
+                    color: atelierFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Toutes ({activeOrders.length})
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setAtelierFilter('urgent')}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    borderRadius: '7px',
+                    border: 'none',
+                    background: atelierFilter === 'urgent' ? '#d97706' : 'transparent',
+                    color: atelierFilter === 'urgent' ? '#fff' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}
+                >
+                  ⚡ Urgent ({expressOrdersCount})
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setAtelierFilter('retard')}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    borderRadius: '7px',
+                    border: 'none',
+                    background: atelierFilter === 'retard' ? '#ef4444' : 'transparent',
+                    color: atelierFilter === 'retard' ? '#fff' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}
+                >
+                  ⚠️ Retard ({lateOrdersCount})
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
           {/* Liste des cartes Suivi d'Atelier */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '680px', overflowY: 'auto', paddingRight: '0.25rem' }}>
@@ -394,7 +394,7 @@ export default function OrdersTab({
                             </span>
                           )}
                         </div>
-                        
+
                         <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <Package size={15} color="var(--primary)" />
                           <span>{order.type_article}</span>
@@ -477,8 +477,8 @@ export default function OrdersTab({
                           ))}
                         </select>
 
-                        <button 
-                          onClick={() => toggleExpand(order.id)} 
+                        <button
+                          onClick={() => toggleExpand(order.id)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', fontWeight: 700, fontSize: '0.74rem', marginLeft: '0.25rem' }}
                         >
                           {expandedOrderId === order.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -529,7 +529,7 @@ export default function OrdersTab({
                           return (
                             <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed rgba(59, 130, 246, 0.2)', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                               <div style={{ fontWeight: 800, color: 'var(--primary)', marginBottom: '0.2rem' }}>Détails de la Facturation :</div>
-                              
+
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span>Total Brut :</span>
                                 <strong>{displayBrut.toLocaleString()} FCFA</strong>
@@ -544,7 +544,7 @@ export default function OrdersTab({
 
                               {discountAmount > 0 && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
-                                  <span>Réduction ({discountPercent}%) :</span>
+                                  <span>Réduction :</span>
                                   <strong>-{discountAmount.toLocaleString()} FCFA</strong>
                                 </div>
                               )}
@@ -693,7 +693,7 @@ export default function OrdersTab({
                           style={{ flex: 1, padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, borderRadius: '10px', background: '#d97706', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
                           onClick={() => handleStartDelivery(order, 'restitue')}
                         >
-                          <CheckCircle2 size={15} /> Marquer comme récupéré
+                          <CheckCircle2 size={15} /> Commande récupérée
                         </button>
                       )}
                       {order.statut === 'en_cours_livraison' && (
@@ -737,16 +737,13 @@ export default function OrdersTab({
 
         {/* COLONNE DROITE : HISTORIQUE DES COMMANDES */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem', borderRadius: '20px' }}>
-          
+
           {/* Header Historique & Bouton Nouvelle Commande */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.9rem' }}>
             <div>
               <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
                 Historique Global
               </h3>
-              <p style={{ margin: '0.15rem 0 0', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                Consultation et édition des reçus
-              </p>
             </div>
             <button
               type="button"

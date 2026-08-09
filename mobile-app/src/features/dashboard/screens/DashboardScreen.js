@@ -392,11 +392,11 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
       case 'a_livrer':
         return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'À livrer' };
       case 'en_cours_livraison':
-        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'En livraison' };
+        return { bg: 'rgba(79, 70, 229, 0.06)', text: '#4f46e5', border: 'rgba(79, 70, 229, 0.12)', label: 'Livraison en cours' };
       case 'restitue':
-        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Récupéré' };
+        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Commande récupérée' };
       case 'livre':
-        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Livré' };
+        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', label: 'Commande livrée' };
       case 'lavage_cours':
       case 'en_cours_lavage':
         return { bg: 'rgba(37, 99, 235, 0.06)', text: '#2563eb', border: 'rgba(37, 99, 235, 0.12)', label: 'Lavage' };

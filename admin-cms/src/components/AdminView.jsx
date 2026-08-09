@@ -621,16 +621,24 @@ export default function AdminView({ activeTab, onManageStaff }) {
     pret: 'Prêt',
     a_recuperer: 'À récupérer',
     a_livrer: 'À livrer',
-    en_cours_livraison: 'En livraison',
-    restitue: 'Récupéré / Livré',
+    en_cours_livraison: 'Livraison en cours',
+    restitue: 'Commande livrée / récupérée',
     annule: 'Annulé'
   };
 
   const getOrderStatusLabel = (order) => {
     if (!order) return '';
-    if (order.statut === 'restitue') {
+    if (typeof order === 'string') {
+      if (order === 'en_cours_livraison') return 'Livraison en cours';
+      if (order === 'restitue' || order === 'livre') return 'Commande livrée / récupérée';
+      return statusDisplayLabels[order] || order;
+    }
+    if (order.statut === 'restitue' || order.statut === 'livre') {
       const type = order.subscription_details?.type_livraison || (order.mode_reglement === 'livraison' ? 'livraison' : 'recuperation');
-      return type === 'recuperation' ? 'Récupéré' : 'Livré';
+      return type === 'recuperation' ? 'Commande récupérée' : 'Commande livrée';
+    }
+    if (order.statut === 'en_cours_livraison') {
+      return 'Livraison en cours';
     }
     return statusDisplayLabels[order.statut] || order.statut;
   };
@@ -2006,15 +2014,16 @@ export default function AdminView({ activeTab, onManageStaff }) {
           await db.updateOrderStatus(order.id, finalStatus);
           refreshAdminData();
 
-          // Notification WhatsApp
+          // Notification WhatsApp uniquement si la commande est prête ou restituée/livrée
           const customer = customers.find(c => c.id === order.customer_id);
           if (customer) {
             let text = '';
-            if (finalStatus === 'en_cours_lavage') {
-              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est entièrement réglée et passe en cours de lavage chez KLIN UP.`;
-            } else {
-              const finalStatusLabel = finalStatus === 'a_livrer' ? 'mise en livraison' : finalStatus === 'a_recuperer' ? 'mise à disposition/récupérée' : 'livrée/restituée';
-              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${finalStatusLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+            if (finalStatus === 'restitue') {
+              const isDelivery = order.subscription_details?.type_livraison === 'livraison' || order.mode_reglement === 'livraison';
+              const actionLabel = isDelivery ? 'livrée' : 'récupérée';
+              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${actionLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+            } else if (finalStatus === 'pret') {
+              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
             }
             if (text) sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
           }
@@ -2058,11 +2067,18 @@ export default function AdminView({ activeTab, onManageStaff }) {
       refreshAdminData();
       setShowDeliveryPaymentModal(false);
 
-      // Notification WhatsApp solde
+      // Notification WhatsApp uniquement si la commande passe au statut restituée/livrée ou prête
       const customer = customers.find(c => c.id === delivOrder.customer_id);
       if (customer) {
-        const text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA pour votre commande ${delivOrder.identifiant_unique_marquage}.\nVotre commande est entièrement soldée et passe au statut suivant. Merci pour votre confiance !`;
-        sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+        let text = '';
+        if (delivFinalStatus === 'restitue') {
+          const isDelivery = delivOrder.subscription_details?.type_livraison === 'livraison' || delivOrder.mode_reglement === 'livraison';
+          const actionLabel = isDelivery ? 'livrée' : 'récupérée';
+          text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA. Votre commande ${delivOrder.identifiant_unique_marquage} vous a été ${actionLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+        } else if (delivFinalStatus === 'pret') {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${delivOrder.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
+        }
+        if (text) sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
       }
 
       setDelivOrder(null);
@@ -2123,28 +2139,17 @@ export default function AdminView({ activeTab, onManageStaff }) {
       await db.updateOrderStatus(orderId, nextStatus);
       refreshAdminData();
 
-      // Notification WhatsApp changement statut
+      // Notification WhatsApp uniquement pour "pret" et "restitue"
       if (order) {
         const customer = customers.find(c => c.id === order.customer_id);
         if (customer) {
           let text = '';
-          if (nextStatus === 'traitement') {
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est maintenant prise en charge et en cours de traitement chez KLIN UP.`;
-          } else if (nextStatus === 'en_cours_lavage') {
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est en cours de lavage/séchage chez KLIN UP.`;
-          } else if (nextStatus === 'en_cours_repassage') {
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est en cours de repassage chez KLIN UP.`;
-          } else if (nextStatus === 'pret') {
-            const remaining = order.prix_total - order.avance_payee;
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer.`;
-          } else if (nextStatus === 'a_livrer') {
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en cours de livraison à votre adresse.`;
-          } else if (nextStatus === 'a_recuperer') {
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête et est en attente de récupération à la laverie.`;
+          if (nextStatus === 'pret') {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
           } else if (nextStatus === 'restitue') {
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été livrée avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
-          } else if (nextStatus === 'annule') {
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été annulée.`;
+            const isDelivery = order.subscription_details?.type_livraison === 'livraison' || order.mode_reglement === 'livraison';
+            const actionLabel = isDelivery ? 'livrée' : 'récupérée';
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été ${actionLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
           }
           if (text) {
             sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
@@ -2191,12 +2196,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       refreshAdminData();
       setShowCancelModal(false);
 
-      // Notification WhatsApp annulation
-      const customer = customers.find(c => c.id === orderToCancel.customer_id);
-      if (customer) {
-        const text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${orderToCancel.identifiant_unique_marquage} a été annulée.\nMotif : ${cancelReason.trim()}`;
-        sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
-      }
+
 
       setOrderToCancel(null);
       setCancelReason('');
@@ -3959,11 +3959,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
                     const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
                     const netPrice = createdOrder.prix_total !== undefined ? createdOrder.prix_total : (createdOrder.total || 0);
-                    const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
-                    const displayBrut = createdOrder.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
+                    const fraisLivraison = Number(createdOrder.frais_livraison || createdOrder.frais_transport || createdOrder.delivery_fee || 0);
+                    const fraisRecuperation = Number(createdOrder.frais_recuperation || createdOrder.pickup_fee || 0);
 
-                    const discountPercent = createdOrder.remise_pourcentage || 0;
-                    const discountAmount = createdOrder.remise_montant || (discountPercent > 0 ? Math.round(displayBrut * (discountPercent / 100)) : 0);
+                    const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+                    const displayBrut = Number(createdOrder.prix_base_avant_remise) || (calculatedBrut > 0 ? calculatedBrut : Math.max(0, netPrice - fraisLivraison - fraisRecuperation));
+
+                    const discountPercent = Number(createdOrder.remise_pourcentage || createdOrder.remise || createdOrder.discount || 0);
+                    let discountAmount = Number(createdOrder.remise_montant || 0);
+                    if (!discountAmount && discountPercent > 0) {
+                      discountAmount = Math.round(displayBrut * (discountPercent / 100));
+                    }
+                    if (!discountAmount && displayBrut > (netPrice - fraisLivraison - fraisRecuperation)) {
+                      discountAmount = Math.max(0, displayBrut - (netPrice - fraisLivraison - fraisRecuperation));
+                    }
 
                     const rewardTitle = createdOrder.applied_reward_title;
                     const rewardDiscount = Number(createdOrder.applied_reward_discount || createdOrder.reward_discount || 0);
@@ -3986,7 +3995,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
                         {discountAmount > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#dc2626' }}>
-                            <span style={{ fontWeight: '600' }}>Réduction ({discountPercent}%) :</span>
+                            <span style={{ fontWeight: '600' }}>Réduction{discountPercent > 0 ? ` (${discountPercent}%)` : ''} :</span>
                             <span style={{ fontWeight: '700' }}>
                               -{discountAmount.toLocaleString()} FCFA
                             </span>
@@ -3998,6 +4007,24 @@ export default function AdminView({ activeTab, onManageStaff }) {
                             <span style={{ fontWeight: '700' }}>Récompense ({rewardTitle || 'Fidélité'}) :</span>
                             <span style={{ fontWeight: '800' }}>
                               -{rewardDiscount.toLocaleString()} FCFA
+                            </span>
+                          </div>
+                        )}
+
+                        {fraisLivraison > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#2563eb' }}>
+                            <span style={{ fontWeight: '600' }}>Frais de livraison :</span>
+                            <span style={{ fontWeight: '700' }}>
+                              +{fraisLivraison.toLocaleString()} FCFA
+                            </span>
+                          </div>
+                        )}
+
+                        {fraisRecuperation > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#2563eb' }}>
+                            <span style={{ fontWeight: '600' }}>Frais de récupération :</span>
+                            <span style={{ fontWeight: '700' }}>
+                              +{fraisRecuperation.toLocaleString()} FCFA
                             </span>
                           </div>
                         )}

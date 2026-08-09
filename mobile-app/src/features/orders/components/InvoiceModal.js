@@ -47,14 +47,27 @@ export default function InvoiceModal({
 }) {
   if (!order) return null;
 
-  const netPrice = order.prix_total || order.total || 0;
-  const fraisLivraison = Number(order.frais_livraison || 0);
+  const netPrice = Number(order.prix_total !== undefined ? order.prix_total : (order.total || 0));
+  const fraisLivraison = Number(order.frais_livraison || order.frais_transport || order.delivery_fee || 0);
+  const fraisRecuperation = Number(order.frais_recuperation || order.pickup_fee || 0);
   const distanceKm = order.distance_km || null;
-  const brutAvantLivraison = netPrice - fraisLivraison;
-  const displayBrut = order.prix_base_avant_remise || Math.max(brutAvantLivraison, 0);
-  const displayRemiseMontant = order.remise_montant || Math.max(0, displayBrut - brutAvantLivraison);
-  const displayRemisePourcent = order.remise_pourcentage || (displayBrut > 0 ? Math.round((displayRemiseMontant / displayBrut) * 100) : 0);
-  const hasDiscount = displayRemiseMontant > 0;
+
+  const itemsList = order.items || order.articles || [];
+  let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+
+  const displayBrut = Number(order.prix_base_avant_remise) || (itemsSum > 0 ? itemsSum : Math.max(0, netPrice - fraisLivraison - fraisRecuperation));
+  const discountPercent = Number(order.remise_pourcentage || order.remise || order.discount || 0);
+  let discountAmount = Number(order.remise_montant || 0);
+  if (!discountAmount && discountPercent > 0) {
+    discountAmount = Math.round(displayBrut * (discountPercent / 100));
+  }
+  if (!discountAmount && displayBrut > (netPrice - fraisLivraison - fraisRecuperation)) {
+    discountAmount = Math.max(0, displayBrut - (netPrice - fraisLivraison - fraisRecuperation));
+  }
+  const hasDiscount = discountAmount > 0;
+
+  const avance = Number(order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0));
+  const reste = Math.max(0, netPrice - avance);
 
   if (!visible || !order) return null;
 
@@ -169,10 +182,10 @@ export default function InvoiceModal({
                 {hasDiscount && (
                   <View style={styles.tpeTotalRow}>
                     <Text style={[styles.tpeTotalLabel, { color: '#ef4444' }]}>
-                      REMISE ({displayRemisePourcent}%)
+                      REMISE{discountPercent > 0 ? ` (${discountPercent}%)` : ''}
                     </Text>
                     <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>
-                      -{formatPrice(displayRemiseMontant)}
+                      -{formatPrice(discountAmount)}
                     </Text>
                   </View>
                 )}
@@ -188,6 +201,17 @@ export default function InvoiceModal({
                   </View>
                 )}
 
+                {fraisRecuperation > 0 && (
+                  <View style={styles.tpeTotalRow}>
+                    <Text style={[styles.tpeTotalLabel, { color: '#3b82f6' }]}>
+                      RECUPERATION
+                    </Text>
+                    <Text style={[styles.tpeTotalVal, { color: '#3b82f6' }]}>
+                      +{formatPrice(fraisRecuperation)}
+                    </Text>
+                  </View>
+                )}
+
                 <View style={styles.tpeTotalRow}>
                   <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
                   <Text style={styles.tpeTotalValBold}>{formatPrice(netPrice)}</Text>
@@ -195,13 +219,13 @@ export default function InvoiceModal({
 
                 <View style={styles.tpeTotalRow}>
                   <Text style={styles.tpeTotalLabel}>AVANCE PAYEE</Text>
-                  <Text style={styles.tpeTotalVal}>{formatPrice(order.avance_payee || order.avance || 0)}</Text>
+                  <Text style={styles.tpeTotalVal}>{formatPrice(avance)}</Text>
                 </View>
 
                 <View style={styles.tpeTotalRow}>
                   <Text style={styles.tpeTotalLabelBold}>RESTE A PAYER</Text>
-                  <Text style={[styles.tpeTotalValBold, { color: (order.reste || 0) > 0 ? '#ef4444' : '#10b981' }]}>
-                    {formatPrice(order.reste || 0)}
+                  <Text style={[styles.tpeTotalValBold, { color: reste > 0 ? '#ef4444' : '#10b981' }]}>
+                    {formatPrice(reste)}
                   </Text>
                 </View>
 
