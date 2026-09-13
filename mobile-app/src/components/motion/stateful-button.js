@@ -38,8 +38,8 @@ export function StatefulButton({
   isDarkMode = false,
   disabled = false,
   height = 42,
-  resetDelay = 1500,
-  minLoadingDuration = 2000,
+  resetDelay = 1200,
+  minLoadingDuration = 1500,
   style,
   ...props
 }) {
@@ -62,19 +62,33 @@ export function StatefulButton({
 
   const displaySuccessText = completeLabel || successText;
 
+  // ── Snapshot of active action props ──────────────────────────────────────────
+  // Freezes props (labels, icon, color) for the duration of the action (loading + success)
+  // so background parent re-renders don't flash or preview the subsequent action.
+  const activePropsRef = useRef(null);
+  const isActionActive = internalState === 'loading' || internalState === 'success' || internalState === 'error';
+  const effectiveProps = (isActionActive && activePropsRef.current) ? activePropsRef.current : {
+    children,
+    loadingText,
+    displaySuccessText,
+    errorText,
+    color,
+    icon: icon || thumbIcon,
+  };
+
   // Determine current active text based on state
   const currentLabel = useMemo(() => {
     switch (currentState) {
       case 'loading':
-        return loadingText;
+        return effectiveProps.loadingText;
       case 'success':
-        return displaySuccessText;
+        return effectiveProps.displaySuccessText;
       case 'error':
-        return errorText;
+        return effectiveProps.errorText;
       default:
         return formatText(children);
     }
-  }, [currentState, loadingText, displaySuccessText, errorText, children, formatText]);
+  }, [currentState, effectiveProps, formatText, children]);
 
   // ── Animated values ───────────────────────────────────────────────────────────
   const pressScale = useRef(new Animated.Value(1)).current;
@@ -93,7 +107,7 @@ export function StatefulButton({
       if (type === 'tick') Vibration.vibrate(6);
       else if (type === 'success') Vibration.vibrate([0, 15, 60, 25]);
       else if (type === 'error') Vibration.vibrate([0, 30, 40, 30]);
-    } catch { /* graceful fallback */ }
+    } catch (e) { /* graceful fallback */ }
   }, []);
 
   // ── Transition animation on state change ─────────────────────────────────────
@@ -174,17 +188,6 @@ export function StatefulButton({
     };
   }, []);
 
-  // Reset internal state when label (children) or completeLabel changes,
-  // but do not cancel an ongoing loading operation
-  useEffect(() => {
-    if (internalState !== 'loading') {
-      if (resetTimerRef.current) {
-        clearTimeout(resetTimerRef.current);
-      }
-      setInternalState('idle');
-    }
-  }, [children, completeLabel, internalState]);
-
   // ── Press Handlers ───────────────────────────────────────────────────────────
   const handlePressIn = () => {
     if (isDisabled) return;
@@ -213,9 +216,20 @@ export function StatefulButton({
 
     // If controlled, delegate immediately
     if (controlledState !== undefined) {
-      action?.();
+      if (typeof action === 'function') action();
       return;
     }
+
+    // Freeze active props snapshot so incoming prop changes from parent re-renders
+    // (such as order status updating in background) do not overwrite or preview the next action!
+    activePropsRef.current = {
+      children,
+      loadingText,
+      displaySuccessText: completeLabel || successText,
+      errorText,
+      color,
+      icon: icon || thumbIcon,
+    };
 
     // Uncontrolled state machine: idle -> loading -> success -> idle
     setInternalState('loading');
@@ -227,13 +241,14 @@ export function StatefulButton({
         if (result && typeof result.then === 'function') {
           const res = await result;
           if (res === false) {
+            activePropsRef.current = null;
             setInternalState('idle');
             return;
           }
         }
       }
 
-      // Guarantee minimum spinner duration (2s default)
+      // Guarantee minimum spinner duration (smooth feedback)
       const elapsed = Date.now() - startTime;
       const remaining = Math.max(0, minLoadingDuration - elapsed);
       if (remaining > 0) {
@@ -244,10 +259,14 @@ export function StatefulButton({
 
       if (resetDelay > 0) {
         resetTimerRef.current = setTimeout(() => {
+          activePropsRef.current = null;
           setInternalState('idle');
         }, resetDelay);
+      } else {
+        activePropsRef.current = null;
+        setInternalState('idle');
       }
-    } catch {
+    } catch (err) {
       const elapsed = Date.now() - startTime;
       const remaining = Math.max(0, minLoadingDuration - elapsed);
       if (remaining > 0) {
@@ -257,8 +276,12 @@ export function StatefulButton({
       setInternalState('error');
       if (resetDelay > 0) {
         resetTimerRef.current = setTimeout(() => {
+          activePropsRef.current = null;
           setInternalState('idle');
         }, resetDelay);
+      } else {
+        activePropsRef.current = null;
+        setInternalState('idle');
       }
     }
   };
@@ -268,8 +291,8 @@ export function StatefulButton({
     if (disabled) return isDarkMode ? '#334155' : '#94a3b8';
     if (currentState === 'success') return '#059669'; // Emerald success
     if (currentState === 'error') return '#dc2626'; // Red error
-    return color;
-  }, [disabled, currentState, color, isDarkMode]);
+    return effectiveProps.color || color;
+  }, [disabled, currentState, effectiveProps.color, color, isDarkMode]);
 
   // ── Icon rendering ───────────────────────────────────────────────────────────
   const renderIcon = () => {
@@ -284,7 +307,7 @@ export function StatefulButton({
     }
 
     // Idle state: custom icon or thumbIcon
-    const activeIcon = icon || thumbIcon;
+    const activeIcon = effectiveProps.icon || icon || thumbIcon;
     if (activeIcon && React.isValidElement(activeIcon)) {
       return React.cloneElement(activeIcon, {
         color: '#ffffff',

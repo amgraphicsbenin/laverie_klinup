@@ -101,7 +101,7 @@ export function ModalBackdrop({ children, style, closeOnPress }) {
       style={[
         styles.backdrop,
         {
-          backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.76)' : 'rgba(0, 0, 0, 0.58)',
+          backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.78)' : 'rgba(0, 0, 0, 0.65)',
           opacity: fadeAnim,
         },
         style,
@@ -127,7 +127,7 @@ export function ModalContainer({ size: propSize, children, style }) {
   const containerStyle = useMemo(() => {
     switch (activeSize) {
       case 'xs':
-        return { width: '92%', maxWidth: 330 };
+        return { width: '92%', maxWidth: 360 };
       case 'sm':
         return { width: '92%', maxWidth: 390 };
       case 'md':
@@ -213,8 +213,8 @@ export function ModalDialog({ children, style }) {
         {
           backgroundColor: isDarkMode ? '#18181b' : '#ffffff',
           borderColor: isDarkMode ? '#27272a' : '#e4e4e7',
-          borderRadius: isFull ? 0 : 24,
-          padding: isFull ? 18 : 22,
+          borderRadius: isFull ? 0 : 26,
+          padding: isFull ? 18 : 24,
           opacity: opacityAnim,
           transform: [{ scale: scaleAnim }, { translateY: translateYAnim }],
         },
@@ -459,6 +459,8 @@ export function ModalButton({
     >
       {icon && <View style={styles.buttonIcon}>{icon}</View>}
       <Text
+        numberOfLines={1}
+        ellipsizeMode="tail"
         style={[
           styles.buttonText,
           { color: buttonStyle.textColor },
@@ -513,31 +515,35 @@ export function ConfirmationModal({
     <Modal isOpen={activeOpen} onClose={onClose} size={size} isDarkMode={isDarkMode}>
       <Modal.Backdrop>
         <Modal.Container size={size}>
-          <Modal.Dialog>
+          <Modal.Dialog style={{ alignItems: 'center' }}>
             <Modal.CloseTrigger />
-            <Modal.Header layout="row">
+            <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 4 }}>
               {icon ? (
-                <Modal.Icon variant={variant}>{icon}</Modal.Icon>
+                <Modal.Icon variant={variant} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}>{icon}</Modal.Icon>
               ) : variant === 'danger' ? (
-                <Modal.Icon variant="danger"><Ban size={20} color="#ef4444" /></Modal.Icon>
+                <Modal.Icon variant="danger" style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}><Ban size={24} color="#ef4444" strokeWidth={2.4} /></Modal.Icon>
               ) : (
-                <Modal.Icon variant="warning"><AlertTriangle size={20} color="#f59e0b" /></Modal.Icon>
+                <Modal.Icon variant="warning" style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}><AlertTriangle size={24} color="#f59e0b" strokeWidth={2.4} /></Modal.Icon>
               )}
-              <View style={{ flex: 1, justifyContent: 'center' }}>
-                <Modal.Heading>{title}</Modal.Heading>
-              </View>
-            </Modal.Header>
-
-            <Modal.Body>
+              <Modal.Heading style={{ textAlign: 'center', fontSize: 18, fontWeight: '800' }}>{title}</Modal.Heading>
               {activeDescription && (
-                <Modal.Description style={{ marginTop: 2, lineHeight: 19 }}>
+                <Modal.Description style={{ textAlign: 'center', marginTop: 6, lineHeight: 20, fontSize: 13.5 }}>
                   {activeDescription}
                 </Modal.Description>
               )}
-              {children}
-            </Modal.Body>
+            </Modal.Header>
 
-            <Modal.Footer>
+            {children && <Modal.Body style={{ width: '100%' }}>{children}</Modal.Body>}
+
+            <Modal.Footer
+              style={{
+                width: '100%',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 12,
+                marginTop: 20,
+              }}
+            >
               <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
                 {cancelText}
               </Modal.Button>
@@ -627,16 +633,16 @@ export function AlertModal({
     <Modal
       isOpen={activeOpen}
       onClose={onClose}
-      size="xs"
+      size="sm"
       isDarkMode={isDarkMode}
       closeOnBackdropPress={canDismissOnBackdrop}
     >
       <Modal.Backdrop closeOnPress={canDismissOnBackdrop}>
-        <Modal.Container size="xs">
+        <Modal.Container size="sm">
           <Modal.Dialog style={{ alignItems: 'center' }}>
             {canDismissOnBackdrop && <Modal.CloseTrigger onPress={onClose} />}
             <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 4 }}>
-              <Modal.Icon variant={variant} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 8 }}>
+              <Modal.Icon variant={variant} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}>
                 {variant === 'danger' ? (
                   <Ban size={24} color="#ef4444" strokeWidth={2.4} />
                 ) : variant === 'warning' ? (
@@ -647,9 +653,9 @@ export function AlertModal({
                   <AlertTriangle size={24} color="#002cf7" strokeWidth={2.4} />
                 )}
               </Modal.Icon>
-              <Modal.Heading style={{ textAlign: 'center' }}>{title}</Modal.Heading>
+              <Modal.Heading style={{ textAlign: 'center', fontSize: 18, fontWeight: '800' }}>{title}</Modal.Heading>
               {activeMessage && (
-                <Modal.Description style={{ textAlign: 'center', marginTop: 4, lineHeight: 19 }}>
+                <Modal.Description style={{ textAlign: 'center', marginTop: 6, lineHeight: 20, fontSize: 13.5 }}>
                   {activeMessage}
                 </Modal.Description>
               )}
@@ -662,8 +668,8 @@ export function AlertModal({
                 width: '100%',
                 flexDirection: hasMultipleButtons ? 'column' : 'row',
                 justifyContent: 'center',
-                gap: 10,
-                marginTop: 14,
+                gap: 12,
+                marginTop: 20,
               }}
             >
               {buttons && buttons.length > 0 ? (
@@ -671,7 +677,8 @@ export function AlertModal({
                   const isDestructive =
                     btn.style === 'destructive' ||
                     (btn.text || '').toLowerCase() === 'supprimer' ||
-                    (btn.text || '').toLowerCase() === 'résilier';
+                    (btn.text || '').toLowerCase() === 'résilier' ||
+                    (btn.text || '').toLowerCase() === 'déconnexion';
                   const isCancel =
                     btn.style === 'cancel' ||
                     (btn.text || '').toLowerCase() === 'annuler' ||
@@ -685,7 +692,7 @@ export function AlertModal({
                       onPress={() => handlePress(btn)}
                       style={{
                         flex: hasMultipleButtons ? 0 : 1,
-                        width: '100%',
+                        width: hasMultipleButtons ? '100%' : undefined,
                       }}
                     >
                       {btn.text}
@@ -748,14 +755,14 @@ const styles = StyleSheet.create({
   },
   dialog: {
     width: '100%',
-    maxHeight: '90%',
+    maxHeight: Platform.OS === 'web' ? '90vh' : '90%',
     borderWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.28,
-    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.22,
+    shadowRadius: 32,
     elevation: 14,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   closeTrigger: {
     position: 'absolute',
@@ -806,25 +813,27 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 18,
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 20,
+    width: '100%',
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     borderRadius: 9999,
-    minHeight: 44,
+    minHeight: 46,
   },
   buttonIcon: {
     marginRight: 6,
   },
   buttonText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
+    textAlign: 'center',
   },
 });

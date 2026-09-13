@@ -1203,6 +1203,149 @@ export const db = {
   },
 
   /**
+   * Modifie une commande existante (notamment par la caisse avant validation).
+   */
+  updateOrder: async (orderId, orderData) => {
+    const order = memoryDb.orders.find(o => o.id === orderId);
+    if (!order) throw new Error('Commande non trouvée');
+
+    const currentUser = db.getCurrentUser();
+    if (currentUser && (currentUser.role === 'livreur' || currentUser.role === 'agent_lavage_repassage')) {
+      throw new Error('Action non autorisée pour ce profil.');
+    }
+
+    const customer = memoryDb.customers.find(c => c.id === (orderData.customer_id || order.customer_id));
+
+    // Sauvegarde pour rollback en cas d'erreur
+    const oldOrderSnapshot = JSON.parse(JSON.stringify(order));
+    const oldCustomerDette = customer ? Number(customer.solde_dette || 0) : null;
+    const oldCustomerPoints = customer ? Number(customer.points_fidelite || 0) : null;
+
+    addPendingOrderUpdate(orderId);
+
+    const oldTotal = Number(order.prix_total || order.total || 0);
+    const oldAvance = Number(order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0));
+    const oldUnpaid = Math.max(0, oldTotal - oldAvance);
+
+    const inputItems = (orderData.items || orderData.articles || order.items || order.articles || []).map(item => ({
+      article: item.article,
+      service: item.service,
+      quantite: Number(item.quantite || item.quantity || 1),
+      prix: Number(item.prix || item.price || 0)
+    }));
+
+    let totalPrice = Number(orderData.total !== undefined ? orderData.total : (orderData.prix_total !== undefined ? orderData.prix_total : oldTotal));
+    let basePriceBeforeRemise = Number(orderData.prix_base_avant_remise !== undefined ? orderData.prix_base_avant_remise : (order.prix_base_avant_remise || totalPrice));
+    let discountAmount = Number(orderData.remise_montant !== undefined ? orderData.remise_montant : (order.remise_montant || 0));
+    let discountPercent = Number(orderData.remise_pourcentage !== undefined ? orderData.remise_pourcentage : (order.remise_pourcentage || 0));
+
+    const deliveryFee = Number(orderData.frais_livraison !== undefined ? orderData.frais_livraison : (order.frais_livraison || 0));
+    const pickupFee = Number(orderData.frais_recuperation !== undefined ? orderData.frais_recuperation : (order.frais_recuperation || 0));
+
+    const advancePaid = Number(orderData.avance_payee !== undefined ? orderData.avance_payee : (orderData.avance !== undefined ? orderData.avance : oldAvance));
+    const unpaidBalance = Math.max(0, totalPrice - advancePaid);
+
+    // Ajustement dette client
+    const diffDette = unpaidBalance - oldUnpaid;
+    if (customer && diffDette !== 0) {
+      customer.solde_dette = Math.max(0, Number(customer.solde_dette || 0) + diffDette);
+    }
+
+    // Ajustement points fidélité
+    const diffAdvance = advancePaid - oldAvance;
+    if (customer && diffAdvance > 0) {
+      const sysSettings = db.getSettings ? db.getSettings() : {};
+      const fidelityActive = sysSettings.fidelity_active ?? true;
+      const spendPerPoint = Number(sysSettings.fidelity_spend_per_point) || 1000;
+      if (fidelityActive) {
+        const newPoints = Math.floor(diffAdvance / spendPerPoint);
+        customer.points_fidelite = (customer.points_fidelite || 0) + newPoints;
+      }
+    }
+
+    const urgencyVal = orderData.niveau_urgence || order.niveau_urgence || 'Normal';
+    let dueDate = order.due_date;
+    if (orderData.due_date) {
+      dueDate = orderData.due_date;
+    } else if (orderData.niveau_urgence && orderData.niveau_urgence !== order.niveau_urgence) {
+      const expressHoursItem = memoryDb.catalog.find(c => c.id === 'setting_express_hours');
+      const expressHours = expressHoursItem ? Number(expressHoursItem.prix) : 6;
+      const normalHoursItem = memoryDb.catalog.find(c => c.id === 'setting_normal_hours');
+      const normalHours = normalHoursItem ? Number(normalHoursItem.prix) : 48;
+      const hoursToAdd = urgencyVal === 'Express' ? expressHours : normalHours;
+      dueDate = new Date(Date.now() + 3600000 * hoursToAdd).toISOString();
+    }
+
+    const nowStr = new Date().toISOString();
+    const modeReglementVal = orderData.mode_reglement || orderData.mode_paiement || order.mode_reglement || 'Espèce';
+
+    const updatedOrderFields = {
+      customer_id: orderData.customer_id || order.customer_id,
+      items: inputItems,
+      articles: inputItems,
+      type_article: (inputItems[0] ? inputItems[0].article : order.type_article || 'Divers'),
+      type_service: (inputItems[0] ? inputItems[0].service : order.type_service || 'lavage_simple'),
+      niveau_urgence: urgencyVal,
+      mode_reglement: modeReglementVal,
+      mode_paiement: modeReglementVal,
+      avance_payee: advancePaid,
+      avance: advancePaid,
+      prix_total: totalPrice,
+      total: totalPrice,
+      remise_pourcentage: discountPercent,
+      remise_montant: discountAmount,
+      prix_base_avant_remise: basePriceBeforeRemise,
+      due_date: dueDate,
+      acompte_paid_at: advancePaid > 0 ? (order.acompte_paid_at || nowStr) : null,
+      solde_paid_at: unpaidBalance <= 0 ? (order.solde_paid_at || nowStr) : null,
+      frais_livraison: deliveryFee,
+      frais_recuperation: pickupFee,
+      with_pickup: orderData.with_pickup !== undefined ? !!orderData.with_pickup : order.with_pickup,
+      distance_km: Number(orderData.distance_km !== undefined ? orderData.distance_km : (order.distance_km || 0)),
+      reference_paiement: orderData.reference_paiement !== undefined ? orderData.reference_paiement : order.reference_paiement,
+      reference_momo: orderData.reference_momo !== undefined ? orderData.reference_momo : order.reference_momo,
+      operateur_momo: orderData.operateur_momo !== undefined ? orderData.operateur_momo : order.operateur_momo,
+      modified_at: nowStr,
+      modified_by_id: currentUser ? currentUser.id : null,
+      modified_by_name: currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : null
+    };
+
+    // Mise à jour locale
+    Object.assign(order, updatedOrderFields);
+    db.notify();
+
+    try {
+      await performMutation('update', 'orders', orderId, updatedOrderFields);
+
+      if (customer && diffDette !== 0) {
+        await performMutation('update', 'customers', customer.id, {
+          solde_dette: customer.solde_dette,
+          points_fidelite: customer.points_fidelite
+        }).catch(e => console.warn('[DB] Customer update error:', e));
+      }
+
+      db.logAction(
+        'MODIFICATION_COMMANDE',
+        `Commande ${order.identifiant_unique_marquage || order.id} modifiée par la caisse (${currentUser ? `${currentUser.prenom} ${currentUser.nom}` : ''})`
+      );
+      sendOrderNotification('UPDATE', order);
+    } catch (e) {
+      // Rollback
+      Object.assign(order, oldOrderSnapshot);
+      if (customer && oldCustomerDette !== null) {
+        customer.solde_dette = oldCustomerDette;
+        customer.points_fidelite = oldCustomerPoints;
+      }
+      db.notify();
+      throw e;
+    } finally {
+      removePendingOrderUpdate(orderId);
+    }
+
+    return order;
+  },
+
+  /**
    * Met à jour le statut d'une commande.
    */
   updateOrderStatus: async (orderId, newStatus) => {

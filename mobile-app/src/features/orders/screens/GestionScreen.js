@@ -17,6 +17,7 @@ import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import ClientsScreen from '../../clients/screens/ClientsScreen';
 import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
+import { OrderFormModal } from '../../../components/OrderFormModal';
 import { t } from '../../../services/i18n';
 
 export default function GestionScreen({
@@ -115,6 +116,7 @@ export default function GestionScreen({
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
   const [momoOperator, setMomoOperator] = useState('MTN');
+  const [editingOrder, setEditingOrder] = useState(null);
 
   const validateCancelReason = (text) => {
     const trimmed = text.trim();
@@ -476,6 +478,10 @@ export default function GestionScreen({
     if (Platform.OS === 'web') return;
 
     const backAction = () => {
+      if (editingOrder) {
+        setEditingOrder(null);
+        return true;
+      }
       if (showInvoiceModal) {
         setShowInvoiceModal(false);
         setInvoiceOrder(null);
@@ -514,16 +520,17 @@ export default function GestionScreen({
     showOrderDetails,
     selectedClient,
     setSelectedOrder,
-    wasEditingFromFiche
+    wasEditingFromFiche,
+    editingOrder
   ]);
 
   // Notify parent of modal visibility
   useEffect(() => {
     if (onModalStateChange) {
-      const isAnyModalOpen = showInvoiceModal || showCustomerModal || selectedClient !== null || showOrderDetails || paymentModalVisible || cancelModalVisible;
+      const isAnyModalOpen = showInvoiceModal || showCustomerModal || selectedClient !== null || showOrderDetails || paymentModalVisible || cancelModalVisible || editingOrder !== null;
       onModalStateChange(isAnyModalOpen);
     }
-  }, [showInvoiceModal, showCustomerModal, selectedClient, showOrderDetails, paymentModalVisible, cancelModalVisible, onModalStateChange]);
+  }, [showInvoiceModal, showCustomerModal, selectedClient, showOrderDetails, paymentModalVisible, cancelModalVisible, editingOrder, onModalStateChange]);
 
   const handleCloseOrderDetails = () => {
     setShowOrderDetails(false);
@@ -581,14 +588,13 @@ export default function GestionScreen({
       }
     };
 
-    // Délai de 2 secondes sur le spinner intégré du bouton pour une transition fluide
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
     if (isFinal) {
       if (showOrderDetails) {
         setShowOrderDetails(false);
         setSelectedOrder(null);
       }
+      // Délai pour laisser le spinner du bouton s'afficher avant l'animation de sortie
+      await new Promise((resolve) => setTimeout(resolve, 800));
       await triggerFinalStatusAnimation(order.id, nextStatus, performUpdate);
     } else {
       await performUpdate();
@@ -1609,33 +1615,60 @@ export default function GestionScreen({
                           return (
                             <View style={{ gap: 8, marginTop: 6, marginHorizontal: 2 }}>
                               {canValidate ? (
-                                <TouchableOpacity
-                                  onPress={(e) => {
-                                    e.stopPropagation();
-                                    handleValidateOrder(item);
-                                  }}
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: '#059669',
-                                    borderRadius: 14,
-                                    paddingVertical: 11,
-                                    paddingHorizontal: 16,
-                                    gap: 8,
-                                    shadowColor: '#059669',
-                                    shadowOffset: { width: 0, height: 3 },
-                                    shadowOpacity: 0.25,
-                                    shadowRadius: 8,
-                                    elevation: 4,
-                                  }}
-                                  activeOpacity={0.85}
-                                >
-                                  <CheckCircle size={16} color="#ffffff" strokeWidth={2.5} />
-                                  <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.4 }}>
-                                    VALIDER LA COMMANDE
-                                  </Text>
-                                </TouchableOpacity>
+                                <>
+                                  <TouchableOpacity
+                                    onPress={(e) => {
+                                      e.stopPropagation();
+                                      setEditingOrder(item);
+                                    }}
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.12)' : '#eff6ff',
+                                      borderColor: isDarkMode ? 'rgba(0, 44, 247, 0.35)' : '#bfdbfe',
+                                      borderWidth: 1.5,
+                                      borderRadius: 14,
+                                      paddingVertical: 10,
+                                      paddingHorizontal: 16,
+                                      gap: 8,
+                                    }}
+                                    activeOpacity={0.8}
+                                  >
+                                    <Edit3 size={15} color="#002cf7" strokeWidth={2.2} />
+                                    <Text style={{ color: '#002cf7', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>
+                                      MODIFIER LA COMMANDE
+                                    </Text>
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    onPress={(e) => {
+                                      e.stopPropagation();
+                                      handleValidateOrder(item);
+                                    }}
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      backgroundColor: '#059669',
+                                      borderRadius: 14,
+                                      paddingVertical: 11,
+                                      paddingHorizontal: 16,
+                                      gap: 8,
+                                      shadowColor: '#059669',
+                                      shadowOffset: { width: 0, height: 3 },
+                                      shadowOpacity: 0.25,
+                                      shadowRadius: 8,
+                                      elevation: 4,
+                                    }}
+                                    activeOpacity={0.85}
+                                  >
+                                    <CheckCircle size={16} color="#ffffff" strokeWidth={2.5} />
+                                    <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.4 }}>
+                                      VALIDER LA COMMANDE
+                                    </Text>
+                                  </TouchableOpacity>
+                                </>
                               ) : (
                                 <View style={{
                                   flexDirection: 'row',
@@ -1671,7 +1704,7 @@ export default function GestionScreen({
                                   isDarkMode={isDarkMode}
                                   disabled={!canLivrer}
                                   height={42}
-                                  minLoadingDuration={2000}
+                                  minLoadingDuration={1500}
                                   icon={<Truck size={16} color="#ffffff" />}
                                   loadingText="Préparation livraison..."
                                   completeLabel="Prêt pour livraison"
@@ -1686,7 +1719,7 @@ export default function GestionScreen({
                                   isDarkMode={isDarkMode}
                                   disabled={!canRecuperer}
                                   height={42}
-                                  minLoadingDuration={2000}
+                                  minLoadingDuration={1500}
                                   icon={<UserCheck size={16} color="#ffffff" />}
                                   loadingText="Validation retrait..."
                                   completeLabel="Remis au client"
@@ -1725,7 +1758,7 @@ export default function GestionScreen({
                               isDarkMode={isDarkMode}
                               disabled={!canTransition}
                               height={42}
-                              minLoadingDuration={2000}
+                              minLoadingDuration={1500}
                               icon={getNextStatusIcon(item.statut)}
                               loadingText={nextStyle.loadingText}
                               completeLabel={nextStyle.completeLabel}
@@ -2108,30 +2141,54 @@ export default function GestionScreen({
                     return (
                       <View style={{ gap: 10, marginTop: 20, marginBottom: 20 }}>
                         {canValidate ? (
-                          <TouchableOpacity
-                            onPress={() => handleValidateOrder(selectedOrder)}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: '#059669',
-                              borderRadius: 14,
-                              paddingVertical: 14,
-                              paddingHorizontal: 20,
-                              gap: 8,
-                              shadowColor: '#059669',
-                              shadowOffset: { width: 0, height: 4 },
-                              shadowOpacity: 0.3,
-                              shadowRadius: 10,
-                              elevation: 5,
-                            }}
-                            activeOpacity={0.85}
-                          >
-                            <CheckCircle size={18} color="#ffffff" strokeWidth={2.5} />
-                            <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 }}>
-                              VALIDER LA COMMANDE
-                            </Text>
-                          </TouchableOpacity>
+                          <>
+                            <TouchableOpacity
+                              onPress={() => setEditingOrder(selectedOrder)}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.12)' : '#eff6ff',
+                                borderColor: isDarkMode ? 'rgba(0, 44, 247, 0.35)' : '#bfdbfe',
+                                borderWidth: 1.5,
+                                borderRadius: 14,
+                                paddingVertical: 13,
+                                paddingHorizontal: 20,
+                                gap: 8,
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Edit3 size={17} color="#002cf7" strokeWidth={2.2} />
+                              <Text style={{ color: '#002cf7', fontSize: 14, fontWeight: '700', letterSpacing: 0.4 }}>
+                                MODIFIER LA COMMANDE
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              onPress={() => handleValidateOrder(selectedOrder)}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#059669',
+                                borderRadius: 14,
+                                paddingVertical: 14,
+                                paddingHorizontal: 20,
+                                gap: 8,
+                                shadowColor: '#059669',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 10,
+                                elevation: 5,
+                              }}
+                              activeOpacity={0.85}
+                            >
+                              <CheckCircle size={18} color="#ffffff" strokeWidth={2.5} />
+                              <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 }}>
+                                VALIDER LA COMMANDE
+                              </Text>
+                            </TouchableOpacity>
+                          </>
                         ) : (
                           <View style={{
                             flexDirection: 'row',
@@ -2168,7 +2225,7 @@ export default function GestionScreen({
                             isDarkMode={isDarkMode}
                             disabled={!canLivrer}
                             height={46}
-                            minLoadingDuration={2000}
+                            minLoadingDuration={1500}
                             icon={<Truck size={17} color="#ffffff" />}
                             loadingText="Préparation livraison..."
                             completeLabel="Prêt pour livraison"
@@ -2183,7 +2240,7 @@ export default function GestionScreen({
                             isDarkMode={isDarkMode}
                             disabled={!canRecuperer}
                             height={46}
-                            minLoadingDuration={2000}
+                            minLoadingDuration={1500}
                             icon={<UserCheck size={17} color="#ffffff" />}
                             loadingText="Validation retrait..."
                             completeLabel="Remis au client"
@@ -2221,7 +2278,7 @@ export default function GestionScreen({
                         isDarkMode={isDarkMode}
                         disabled={!canTransition}
                         height={46}
-                        minLoadingDuration={2000}
+                        minLoadingDuration={1500}
                         icon={getNextStatusIcon(selectedOrder.statut)}
                         loadingText={nextStyle.loadingText}
                         completeLabel={nextStyle.completeLabel}
@@ -2919,6 +2976,24 @@ export default function GestionScreen({
           </Modal.Container>
         </Modal.Backdrop>
       </Modal>
+
+      {/* MODAL MODIFICATION DE COMMANDE AVANT VALIDATION */}
+      {editingOrder && (
+        <OrderFormModal
+          key={`edit-order-${editingOrder.id}`}
+          visible={!!editingOrder}
+          orderToEdit={editingOrder}
+          onClose={() => setEditingOrder(null)}
+          onShowSuccess={(msg) => {
+            if (onShowSuccess) onShowSuccess(msg);
+            if (selectedOrder && selectedOrder.id === editingOrder.id) {
+              const fresh = (db.getOrders ? db.getOrders() : []).find(o => o.id === editingOrder.id);
+              if (fresh) setSelectedOrder(fresh);
+            }
+            setEditingOrder(null);
+          }}
+        />
+      )}
     </View>
   );
 }

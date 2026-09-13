@@ -73,6 +73,14 @@ function App() {
   const [dbReady, setDbReady] = useState(false);
   const [splashFinished, setSplashFinished] = useState(false);
 
+  // Sécurité absolue : garantir la disparition du splash screen après 3.5s au cas où
+  useEffect(() => {
+    const splashSafetyTimer = setTimeout(() => {
+      setSplashFinished(true);
+    }, 3500);
+    return () => clearTimeout(splashSafetyTimer);
+  }, []);
+
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('accueil');
   const [selectedOrder, setSelectedOrder] = useState(null);

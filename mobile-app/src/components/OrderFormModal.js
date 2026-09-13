@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Alert } from 'react-native';
 import { SmoothScrollView as ScrollView } from './SmoothScroll';
-import { X, Plus, ShoppingBag } from 'lucide-react-native';
+import { X, Plus, ShoppingBag, Edit3 } from 'lucide-react-native';
 import SafeBlurView from './SafeBlurView';
 const BlurView = SafeBlurView;
 import { MotiView } from './SafeView';
@@ -20,7 +20,7 @@ import { t } from '../services/i18n';
 import { sendOrderCreatedWhatsAppNotification } from '../utils/phoneUtils';
 import Modal, { ConfirmationModal } from './ui/modal';
 
-export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate }) {
+export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate, orderToEdit = null }) {
   const { isDarkMode, currentLang } = useDbState();
   const customers = db.getCustomers();
   const catalog = db.getCatalog();
@@ -47,6 +47,48 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate }) 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
   const isSubscriptionMode = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
 
+  // Sync state when editing an existing order
+  useEffect(() => {
+    if (visible && orderToEdit) {
+      setOrderClient(orderToEdit.customer_id || '');
+
+      const orderItems = orderToEdit.items || orderToEdit.articles || [];
+      const currentCatalog = catalog || (db.getCatalog ? db.getCatalog() : []);
+      const mappedArticles = orderItems.map((item, idx) => {
+        const catItem = currentCatalog.find(c =>
+          c.article === item.article &&
+          (c.service === item.service || (!c.service && !item.service))
+        );
+        return {
+          id: catItem ? catItem.id : (item.id || `order_item_${idx}_${item.article}_${item.service}`),
+          article: item.article,
+          service: item.service || 'lavage_simple',
+          quantity: Number(item.quantite || item.quantity || 1),
+          price: Number(item.prix !== undefined ? item.prix : (item.price !== undefined ? item.price : (catItem?.prix || 0)))
+        };
+      });
+      setSelectedArticles(mappedArticles);
+      setExpandedArticles([...new Set(mappedArticles.map(a => a.article))]);
+
+      const avanceVal = orderToEdit.avance_payee !== undefined ? orderToEdit.avance_payee : (orderToEdit.avance !== undefined ? orderToEdit.avance : '0');
+      setOrderAvance(String(avanceVal));
+
+      const rawMode = orderToEdit.mode_reglement || orderToEdit.mode_paiement || 'Espèce';
+      setOrderPaymentMethod(rawMode.toLowerCase().includes('mobile') ? 'Mobile Money' : 'Espèce');
+
+      setOrderDiscount(String(orderToEdit.remise_montant ?? '0'));
+      setOrderUrgency(orderToEdit.niveau_urgence || 'Normal');
+      setWithDelivery(Boolean(Number(orderToEdit.frais_livraison) > 0 || orderToEdit.with_delivery));
+      setWithPickup(Boolean(Number(orderToEdit.frais_recuperation) > 0 || orderToEdit.with_pickup));
+      setMomoRefNumber(orderToEdit.reference_momo || orderToEdit.reference_paiement || '');
+      setMomoOperator(orderToEdit.operateur_momo || 'MTN');
+      setPayWithSubscription(Boolean(orderToEdit.pay_with_subscription || orderToEdit.is_subscription_order));
+      setSubscribePlanId(orderToEdit.subscribe_plan_id || '');
+    } else if (visible && !orderToEdit) {
+      resetForm();
+    }
+  }, [visible, orderToEdit]);
+
   useEffect(() => {
     if (isSubscriptionMode) {
       setOrderAvance('0');
@@ -56,13 +98,15 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate }) 
   }, [isSubscriptionMode]);
 
   useEffect(() => {
-    if (activeCustomer && activeCustomer.active_subscription) {
-      setPayWithSubscription(true);
-    } else {
-      setPayWithSubscription(false);
+    if (!orderToEdit) {
+      if (activeCustomer && activeCustomer.active_subscription) {
+        setPayWithSubscription(true);
+      } else {
+        setPayWithSubscription(false);
+      }
+      setSubscribePlanId('');
     }
-    setSubscribePlanId('');
-  }, [orderClient]);
+  }, [orderClient, orderToEdit]);
 
   const resetForm = () => {
     setOrderClient('');
@@ -77,6 +121,11 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate }) 
   };
 
   const handleCancelOrder = () => {
+    if (orderToEdit) {
+      resetForm();
+      onClose();
+      return;
+    }
     const hasData = !!orderClient || selectedArticles.length > 0 || parseFloat(orderAvance) > 0 || parseInt(orderDiscount) > 0 || !!subscribePlanId;
     if (hasData) {
       setShowCancelConfirmModal(true);
@@ -229,6 +278,57 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate }) 
 
       const finalTotal = netTotal + deliveryFee + pickupFee;
 
+      if (orderToEdit) {
+        const updateData = {
+          customer_id: orderClient,
+          articles: selectedArticles.map(a => ({
+            article: a.article,
+            service: a.service,
+            quantite: a.quantity,
+            prix: a.price
+          })),
+          items: selectedArticles.map(a => ({
+            article: a.article,
+            service: a.service,
+            quantite: a.quantity,
+            prix: a.price
+          })),
+          total: finalTotal,
+          prix_total: finalTotal,
+          prix_base_avant_remise: currentTotal,
+          frais_livraison: deliveryFee,
+          frais_recuperation: pickupFee,
+          with_pickup: withPickup,
+          distance_km: Math.max(deliveryCalc.distanceKm || 0, pickupCalc.distanceKm || 0),
+          avance: finalAvance,
+          avance_payee: finalAvance,
+          mode_paiement: finalModeReglement,
+          mode_reglement: finalModeReglement,
+          niveau_urgence: orderUrgency,
+          remise_pourcentage: discountPercent,
+          remise_montant: discountAmountFCFA,
+          pay_with_subscription: payWithSubscription,
+          subscribe_plan_id: subscribePlanId,
+          reference_paiement: finalModeReglement === 'Mobile Money' ? momoRefNumber.trim() : null,
+          reference_momo: finalModeReglement === 'Mobile Money' ? momoRefNumber.trim() : null,
+          operateur_momo: finalModeReglement === 'Mobile Money' ? momoOperator : null
+        };
+
+        await db.updateOrder(orderToEdit.id, updateData);
+
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        setTimeout(() => {
+          resetForm();
+          onClose();
+          if (onShowSuccess) {
+            onShowSuccess("Commande modifiée avec succès !");
+          }
+        }, 500);
+
+        return true;
+      }
+
       const newOrder = {
         customer_id: orderClient,
         articles: selectedArticles.map(a => ({
@@ -305,11 +405,13 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate }) 
             <Modal.CloseTrigger onPress={handleCancelOrder} />
             <Modal.Header layout="row">
               <Modal.Icon variant="primary">
-                <ShoppingBag size={20} color="#002cf7" />
+                {orderToEdit ? <Edit3 size={20} color="#002cf7" /> : <ShoppingBag size={20} color="#002cf7" />}
               </Modal.Icon>
               <View style={{ flex: 1 }}>
-                <Modal.Heading>Nouvelle Commande</Modal.Heading>
-                <Modal.Description>Créer un ticket pressing / laverie</Modal.Description>
+                <Modal.Heading>{orderToEdit ? "Modifier la Commande" : "Nouvelle Commande"}</Modal.Heading>
+                <Modal.Description>
+                  {orderToEdit ? `Ticket #${orderToEdit.identifiant_unique_marquage || orderToEdit.id} • En attente de validation` : "Créer un ticket pressing / laverie"}
+                </Modal.Description>
               </View>
             </Modal.Header>
 
@@ -319,6 +421,26 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate }) 
                 contentContainerStyle={styles.compactModalScroll} 
                 showsVerticalScrollIndicator={false}
               >
+              {orderToEdit && (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#eff6ff',
+                  borderColor: isDarkMode ? 'rgba(0, 44, 247, 0.35)' : '#bfdbfe',
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  paddingVertical: 9,
+                  paddingHorizontal: 12,
+                  marginBottom: 12,
+                  gap: 8,
+                }}>
+                  <Edit3 size={15} color="#002cf7" />
+                  <Text style={{ flex: 1, fontSize: 12, fontWeight: '700', color: isDarkMode ? '#93c5fd' : '#1d4ed8' }}>
+                    Modification de la commande avant validation caisse
+                  </Text>
+                </View>
+              )}
+
               {/* Sélection du client */}
               <View style={{ zIndex: 30, elevation: 0, position: 'relative' }}>
                 <Text style={styles.formLabel}>Client</Text>
@@ -986,12 +1108,12 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate }) 
                     isDarkMode={isDarkMode}
                     height={48}
                     minLoadingDuration={2000}
-                    icon={<ShoppingBag size={18} color="#ffffff" />}
-                    loadingText="Création de la commande..."
-                    completeLabel="Commande enregistrée !"
+                    icon={orderToEdit ? <Edit3 size={18} color="#ffffff" /> : <ShoppingBag size={18} color="#ffffff" />}
+                    loadingText={orderToEdit ? "Enregistrement des modifications..." : "Création de la commande..."}
+                    completeLabel={orderToEdit ? "Modifications enregistrées !" : "Commande enregistrée !"}
                     onComplete={handleCreateOrder}
                   >
-                    Enregistrer la Commande
+                    {orderToEdit ? "Enregistrer les modifications" : "Enregistrer la Commande"}
                   </SlideActionButton>
                 </View>
               </View>
