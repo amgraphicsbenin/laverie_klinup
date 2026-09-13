@@ -39,7 +39,6 @@
         "projectId": "d135428c-fc03-49fe-92c9-fb0a9a86d7a2"
       }
     },
-    "owner": "amgraphicsbenin",
     "plugins": [
       "expo-asset",
       "expo-sharing",

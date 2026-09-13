@@ -35,11 +35,19 @@ const STRIP_BY_TABLE: Record<string, string[]> = {
   catalog: ['sku', 'prix_urgent', 'is_active'],
 };
 
+// Cache mémoire des colonnes absentes du schéma Supabase distant
+const knownMissingCols = new Set<string>();
+
 function sanitizePayload(table: string, data: any): any {
   if (!data) return data;
   const sanitized = { ...data };
   for (const col of STRIP_FROM_ALL) delete sanitized[col];
   for (const col of (STRIP_BY_TABLE[table] || [])) delete sanitized[col];
+  for (const key of Object.keys(sanitized)) {
+    if (knownMissingCols.has(`${table}:${key}`)) {
+      delete sanitized[key];
+    }
+  }
   return sanitized;
 }
 
@@ -88,12 +96,14 @@ export async function performMutation(
 
   console.error(`[KLIN UP DB] ❌ Erreur Supabase sur table '${table}' [${action}] :`, errCode, errMsg);
 
-  // Schema cache / missing column → iterative retry loop (up to 5 attempts)
+  // Schema cache / missing column → iterative retry loop
   let currentErrCode = errCode;
   let currentErrMsg = errMsg;
   let retriedData: Record<string, any> = { ...sanitizedData };
 
-  for (let attempt = 1; attempt <= 5; attempt++) {
+  const maxAttempts = Math.min(Math.max(Object.keys(retriedData).length + 2, 10), 25);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (
       currentErrCode === 'PGRST204' ||
       currentErrCode === '42703' ||
@@ -106,14 +116,19 @@ export async function performMutation(
                   || currentErrMsg.match(/column ([a-z0-9_]+)/i);
       const missingCol = match?.[1];
 
-      if (missingCol && Object.prototype.hasOwnProperty.call(retriedData, missingCol)) {
-        console.warn(`[KLIN UP DB] ⚠️ Colonne '${missingCol}' absente du schéma Supabase — retrait (essai ${attempt}).`);
+      if (missingCol) {
+        knownMissingCols.add(`${table}:${missingCol}`);
         delete retriedData[missingCol];
+        console.warn(`[KLIN UP DB] ⚠️ Colonne '${missingCol}' absente du schéma Supabase — retrait (essai ${attempt}).`);
       } else {
         const optionalCols = ['ville', 'responsable_id', 'responsable_nom', 'created_by_id', 'created_by_name',
                               'push_token', 'push_token_updated_at', 'motif_annulation', 'solde_paid_at',
-                              'reference_paiement', 'reference_momo', 'acompte_paid_at', 'operateur_momo'];
-        for (const col of optionalCols) delete retriedData[col];
+                              'reference_paiement', 'reference_momo', 'acompte_paid_at', 'operateur_momo',
+                              'cree_par_livreur', 'validee_par_caisse', 'created_by_role', 'validated_by_id', 'validated_by_name', 'validated_at'];
+        for (const col of optionalCols) {
+          knownMissingCols.add(`${table}:${col}`);
+          delete retriedData[col];
+        }
       }
 
       let retryRes: any;

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Modal, ScrollView, TextInput, Alert, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
+import { SmoothScrollView as ScrollView } from './SmoothScroll';
 import { Award, Gift, Sparkles, Star, Crown, ChevronRight, X, CheckCircle2, Zap, ArrowRight, ShieldCheck } from 'lucide-react-native';
+import { Modal, ConfirmationModal } from './ui/modal';
 import { getFidelityTier, getRewardCatalog, FIDELITY_TIERS, renderTierIcon, renderRewardIcon } from '../utils/fidelityUtils';
 import { db } from '../services/db';
 
@@ -14,6 +16,7 @@ export default function RewardFidelityCard({
   const [activeTab, setActiveTab] = useState('redeem'); // 'redeem' | 'adjust'
   const [pointsDeltaInput, setPointsDeltaInput] = useState('');
   const [reasonInput, setReasonInput] = useState('');
+  const [pendingRewardToRedeem, setPendingRewardToRedeem] = useState(null);
 
   if (!client) return null;
 
@@ -35,39 +38,28 @@ export default function RewardFidelityCard({
     setReasonInput('');
   };
 
-  const handleRedeem = async (reward) => {
+  const handleRedeem = (reward) => {
     if (pts < reward.cost) {
       Alert.alert("Points insuffisants", `Il vous manque ${reward.cost - pts} points pour débloquer cette récompense.`);
       return;
     }
+    setPendingRewardToRedeem(reward);
+  };
 
-    const confirmMsg = `Voulez-vous échanger ${reward.cost} points contre la récompense "${reward.title}" pour ${client.prenom} ${client.nom} ?`;
-
-    const executeRedeem = async () => {
-      try {
-        const updated = await db.redeemCustomerReward(client.id, reward.id, reward.title, reward.cost);
-        if (updated) {
-          if (onUpdateClient) onUpdateClient(updated);
-          if (onShowSuccess) onShowSuccess(`Récompense '${reward.title}' débloquée !`);
-          handleCloseModal();
-        }
-      } catch (err) {
-        Alert.alert("Erreur", err.message || "Impossible d'effectuer l'échange.");
+  const executeRedeem = async () => {
+    const reward = pendingRewardToRedeem;
+    setPendingRewardToRedeem(null);
+    if (!reward) return;
+    try {
+      const updated = await db.redeemCustomerReward(client.id, reward.id, reward.title, reward.cost);
+      if (updated) {
+        if (onUpdateClient) onUpdateClient(updated);
+        if (onShowSuccess) onShowSuccess(`Récompense '${reward.title}' débloquée !`);
+        handleCloseModal();
       }
-    };
-
-    Alert.alert(
-      "Confirmation d'échange",
-      confirmMsg,
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Échanger",
-          style: "default",
-          onPress: executeRedeem
-        }
-      ]
-    );
+    } catch (err) {
+      Alert.alert("Erreur", err.message || "Impossible d'effectuer l'échange.");
+    }
   };
 
   const handleApplyAdjustment = async (customDelta = null) => {
@@ -163,162 +155,180 @@ export default function RewardFidelityCard({
         </View>
       </View>
 
-      {/* MODAL GESTION RECOMPENSES & POINTS */}
+      {/* MODAL GESTION RECOMPENSES & POINTS (HEROUI MODAL) */}
       <Modal
-        visible={showRewardModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={handleCloseModal}
+        isOpen={showRewardModal}
+        onClose={handleCloseModal}
+        size="md"
+        isDarkMode={isDarkMode}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalBox, { backgroundColor: isDarkMode ? '#121212' : '#ffffff', borderColor: isDarkMode ? '#27272a' : 'transparent', borderWidth: isDarkMode ? 1 : 0 }]}>
-            
-            {/* MODAL HEADER */}
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Award size={20} color="#002cf7" />
-                <Text style={[styles.modalTitleText, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>
-                  Reward & Fidélité Client
-                </Text>
-              </View>
-              <TouchableOpacity onPress={handleCloseModal} style={styles.closeBtn}>
-                <X size={18} color={isDarkMode ? '#94a3b8' : '#64748b'} />
-              </TouchableOpacity>
-            </View>
-
-            {/* BALANCE HEADER */}
-            <View style={[styles.balanceCard, { backgroundColor: tier.bgLight, borderColor: tier.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                {renderTierIcon(tier.iconName, 22, tier.color)}
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#0f172a' }}>{client.prenom} {client.nom}</Text>
-                  <Text style={{ fontSize: 11, color: tier.color, fontWeight: '600' }}>{tier.title}</Text>
+        <Modal.Backdrop>
+          <Modal.Container size="md">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header layout="row">
+                <Modal.Icon variant="primary">
+                  <Award size={20} color="#002cf7" />
+                </Modal.Icon>
+                <View style={{ flex: 1 }}>
+                  <Modal.Heading>Reward & Fidélité Client</Modal.Heading>
+                  <Modal.Description>Gérer les points et récompenses</Modal.Description>
                 </View>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: tier.color }}>{pts} pts</Text>
-                <Text style={{ fontSize: 10, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Solde disponible</Text>
-              </View>
-            </View>
+              </Modal.Header>
 
-            {/* TABS NAVIGATION */}
-            <View style={[styles.tabRow, { backgroundColor: isDarkMode ? '#18181b' : 'rgba(0,0,0,0.04)' }]}>
-              <TouchableOpacity
-                style={[styles.tabItem, activeTab === 'redeem' && [styles.tabItemActive, isDarkMode && { backgroundColor: '#27272a' }]]}
-                onPress={() => setActiveTab('redeem')}
-              >
-                <Gift size={14} color={activeTab === 'redeem' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#a1a1aa' : '#64748b')} style={{ marginRight: 6 }} />
-                <Text style={[styles.tabText, isDarkMode && { color: '#a1a1aa' }, activeTab === 'redeem' && [styles.tabTextActive, isDarkMode && { color: '#38bdf8' }]]}>Récompenses ({rewardCatalog.length})</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.tabItem, activeTab === 'adjust' && [styles.tabItemActive, isDarkMode && { backgroundColor: '#27272a' }]]}
-                onPress={() => setActiveTab('adjust')}
-              >
-                <Zap size={14} color={activeTab === 'adjust' ? (isDarkMode ? '#38bdf8' : '#002cf7') : (isDarkMode ? '#a1a1aa' : '#64748b')} style={{ marginRight: 6 }} />
-                <Text style={[styles.tabText, isDarkMode && { color: '#a1a1aa' }, activeTab === 'adjust' && [styles.tabTextActive, isDarkMode && { color: '#38bdf8' }]]}>Ajuster Points</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* TAB CONTENT 1: REDEEM CATALOG */}
-            {activeTab === 'redeem' ? (
-              <ScrollView style={styles.catalogScroll} showsVerticalScrollIndicator={false}>
-                {rewardCatalog.map((reward) => {
-                  const canAfford = pts >= reward.cost;
-                  return (
-                    <View
-                      key={reward.id}
-                      style={[
-                        styles.rewardCard,
-                        {
-                          backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
-                          borderColor: canAfford ? (isDarkMode ? '#38bdf8' : '#3b82f6') : (isDarkMode ? '#27272a' : '#e2e8f0'),
-                          opacity: canAfford ? 1 : 0.75
-                        }
-                      ]}
-                    >
-                      <View style={[styles.rewardIconWrapper, { backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)' }]}>
-                        {renderRewardIcon(reward.iconName, 20, isDarkMode ? '#38bdf8' : '#002cf7')}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.rewardTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>{reward.title}</Text>
-                        <Text style={[styles.rewardDesc, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>{reward.description}</Text>
-                        <Text style={styles.rewardCostTag}>Coût : {reward.cost} points</Text>
-                      </View>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.claimBtn,
-                          { backgroundColor: canAfford ? '#002cf7' : '#94a3b8' }
-                        ]}
-                        disabled={!canAfford}
-                        onPress={() => handleRedeem(reward)}
-                      >
-                        <Text style={styles.claimBtnText}>
-                          {canAfford ? 'Échanger' : `-${reward.cost - pts} pts`}
-                        </Text>
-                      </TouchableOpacity>
+              <Modal.Body scrollable={false}>
+                {/* BALANCE HEADER */}
+                <View style={[styles.balanceCard, { backgroundColor: tier.bgLight, borderColor: tier.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {renderTierIcon(tier.iconName, 22, tier.color)}
+                    <View>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#0f172a' }}>{client.prenom} {client.nom}</Text>
+                      <Text style={{ fontSize: 11, color: tier.color, fontWeight: '600' }}>{tier.title}</Text>
                     </View>
-                  );
-                })}
-              </ScrollView>
-            ) : (
-              /* TAB CONTENT 2: ADJUST POINTS */
-              <ScrollView style={styles.catalogScroll} showsVerticalScrollIndicator={false}>
-                <Text style={[styles.adjustTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>Bonus Rapides :</Text>
-                <View style={styles.quickBonusRow}>
-                  {[10, 25, 50, 100].map((bonus) => (
-                    <TouchableOpacity
-                      key={bonus}
-                      style={[styles.quickBonusChip, isDarkMode && { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: 'rgba(56, 189, 248, 0.3)' }]}
-                      onPress={() => handleApplyAdjustment(bonus)}
-                    >
-                      <Text style={[styles.quickBonusText, isDarkMode && { color: '#38bdf8' }]}>+{bonus} pts</Text>
-                    </TouchableOpacity>
-                  ))}
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: tier.color }}>{pts} pts</Text>
+                    <Text style={{ fontSize: 10, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Solde disponible</Text>
+                  </View>
+                </View>
+
+                {/* TABS NAVIGATION */}
+                <View style={[styles.tabRow, { backgroundColor: isDarkMode ? '#18181b' : 'rgba(0,0,0,0.04)' }]}>
                   <TouchableOpacity
-                    style={[styles.quickBonusChip, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2', borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca' }]}
-                    onPress={() => handleApplyAdjustment(-20)}
+                    style={[styles.tabItem, activeTab === 'redeem' && [styles.tabItemActive, isDarkMode && { backgroundColor: '#27272a' }]]}
+                    onPress={() => setActiveTab('redeem')}
                   >
-                    <Text style={[styles.quickBonusText, { color: isDarkMode ? '#f87171' : '#dc2626' }]}>-20 pts</Text>
+                    <Gift size={14} color={activeTab === 'redeem' ? (isDarkMode ? '#ffffff' : '#002cf7') : (isDarkMode ? '#a1a1aa' : '#64748b')} style={{ marginRight: 6 }} />
+                    <Text style={[styles.tabText, activeTab === 'redeem' && [styles.tabTextActive, isDarkMode && { color: '#ffffff' }]]}>
+                      Catalogue Récompenses
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.tabItem, activeTab === 'adjust' && [styles.tabItemActive, isDarkMode && { backgroundColor: '#27272a' }]]}
+                    onPress={() => setActiveTab('adjust')}
+                  >
+                    <Zap size={14} color={activeTab === 'adjust' ? (isDarkMode ? '#ffffff' : '#002cf7') : (isDarkMode ? '#a1a1aa' : '#64748b')} style={{ marginRight: 6 }} />
+                    <Text style={[styles.tabText, activeTab === 'adjust' && [styles.tabTextActive, isDarkMode && { color: '#ffffff' }]]}>
+                      Ajuster Manuellement
+                    </Text>
                   </TouchableOpacity>
                 </View>
 
-                <View style={[styles.dividerLine, isDarkMode && { backgroundColor: '#27272a' }]} />
+                {activeTab === 'redeem' ? (
+                  <ScrollView style={{ maxHeight: 350 }} showsVerticalScrollIndicator={false}>
+                    <Text style={[styles.tabDesc, { color: isDarkMode ? '#a1a1aa' : '#64748b' }]}>
+                      Sélectionnez un avantage pour convertir les points de fidélité du client :
+                    </Text>
+                    <View style={{ gap: 10 }}>
+                      {rewardCatalog.map((reward) => {
+                        const canAfford = pts >= reward.cost;
+                        return (
+                          <View
+                            key={reward.id}
+                            style={[
+                              styles.rewardCard,
+                              {
+                                backgroundColor: isDarkMode ? '#18181b' : '#ffffff',
+                                borderColor: canAfford ? (isDarkMode ? '#3f3f46' : '#e2e8f0') : (isDarkMode ? '#27272a' : '#f1f5f9'),
+                                opacity: canAfford ? 1 : 0.65
+                              }
+                            ]}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                              <View style={[styles.rewardIconCircle, { backgroundColor: isDarkMode ? '#27272a' : '#f8fafc' }]}>
+                                {renderRewardIcon(reward.icon, 20, canAfford ? '#002cf7' : (isDarkMode ? '#71717a' : '#94a3b8'))}
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={[styles.rewardTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>{reward.title}</Text>
+                                <Text style={[styles.rewardDesc, { color: isDarkMode ? '#a1a1aa' : '#64748b' }]} numberOfLines={2}>{reward.description}</Text>
+                              </View>
+                            </View>
+                            <TouchableOpacity
+                              style={[
+                                styles.redeemActionBtn,
+                                { backgroundColor: canAfford ? '#002cf7' : (isDarkMode ? '#27272a' : '#e2e8f0') }
+                              ]}
+                              disabled={!canAfford}
+                              onPress={() => handleRedeem(reward)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={[styles.redeemActionBtnText, { color: canAfford ? '#ffffff' : (isDarkMode ? '#71717a' : '#94a3b8') }]}>
+                                {reward.cost} pts
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                ) : (
+                  <ScrollView style={{ maxHeight: 350 }} showsVerticalScrollIndicator={false}>
+                    <Text style={[styles.tabDesc, { color: isDarkMode ? '#a1a1aa' : '#64748b' }]}>
+                      Créditer ou débiter manuellement des points de fidélité :
+                    </Text>
 
-                <Text style={[styles.adjustTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>Ajustement Personnalisé :</Text>
-                <Text style={[styles.fieldLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>Nombre de points (positif ou négatif) :</Text>
-                <TextInput
-                  placeholder="Ex: 15 ou -10"
-                  placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
-                  keyboardType="numeric"
-                  value={pointsDeltaInput}
-                  onChangeText={setPointsDeltaInput}
-                  style={[styles.modalInput, { backgroundColor: isDarkMode ? '#09090b' : '#f1f5f9', borderColor: isDarkMode ? '#27272a' : '#e2e8f0', borderWidth: 1, color: isDarkMode ? '#ffffff' : '#0f172a' }]}
-                />
+                    {/* QUICK PILLS */}
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                      {[+10, +25, +50, -20].map((delta) => (
+                        <TouchableOpacity
+                          key={delta}
+                          style={[styles.quickDeltaPill, { backgroundColor: isDarkMode ? '#18181b' : '#f8fafc', borderColor: delta > 0 ? '#10b981' : '#ef4444' }]}
+                          onPress={() => setPointsDeltaInput(String(delta))}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: delta > 0 ? '#10b981' : '#ef4444' }}>
+                            {delta > 0 ? `+${delta}` : delta} pts
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
 
-                <Text style={[styles.fieldLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>Motif de l'opération :</Text>
-                <TextInput
-                  placeholder="Ex: Geste commercial, Bonus parrainage..."
-                  placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
-                  value={reasonInput}
-                  onChangeText={setReasonInput}
-                  style={[styles.modalInput, { backgroundColor: isDarkMode ? '#09090b' : '#f1f5f9', borderColor: isDarkMode ? '#27272a' : '#e2e8f0', borderWidth: 1, color: isDarkMode ? '#ffffff' : '#0f172a' }]}
-                />
+                    <Text style={[styles.inputLabel, { color: isDarkMode ? '#d4d4d8' : '#334155' }]}>Points à ajuster (ex: +25 ou -15)</Text>
+                    <TextInput
+                      placeholder="Nombre de points..."
+                      placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
+                      keyboardType="numeric"
+                      value={pointsDeltaInput}
+                      onChangeText={setPointsDeltaInput}
+                      style={[styles.modalInput, { backgroundColor: isDarkMode ? '#09090b' : '#f1f5f9', borderColor: isDarkMode ? '#27272a' : '#e2e8f0', borderWidth: 1, color: isDarkMode ? '#ffffff' : '#0f172a' }]}
+                    />
 
-                <TouchableOpacity
-                  style={styles.submitAdjustBtn}
-                  onPress={() => handleApplyAdjustment()}
-                >
-                  <Zap size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                  <Text style={styles.submitAdjustBtnText}>Valider l'ajustement</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
+                    <Text style={[styles.inputLabel, { color: isDarkMode ? '#d4d4d8' : '#334155', marginTop: 10 }]}>Motif de l'ajustement (optionnel)</Text>
+                    <TextInput
+                      placeholder="Ex: Geste commercial, régularisation..."
+                      placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
+                      value={reasonInput}
+                      onChangeText={setReasonInput}
+                      style={[styles.modalInput, { backgroundColor: isDarkMode ? '#09090b' : '#f1f5f9', borderColor: isDarkMode ? '#27272a' : '#e2e8f0', borderWidth: 1, color: isDarkMode ? '#ffffff' : '#0f172a' }]}
+                    />
 
-          </View>
-        </View>
+                    <TouchableOpacity
+                      style={styles.submitAdjustBtn}
+                      onPress={() => handleApplyAdjustment()}
+                    >
+                      <Zap size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                      <Text style={styles.submitAdjustBtnText}>Valider l'ajustement</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                )}
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
+
+      {/* CONFIRMATION MODAL : ÉCHANGE DE POINTS */}
+      <ConfirmationModal
+        visible={!!pendingRewardToRedeem}
+        onClose={() => setPendingRewardToRedeem(null)}
+        onConfirm={executeRedeem}
+        title="Confirmation d'échange"
+        description={pendingRewardToRedeem ? `Voulez-vous échanger ${pendingRewardToRedeem.cost} points contre la récompense "${pendingRewardToRedeem.title}" pour ${client.prenom} ${client.nom} ?` : ''}
+        variant="primary"
+        confirmText="Échanger"
+        cancelText="Annuler"
+        isDarkMode={isDarkMode}
+      />
     </>
   );
 }
@@ -434,7 +444,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 9999,
     paddingVertical: 10,
   },
   redeemBtnText: {
@@ -446,7 +456,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: 9999,
     borderWidth: 1,
   },
   adjustBtnText: {
@@ -459,8 +469,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   modalBox: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 393 : '100%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -492,7 +505,7 @@ const styles = StyleSheet.create({
   tabRow: {
     flexDirection: 'row',
     backgroundColor: 'rgba(0,0,0,0.04)',
-    borderRadius: 12,
+    borderRadius: 9999,
     padding: 3,
     marginBottom: 16,
   },
@@ -502,7 +515,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 9,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   tabItemActive: {
     backgroundColor: '#ffffff',
@@ -557,7 +570,7 @@ const styles = StyleSheet.create({
   claimBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   claimBtnText: {
     color: '#ffffff',
@@ -581,7 +594,7 @@ const styles = StyleSheet.create({
     borderColor: '#bfdbfe',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   quickBonusText: {
     color: '#1d4ed8',
@@ -607,7 +620,7 @@ const styles = StyleSheet.create({
   },
   submitAdjustBtn: {
     backgroundColor: '#002cf7',
-    borderRadius: 14,
+    borderRadius: 9999,
     paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'center',

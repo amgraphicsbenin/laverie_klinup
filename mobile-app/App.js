@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView, StatusBar as RNStatusBar, AppState, Modal } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Platform, BackHandler, ScrollView, StatusBar as RNStatusBar, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,6 +17,10 @@ const BlurView = SafeBlurView;
 import { MotiView } from './src/components/SafeView';
 import { OrderFormModal } from './src/components/OrderFormModal';
 import { registerAlertHandler } from './src/services/alert';
+import ActionTransitionOverlay, { ActionTransitionOverlay as ActionTransitionOverlayNamed } from './src/components/ActionTransitionOverlay';
+import { registerTransitionHandler } from './src/services/actionTransition';
+import { AlertModal } from './src/components/ui/modal';
+import SplashScreen from './src/components/SplashScreen';
 
 import FlaticonIcon from './src/components/FlaticonIcon';
 import { initSystemNotifications, savePushTokenToSupabase } from './src/services/notificationService';
@@ -60,13 +64,14 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-export default function App() {
+function App() {
 
   const dbState = useDbState();
   const currentUser = dbState.currentUser;
   const isDarkMode = dbState.isDarkMode;
 
   const [dbReady, setDbReady] = useState(false);
+  const [splashFinished, setSplashFinished] = useState(false);
 
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('accueil');
@@ -81,7 +86,13 @@ export default function App() {
   const [initSelectedClient, setInitSelectedClient] = useState(null);
   const [successToast, setSuccessToast] = useState({ visible: false, message: '' });
   const [customAlertState, setCustomAlertState] = useState({ visible: false, title: '', message: '', buttons: [] });
+  const [actionTransitionState, setActionTransitionState] = useState({ visible: false, phase: 'loading', message: '' });
   const [isSwipeDisabled, setIsSwipeDisabled] = useState(false);
+  const [homeAnimTrigger, setHomeAnimTrigger] = useState(0);
+  const [gestionAnimTrigger, setGestionAnimTrigger] = useState(0);
+  const [addAnimTrigger, setAddAnimTrigger] = useState(0);
+  const [historyAnimTrigger, setHistoryAnimTrigger] = useState(0);
+  const [profileAnimTrigger, setProfileAnimTrigger] = useState(0);
   const [, forceUpdate] = useState(0);
 
   const scrollViewRef = useRef(null);
@@ -93,9 +104,36 @@ export default function App() {
 
   const switchTab = (tabName, animated = false) => {
     setActiveTab(tabName);
+    if (tabName === 'accueil') setHomeAnimTrigger(c => c + 1);
+    else if (tabName === 'gestion') setGestionAnimTrigger(c => c + 1);
+    else if (tabName === 'creer_commande') setAddAnimTrigger(c => c + 1);
+    else if (tabName === 'historique') setHistoryAnimTrigger(c => c + 1);
+    else if (tabName === 'profile') setProfileAnimTrigger(c => c + 1);
+
     const targetIndex = availableTabs.indexOf(tabName);
-    if (targetIndex !== -1 && scrollViewRef.current && containerWidth > 0) {
-      scrollViewRef.current.scrollTo({ x: targetIndex * containerWidth, animated });
+    if (targetIndex !== -1 && containerWidth > 0) {
+      const targetX = targetIndex * containerWidth;
+      const doScroll = () => {
+        if (scrollViewRef.current) {
+          if (typeof scrollViewRef.current.scrollTo === 'function') {
+            scrollViewRef.current.scrollTo({ x: targetX, animated });
+          }
+          if (Platform.OS === 'web') {
+            try {
+              const node = typeof scrollViewRef.current.getScrollableNode === 'function'
+                ? scrollViewRef.current.getScrollableNode()
+                : scrollViewRef.current;
+              if (node) {
+                node.scrollLeft = targetX;
+              }
+            } catch (e) {}
+          }
+        }
+      };
+
+      doScroll();
+      setTimeout(doScroll, 40);
+      setTimeout(doScroll, 120);
     }
   };
 
@@ -118,10 +156,29 @@ export default function App() {
 
   useEffect(() => {
     const targetIndex = availableTabs.indexOf(activeTab);
-    if (targetIndex !== -1 && scrollViewRef.current && containerWidth > 0) {
-      scrollViewRef.current.scrollTo({ x: targetIndex * containerWidth, animated: false });
+    if (targetIndex !== -1 && containerWidth > 0) {
+      const targetX = targetIndex * containerWidth;
+      const doScroll = () => {
+        if (scrollViewRef.current) {
+          if (typeof scrollViewRef.current.scrollTo === 'function') {
+            scrollViewRef.current.scrollTo({ x: targetX, animated: false });
+          }
+          if (Platform.OS === 'web') {
+            try {
+              const node = typeof scrollViewRef.current.getScrollableNode === 'function'
+                ? scrollViewRef.current.getScrollableNode()
+                : scrollViewRef.current;
+              if (node) {
+                node.scrollLeft = targetX;
+              }
+            } catch (e) {}
+          }
+        }
+      };
+      doScroll();
+      setTimeout(doScroll, 50);
     }
-  }, [containerWidth, currentUser?.role]);
+  }, [activeTab, containerWidth, currentUser?.role]);
 
   useEffect(() => {
     registerAlertHandler(({ title, message, buttons }) => {
@@ -131,6 +188,9 @@ export default function App() {
         message: message || '',
         buttons: buttons && buttons.length > 0 ? buttons : [{ text: t('app.ok') }]
       });
+    });
+    registerTransitionHandler(({ visible, phase = 'loading', message }) => {
+      setActionTransitionState({ visible, phase, message });
     });
   }, []);
 
@@ -221,6 +281,21 @@ export default function App() {
   }, []);
 
 
+  const getAlertVariant = (title, message) => {
+    const t = (title || '').toLowerCase();
+    const m = (message || '').toLowerCase();
+    if (t.includes('erreur') || t.includes('fail') || t.includes('impossible') || m.includes('erreur') || m.includes('échoué') || t.includes('insuffisant') || t.includes('annul')) {
+      return 'danger';
+    }
+    if (t.includes('succès') || t.includes('success') || t.includes('confirme') || m.includes('succès') || t.includes('enregistré')) {
+      return 'success';
+    }
+    if (t.includes('attention') || t.includes('warning') || m.includes('attention') || t.includes('supprimer') || t.includes('résilier') || t.includes('confirmation')) {
+      return 'warning';
+    }
+    return 'primary';
+  };
+
   const getAlertIcon = (title, message) => {
     const t = (title || '').toLowerCase();
     const m = (message || '').toLowerCase();
@@ -254,6 +329,26 @@ export default function App() {
       savePushTokenToSupabase(currentUser.id, currentUser.store_id || 'store_central').catch(() => {});
     }
   }, [currentUser]);
+
+  // On web: ensure the custom alert modal portal is always topmost
+  useEffect(() => {
+    if (Platform.OS === 'web' && customAlertState?.visible) {
+      const timer = setTimeout(() => {
+        const portals = document.querySelectorAll('body > div');
+        if (portals.length > 0) {
+          const lastPortal = portals[portals.length - 1];
+          if (lastPortal) {
+            lastPortal.style.zIndex = '9999999';
+            const childDiv = lastPortal.firstElementChild;
+            if (childDiv) {
+              childDiv.style.zIndex = '9999999';
+            }
+          }
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [customAlertState?.visible]);
 
   // Handle native Android back gesture / hardware back button
   useEffect(() => {
@@ -372,8 +467,8 @@ export default function App() {
   const totalSlots = isAtelier ? 2 : 5;
   const tabBarInnerWidth = Math.max(100, containerWidth - 8);
   const slotWidth = tabBarInnerWidth / totalSlots;
-  const pillWidth = Math.min(46, slotWidth - 8);
-  const pillHeight = 28;
+  const pillWidth = Math.min(52, slotWidth - 6);
+  const pillHeight = 32;
   
   const getActiveSlotIndex = (tab) => {
     if (isAtelier) {
@@ -404,16 +499,11 @@ export default function App() {
         backgroundColor={isDarkMode ? '#000000' : '#ffffff'}
         translucent={Platform.OS === 'android'}
       />
-      {!dbReady ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#002cf7" />
-          <Text style={styles.loadingText}>Chargement</Text>
-          <Text style={styles.loadingSubtext}>Préparation de votre espace</Text>
-        </View>
-      ) : (!currentUser ? (
-        <LoginScreen />
-      ) : (
-        <View style={[styles.container, { backgroundColor: isDarkMode ? '#000000' : '#ffffff', paddingTop: insets.top }]}>
+      {dbReady && (
+        !currentUser ? (
+          <LoginScreen />
+        ) : (
+          <View style={[styles.container, { backgroundColor: isDarkMode ? '#000000' : '#ffffff', paddingTop: insets.top }]}>
           <View 
             style={styles.content}
             onLayout={(e) => {
@@ -427,16 +517,12 @@ export default function App() {
               ref={scrollViewRef}
               horizontal
               pagingEnabled={true}
-              nestedScrollEnabled={true}
               showsHorizontalScrollIndicator={false}
               bounces={false}
-              scrollEventThrottle={16}
-              onScroll={handleScroll}
-              onMomentumScrollEnd={handleMomentumScrollEnd}
               style={{ flex: 1 }}
               contentContainerStyle={{ width: containerWidth * availableTabs.length }}
               keyboardShouldPersistTaps="handled"
-              scrollEnabled={!isSwipeDisabled}
+              scrollEnabled={false}
             >
               {availableTabs.map((tabKey) => (
                 <View key={tabKey} style={{ width: containerWidth, flex: 1, overflow: 'hidden' }}>
@@ -450,7 +536,7 @@ export default function App() {
       <MotiView
         pointerEvents={isNavBarHidden ? 'none' : 'auto'}
         animate={{
-          translateY: isNavBarHidden ? 110 : 0,
+          translateY: isNavBarHidden ? 120 : 0,
           opacity: isNavBarHidden ? 0 : 1,
           scale: isNavBarHidden ? 0.95 : 1,
         }}
@@ -464,7 +550,7 @@ export default function App() {
           styles.tabBar,
           {
             paddingTop: 8,
-            paddingBottom: Math.max(10, insets.bottom),
+            paddingBottom: Math.max(12, insets.bottom),
             backgroundColor: '#002cf7',
           }
         ]}
@@ -484,7 +570,7 @@ export default function App() {
           style={{
             position: 'absolute',
             left: 4,
-            top: 11,
+            top: 10,
             width: pillWidth,
             height: pillHeight,
             borderRadius: 9999,
@@ -495,7 +581,12 @@ export default function App() {
         />
 
         <TouchableOpacity 
-          onPress={() => { switchTab('accueil'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+          onPress={() => {
+            switchTab('accueil');
+            setOrderFormVisible(false);
+            setLocalModalOpen(false);
+            setHomeAnimTrigger(c => c + 1);
+          }}
           style={[styles.tabItem, { zIndex: 1 }]}
           activeOpacity={0.8}
         >
@@ -504,7 +595,8 @@ export default function App() {
               <FlaticonIcon
                 name="accueil"
                 active={activeTab === 'accueil'}
-                size={20}
+                trigger={homeAnimTrigger}
+                size={24}
                 color={activeTab === 'accueil' ? '#002cf7' : '#ffffff'}
               />
             </View>
@@ -520,7 +612,12 @@ export default function App() {
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={() => { switchTab('gestion'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+            onPress={() => {
+              switchTab('gestion');
+              setOrderFormVisible(false);
+              setLocalModalOpen(false);
+              setGestionAnimTrigger(c => c + 1);
+            }}
             style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
@@ -529,7 +626,8 @@ export default function App() {
                 <FlaticonIcon
                   name="gestion"
                   active={activeTab === 'gestion'}
-                  size={20}
+                  trigger={gestionAnimTrigger}
+                  size={24}
                   color={activeTab === 'gestion' ? '#002cf7' : '#ffffff'}
                 />
               </View>
@@ -547,7 +645,12 @@ export default function App() {
         {/* Add Order Tab Button ("Ajouter" - Dedicated Page) */}
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={() => { switchTab('creer_commande'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+            onPress={() => {
+              switchTab('creer_commande');
+              setOrderFormVisible(false);
+              setLocalModalOpen(false);
+              setAddAnimTrigger(c => c + 1);
+            }}
             style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
@@ -556,7 +659,8 @@ export default function App() {
                 <FlaticonIcon
                   name="ajouter"
                   active={activeTab === 'creer_commande'}
-                  size={20}
+                  trigger={addAnimTrigger}
+                  size={24}
                   color={activeTab === 'creer_commande' ? '#002cf7' : '#ffffff'}
                 />
               </View>
@@ -573,7 +677,12 @@ export default function App() {
 
         {currentUser.role !== 'agent_lavage_repassage' && (
           <TouchableOpacity 
-            onPress={() => { switchTab('historique'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+            onPress={() => {
+              switchTab('historique');
+              setOrderFormVisible(false);
+              setLocalModalOpen(false);
+              setHistoryAnimTrigger(c => c + 1);
+            }}
             style={[styles.tabItem, { zIndex: 1 }]}
             activeOpacity={0.8}
           >
@@ -582,7 +691,8 @@ export default function App() {
                 <FlaticonIcon
                   name="historique"
                   active={activeTab === 'historique'}
-                  size={20}
+                  trigger={historyAnimTrigger}
+                  size={24}
                   color={activeTab === 'historique' ? '#002cf7' : '#ffffff'}
                 />
               </View>
@@ -598,7 +708,12 @@ export default function App() {
         )}
 
         <TouchableOpacity 
-          onPress={() => { switchTab('profile'); setOrderFormVisible(false); setLocalModalOpen(false); }}
+          onPress={() => {
+            switchTab('profile');
+            setOrderFormVisible(false);
+            setLocalModalOpen(false);
+            setProfileAnimTrigger(c => c + 1);
+          }}
           style={[styles.tabItem, { zIndex: 1 }]}
           activeOpacity={0.8}
         >
@@ -607,7 +722,8 @@ export default function App() {
                 <FlaticonIcon
                   name="profile"
                   active={activeTab === 'profile'}
-                  size={20}
+                  trigger={profileAnimTrigger}
+                  size={24}
                   color={activeTab === 'profile' ? '#002cf7' : '#ffffff'}
                 />
               </View>
@@ -621,7 +737,13 @@ export default function App() {
             </View>
         </TouchableOpacity>
       </MotiView>
-      <OrderFormModal key={orderFormKey} visible={orderFormVisible} onClose={() => setOrderFormVisible(false)} onShowSuccess={triggerSuccess} />
+      <OrderFormModal
+        key={orderFormKey}
+        visible={orderFormVisible}
+        onClose={() => setOrderFormVisible(false)}
+        onShowSuccess={triggerSuccess}
+        onNavigate={(tab) => switchTab(tab)}
+      />
 
         </View>
       ))}
@@ -655,145 +777,45 @@ export default function App() {
           </View>
         </MotiView>
       )}
+
       {/* GLOBAL CUSTOM PREMIUM ALERT MODAL */}
-      <Modal
+      <AlertModal
         visible={!!customAlertState.visible}
-        transparent={true}
-        animationType="fade"
-        statusBarTranslucent={true}
-        onRequestClose={() => {
-          if (customAlertState.buttons && customAlertState.buttons.length <= 1) {
+        onClose={() => {
+          if (!customAlertState.buttons || customAlertState.buttons.length <= 1) {
             setCustomAlertState(prev => ({ ...prev, visible: false }));
           }
         }}
-      >
-        <View
-          pointerEvents="auto"
-          style={[StyleSheet.absoluteFill, { zIndex: 999999, elevation: 999999, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
-        >
-          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => {
-            if (customAlertState.buttons && customAlertState.buttons.length <= 1) {
-              setCustomAlertState(prev => ({ ...prev, visible: false }));
-            }
-          }}>
-            <BlurView intensity={85} tint="dark" style={StyleSheet.absoluteFill} />
-          </TouchableOpacity>
-          
-          <View
-            style={{
-              backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-              borderRadius: 24,
-              borderWidth: 1,
-              borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
-              padding: 24,
-              width: '90%',
-              maxWidth: 340,
-              alignItems: 'center',
-              shadowColor: 'transparent',
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0,
-              shadowRadius: 0,
-              elevation: 0,
-            }}
-          >
-            {/* Alert Icon */}
-            {(() => {
-              const iconInfo = getAlertIcon(customAlertState.title, customAlertState.message);
-              return (
-                <View style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 28,
-                  backgroundColor: iconInfo.bg,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginBottom: 16,
-                }}>
-                  <MaterialCommunityIcons name={iconInfo.name} size={28} color={iconInfo.color} />
-                </View>
-              );
-            })()}
-            
-            {/* Title */}
-            <Text style={{
-              fontSize: 16,
-              fontWeight: '700',
-              color: isDarkMode ? '#ffffff' : '#09090b',
-              textAlign: 'center',
-              marginBottom: 10,
-            }}>
-              {customAlertState.title}
-            </Text>
-            
-            {/* Message */}
-            <Text style={{
-              fontSize: 13,
-              color: isDarkMode ? '#d4d4d8' : '#475569',
-              textAlign: 'center',
-              lineHeight: 18,
-              marginBottom: 24,
-            }}>
-              {customAlertState.message}
-            </Text>
-            
-            {/* Buttons Row */}
-            <View style={{
-              flexDirection: customAlertState.buttons && customAlertState.buttons.length > 2 ? 'column' : 'row',
-              gap: 10,
-              width: '100%',
-              justifyContent: 'center',
-            }}>
-              {customAlertState.buttons && customAlertState.buttons.map((btn, index) => {
-                const isDestructive = btn.style === 'destructive' || btn.text.toLowerCase() === 'supprimer' || btn.text.toLowerCase() === 'résilier';
-                const isCancel = btn.style === 'cancel' || btn.text.toLowerCase() === 'annuler' || btn.text.toLowerCase() === 'non';
-                
-                let btnBg = '#002cf7';
-                let textColor = '#ffffff';
-                let borderW = 0;
-                let borderC = 'transparent';
-                
-                if (isDestructive) {
-                  btnBg = '#ef4444';
-                } else if (isCancel) {
-                  btnBg = 'transparent';
-                  textColor = isDarkMode ? '#d4d4d8' : '#475569';
-                  borderW = 1.5;
-                  borderC = isDarkMode ? '#27272a' : '#e2e8f0';
-                }
-                
-                return (
-                  <TouchableOpacity
-                    key={btn.text}
-                    activeOpacity={0.8}
-                    onPress={() => handleButtonPress(btn)}
-                    style={{
-                      flex: customAlertState.buttons.length > 2 ? 0 : 1,
-                      height: 44,
-                      borderRadius: 14,
-                      backgroundColor: btnBg,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      borderWidth: borderW,
-                      borderColor: borderC,
-                      paddingHorizontal: 12,
-                      width: '100%',
-                    }}
-                  >
-                    <Text style={{
-                      fontSize: 13,
-                      fontWeight: '600',
-                      color: textColor,
-                    }}>
-                      {btn.text}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-      </Modal>
+        title={customAlertState.title}
+        message={customAlertState.message}
+        variant={getAlertVariant(customAlertState.title, customAlertState.message)}
+        buttons={customAlertState.buttons}
+        onButtonPress={handleButtonPress}
+        isDarkMode={isDarkMode}
+      />
 
+      {/* GLOBAL HEROUI ACTION TRANSITION OVERLAY (2 SECONDS SPINNER + SUCCESS CONFIRMATION) */}
+      {(() => {
+        const Overlay = ActionTransitionOverlay || ActionTransitionOverlayNamed;
+        if (!Overlay) return null;
+        return (
+          <Overlay
+            visible={actionTransitionState.visible}
+            phase={actionTransitionState.phase}
+            message={actionTransitionState.message}
+            isDarkMode={isDarkMode}
+          />
+        );
+      })()}
+
+      {/* Premium Animated Splash Screen Overlay */}
+      {!splashFinished && (
+        <SplashScreen
+          isReady={dbReady}
+          isDarkMode={isDarkMode}
+          onFinish={() => setSplashFinished(true)}
+        />
+      )}
 
     </View>
   );
@@ -818,7 +840,7 @@ const PHONE_W = 393;
 const PHONE_H = 852;
 
 const styles = StyleSheet.create({
-  // â”€â”€ Web-only phone frame wrapper â”€â”€
+  // ── Web-only phone frame wrapper ──
   webOuter: {
     flex: 1,
     height: '100vh',
@@ -896,10 +918,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     width: '100%',
-    height: 58,
+    height: 60,
   },
   tabIconWrapper: {
-    height: 34,
+    height: 36,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
@@ -924,13 +946,13 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   tabLabel: {
-    fontSize: 9,
+    fontSize: 10,
     color: '#ffffff',
-    marginTop: 2,
+    marginTop: 3,
     fontWeight: '600',
     textAlign: 'center',
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   tabLabelActive: {
     color: '#ffffff',
@@ -977,3 +999,12 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
 });
+
+
+export default function RootApp() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}

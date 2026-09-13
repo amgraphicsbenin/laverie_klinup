@@ -1,17 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Platform, Alert, Modal } from 'react-native';
-import { X, Plus } from 'lucide-react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Alert } from 'react-native';
+import { SmoothScrollView as ScrollView } from './SmoothScroll';
+import { X, Plus, ShoppingBag } from 'lucide-react-native';
 import SafeBlurView from './SafeBlurView';
 const BlurView = SafeBlurView;
 import { MotiView } from './SafeView';
 import { CustomSelect } from './CustomSelect';
+import { SlideActionButton } from './motion/slide-action-button';
+import {
+  AdaptiveStepper,
+  AdaptiveStepperDecrement,
+  AdaptiveStepperIncrement,
+  AdaptiveStepperValue,
+} from './motion/adaptive-stepper';
 import { db } from '../services/db';
 import { useTabBarHeight } from '../hooks/useTabBarHeight';
 import { useDbState } from '../hooks/useDbState';
 import { t } from '../services/i18n';
 import { sendOrderCreatedWhatsAppNotification } from '../utils/phoneUtils';
+import Modal, { ConfirmationModal } from './ui/modal';
 
-export function OrderFormModal({ visible, onClose, onShowSuccess }) {
+export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate }) {
   const { isDarkMode, currentLang } = useDbState();
   const customers = db.getCustomers();
   const catalog = db.getCatalog();
@@ -33,6 +42,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
   const [subscribePlanId, setSubscribePlanId] = useState('');
   const [withDelivery, setWithDelivery] = useState(false);
   const [withPickup, setWithPickup] = useState(false);
+  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
 
   const activeCustomer = orderClient ? customers.find(c => c.id === orderClient) : null;
   const isSubscriptionMode = (!!payWithSubscription || !!subscribePlanId) && activeCustomer && (!!activeCustomer.active_subscription || !!subscribePlanId);
@@ -69,21 +79,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
   const handleCancelOrder = () => {
     const hasData = !!orderClient || selectedArticles.length > 0 || parseFloat(orderAvance) > 0 || parseInt(orderDiscount) > 0 || !!subscribePlanId;
     if (hasData) {
-      Alert.alert(
-        "Confirmer l'annulation",
-        "Voulez-vous vraiment annuler la création de cette commande ? Toutes les informations saisies seront réinitialisées.",
-        [
-          { text: "Continuer l'édition", style: "cancel" },
-          { 
-            text: "Oui, annuler", 
-            style: "destructive", 
-            onPress: () => {
-              resetForm();
-              onClose();
-            } 
-          }
-        ]
-      );
+      setShowCancelConfirmModal(true);
     } else {
       resetForm();
       onClose();
@@ -134,6 +130,31 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
     }
   };
 
+  const setArticleQuantity = (item, quantity) => {
+    const qty = parseInt(quantity, 10);
+    if (isNaN(qty) || qty < 0) return;
+    if (qty === 0) {
+      setSelectedArticles(prev => prev.filter(a => a.id !== item.id));
+      return;
+    }
+    const clearedCart = selectedArticles.filter(a => !(a.article === item.article && a.service !== item.service));
+    const existingIdx = clearedCart.findIndex(a => a.id === item.id);
+    if (existingIdx !== -1) {
+      const copy = [...clearedCart];
+      copy[existingIdx].quantity = qty;
+      setSelectedArticles(copy);
+    } else {
+      setSelectedArticles([...clearedCart, {
+        id: item.id,
+        article: item.article,
+        service: item.service,
+        quantity: qty,
+        price: item.prix
+      }]);
+    }
+  };
+
+
   const formatPrice = (price) => {
     if (price === undefined || price === null) return '0 FCFA';
     return `${price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} FCFA`;
@@ -146,11 +167,11 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
   const handleCreateOrder = async () => {
     if (!orderClient) {
       Alert.alert("Erreur", "Veuillez sélectionner un client.");
-      return;
+      return false;
     }
     if (selectedArticles.length === 0) {
       Alert.alert("Erreur", "Veuillez ajouter au moins un article.");
-      return;
+      return false;
     }
 
     const totalClothes = selectedArticles.reduce((sum, item) => sum + item.quantity, 0);
@@ -161,7 +182,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
           "Solde insuffisant",
           `Le solde d'abonnement du client (${remaining} vêtements restants) est insuffisant pour cette commande (${totalClothes} vêtements). Veuillez renouveler l'abonnement ou payer par un autre mode.`
         );
-        return;
+        return false;
       }
     }
 
@@ -187,11 +208,11 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
           "Confirmation Mobile Money requise",
           "Veuillez saisir le numéro de référence de la transaction Mobile Money avant de valider."
         );
-        return;
+        return false;
       }
       if (!/^\d{8,15}$/.test(ref)) {
         setMomoRefError("Le numéro de référence doit contenir entre 8 et 15 chiffres.");
-        return;
+        return false;
       }
     }
 
@@ -242,14 +263,29 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
         sendOrderCreatedWhatsAppNotification(created || newOrder, targetCustomer);
       }
 
-      // Clean state
-      setOrderClient('');
-      setSelectedArticles([]);
-      resetForm();
-      onClose();
-      if (onShowSuccess) onShowSuccess("Commande créée avec succès !");
+      // Délai de 2 secondes sur le spinner intégré du bouton
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      setTimeout(() => {
+        // Clean state
+        setOrderClient('');
+        setSelectedArticles([]);
+        resetForm();
+        onClose();
+        if (onNavigate) onNavigate('gestion');
+        if (onShowSuccess) {
+          if (currentUser?.role === 'livreur') {
+            onShowSuccess("Commande enregistrée ! En attente de validation par la caisse.");
+          } else {
+            onShowSuccess("Commande créée avec succès !");
+          }
+        }
+      }, 700);
+
+      return true;
     } catch (e) {
       Alert.alert("Erreur", e.message || "Impossible de créer la commande.");
+      return false;
     }
   };
 
@@ -258,45 +294,33 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
   return (
     <Modal
       visible={visible}
-      transparent={true}
-      animationType="none"
-      onRequestClose={onClose}
+      onClose={handleCancelOrder}
+      size="cover"
+      isDarkMode={isDarkMode}
+      closeOnBackdropPress={false}
     >
-      <MotiView
-        animate={{
-          opacity: visible ? 1 : 0
-        }}
-        transition={{ type: 'timing', duration: 120 }}
-        style={StyleSheet.absoluteFill}
-      >
-      <View style={styles.absoluteModalContainer}>
-        <View style={styles.compactModalOverlay}>
-          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
-            <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-          </TouchableOpacity>
-          <MotiView
-            animate={{
-              opacity: visible ? 1 : 0,
-              scale: visible ? 1 : 0.9,
-              translateY: visible ? 0 : 40
-            }}
-            transition={{ type: 'spring', damping: 15, mass: 0.8 }}
-            style={[styles.compactModalView, { maxHeight: '90%' }]}
-          >
-            <View style={styles.compactModalHeader}>
-              <Text style={styles.compactModalTitle}>Nouvelle Commande</Text>
-              <TouchableOpacity onPress={handleCancelOrder}>
-                <X size={20} color="#71717a" />
-              </TouchableOpacity>
-            </View>
+      <Modal.Backdrop closeOnPress={false}>
+        <Modal.Container size="cover">
+          <Modal.Dialog style={{ maxHeight: '92%' }}>
+            <Modal.CloseTrigger onPress={handleCancelOrder} />
+            <Modal.Header layout="row">
+              <Modal.Icon variant="primary">
+                <ShoppingBag size={20} color="#002cf7" />
+              </Modal.Icon>
+              <View style={{ flex: 1 }}>
+                <Modal.Heading>Nouvelle Commande</Modal.Heading>
+                <Modal.Description>Créer un ticket pressing / laverie</Modal.Description>
+              </View>
+            </Modal.Header>
 
-            <ScrollView 
-              style={{ flexShrink: 1, width: '100%' }}
-              contentContainerStyle={styles.compactModalScroll} 
-              showsVerticalScrollIndicator={false}
-            >
+            <Modal.Body scrollable={false} style={{ flexShrink: 1, paddingVertical: 4 }}>
+              <ScrollView 
+                style={{ flexShrink: 1, width: '100%' }}
+                contentContainerStyle={styles.compactModalScroll} 
+                showsVerticalScrollIndicator={false}
+              >
               {/* Sélection du client */}
-              <View style={{ zIndex: 30, elevation: 30, position: 'relative' }}>
+              <View style={{ zIndex: 30, elevation: 0, position: 'relative' }}>
                 <Text style={styles.formLabel}>Client</Text>
                 <CustomSelect
                   value={orderClient}
@@ -489,25 +513,20 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                                       <Text style={styles.serviceLabel}>{serviceLabel}</Text>
                                       <Text style={styles.servicePrice}>{formatPrice(item.prix)}</Text>
                                     </View>
-                                    {qty === 0 ? (
-                                      <TouchableOpacity 
-                                        onPress={() => addArticleToOrder(item)}
-                                        style={styles.serviceAddBtn}
-                                      >
-                                        <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                                        <Text style={styles.serviceAddBtnText}>Ajouter</Text>
-                                      </TouchableOpacity>
-                                    ) : (
-                                      <View style={styles.serviceQtyRow}>
-                                        <TouchableOpacity onPress={() => removeArticleFromOrder(item.id)} style={styles.serviceQtyBtn}>
-                                          <Text style={styles.serviceQtyBtnText}>-</Text>
-                                        </TouchableOpacity>
-                                        <Text style={styles.serviceQtyText}>{qty}</Text>
-                                        <TouchableOpacity onPress={() => addArticleToOrder(item)} style={styles.serviceQtyBtn}>
-                                          <Text style={styles.serviceQtyBtnText}>+</Text>
-                                        </TouchableOpacity>
-                                      </View>
-                                    )}
+                                    <AdaptiveStepper
+                                      value={qty}
+                                      min={0}
+                                      max={99}
+                                      isDarkMode={isDarkMode}
+                                      onValueChange={(newQty) => {
+                                        setArticleQuantity(item, newQty);
+                                      }}
+                                      aria-label={`Quantité de ${articleName} - ${serviceLabel}`}
+                                    >
+                                      <AdaptiveStepperDecrement />
+                                      <AdaptiveStepperValue />
+                                      <AdaptiveStepperIncrement />
+                                    </AdaptiveStepper>
                                   </View>
                                 );
                               })}
@@ -569,7 +588,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                 </View>
                 <TouchableOpacity
                   onPress={() => setWithDelivery(!withDelivery)}
-                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: withDelivery ? '#3b82f6' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9999, backgroundColor: withDelivery ? '#3b82f6' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
                   activeOpacity={0.8}
                 >
                   <Text style={{ fontSize: 13, fontWeight: '700', color: withDelivery ? '#ffffff' : (isDarkMode ? '#a1a1aa' : '#64748b') }}>
@@ -592,7 +611,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                 </View>
                 <TouchableOpacity
                   onPress={() => setWithPickup(!withPickup)}
-                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: withPickup ? '#10b981' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9999, backgroundColor: withPickup ? '#10b981' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
                   activeOpacity={0.8}
                 >
                   <Text style={{ fontSize: 13, fontWeight: '700', color: withPickup ? '#ffffff' : (isDarkMode ? '#a1a1aa' : '#64748b') }}>
@@ -602,7 +621,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
               </View>
 
               {/* Avance et Mode de règlement (same line) */}
-              <View style={[styles.formRowInline, { zIndex: 20, elevation: 20 }]}>
+              <View style={[styles.formRowInline, { zIndex: 20, elevation: 0 }]}>
                 <View style={styles.formFieldInline}>
                   <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
                     Avance (FCFA)
@@ -623,7 +642,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                     ]}
                   />
                 </View>
-                <View style={[styles.formFieldInline, { zIndex: 20, elevation: 20 }]}>
+                <View style={[styles.formFieldInline, { zIndex: 20, elevation: 0 }]}>
                   <Text style={styles.formLabel}>Mode Règlement</Text>
                   <CustomSelect
                     value={orderPaymentMethod}
@@ -654,7 +673,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                       style={{
                         flex: 1,
                         paddingVertical: 10,
-                        borderRadius: 10,
+                        borderRadius: 9999,
                         borderWidth: momoOperator === op ? 2 : 1.5,
                         borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
                         backgroundColor: momoOperator === op
@@ -939,36 +958,65 @@ export function OrderFormModal({ visible, onClose, onShowSuccess }) {
                 );
               })()}
 
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 }}>
                 <TouchableOpacity
                   onPress={handleCancelOrder}
-                  style={[
-                    styles.submitOrderBtn,
-                    {
-                      flex: 1,
-                      backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? '#27272a' : '#cbd5e1',
-                    }
-                  ]}
+                  style={{
+                    flex: 1,
+                    backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? '#27272a' : '#cbd5e1',
+                    height: 48,
+                    borderRadius: 9999,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: 0,
+                    marginTop: 0,
+                    marginBottom: 0,
+                  }}
                 >
-                  <Text style={[styles.submitOrderBtnText, { color: isDarkMode ? '#e4e4e7' : '#475569' }]}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#e4e4e7' : '#475569' }}>
                     Annuler
                   </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={handleCreateOrder}
-                  style={[styles.submitOrderBtn, { flex: 2 }]}
-                >
-                  <Text style={styles.submitOrderBtnText}>Enregistrer la Commande</Text>
-                </TouchableOpacity>
+                <View style={{ flex: 2, height: 48, justifyContent: 'center' }}>
+                  <SlideActionButton
+                    color="#002cf7"
+                    isDarkMode={isDarkMode}
+                    height={48}
+                    minLoadingDuration={2000}
+                    icon={<ShoppingBag size={18} color="#ffffff" />}
+                    loadingText="Création de la commande..."
+                    completeLabel="Commande enregistrée !"
+                    onComplete={handleCreateOrder}
+                  >
+                    Enregistrer la Commande
+                  </SlideActionButton>
+                </View>
               </View>
             </ScrollView>
-          </MotiView>
-        </View>
-      </View>
-    </MotiView>
+          </Modal.Body>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
+
+    {/* CONFIRMATION MODAL : ANNULATION DE LA CRÉATION */}
+    <ConfirmationModal
+      visible={showCancelConfirmModal}
+      onClose={() => setShowCancelConfirmModal(false)}
+      onConfirm={() => {
+        setShowCancelConfirmModal(false);
+        resetForm();
+        onClose();
+      }}
+      title="Confirmer l'annulation"
+      description="Voulez-vous vraiment annuler la création de cette commande ? Toutes les informations saisies seront réinitialisées."
+      variant="danger"
+      confirmText="Oui, annuler"
+      cancelText="Continuer l'édition"
+      isDarkMode={isDarkMode}
+    />
     </Modal>
   );
 }
@@ -985,7 +1033,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(241, 245, 249, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     padding: 16,
   },
   compactModalView: {
@@ -1000,7 +1048,7 @@ const baseStyles = StyleSheet.create({
     shadowRadius: 0,
     elevation: 0,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#e4e4e7',
     overflow: 'hidden',
   },
   compactModalHeader: {
@@ -1041,15 +1089,16 @@ const baseStyles = StyleSheet.create({
   },
   submitOrderBtn: {
     backgroundColor: '#2563eb',
-    borderRadius: 16,
+    borderRadius: 9999,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 10,
+    marginTop: 0,
+    marginBottom: 0,
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0,
     shadowRadius: 0,
+    elevation: 0,
   },
   submitOrderBtnText: {
     color: '#ffffff',
@@ -1063,6 +1112,11 @@ const baseStyles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginVertical: 14,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   receiptRow: {
     flexDirection: 'row',
@@ -1109,7 +1163,7 @@ const baseStyles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 9999,
     backgroundColor: '#ffffff',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
@@ -1197,7 +1251,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: 'rgba(0, 44, 247, 0.06)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   clothingAddBtnText: {
     fontSize: 11,
@@ -1208,7 +1262,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   clothingCloseBtnText: {
     fontSize: 11,
@@ -1247,7 +1301,7 @@ const baseStyles = StyleSheet.create({
     borderColor: 'rgba(0, 44, 247, 0.1)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 9999,
   },
   serviceAddBtnText: {
     fontSize: 10,
@@ -1290,7 +1344,7 @@ const baseStyles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 8,
     zIndex: 10,
-    elevation: 10,
+    elevation: 0,
   },
   subCard: {
     backgroundColor: 'rgba(0, 44, 247, 0.04)',
@@ -1299,7 +1353,11 @@ const baseStyles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     zIndex: 10,
-    elevation: 10,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   subHeaderRow: {
     flexDirection: 'row',
@@ -1376,7 +1434,7 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
-    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
     compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
     compactModalTitle: { color: '#ffffff' },
     modalLabel: { color: '#d4d4d8' },

@@ -9,10 +9,10 @@ import {
   Modal, 
   View, 
   Text, 
-  ScrollView, 
   TouchableOpacity, 
   StyleSheet 
 } from 'react-native';
+import { SmoothScrollView as ScrollView } from '../../../components/SmoothScroll';
 import { X, Download, Printer } from 'lucide-react-native';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
@@ -96,9 +96,7 @@ export default function InvoiceModal({
             activeOpacity={1} 
             style={StyleSheet.absoluteFill} 
             onPress={onClose}
-          >
-            <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-          </TouchableOpacity>
+          />
           
           <View style={styles.popupModalView}>
             <View style={styles.compactModalHeader}>

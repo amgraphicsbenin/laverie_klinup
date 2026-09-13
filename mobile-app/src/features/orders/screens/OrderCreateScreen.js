@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Platform, Alert, RefreshControl } from 'react-native';
-import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus, Gift, MapPin } from 'lucide-react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Alert, RefreshControl } from 'react-native';
+import { SmoothScrollView as ScrollView } from '../../../components/SmoothScroll';
+import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus, Gift, MapPin, UserCheck } from 'lucide-react-native';
 import { CustomSelect } from '../../../components/CustomSelect';
+import { SlideActionButton } from '../../../components/motion/slide-action-button';
+import {
+  AdaptiveStepper,
+  AdaptiveStepperDecrement,
+  AdaptiveStepperIncrement,
+  AdaptiveStepperValue,
+} from '../../../components/motion/adaptive-stepper';
 import { db } from '../../../services/db';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
@@ -230,11 +238,11 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
   const handleCreateOrder = async () => {
     if (!orderClient) {
       Alert.alert("Champ requis", "Veuillez sélectionner un client.");
-      return;
+      return false;
     }
     if (selectedArticles.length === 0) {
       Alert.alert("Articles requis", "Veuillez ajouter au moins un vêtement.");
-      return;
+      return false;
     }
 
     const totalClothes = selectedArticles.reduce((sum, item) => sum + item.quantity, 0);
@@ -245,7 +253,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
           "Solde d'abonnement insuffisant",
           `Le solde du client (${remaining} vêtements) est insuffisant pour cette commande (${totalClothes} vêtements).`
         );
-        return;
+        return false;
       }
     }
 
@@ -263,11 +271,11 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
       const ref = momoRefNumber.trim();
       if (!ref) {
         setMomoRefError("Numéro de référence Mobile Money requis.");
-        return;
+        return false;
       }
       if (!/^\d{8,15}$/.test(ref)) {
         setMomoRefError("Le numéro de référence doit contenir entre 8 et 15 chiffres.");
-        return;
+        return false;
       }
     }
 
@@ -346,6 +354,9 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         sendOrderCreatedWhatsAppNotification(created || newOrder, targetCustomer);
       }
 
+      // Délai de 2 secondes sur le spinner intégré du bouton
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       // Clean state
       setOrderClient('');
       setSelectedArticles([]);
@@ -362,26 +373,43 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
       setMomoRefError('');
       setMomoOperator('MTN');
 
-      if (onShowSuccess) onShowSuccess("Commande créée avec succès !");
-      if (onNavigate) onNavigate('gestion');
+      if (Platform.OS === 'web' && typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+
+      setTimeout(() => {
+        if (onShowSuccess) {
+          if (currentUser?.role === 'livreur') {
+            onShowSuccess("Commande enregistrée ! En attente de validation par la caisse.");
+          } else {
+            onShowSuccess("Commande créée avec succès !");
+          }
+        }
+        if (onNavigate) {
+          onNavigate('gestion');
+        }
+      }, 700);
+
+      return true;
     } catch (e) {
       Alert.alert("Erreur", e.message || "Impossible de créer la commande.");
+      return false;
     }
   };
 
   const handleCreateClient = async () => {
     if (!clientPrenom.trim() || !clientNom.trim()) {
       Alert.alert("Champs requis", "Veuillez saisir le prénom et le nom du client.");
-      return;
+      return false;
     }
     if (!clientTelephone.trim()) {
       Alert.alert('Erreur', 'Veuillez saisir le numéro de téléphone.');
-      return;
+      return false;
     }
 
     if (!validatePhoneNumber(clientTelephone, clientIndicatif)) {
       Alert.alert("Erreur", "Le format du numéro de téléphone n'est pas valide pour l'indicatif choisi.");
-      return;
+      return false;
     }
 
     try {
@@ -410,6 +438,9 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         await db.subscribeCustomer(newCustomer.id, clientSubscriptionPlanId);
       }
 
+      // Délai de 2 secondes sur le spinner intégré du bouton
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       // Clear new client form state
       setClientPrenom('');
       setClientNom('');
@@ -423,15 +454,18 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
       setClientPrefPliage('Plié');
       setClientSubscriptionPlanId('');
       setClientStoreId(currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : '');
-      setClientSubscriptionPlanId('');
 
-      if (onShowSuccess) onShowSuccess(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès !`);
+      setTimeout(() => {
+        if (onShowSuccess) onShowSuccess(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès !`);
+        // Auto-select the newly created client and switch back to Order Creation form!
+        setOrderClient(newCustomer.id);
+        setActiveMode('commande');
+      }, 700);
 
-      // Auto-select the newly created client and switch back to Order Creation form!
-      setOrderClient(newCustomer.id);
-      setActiveMode('commande');
+      return true;
     } catch (e) {
       Alert.alert("Erreur", e.message || "Impossible de créer le client.");
+      return false;
     }
   };
 
@@ -649,7 +683,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
                   justifyContent: 'center',
                   paddingVertical: 10,
                   paddingHorizontal: 14,
-                  borderRadius: 10,
+                  borderRadius: 9999,
                   marginTop: 6,
                   backgroundColor: '#002cf7'
                 }}
@@ -750,13 +784,19 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
             </ScrollView>
           </View>
 
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={handleCreateClient}
-            style={styles.submitBtn}
+          <SlideActionButton
+            color="#002cf7"
+            isDarkMode={isDarkMode}
+            height={48}
+            minLoadingDuration={2000}
+            icon={<UserCheck size={18} color="#ffffff" />}
+            loadingText="Création du profil..."
+            completeLabel="Client enregistré !"
+            onComplete={handleCreateClient}
+            style={{ marginTop: 16, marginBottom: 12 }}
           >
-            <Text style={styles.submitBtnText}>Enregistrer le Client</Text>
-          </TouchableOpacity>
+            Enregistrer le Client
+          </SlideActionButton>
         </ScrollView>
       ) : (
         /* PAGE 1: NOUVELLE COMMANDE */
@@ -766,7 +806,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
           keyboardShouldPersistTaps="handled"
         >
           {/* Step 1: Sélection du Client */}
-          <View style={[styles.cardSection, { zIndex: 30, elevation: 30 }]}>
+          <View style={[styles.cardSection, { zIndex: 30, elevation: 0 }]}>
             <View style={styles.sectionHeader}>
               <User size={16} color="#002cf7" />
               <Text style={styles.sectionTitle}>1. Client & Abonnement</Text>
@@ -845,7 +885,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
           </View>
 
           {/* Step 2: Vêtements & Prestations */}
-          <View style={[styles.cardSection, { zIndex: 20, elevation: 20 }]}>
+          <View style={[styles.cardSection, { zIndex: 20, elevation: 0 }]}>
             <View style={styles.sectionHeader}>
               <ShoppingBag size={16} color="#002cf7" />
               <Text style={styles.sectionTitle}>2. Sélection des Vêtements</Text>
@@ -943,54 +983,20 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
                                     <Text style={styles.serviceLabel}>{serviceLabel}</Text>
                                     <Text style={styles.servicePrice}>{formatPrice(item.prix)}</Text>
                                   </View>
-                                  {qty === 0 ? (
-                                    <TouchableOpacity
-                                      onPress={() => addArticleToOrder(item)}
-                                      style={styles.serviceAddBtn}
-                                    >
-                                      <Plus size={12} color="#002cf7" style={{ marginRight: 4 }} />
-                                      <Text style={styles.serviceAddBtnText}>Ajouter</Text>
-                                    </TouchableOpacity>
-                                  ) : (
-                                    <View style={[styles.serviceQtyRow, { gap: 6 }]}>
-                                      <TextInput
-                                        keyboardType="numeric"
-                                        value={editQtys[item.id] !== undefined ? editQtys[item.id] : qty.toString()}
-                                        onChangeText={(val) => setEditQtys({...editQtys, [item.id]: val})}
-                                        style={{
-                                          width: 46,
-                                          height: 30,
-                                          borderRadius: 6,
-                                          borderWidth: 1,
-                                          borderColor: '#d4d4d8',
-                                          textAlign: 'center',
-                                          fontSize: 14,
-                                          fontWeight: '600',
-                                          backgroundColor: '#ffffff',
-                                          padding: 0
-                                        }}
-                                      />
-                                      <TouchableOpacity
-                                        onPress={() => {
-                                          const val = editQtys[item.id] !== undefined ? editQtys[item.id] : qty;
-                                          setArticleQuantity(item, val);
-                                          const newEdits = {...editQtys};
-                                          delete newEdits[item.id];
-                                          setEditQtys(newEdits);
-                                        }}
-                                        style={{
-                                          width: 30,
-                                          height: 30,
-                                          borderRadius: 6,
-                                          backgroundColor: '#10b981',
-                                          alignItems: 'center',
-                                          justifyContent: 'center'
-                                        }}
-                                      >
-                                        <Check size={16} color="#ffffff" />
-                                      </TouchableOpacity>
-                                    </View>
-                                  )}
+                                  <AdaptiveStepper
+                                    value={qty}
+                                    min={0}
+                                    max={99}
+                                    isDarkMode={isDarkMode}
+                                    onValueChange={(newQty) => {
+                                      setArticleQuantity(item, newQty);
+                                    }}
+                                    aria-label={`Quantité de ${articleName} - ${serviceLabel}`}
+                                  >
+                                    <AdaptiveStepperDecrement />
+                                    <AdaptiveStepperValue />
+                                    <AdaptiveStepperIncrement />
+                                  </AdaptiveStepper>
                                 </View>
                               );
                             })}
@@ -1005,7 +1011,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
           </View>
 
           {/* Step 3: Options & Paiement */}
-          <View style={[styles.cardSection, { zIndex: 10, elevation: 10 }]}>
+          <View style={[styles.cardSection, { zIndex: 10, elevation: 0 }]}>
             <View style={styles.sectionHeader}>
               <Sparkles size={16} color="#002cf7" />
               <Text style={styles.sectionTitle}>3. Options & Paiement</Text>
@@ -1060,7 +1066,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               </View>
               <TouchableOpacity
                 onPress={() => setWithDelivery(!withDelivery)}
-                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: withDelivery ? '#3b82f6' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9999, backgroundColor: withDelivery ? '#3b82f6' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
                 activeOpacity={0.8}
               >
                 <Text style={{ fontSize: 13, fontWeight: '700', color: withDelivery ? '#ffffff' : (isDarkMode ? '#a1a1aa' : '#64748b') }}>
@@ -1083,7 +1089,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               </View>
               <TouchableOpacity
                 onPress={() => setWithPickup(!withPickup)}
-                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: withPickup ? '#8b5cf6' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9999, backgroundColor: withPickup ? '#8b5cf6' : (isDarkMode ? '#27272a' : '#e2e8f0') }}
                 activeOpacity={0.8}
               >
                 <Text style={{ fontSize: 13, fontWeight: '700', color: withPickup ? '#ffffff' : (isDarkMode ? '#a1a1aa' : '#64748b') }}>
@@ -1093,7 +1099,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
             </View>
 
             {/* Avance & Mode de paiement */}
-            <View style={[styles.formRowInline, { zIndex: 20, elevation: 20 }]}>
+            <View style={[styles.formRowInline, { zIndex: 20, elevation: 0 }]}>
               <View style={styles.formFieldInline}>
                 <Text style={[styles.formLabel, isSubscriptionMode && { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
                   Avance (FCFA)
@@ -1114,7 +1120,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
                   ]}
                 />
               </View>
-              <View style={[styles.formFieldInline, { zIndex: 20, elevation: 20 }]}>
+              <View style={[styles.formFieldInline, { zIndex: 20, elevation: 0 }]}>
                 <Text style={styles.formLabel}>Mode Règlement</Text>
                 <CustomSelect
                   value={orderPaymentMethod}
@@ -1145,7 +1151,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
                       style={{
                         flex: 1,
                         paddingVertical: 10,
-                        borderRadius: 10,
+                        borderRadius: 9999,
                         borderWidth: momoOperator === op ? 2 : 1.5,
                         borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
                         backgroundColor: momoOperator === op
@@ -1291,7 +1297,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
                           backgroundColor: isApplied ? '#10b981' : '#002cf7',
                           paddingHorizontal: 14,
                           paddingVertical: 8,
-                          borderRadius: 8
+                          borderRadius: 9999
                         }}
                         activeOpacity={0.8}
                       >
@@ -1518,32 +1524,43 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
           })()}
 
           {/* Action Buttons */}
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, marginBottom: 12 }}>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleCancelOrder}
-              style={[
-                styles.submitBtn,
-                {
-                  flex: 1,
-                  backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
-                  borderWidth: 1,
-                  borderColor: isDarkMode ? '#27272a' : '#cbd5e1',
-                }
-              ]}
+              style={{
+                flex: 1,
+                backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#27272a' : '#cbd5e1',
+                height: 48,
+                borderRadius: 9999,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 0,
+                marginTop: 0,
+                marginBottom: 0,
+              }}
             >
-              <Text style={[styles.submitBtnText, { color: isDarkMode ? '#e4e4e7' : '#475569' }]}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#e4e4e7' : '#475569' }}>
                 Annuler
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleCreateOrder}
-              style={[styles.submitBtn, { flex: 2 }]}
-            >
-              <Text style={styles.submitBtnText}>Créer la Commande</Text>
-            </TouchableOpacity>
+            <View style={{ flex: 2, height: 48, justifyContent: 'center' }}>
+              <SlideActionButton
+                color="#002cf7"
+                isDarkMode={isDarkMode}
+                height={48}
+                minLoadingDuration={2000}
+                icon={<ShoppingBag size={18} color="#ffffff" />}
+                loadingText="Création de la commande..."
+                completeLabel="Commande créée !"
+                onComplete={handleCreateOrder}
+              >
+                Créer la Commande
+              </SlideActionButton>
+            </View>
           </View>
         </ScrollView>
       )}
@@ -1567,7 +1584,7 @@ function getStyles(isDarkMode) {
     segmentedContainer: {
       flexDirection: 'row',
       backgroundColor: isDarkMode ? '#121212' : '#f1f5f9',
-      borderRadius: 16,
+      borderRadius: 9999,
       padding: 4,
     },
     segmentedBtn: {
@@ -1576,7 +1593,7 @@ function getStyles(isDarkMode) {
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 10,
-      borderRadius: 12,
+      borderRadius: 9999,
     },
     segmentedBtnActive: {
       backgroundColor: '#002cf7',
@@ -1605,6 +1622,11 @@ function getStyles(isDarkMode) {
       padding: 16,
       borderWidth: 1,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
     },
     sectionHeader: {
       flexDirection: 'row',
@@ -1636,6 +1658,11 @@ function getStyles(isDarkMode) {
       padding: 12,
       borderWidth: 1,
       borderColor: isDarkMode ? '#27272a' : '#dbeafe',
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
     },
     subHeaderRow: {
       flexDirection: 'row',
@@ -1695,6 +1722,11 @@ function getStyles(isDarkMode) {
       marginVertical: 4,
       borderWidth: 1,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
     },
     clothingHeader: {
       flexDirection: 'row',
@@ -1710,7 +1742,7 @@ function getStyles(isDarkMode) {
       paddingVertical: 4,
       paddingHorizontal: 10,
       backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.2)' : '#eff6ff',
-      borderRadius: 8,
+      borderRadius: 9999,
     },
     clothingAddBtnText: {
       fontSize: 12,
@@ -1721,7 +1753,7 @@ function getStyles(isDarkMode) {
       paddingVertical: 4,
       paddingHorizontal: 10,
       backgroundColor: isDarkMode ? '#27272a' : '#f1f5f9',
-      borderRadius: 8,
+      borderRadius: 9999,
     },
     clothingCloseBtnText: {
       fontSize: 12,
@@ -1754,7 +1786,7 @@ function getStyles(isDarkMode) {
       alignItems: 'center',
       paddingVertical: 4,
       paddingHorizontal: 8,
-      borderRadius: 6,
+      borderRadius: 9999,
       borderWidth: 1,
       borderColor: '#002cf7',
     },
@@ -1771,7 +1803,7 @@ function getStyles(isDarkMode) {
     serviceQtyBtn: {
       width: 26,
       height: 26,
-      borderRadius: 6,
+      borderRadius: 9999,
       backgroundColor: '#002cf7',
       justifyContent: 'center',
       alignItems: 'center',
@@ -1797,7 +1829,7 @@ function getStyles(isDarkMode) {
     urgencyBtn: {
       flex: 1,
       paddingVertical: 10,
-      borderRadius: 12,
+      borderRadius: 9999,
       borderWidth: 1,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       alignItems: 'center',
@@ -1834,6 +1866,11 @@ function getStyles(isDarkMode) {
       padding: 16,
       borderWidth: 1,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
     },
     receiptSectionTitle: {
       fontSize: 14,
@@ -1872,7 +1909,7 @@ function getStyles(isDarkMode) {
     },
     submitBtn: {
       backgroundColor: '#002cf7',
-      borderRadius: 16,
+      borderRadius: 9999,
       paddingVertical: 16,
       alignItems: 'center',
       justifyContent: 'center',
@@ -1881,7 +1918,7 @@ function getStyles(isDarkMode) {
       shadowOpacity: 0,
       shadowRadius: 0,
       elevation: 0,
-      marginTop: 8,
+      marginTop: 0,
     },
     submitBtnText: {
       color: '#ffffff',
@@ -1907,7 +1944,7 @@ function getStyles(isDarkMode) {
     planChip: {
       paddingHorizontal: 14,
       paddingVertical: 9,
-      borderRadius: 12,
+      borderRadius: 9999,
       backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
       borderWidth: 1.5,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',

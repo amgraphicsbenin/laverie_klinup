@@ -1,72 +1,71 @@
 import React from 'react';
-import Svg, { Path, G } from 'react-native-svg';
+import AnimatedHomeIcon from './AnimatedHomeIcon';
+import AnimatedGestionIcon from './AnimatedGestionIcon';
+import AnimatedAddIcon from './AnimatedAddIcon';
+import AnimatedHistoryIcon from './AnimatedHistoryIcon';
+import AnimatedProfileIcon from './AnimatedProfileIcon';
 
 /**
- * Official Navigation Bar SVG Icons from 'nav icons' directory
- * Uses exact SVG vector paths: Home.svg, Manage.svg, Add.svg, History.svg, Profile.svg
+ * Navigation Bar Animated Icons
+ * Uses authentic motion vector components for all 5 navigation tabs.
  */
-export default function FlaticonIcon({ name, active = false, color = '#002cf7', size = 22 }) {
+export default function FlaticonIcon({ name, active = false, color = '#002cf7', size = 24, trigger = 0, ...props }) {
   switch (name) {
     case 'home':
     case 'accueil':
       return (
-        <Svg width={size} height={size} viewBox="0 0 512.001 512.001" fill="none">
-          <Path
-            d="M490.134,185.472L338.966,34.304c-45.855-45.737-120.076-45.737-165.931,0L21.867,185.472 C7.819,199.445-0.055,218.457,0,238.272v221.397C0.047,488.568,23.475,511.976,52.374,512h407.253 c28.899-0.023,52.326-23.432,52.373-52.331V238.272C512.056,218.457,504.182,199.445,490.134,185.472z M448,448H341.334v-67.883 c0-44.984-36.467-81.451-81.451-81.451c0,0,0,0,0,0h-7.765c-44.984,0-81.451,36.467-81.451,81.451l0,0V448H64V238.272 c0.007-2.829,1.125-5.541,3.115-7.552L218.283,79.552c20.825-20.831,54.594-20.835,75.425-0.01c0.003,0.003,0.007,0.007,0.01,0.01 L444.886,230.72c1.989,2.011,3.108,4.723,3.115,7.552V448z"
-            fill={color}
-          />
-        </Svg>
+        <AnimatedHomeIcon
+          active={active}
+          color={color}
+          size={size}
+          trigger={trigger}
+          {...props}
+        />
       );
     case 'gestion':
     case 'manage':
       return (
-        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Path
-            d="m17 12.5a1.5 1.5 0 0 1 -1.5 1.5h-7a1.5 1.5 0 0 1 0-3h7a1.5 1.5 0 0 1 1.5 1.5zm-4.5 3.5h-4a1.5 1.5 0 0 0 0 3h4a1.5 1.5 0 0 0 0-3zm9.5-7.843v10.343a5.506 5.506 0 0 1 -5.5 5.5h-9a5.506 5.506 0 0 1 -5.5-5.5v-13a5.506 5.506 0 0 1 5.5-5.5h6.343a5.462 5.462 0 0 1 3.889 1.611l2.657 2.657a5.464 5.464 0 0 1 1.611 3.889zm-3 10.343v-9.5h-4a2 2 0 0 1 -2-2v-4h-5.5a2.5 2.5 0 0 0 -2.5 2.5v13a2.5 2.5 0 0 0 2.5 2.5h9a2.5 2.5 0 0 0 2.5-2.5z"
-            fill={color}
-          />
-        </Svg>
+        <AnimatedGestionIcon
+          active={active}
+          color={color}
+          size={size}
+          trigger={trigger}
+          {...props}
+        />
       );
     case 'ajouter':
     case 'add':
     case 'creer_commande':
       return (
-        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Path
-            d="m12 0a12 12 0 1 0 12 12 12.013 12.013 0 0 0 -12-12zm0 21a9 9 0 1 1 9-9 9.01 9.01 0 0 1 -9 9zm5-9a1.5 1.5 0 0 1 -1.5 1.5h-2v2a1.5 1.5 0 0 1 -3 0v-2h-2a1.5 1.5 0 0 1 0-3h2v-2a1.5 1.5 0 0 1 3 0v2h2a1.5 1.5 0 0 1 1.5 1.5z"
-            fill={color}
-          />
-        </Svg>
+        <AnimatedAddIcon
+          active={active}
+          color={color}
+          size={size}
+          trigger={trigger}
+          {...props}
+        />
       );
     case 'historique':
     case 'history':
       return (
-        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-          <Path
-            d="M12,0A12.034,12.034,0,0,0,4.04,3.04L2.707,1.707A1,1,0,0,0,1,2.414V7A1,1,0,0,0,2,8H6.586a1,1,0,0,0,.707-1.707L6.158,5.158A9,9,0,0,1,21,12.26,9,9,0,0,1,3.1,13.316,1.51,1.51,0,0,0,1.613,12h0A1.489,1.489,0,0,0,.115,13.663,12.018,12.018,0,0,0,12.474,23.991,12.114,12.114,0,0,0,23.991,12.474,12.013,12.013,0,0,0,12,0Z"
-            fill={color}
-          />
-          <Path
-            d="M11.5,7h0A1.5,1.5,0,0,0,10,8.5v4.293a2,2,0,0,0,.586,1.414L12.379,16A1.5,1.5,0,0,0,14.5,13.879l-1.5-1.5V8.5A1.5,1.5,0,0,0,11.5,7Z"
-            fill={color}
-          />
-        </Svg>
+        <AnimatedHistoryIcon
+          active={active}
+          color={color}
+          size={size}
+          trigger={trigger}
+          {...props}
+        />
       );
     case 'profile':
     case 'profil':
       return (
-        <Svg width={size} height={size} viewBox="0 0 512 512" fill="none">
-          <G>
-            <Path
-              d="M244.317,299.051c-90.917,8.218-160.183,85.041-158.976,176.32V480c0,17.673,14.327,32,32,32l0,0c17.673,0,32-14.327,32-32 v-5.909c-0.962-56.045,40.398-103.838,96-110.933c58.693-5.82,110.992,37.042,116.812,95.735c0.344,3.47,0.518,6.954,0.521,10.441 V480c0,17.673,14.327,32,32,32l0,0c17.673,0,32-14.327,32-32v-10.667c-0.104-94.363-76.685-170.774-171.047-170.67 C251.854,298.668,248.082,298.797,244.317,299.051z"
-              fill={color}
-            />
-            <Path
-              d="M256.008,256c70.692,0,128-57.308,128-128S326.7,0,256.008,0s-128,57.308-128,128 C128.078,198.663,185.345,255.929,256.008,256z M256.008,64c35.346,0,64,28.654,64,64s-28.654,64-64,64s-64-28.654-64-64 S220.662,64,256.008,64z"
-              fill={color}
-            />
-          </G>
-        </Svg>
+        <AnimatedProfileIcon
+          active={active}
+          color={color}
+          size={size}
+          trigger={trigger}
+          {...props}
+        />
       );
     default:
       return null;

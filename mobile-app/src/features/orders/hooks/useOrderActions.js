@@ -41,19 +41,20 @@ export default function useOrderActions({
    * @param {String} nextStatus - Statut cible.
    * @param {Function} callback - Action finale (mutation BD).
    */
-  const triggerFinalStatusAnimation = (orderId, nextStatus, callback) => {
-    setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'enter' } }));
+  const triggerFinalStatusAnimation = async (orderId, nextStatus, callback) => {
+    // 1. Exécuter l'action réseau / base de données (avec spinner + confirmation de succès fusionnée dans le modal)
+    if (typeof callback === 'function') {
+      await callback();
+    }
+    // 2. Sortie fluide de la carte dans la liste
+    setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'exit' } }));
     setTimeout(() => {
-      setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'exit' } }));
-      setTimeout(async () => {
-        await callback();
-        setAnimatingOrderIds(prev => {
-          const next = { ...prev };
-          delete next[orderId];
-          return next;
-        });
-      }, 300);
-    }, 850);
+      setAnimatingOrderIds(prev => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+    }, 300);
   };
 
   /**
@@ -210,7 +211,7 @@ export default function useOrderActions({
       setPaymentOrder(order);
       setPaymentNextStatus(nextStatus);
       setPaymentModalVisible(true);
-      return;
+      return false;
     }
 
     const performUpdate = async () => {
@@ -229,6 +230,9 @@ export default function useOrderActions({
         Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
       }
     };
+
+    // Délai de 2 secondes sur le spinner intégré du bouton pour une transition fluide
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     if (isFinal) {
       if (setShowOrderDetails) {

@@ -12,190 +12,38 @@ import {
   DEFAULT_LOGS,
   DEFAULT_CATALOG
 } from './seeds';
-import { performMutation, initDb, persist } from './syncEngine';
+import { performMutation, persist, initDb } from './syncEngine';
 import { supabase } from '../supabaseClient';
 import { sendSystemNotification, sendOrderNotification, getOrderStatusLabel } from '../notificationService';
+import { withActionTransition } from '../actionTransition';
+import {
+  memoryDb,
+  listeners,
+  notifyListeners,
+  addPendingOrderUpdate,
+  removePendingOrderUpdate,
+  isPendingOrderUpdate
+} from './memoryStore';
 
-// Base de données locale en mémoire (chargée en direct depuis Supabase)
-export const memoryDb = {
-  staff: [],
-  customers: [],
-  orders: [],
-  logs: [],
-  notifications: [],
-  catalog: [],
-  stores: [],
-  delivery_zones: [],
-  pickup_zones: [],
-  current_user: null,
-  pin_reset_requests: [],
-  dark_mode: false,
-  settings: {
-    fidelity_active: true,
-    fidelity_spend_per_point: 1000,
-    fidelity_tier_silver_pts: 50,
-    fidelity_tier_gold_pts: 150,
-    fidelity_tier_platinum_pts: 300
-  }
+import {
+  normalizeOrderStatus,
+  hydrateOrder,
+  reconcileOrderStates,
+  startOrderStateCron
+} from './orderUtils';
+
+export {
+  memoryDb,
+  listeners,
+  notifyListeners,
+  addPendingOrderUpdate,
+  removePendingOrderUpdate,
+  isPendingOrderUpdate,
+  normalizeOrderStatus,
+  hydrateOrder,
+  reconcileOrderStates,
+  startOrderStateCron
 };
-
-// Ensemble d'écouteurs de changement d'état (Pattern Observateur)
-export const listeners = new Set();
-
-// ── File des commandes en cours de mutation locale (anti-écrasement par sync périodique) ──
-// Quand une commande est en cours de mise à jour (updateOrderStatus, deliverOrderWithPayment, cancelOrder),
-// son ID est ajouté ici pour empêcher le startPeriodicSync (toutes les 5s) et le Realtime
-// d'écraser la modification locale avant que performMutation n'ait terminé.
-const pendingOrderUpdates = new Set();
-
-export function addPendingOrderUpdate(orderId) {
-  if (orderId) pendingOrderUpdates.add(orderId);
-}
-export function removePendingOrderUpdate(orderId) {
-  if (orderId) pendingOrderUpdates.delete(orderId);
-}
-export function isPendingOrderUpdate(orderId) {
-  return orderId ? pendingOrderUpdates.has(orderId) : false;
-}
-
-/**
- * Notifie tous les écouteurs qu'un changement a eu lieu dans memoryDb.
- * Permet aux composants React de se rafraîchir automatiquement.
- */
-export const notifyListeners = () => {
-  listeners.forEach(listener => listener());
-};
-
-/**
- * Normalise n'importe quelle variante de statut vers le cycle de vie standard KLIN UP.
- * @param {String} rawStatus - Statut brut.
- * @returns {String} Statut canonique.
- */
-export function normalizeOrderStatus(rawStatus) {
-  if (!rawStatus) return 'en_attente';
-  const s = String(rawStatus).trim().toLowerCase();
-  if (s === 'pending' || s === 'attente' || s === 'en_attente') return 'en_attente';
-  if (s === 'processing' || s === 'traitement') return 'traitement';
-  if (s === 'washing' || s === 'lavage_cours' || s === 'en_cours_lavage') return 'en_cours_lavage';
-  if (s === 'ironing' || s === 'repassage_cours' || s === 'en_cours_repassage') return 'en_cours_repassage';
-  if (s === 'ready' || s === 'pret') return 'pret';
-  if (s === 'a_livrer') return 'a_livrer';
-  if (s === 'a_recuperer') return 'a_recuperer';
-  if (s === 'in_delivery' || s === 'delivering' || s === 'en_cours_livraison') return 'en_cours_livraison';
-  if (s === 'livre' || s === 'delivered' || s === 'completed' || s === 'restitue') return 'restitue';
-  if (s === 'canceled' || s === 'cancelled' || s === 'annule') return 'annule';
-  if (s === 'retard' || s === 'en_retard' || s === 'late') return 'traitement';
-  return 'en_attente';
-}
-
-/**
- * Hydrate une commande avec les détails d'abonnements calculés et un statut normalisé.
- * @param {Object} order - La commande brute à hydrater.
- * @returns {Object} La commande hydratée avec les valeurs numériques typées et statut valide.
- */
-export function hydrateOrder(order) {
-  if (!order) return order;
-  const hydrated = { ...order };
-
-  hydrated.statut = normalizeOrderStatus(order.statut || order.status);
-
-  const isCompleted = hydrated.statut === 'restitue' || hydrated.statut === 'annule';
-  if (!isCompleted && order.due_date) {
-    const dueDateObj = new Date(order.due_date);
-    if (!isNaN(dueDateObj.getTime()) && dueDateObj < new Date()) {
-      hydrated.est_en_retard = true;
-    } else {
-      hydrated.est_en_retard = false;
-    }
-  } else {
-    hydrated.est_en_retard = false;
-  }
-
-  if (order.subscription_details) {
-    if (order.subscription_details.remise_pourcentage !== undefined) {
-      hydrated.remise_pourcentage = Number(order.subscription_details.remise_pourcentage) || 0;
-    }
-    if (order.subscription_details.remise_montant !== undefined) {
-      hydrated.remise_montant = Number(order.subscription_details.remise_montant) || 0;
-    }
-    if (order.subscription_details.prix_base_avant_remise !== undefined) {
-      hydrated.prix_base_avant_remise = Number(order.subscription_details.prix_base_avant_remise) || 0;
-    }
-  }
-  return hydrated;
-}
-
-/**
- * Assainit et réconcilie l'état de toutes les commandes en mémoire.
- * @returns {Boolean} Vrai si au moins un ajustement a été apporté.
- */
-export function reconcileOrderStates() {
-  if (!memoryDb || !Array.isArray(memoryDb.orders)) return false;
-  let hasChanges = false;
-  const now = new Date();
-
-  memoryDb.orders.forEach(order => {
-    if (!order) return;
-
-    const normalized = normalizeOrderStatus(order.statut || order.status);
-    if (order.statut !== normalized) {
-      order.statut = normalized;
-      hasChanges = true;
-    }
-
-    const isCompleted = order.statut === 'restitue' || order.statut === 'annule';
-    let isLate = false;
-    if (!isCompleted && order.due_date) {
-      const dueDateObj = new Date(order.due_date);
-      if (!isNaN(dueDateObj.getTime()) && dueDateObj < now) {
-        isLate = true;
-      }
-    }
-
-    if (order.est_en_retard !== isLate) {
-      order.est_en_retard = isLate;
-      hasChanges = true;
-    }
-
-    if (order.prix_total !== undefined && typeof order.prix_total !== 'number') {
-      order.prix_total = Number(order.prix_total) || 0;
-      hasChanges = true;
-    }
-    if (order.avance_payee !== undefined && typeof order.avance_payee !== 'number') {
-      order.avance_payee = Number(order.avance_payee) || 0;
-      hasChanges = true;
-    }
-  });
-
-  return hasChanges;
-}
-
-let orderCronTimer = null;
-/**
- * Cron local de réconciliation des états de commandes en mémoire vive (intervalle: 2000 ms).
- * RÔLE : normalisation locale uniquement (correction de statuts, calcul des retards).
- * La synchronisation réseau et la diffusion aux autres appareils sont gérées par :
- *   - Le trigger PostgreSQL `trg_notify_order_action` (chien de garde serveur instantané)
- *   - Le Supabase Realtime WebSocket (diffusion temps réel aux appareils)
- *   - `startPeriodicSync()` (fallback poll orders-only toutes les 5s)
- */
-export function startOrderStateCron() {
-  if (orderCronTimer) return;
-  if (reconcileOrderStates()) {
-    persist();
-    notifyListeners();
-  }
-  orderCronTimer = setInterval(() => {
-    try {
-      if (reconcileOrderStates()) {
-        persist();
-        notifyListeners();
-      }
-    } catch (e) {
-      console.warn('[Order Cron Local 2s] Erreur silencieuse:', e);
-    }
-  }, 2000);
-}
 
 // Interface publique de la base de données (l'objet db original)
 export const db = {
@@ -561,7 +409,9 @@ export const db = {
     persist();
     db.notify();
 
-    performMutation('insert', 'activity_logs', newLog.id, newLog);
+    performMutation('insert', 'activity_logs', newLog.id, newLog).catch(e => {
+      console.warn('[KLIN UP DB] Synchronisation du log ignorée ou repliée:', e?.message || e);
+    });
     return newLog;
   },
 
@@ -1183,8 +1033,13 @@ export const db = {
     const nowStr = new Date().toISOString();
 
     const currentUser = db.getCurrentUser();
+    const isCreatedByLivreur = (currentUser && currentUser.role === 'livreur') || orderData.created_by_role === 'livreur' || orderData.cree_par_livreur === true;
+
     const modeReglementVal = orderData.mode_reglement || orderData.mode_paiement || 'Espèces';
-    const initialStatus = orderData.statut === 'attente' ? 'en_attente' : (orderData.statut || 'en_attente');
+    let initialStatus = orderData.statut === 'attente' ? 'en_attente' : (orderData.statut || 'en_attente');
+    if (isCreatedByLivreur) {
+      initialStatus = 'en_attente_validation';
+    }
 
     let currentStoreId = orderData.store_id ||
       (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
@@ -1203,6 +1058,9 @@ export const db = {
       customer_id: orderData.customer_id,
       store_id: currentStoreId,
       statut: initialStatus,
+      cree_par_livreur: isCreatedByLivreur,
+      validee_par_caisse: !isCreatedByLivreur,
+      created_by_role: isCreatedByLivreur ? 'livreur' : (currentUser?.role || 'agent_accueil'),
       type_article: orderData.type_article || (inputItems[0] ? inputItems[0].article : 'Divers'),
       type_service: orderData.type_service || (inputItems[0] ? inputItems[0].service : 'lavage_simple'),
       niveau_urgence: urgencyVal,
@@ -1228,7 +1086,10 @@ export const db = {
       operateur_momo: orderData.operateur_momo || null,
       items: inputItems,
       created_by_id: currentUser ? currentUser.id : null,
-      created_by_name: currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : null
+      created_by_name: currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : null,
+      validated_by_id: isCreatedByLivreur ? null : (currentUser ? currentUser.id : null),
+      validated_by_name: isCreatedByLivreur ? null : (currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : null),
+      validated_at: isCreatedByLivreur ? null : nowStr
     };
 
     if (isSubscriptionOrder) {
@@ -1269,7 +1130,9 @@ export const db = {
       throw e;
     }
 
-    if (isSubscriptionOrder) {
+    if (isCreatedByLivreur) {
+      db.logAction('CREATION_COMMANDE', `Commande ${codeMarquage} créée par le livreur ${currentUser ? `${currentUser.prenom} ${currentUser.nom}` : ''} (en attente de validation caisse)`);
+    } else if (isSubscriptionOrder) {
       if (subscribedPlan) {
         db.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} créée avec souscription immédiate à ${subscribedPlan.article} (${totalClothes} vêtements débités)`);
       } else {
@@ -1291,6 +1154,52 @@ export const db = {
     db.notify();
     sendOrderNotification('INSERT', newOrder);
     return newOrder;
+  },
+
+  /**
+   * Valide une commande créée par un livreur par l'agent de caisse / manager.
+   */
+  validateOrderByCashier: async (orderId) => {
+    const order = memoryDb.orders.find(o => o.id === orderId);
+    if (!order) throw new Error('Commande non trouvée');
+
+    const currentUser = db.getCurrentUser();
+    if (currentUser && (currentUser.role === 'livreur' || currentUser.role === 'agent_lavage_repassage')) {
+      throw new Error('Action non autorisée pour ce profil.');
+    }
+
+    const nowStr = new Date().toISOString();
+    const oldStatus = order.statut;
+    const oldValidee = order.validee_par_caisse;
+
+    addPendingOrderUpdate(orderId);
+
+    order.validee_par_caisse = true;
+    order.statut = 'en_attente';
+    order.validated_by_id = currentUser ? currentUser.id : null;
+    order.validated_by_name = currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : 'Agent Caisse';
+    order.validated_at = nowStr;
+
+    db.notify();
+
+    try {
+      await performMutation('update', 'orders', orderId, {
+        validee_par_caisse: true,
+        statut: 'en_attente',
+        validated_by_id: order.validated_by_id,
+        validated_by_name: order.validated_by_name,
+        validated_at: order.validated_at,
+      });
+      db.logAction('VALIDATION_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} validée par la caisse (${order.validated_by_name})`);
+      sendOrderNotification('UPDATE', order);
+    } catch (e) {
+      order.statut = oldStatus;
+      order.validee_par_caisse = oldValidee;
+      db.notify();
+      throw e;
+    }
+
+    return order;
   },
 
   /**
@@ -1890,6 +1799,59 @@ export const db = {
     }
   }
 };
+
+// --- TRANSITION HEROUI SPINNER (2 SECONDES) ---
+// Enveloppe automatiquement toutes les actions de :
+// - Changement de statut (updateOrderStatus, cancelOrder, approvePinResetRequest, rejectPinResetRequest)
+// - Création (createOrder, addCustomer, addStaff, addCatalogItem)
+// - Enregistrement (updateCustomer, adjustCustomerPoints, updateCatalogPrice, updateCatalogItem, updateStaff, updateRewardCatalog, updateStaffPin, resetStaffPin)
+// - Suppression (deleteCustomer, deleteOrder, deleteStaff, unsubscribeCustomer)
+// - Confirmation (deliverOrderWithPayment, subscribeCustomer, redeemCustomerReward, markCustomerRewardUsed)
+const ACTION_TRANSITION_CONFIG = {
+  // Changement de statut (les actions de commande updateOrderStatus / cancelOrder s'exécutent désormais instantanément sans spinner bloquant)
+  approvePinResetRequest: "Validation de la demande...",
+  rejectPinResetRequest: "Refus de la demande...",
+
+  // Création (géré désormais directement par le spinner intégré du bouton SlideActionButton)
+  // createOrder: "Création de la commande...",
+  // addCustomer: "Création du client...",
+  addStaff: "Création de l'employé...",
+  addCatalogItem: "Création du tarif...",
+
+  // Enregistrement (géré désormais directement par le spinner intégré du bouton SlideActionButton)
+  // updateCustomer: "Enregistrement du client...",
+  adjustCustomerPoints: "Enregistrement des points...",
+  updateCatalogPrice: "Enregistrement du tarif...",
+  updateCatalogItem: "Enregistrement de l'article...",
+  updateStaff: "Enregistrement de l'employé...",
+  updateRewardCatalog: "Enregistrement du catalogue...",
+  updateStaffPin: "Mise à jour du code PIN...",
+  resetStaffPin: "Réinitialisation du code PIN...",
+
+  // Suppression
+  deleteCustomer: "Suppression du client...",
+  deleteOrder: "Suppression de la commande...",
+  deleteStaff: "Suppression de l'employé...",
+  unsubscribeCustomer: "Résiliation de l'abonnement...",
+
+  // Confirmation
+  subscribeCustomer: "Confirmation de l'abonnement...",
+  redeemCustomerReward: "Validation de la récompense...",
+  markCustomerRewardUsed: "Confirmation de l'utilisation...",
+};
+
+for (const [methodName, defaultMessage] of Object.entries(ACTION_TRANSITION_CONFIG)) {
+  if (typeof db[methodName] === 'function') {
+    const originalFn = db[methodName];
+    db[methodName] = async function (...args) {
+      let actionMessage = defaultMessage;
+      let successOptions = null;
+
+      return withActionTransition(() => originalFn.apply(this, args), actionMessage, 2000, successOptions);
+    };
+  }
+}
+
 
 /**
  * Calcule la distance de Haversine en km entre deux coordonnées GPS.

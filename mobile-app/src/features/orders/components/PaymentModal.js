@@ -11,9 +11,9 @@ import {
   Text, 
   TextInput, 
   TouchableOpacity, 
-  ScrollView, 
   StyleSheet 
 } from 'react-native';
+import { SmoothScrollView as ScrollView } from '../../../components/SmoothScroll';
 import { X } from 'lucide-react-native';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
@@ -106,11 +106,9 @@ export default function PaymentModal({
       ]}
     >
       <View style={styles.absoluteModalContainer || { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
-        <View style={styles.popupModalOverlay || { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose}>
-            <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-          </TouchableOpacity>
-          <View style={[styles.popupModalView || { width: '90%', maxWidth: 400, backgroundColor: isDarkMode ? '#121212' : '#ffffff', borderRadius: 12, padding: 20 }, { maxHeight: '80%' }]}>
+        <View style={styles.popupModalOverlay || { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.65)', padding: 16 }}>
+          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
+          <View style={[styles.popupModalView || { width: '100%', maxWidth: 380, backgroundColor: isDarkMode ? '#121212' : '#ffffff', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: isDarkMode ? '#27272a' : '#e4e4e7', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }, { maxHeight: '80%' }]}>
             
             {/* En-tête de la modale */}
             <View style={styles.compactModalHeader || { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
@@ -169,7 +167,7 @@ export default function PaymentModal({
                     alignItems: 'center',
                     justifyContent: 'center',
                     paddingVertical: 12,
-                    borderRadius: 8,
+                    borderRadius: 9999,
                     borderWidth: 1.5,
                     borderColor: cashBorder,
                     backgroundColor: cashBg
@@ -188,7 +186,7 @@ export default function PaymentModal({
                     alignItems: 'center',
                     justifyContent: 'center',
                     paddingVertical: 12,
-                    borderRadius: 8,
+                    borderRadius: 9999,
                     borderWidth: 1.5,
                     borderColor: momoBorder,
                     backgroundColor: momoBg
@@ -216,7 +214,7 @@ export default function PaymentModal({
                         style={{
                           flex: 1,
                           paddingVertical: 10,
-                          borderRadius: 10,
+                          borderRadius: 9999,
                           borderWidth: momoOperator === op ? 2 : 1.5,
                           borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
                           backgroundColor: momoOperator === op
@@ -251,7 +249,7 @@ export default function PaymentModal({
                     style={{
                       borderWidth: 1,
                       borderColor: momoInputBorder,
-                      borderRadius: 8,
+                      borderRadius: 12,
                       paddingHorizontal: 12,
                       paddingVertical: 10,
                       fontSize: 13,
@@ -273,7 +271,7 @@ export default function PaymentModal({
                   style={{
                     flex: 1,
                     paddingVertical: 12,
-                    borderRadius: 8,
+                    borderRadius: 9999,
                     borderWidth: 1.5,
                     borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
                     alignItems: 'center',
@@ -291,7 +289,7 @@ export default function PaymentModal({
                     flex: 1,
                     backgroundColor: '#16a34a',
                     paddingVertical: 12,
-                    borderRadius: 8,
+                    borderRadius: 9999,
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}

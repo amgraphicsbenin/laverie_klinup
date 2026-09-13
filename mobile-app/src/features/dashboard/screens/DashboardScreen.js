@@ -1,7 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, BackHandler, RefreshControl, Modal, TextInput, Linking, Alert, Image } from 'react-native';
-import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check, MapPin, Trophy, Crown, Star, Award, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Platform, BackHandler, RefreshControl, TextInput, Linking, Alert, Image, Dimensions } from 'react-native';
+import { SmoothScrollView as ScrollView } from '../../../components/SmoothScroll';
+import { TrendingUp, TrendingDown, RefreshCw, Layers, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, ChevronDown, X, Percent, ShoppingBag, Clock, User, Bell, Calendar, Check, MapPin, Trophy, Crown, Star, Award, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { Modal } from '../../../components/ui/modal';
 import { db } from '../../../services/db';
+import { CustomSelect } from '../../../components/CustomSelect';
 import { MotiView } from '../../../components/SafeView';
 import Svg, { Rect, Path, Circle } from 'react-native-svg';
 import SafeBlurView from '../../../components/SafeBlurView';
@@ -10,8 +13,13 @@ import { useScrollPaddingBottom, useTabBarHeight } from '../../../hooks/useTabBa
 import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
 import NotificationModal from '../../../components/NotificationModal';
+import NotificationPopover from '../../../components/NotificationPopover';
 import { t } from '../../../services/i18n';
 import { getFidelityTier } from '../../../utils/fidelityUtils';
+import AnimatedBadge from '../../../components/AnimatedBadge';
+import GamifiedCustomerCard from '../../../components/GamifiedCustomerCard';
+import CustomerProfileMorphingDialog from '../../../components/CustomerProfileMorphingDialog';
+
 
 export default function DashboardScreen({ onNavigate, setSelectedOrder, setGestionFilter, onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { orders, customers, notifications, currentUser, isDarkMode } = useDbState();
@@ -20,9 +28,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   const userInitials = currentUser
     ? `${(currentUser.prenom || 'K')[0].toUpperCase()}${(currentUser.nom || 'U')[0].toUpperCase()}`
     : 'KU';
-  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [revenuePeriod, setRevenuePeriod] = useState('today'); // 'today' | 'week' | 'month' | 'year' | 'custom'
-  const [periodPickerVisible, setPeriodPickerVisible] = useState(false);
   const [customModalVisible, setCustomModalVisible] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -31,8 +37,6 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   const [activeCalendarField, setActiveCalendarField] = useState(null); // 'start' | 'end' | null
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
-  const filterPillRef = useRef(null);
-  const [dropdownPos, setDropdownPos] = useState({ top: 275, right: 24 });
 
   const monthNamesFr = [
     'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -52,20 +56,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
     setActiveCalendarField(null);
   };
 
-  const handleFilterPillPress = () => {
-    if (periodPickerVisible) {
-      setPeriodPickerVisible(false);
-    } else {
-      if (filterPillRef.current && filterPillRef.current.measureInWindow) {
-        filterPillRef.current.measureInWindow((x, y, width, height) => {
-          setDropdownPos({ top: y + height + 4, right: 24 });
-          setPeriodPickerVisible(true);
-        });
-      } else {
-        setPeriodPickerVisible(true);
-      }
-    }
-  };
+
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -385,6 +376,9 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 
   const getStatusColor = (statut) => {
     switch (statut) {
+      case 'en_attente_validation':
+      case 'attente_validation':
+        return { bg: 'rgba(124, 58, 237, 0.08)', text: '#7c3aed', border: 'rgba(124, 58, 237, 0.2)', label: 'Validation Caisse' };
       case 'pret':
         return { bg: 'rgba(5, 150, 105, 0.06)', text: '#059669', border: 'rgba(5, 150, 105, 0.12)', label: 'Prêt' };
       case 'a_recuperer':
@@ -586,106 +580,90 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
     }
 
     return (
-      <MotiView
-        pointerEvents={isVisible ? 'auto' : 'none'}
-        animate={{
-          opacity: isVisible ? 1 : 0
-        }}
-        transition={{ type: 'timing', duration: 250 }}
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            zIndex: 9999,
-            justifyContent: 'center',
-            alignItems: 'center',
-            bottom: 0,
-          }
-        ]}
+      <Modal
+        visible={isVisible}
+        onClose={() => setActiveKpiDetail(null)}
+        size="md"
+        isDarkMode={isDarkMode}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          style={StyleSheet.absoluteFill}
-          onPress={() => setActiveKpiDetail(null)}
-        >
-          <BlurView tint={isDarkMode ? "dark" : "light"} intensity={85} style={StyleSheet.absoluteFill} />
-        </TouchableOpacity>
-
-        <MotiView
-          animate={{
-            opacity: isVisible ? 1 : 0,
-            scale: isVisible ? 1 : 0.9,
-            translateY: isVisible ? 0 : 50
-          }}
-          transition={{ type: 'spring', damping: 18, mass: 0.8 }}
-          style={styles.premiumModalContent}
-        >
-          <View style={styles.modalHeader}>
-            <View style={styles.modalTitleContainer}>
-              <View style={[styles.themeDot, { backgroundColor: theme.primary }]} />
-              <Text style={styles.premiumModalTitle}>{theme.title}</Text>
-            </View>
-            <TouchableOpacity onPress={() => setActiveKpiDetail(null)} style={styles.premiumCloseBtn}>
-              <X size={16} color="#71717a" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            style={{ flexShrink: 1, width: '100%' }}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 24 }}
-          >
-            {/* Hero Banner Section with glass texture */}
-            <View style={[styles.premiumKpiHeroCard, { backgroundColor: theme.bg, borderColor: 'rgba(255, 255, 255, 0.9)' }]}>
-              <Text style={[styles.premiumKpiHeroValue, { color: theme.primary }]}>{heroValue}</Text>
-              <Text style={styles.premiumKpiHeroLabel}>{heroLabel}</Text>
-            </View>
-
-            {/* Sub-statistics Grid */}
-            <Text style={styles.premiumModalSectionTitle}>Mesures Clés</Text>
-            <View style={styles.kpiSubGrid}>
-              {subStats.map((stat) => (
-                <View key={stat.label} style={styles.premiumKpiSubBox}>
-                  <Text style={styles.kpiSubBoxLabel}>{stat.label}</Text>
-                  <Text style={[styles.premiumKpiSubBoxVal, { color: theme.primary }]}>{stat.val}</Text>
+        <Modal.Backdrop>
+          <Modal.Container size="md">
+            <Modal.Dialog>
+              <Modal.CloseTrigger onPress={() => setActiveKpiDetail(null)} />
+              <Modal.Header layout="row">
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: theme.bg || (isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.08)'),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <View style={[styles.themeDot, { backgroundColor: theme.primary, width: 10, height: 10, borderRadius: 5 }]} />
                 </View>
-              ))}
-            </View>
+                <View style={{ flex: 1 }}>
+                  <Modal.Heading>{theme.title}</Modal.Heading>
+                  <Modal.Description>Statistiques et détails</Modal.Description>
+                </View>
+              </Modal.Header>
 
-            {/* Related Detail List */}
-            <Text style={styles.premiumModalSectionTitle}>{listTitle}</Text>
-            <View style={styles.detailsListContainer}>
-              {listItems.length === 0 ? (
-                <Text style={styles.emptyDetailsText}>Aucune donnée disponible</Text>
-              ) : (
-                listItems.map((o) => {
-                  const status = getStatusColor(o.statut);
-                  return (
-                    <TouchableOpacity
-                      key={o.id}
-                      onPress={() => {
-                        setActiveKpiDetail(null);
-                        handleOrderPress(o);
-                      }}
-                      style={styles.premiumDetailsOrderRowClickable}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.detailsClientName}>{getCustomerName(o.customer_id)}</Text>
-                        <Text style={styles.detailsTicketNo}>Ticket #{getDisplayTicketId(o)}</Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.detailsPrice}>{formatPrice(o.prix_total || o.total)}</Text>
-                        <View style={[styles.miniStatusTag, { backgroundColor: status.bg, borderColor: status.border }]}>
-                          <Text style={[styles.miniStatusText, { color: status.text }]}>{status.label}</Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </View>
-          </ScrollView>
-        </MotiView>
-      </MotiView>
+              <Modal.Body>
+                {/* Hero Banner Section with glass texture */}
+                <View style={[styles.premiumKpiHeroCard, { backgroundColor: theme.bg, borderColor: isDarkMode ? '#27272a' : 'rgba(255, 255, 255, 0.9)' }]}>
+                  <Text style={[styles.premiumKpiHeroValue, { color: theme.primary }]}>{heroValue}</Text>
+                  <Text style={styles.premiumKpiHeroLabel}>{heroLabel}</Text>
+                </View>
+
+                {/* Sub-statistics Grid */}
+                <Text style={styles.premiumModalSectionTitle}>Mesures Clés</Text>
+                <View style={styles.kpiSubGrid}>
+                  {subStats.map((stat) => (
+                    <View key={stat.label} style={styles.premiumKpiSubBox}>
+                      <Text style={styles.kpiSubBoxLabel}>{stat.label}</Text>
+                      <Text style={[styles.premiumKpiSubBoxVal, { color: theme.primary }]}>{stat.val}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Related Detail List */}
+                <Text style={styles.premiumModalSectionTitle}>{listTitle}</Text>
+                <View style={styles.detailsListContainer}>
+                  {listItems.length === 0 ? (
+                    <Text style={styles.emptyDetailsText}>Aucune donnée disponible</Text>
+                  ) : (
+                    listItems.map((o) => {
+                      const status = getStatusColor(o.statut);
+                      return (
+                        <TouchableOpacity
+                          key={o.id}
+                          onPress={() => {
+                            setActiveKpiDetail(null);
+                            handleOrderPress(o);
+                          }}
+                          style={styles.premiumDetailsOrderRowClickable}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.detailsClientName}>{getCustomerName(o.customer_id)}</Text>
+                            <Text style={styles.detailsTicketNo}>Ticket #{getDisplayTicketId(o)}</Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={styles.detailsPrice}>{formatPrice(o.prix_total || o.total)}</Text>
+                            <View style={[styles.miniStatusTag, { backgroundColor: status.bg, borderColor: status.border }]}>
+                              <Text style={[styles.miniStatusText, { color: status.text }]}>{status.label}</Text>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </View>
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
     );
   };
 
@@ -693,7 +671,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   return (
     <View style={styles.container}>
       {/* HEADER */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: isDarkMode ? '#000000' : '#ffffff', zIndex: 1000 }]}>
         <View style={styles.headerLeftContainer}>
           {/* Avatar Circle Clickable -> Navigate to Profile */}
           <TouchableOpacity
@@ -722,21 +700,11 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
           </View>
         </View>
 
-        {/* NOTIFICATION BUTTON */}
-        <TouchableOpacity
-          onPress={() => setNotificationModalVisible(true)}
-          style={[styles.notificationBtn, { backgroundColor: isDarkMode ? '#121212' : '#ffffff', borderColor: isDarkMode ? '#27272a' : '#e2e8f0' }]}
-          activeOpacity={0.8}
-        >
-          <Bell size={20} color={isDarkMode ? '#ffffff' : '#09090b'} />
-          {(notifications || []).filter(n => !n.read).length > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>
-                {(notifications || []).filter(n => !n.read).length > 9 ? '9+' : (notifications || []).filter(n => !n.read).length}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {/* NOTIFICATION BUTTON WITH BEUI MOTION POPOVER */}
+        <NotificationPopover
+          notifications={notifications}
+          isDarkMode={isDarkMode}
+        />
       </View>
 
       <ScrollView
@@ -777,7 +745,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             >
               <View style={styles.cardHeaderRow}>
                 <Text style={[styles.newCardTitle, { color: '#ffffff' }]}>CA Mensuel</Text>
-                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 9999 }}>
                   <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>Mois</Text>
                 </View>
               </View>
@@ -785,7 +753,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
 
               <Text style={[styles.newCardBigValue, { color: '#ffffff' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatPrice(monthlyRevenue)}</Text>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start', marginTop: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9999, alignSelf: 'flex-start', marginTop: 4 }}>
                 <TrendingUp size={12} color="#ffffff" style={{ marginRight: 3 }} />
                 <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>+12.4% ce mois</Text>
               </View>
@@ -917,14 +885,48 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <Text style={styles.newCardTitle}>Chiffre d'Affaires</Text>
 
-              <TouchableOpacity
-                ref={filterPillRef}
-                onPress={handleFilterPillPress}
-                activeOpacity={0.8}
-                style={styles.filterPill}
-              >
-                <Text style={styles.filterPillText}>{revenuePeriodData.label} ▾</Text>
-              </TouchableOpacity>
+              <CustomSelect
+                value={revenuePeriod}
+                onChange={(val) => {
+                  if (val === 'custom') {
+                    setCustomModalVisible(true);
+                  } else {
+                    setRevenuePeriod(val);
+                  }
+                }}
+                options={[
+                  { value: 'today', label: t('orders.filtre_aujourdhui', {}, "Aujourd'hui") },
+                  { value: 'week', label: t('orders.filtre_semaine', {}, "Cette Semaine") },
+                  { value: 'month', label: t('orders.filtre_mois', {}, "Ce Mois") },
+                  { value: 'year', label: t('dashboard.cette_annee', {}, "Cette Année") },
+                  { value: 'custom', label: t('dashboard.personnalise', {}, "Personnalisé") },
+                ]}
+                renderTrigger={({ isOpen, toggle, selectedOption }) => (
+                  <TouchableOpacity
+                    onPress={toggle}
+                    activeOpacity={0.8}
+                    style={[
+                      styles.filterPill,
+                      { flexDirection: 'row', alignItems: 'center' },
+                      isOpen && {
+                        borderColor: isDarkMode ? '#38bdf8' : '#002cf7',
+                        backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0, 44, 247, 0.14)',
+                      },
+                    ]}
+                  >
+                    <Text style={styles.filterPillText}>
+                      {revenuePeriodData.label}
+                    </Text>
+                    <View style={{ marginLeft: 5, transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }}>
+                      <ChevronDown
+                        size={13}
+                        color={isDarkMode ? (isOpen ? '#38bdf8' : '#d4d4d8') : (isOpen ? '#002cf7' : '#002cf7')}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                )}
+                popoverWidth={190}
+              />
             </View>
 
             {/* Card Body */}
@@ -1132,39 +1134,17 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
             nestedScrollEnabled={true}
             showsHorizontalScrollIndicator={false}
             style={{ marginHorizontal: -20, marginBottom: 20 }}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
             onTouchStart={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
             onMouseDown={(e) => { if (e && e.stopPropagation) e.stopPropagation(); }}
           >
             {topClients.map((client, index) => {
               const tier = getFidelityTier(client.points_fidelite || 0);
               const rank = index + 1;
-
-              // Rank styling setup
-              let rankBg = isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fffbe6';
-              let rankBorder = 'rgba(245, 158, 11, 0.4)';
-              let rankColor = '#f59e0b';
-              let RankIcon = Crown;
-
-              if (rank === 2) {
-                rankBg = isDarkMode ? 'rgba(56, 189, 248, 0.18)' : '#f0f9ff';
-                rankBorder = 'rgba(56, 189, 248, 0.35)';
-                rankColor = isDarkMode ? '#38bdf8' : '#0284c7';
-                RankIcon = ShieldCheck;
-              } else if (rank === 3) {
-                rankBg = isDarkMode ? 'rgba(217, 119, 6, 0.18)' : '#fff7ed';
-                rankBorder = 'rgba(217, 119, 6, 0.35)';
-                rankColor = '#d97706';
-                RankIcon = Award;
-              } else if (rank >= 4) {
-                rankBg = isDarkMode ? '#1e1e24' : '#f8fafc';
-                rankBorder = isDarkMode ? '#27272a' : '#e2e8f0';
-                rankColor = isDarkMode ? '#a1a1aa' : '#64748b';
-                RankIcon = Star;
-              }
-
               const clientOrders = (orders || []).filter(o => o.customer_id === client.id);
+              const totalSpent = clientOrders.reduce((acc, curr) => acc + Number(curr.total || curr.montant || 0), 0);
               const initials = `${(client.prenom || 'C')[0].toUpperCase()}${(client.nom || 'L')[0].toUpperCase()}`;
+              const fullName = `${client.prenom || ''} ${client.nom || ''}`.trim() || 'Client';
 
               return (
                 <MotiView
@@ -1173,99 +1153,21 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                   animate={{ opacity: 1, scale: 1, translateY: 0 }}
                   transition={{ type: 'spring', damping: 18, stiffness: 140, delay: index * 40 }}
                 >
-                  <TouchableOpacity
-                    activeOpacity={0.82}
-                    onPress={() => setSelectedClient(client)}
-                    style={[
-                      styles.topClientCard,
-                      {
-                        backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-                        borderColor: rank === 1 ? rankBorder : (isDarkMode ? '#27272a' : '#e2e8f0'),
-                        borderWidth: rank === 1 ? 1.5 : 1,
-                      }
-                    ]}
-                  >
-                    {/* Top Header Row: Rank Badge + Points Tag */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 12 }}>
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 3,
-                        backgroundColor: rankBg,
-                        borderColor: rankBorder,
-                        borderWidth: 1,
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 12
-                      }}>
-                        {rank <= 3 ? <RankIcon size={11} color={rankColor} fill={rank === 1 ? rankColor : 'transparent'} /> : null}
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: rankColor }}>#{rank}</Text>
-                      </View>
-
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 4,
-                        backgroundColor: tier.bgLight,
-                        borderColor: tier.border,
-                        borderWidth: 1,
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 12
-                      }}>
-                        <Sparkles size={10} color={tier.color} />
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: tier.color }}>
-                          {client.points_fidelite || 0} pts
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Main Client Profile Row */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, width: '100%' }}>
-                      <View style={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
-                        backgroundColor: tier.bgLight,
-                        borderColor: tier.border,
-                        borderWidth: 1.5,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        overflow: 'hidden'
-                      }}>
-                        {client.photo_url || client.user_picture ? (
-                          <Image
-                            source={{ uri: client.photo_url || client.user_picture }}
-                            style={{ width: 42, height: 42, borderRadius: 21 }}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <Text style={{ fontSize: 14, fontWeight: '800', color: tier.color }}>{initials}</Text>
-                        )}
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#0f172a' }} numberOfLines={1}>
-                          {client.prenom} {client.nom}
-                        </Text>
-                        <Text style={{ fontSize: 11, fontWeight: '600', color: tier.color, marginTop: 1 }} numberOfLines={1}>
-                          {tier.name}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Bottom Row: Number of orders only (Ex: 07 commandes) */}
-                    <View style={{
-                      width: '100%',
-                      paddingTop: 8,
-                      borderTopWidth: 1,
-                      borderTopColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9'
-                    }}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#64748b' }}>
-                        {String(clientOrders.length).padStart(2, '0')} commande{clientOrders.length > 1 ? 's' : ''}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
+                  <CustomerProfileMorphingDialog
+                    client={client}
+                    rank={rank}
+                    tier={tier.name}
+                    tierObj={tier}
+                    ordersCount={clientOrders.length}
+                    totalSpent={totalSpent}
+                    photoUrl={client.photo_url || client.user_picture}
+                    initials={initials}
+                    fullName={fullName}
+                    progressPercent={tier.progressPct}
+                    isDarkMode={isDarkMode}
+                    cardWidth={260}
+                    onOpenFullSheet={(c) => setSelectedClient(c)}
+                  />
                 </MotiView>
               );
             })}
@@ -1310,7 +1212,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                   style={styles.orderCard}
                 >
                   {/* CLIENT + STATUS + PRICE ROW */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <View style={styles.orderLeft}>
                       <View style={styles.orderInfo}>
                         <TouchableOpacity
@@ -1329,12 +1231,19 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                     </View>
 
                     <View style={styles.orderRight}>
-                      <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border }]}>
-                        <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
-                      </View>
+                      <AnimatedBadge
+                        status={item.statut}
+                        statusColor={status}
+                        isDarkMode={isDarkMode}
+                        size="sm"
+                        style={{ marginBottom: 4 }}
+                      >
+                        {status.label}
+                      </AnimatedBadge>
                       <Text style={styles.orderPrice}>{formatPrice(item.prix_total || item.total)}</Text>
-                      <ChevronRight size={14} color="#64748b" style={styles.chevron} />
                     </View>
+
+                    <ChevronRight size={16} color={isDarkMode ? '#94a3b8' : '#64748b'} style={{ marginLeft: 6 }} />
                   </View>
 
                   {/* ADRESSE DE LIVRAISON (ÉTAPE LIVRAISON) */}
@@ -1352,10 +1261,11 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                         backgroundColor: isDarkMode ? 'rgba(3, 105, 161, 0.18)' : '#f0f9ff',
                         borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#bae6fd',
                         borderWidth: 1,
-                        borderRadius: 10,
+                        borderRadius: 9999,
                         paddingHorizontal: 10,
                         paddingVertical: 7,
-                        marginTop: 8,
+                        marginTop: 10,
+                        width: '100%',
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 8
@@ -1381,341 +1291,262 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
         onClose={() => setSelectedClient(null)}
         onShowSuccess={onShowSuccess}
       />
-      <NotificationModal
-        visible={notificationModalVisible}
-        onClose={() => setNotificationModalVisible(false)}
-        notifications={notifications}
-        isDarkMode={isDarkMode}
-      />
-      {periodPickerVisible && (
-        <View style={[StyleSheet.absoluteFill, { zIndex: 999999 }]}>
-          <TouchableOpacity
-            activeOpacity={1}
-            style={StyleSheet.absoluteFill}
-            onPress={() => setPeriodPickerVisible(false)}
-          />
-          <MotiView
-            from={{ opacity: 0, translateY: -4, scale: 0.95 }}
-            animate={{ opacity: 1, translateY: 0, scale: 1 }}
-            transition={{ type: 'timing', duration: 120 }}
-            style={[
-              styles.dropdownMenuRoot,
-              {
-                top: dropdownPos.top || 275,
-                right: dropdownPos.right || 24,
-                backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-                borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
-              }
-            ]}
-          >
-            {[
-              { key: 'today', label: t('orders.filtre_aujourdhui', {}, "Aujourd'hui") },
-              { key: 'week', label: t('orders.filtre_semaine', {}, "Cette Semaine") },
-              { key: 'month', label: t('orders.filtre_mois', {}, "Ce Mois") },
-              { key: 'year', label: t('dashboard.cette_annee', {}, "Cette Année") },
-              { key: 'custom', label: t('dashboard.personnalise', {}, "Personnalisé") },
-            ].map(opt => {
-              const isSelected = revenuePeriod === opt.key;
-              return (
-                <TouchableOpacity
-                  key={opt.key}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    setPeriodPickerVisible(false);
-                    if (opt.key === 'custom') {
-                      setCustomModalVisible(true);
-                    } else {
-                      setRevenuePeriod(opt.key);
-                    }
-                  }}
-                  style={[
-                    styles.dropdownItem,
-                    isSelected && { backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.2)' : '#eff6ff' }
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemText,
-                      { color: isSelected ? '#002cf7' : (isDarkMode ? '#ffffff' : '#09090b') }
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                  {isSelected && <Check size={14} color="#002cf7" />}
-                </TouchableOpacity>
-              );
-            })}
-          </MotiView>
-        </View>
-      )}
 
-      {/* MODAL FILTRE PERSONNALISÉ */}
+
+      {/* MODAL FILTRE PERSONNALISÉ (HEROUI MODAL) */}
       <Modal
-        visible={customModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => {
+        isOpen={customModalVisible}
+        onClose={() => {
           setActiveCalendarField(null);
           setCustomModalVisible(false);
         }}
+        size="md"
+        isDarkMode={isDarkMode}
       >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.65)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-          <MotiView
-            from={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            style={{
-              width: '100%',
-              maxWidth: 380,
-              backgroundColor: isDarkMode ? '#18181b' : '#ffffff',
-              borderRadius: 24,
-              padding: 20,
-              borderWidth: 1,
-              borderColor: isDarkMode ? '#27272a' : '#e4e4e7',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.25,
-              shadowRadius: 20,
-              elevation: 10,
-            }}
-          >
-            {/* Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#09090b' }}>
-                {t('dashboard.personnalise', {}, 'Période Personnalisée')}
-              </Text>
-              <TouchableOpacity onPress={() => {
-                setActiveCalendarField(null);
-                setCustomModalVisible(false);
-              }}>
-                <X size={20} color={isDarkMode ? '#a1a1aa' : '#71717a'} />
-              </TouchableOpacity>
-            </View>
+        <Modal.Backdrop>
+          <Modal.Container size="md">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header layout="row">
+                <Modal.Icon variant="primary">
+                  <Calendar size={20} color="#002cf7" />
+                </Modal.Icon>
+                <View style={{ flex: 1 }}>
+                  <Modal.Heading>
+                    {t('dashboard.personnalise', {}, 'Période Personnalisée')}
+                  </Modal.Heading>
+                  <Modal.Description>
+                    Filtrer les statistiques par dates
+                  </Modal.Description>
+                </View>
+              </Modal.Header>
 
-            {/* Quick Presets */}
-            <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#71717a', marginBottom: 8 }}>
-              Raccourcis rapides
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  const now = new Date();
-                  const todayStr = now.toISOString().split('T')[0];
-                  setCustomStartInput(todayStr);
-                  setCustomEndInput(todayStr);
-                  setActiveCalendarField(null);
-                }}
-                style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5' }}
-              >
-                <Text style={{ fontSize: 12, color: isDarkMode ? '#d4d4d8' : '#3f3f46', fontWeight: '500' }}>Aujourd'hui</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  const now = new Date();
-                  const start = new Date();
-                  start.setDate(now.getDate() - 7);
-                  setCustomStartInput(start.toISOString().split('T')[0]);
-                  setCustomEndInput(now.toISOString().split('T')[0]);
-                  setActiveCalendarField(null);
-                }}
-                style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5' }}
-              >
-                <Text style={{ fontSize: 12, color: isDarkMode ? '#d4d4d8' : '#3f3f46', fontWeight: '500' }}>7 derniers jours</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  const now = new Date();
-                  const start = new Date();
-                  start.setDate(now.getDate() - 30);
-                  setCustomStartInput(start.toISOString().split('T')[0]);
-                  setCustomEndInput(now.toISOString().split('T')[0]);
-                  setActiveCalendarField(null);
-                }}
-                style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5' }}
-              >
-                <Text style={{ fontSize: 12, color: isDarkMode ? '#d4d4d8' : '#3f3f46', fontWeight: '500' }}>30 derniers jours</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Date Pickers Visual Buttons */}
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#3f3f46', marginBottom: 6 }}>
-                {t('dashboard.date_debut', {}, 'Date de début')}
-              </Text>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setActiveCalendarField(activeCalendarField === 'start' ? null : 'start')}
-                style={{
-                  height: 44,
-                  borderWidth: 1.5,
-                  borderColor: activeCalendarField === 'start' ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
-                  borderRadius: 12,
-                  paddingHorizontal: 12,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  backgroundColor: isDarkMode ? '#09090b' : '#fafafa',
-                }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: customStartInput ? '600' : '400', color: customStartInput ? (isDarkMode ? '#ffffff' : '#09090b') : (isDarkMode ? '#52525b' : '#a1a1aa') }}>
-                  {customStartInput || 'Sélectionner la date de début'}
+              <Modal.Body scrollable={false}>
+                {/* Quick Presets */}
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#71717a', marginBottom: 8 }}>
+                  Raccourcis rapides
                 </Text>
-                <Calendar size={18} color={activeCalendarField === 'start' ? '#002cf7' : (isDarkMode ? '#a1a1aa' : '#71717a')} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#3f3f46', marginBottom: 6 }}>
-                {t('dashboard.date_fin', {}, 'Date de fin')}
-              </Text>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setActiveCalendarField(activeCalendarField === 'end' ? null : 'end')}
-                style={{
-                  height: 44,
-                  borderWidth: 1.5,
-                  borderColor: activeCalendarField === 'end' ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
-                  borderRadius: 12,
-                  paddingHorizontal: 12,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  backgroundColor: isDarkMode ? '#09090b' : '#fafafa',
-                }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: customEndInput ? '600' : '400', color: customEndInput ? (isDarkMode ? '#ffffff' : '#09090b') : (isDarkMode ? '#52525b' : '#a1a1aa') }}>
-                  {customEndInput || 'Sélectionner la date de fin'}
-                </Text>
-                <Calendar size={18} color={activeCalendarField === 'end' ? '#002cf7' : (isDarkMode ? '#a1a1aa' : '#71717a')} />
-              </TouchableOpacity>
-            </View>
-
-            {/* INTERACTIVE VISUAL CALENDAR GRID */}
-            {activeCalendarField !== null && (
-              <View style={{
-                marginBottom: 16,
-                padding: 12,
-                borderRadius: 16,
-                backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
-                borderWidth: 1,
-                borderColor: isDarkMode ? '#27272a' : '#e2e8f0'
-              }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
                   <TouchableOpacity
                     onPress={() => {
-                      if (calMonth === 0) {
-                        setCalMonth(11);
-                        setCalYear(calYear - 1);
-                      } else {
-                        setCalMonth(calMonth - 1);
-                      }
+                      const now = new Date();
+                      const todayStr = now.toISOString().split('T')[0];
+                      setCustomStartInput(todayStr);
+                      setCustomEndInput(todayStr);
+                      setActiveCalendarField(null);
                     }}
-                    style={{ padding: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0' }}
+                    style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5' }}
                   >
-                    <ChevronLeft size={16} color={isDarkMode ? '#ffffff' : '#09090b'} />
+                    <Text style={{ fontSize: 12, color: isDarkMode ? '#d4d4d8' : '#3f3f46', fontWeight: '500' }}>Aujourd'hui</Text>
                   </TouchableOpacity>
 
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#09090b' }}>
-                    {monthNamesFr[calMonth]} {calYear} ({activeCalendarField === 'start' ? 'Début' : 'Fin'})
+                  <TouchableOpacity
+                    onPress={() => {
+                      const now = new Date();
+                      const start = new Date();
+                      start.setDate(now.getDate() - 7);
+                      setCustomStartInput(start.toISOString().split('T')[0]);
+                      setCustomEndInput(now.toISOString().split('T')[0]);
+                      setActiveCalendarField(null);
+                    }}
+                    style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5' }}
+                  >
+                    <Text style={{ fontSize: 12, color: isDarkMode ? '#d4d4d8' : '#3f3f46', fontWeight: '500' }}>7 derniers jours</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      const now = new Date();
+                      const start = new Date();
+                      start.setDate(now.getDate() - 30);
+                      setCustomStartInput(start.toISOString().split('T')[0]);
+                      setCustomEndInput(now.toISOString().split('T')[0]);
+                      setActiveCalendarField(null);
+                    }}
+                    style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5' }}
+                  >
+                    <Text style={{ fontSize: 12, color: isDarkMode ? '#d4d4d8' : '#3f3f46', fontWeight: '500' }}>30 derniers jours</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Date Pickers Visual Buttons */}
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#3f3f46', marginBottom: 6 }}>
+                    {t('dashboard.date_debut', {}, 'Date de début')}
                   </Text>
 
                   <TouchableOpacity
-                    onPress={() => {
-                      if (calMonth === 11) {
-                        setCalMonth(0);
-                        setCalYear(calYear + 1);
-                      } else {
-                        setCalMonth(calMonth + 1);
-                      }
+                    activeOpacity={0.8}
+                    onPress={() => setActiveCalendarField(activeCalendarField === 'start' ? null : 'start')}
+                    style={{
+                      height: 44,
+                      borderWidth: 1.5,
+                      borderColor: activeCalendarField === 'start' ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
+                      borderRadius: 9999,
+                      paddingHorizontal: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: isDarkMode ? '#09090b' : '#fafafa',
                     }}
-                    style={{ padding: 6, borderRadius: 8, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0' }}
                   >
-                    <ChevronRight size={16} color={isDarkMode ? '#ffffff' : '#09090b'} />
+                    <Text style={{ fontSize: 14, fontWeight: customStartInput ? '600' : '400', color: customStartInput ? (isDarkMode ? '#ffffff' : '#09090b') : (isDarkMode ? '#52525b' : '#a1a1aa') }}>
+                      {customStartInput || 'Sélectionner la date de début'}
+                    </Text>
+                    <Calendar size={18} color={activeCalendarField === 'start' ? '#002cf7' : (isDarkMode ? '#a1a1aa' : '#71717a')} />
                   </TouchableOpacity>
                 </View>
 
-                {/* Day Headers */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 6 }}>
-                  {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, idx) => (
-                    <Text key={idx} style={{ width: 32, textAlign: 'center', fontSize: 11, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#64748b' }}>
-                      {d}
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#3f3f46', marginBottom: 6 }}>
+                    {t('dashboard.date_fin', {}, 'Date de fin')}
+                  </Text>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setActiveCalendarField(activeCalendarField === 'end' ? null : 'end')}
+                    style={{
+                      height: 44,
+                      borderWidth: 1.5,
+                      borderColor: activeCalendarField === 'end' ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
+                      borderRadius: 9999,
+                      paddingHorizontal: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: isDarkMode ? '#09090b' : '#fafafa',
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: customEndInput ? '600' : '400', color: customEndInput ? (isDarkMode ? '#ffffff' : '#09090b') : (isDarkMode ? '#52525b' : '#a1a1aa') }}>
+                      {customEndInput || 'Sélectionner la date de fin'}
                     </Text>
-                  ))}
+                    <Calendar size={18} color={activeCalendarField === 'end' ? '#002cf7' : (isDarkMode ? '#a1a1aa' : '#71717a')} />
+                  </TouchableOpacity>
                 </View>
 
-                {/* Days Grid */}
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  {Array.from({ length: (new Date(calYear, calMonth, 1).getDay() + 6) % 7 }).map((_, i) => (
-                    <View key={`empty-${i}`} style={{ width: '14.28%', height: 32 }} />
-                  ))}
-
-                  {Array.from({ length: new Date(calYear, calMonth + 1, 0).getDate() }).map((_, i) => {
-                    const dayNum = i + 1;
-                    const formattedMonth = String(calMonth + 1).padStart(2, '0');
-                    const formattedDay = String(dayNum).padStart(2, '0');
-                    const dateStr = `${calYear}-${formattedMonth}-${formattedDay}`;
-
-                    const isSelected = activeCalendarField === 'start'
-                      ? customStartInput === dateStr
-                      : customEndInput === dateStr;
-
-                    return (
+                {/* INTERACTIVE VISUAL CALENDAR GRID */}
+                {activeCalendarField !== null && (
+                  <View style={{
+                    marginBottom: 16,
+                    padding: 12,
+                    borderRadius: 16,
+                    backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? '#27272a' : '#e2e8f0'
+                  }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <TouchableOpacity
-                        key={`day-${dayNum}`}
-                        onPress={() => handleSelectDayTile(dayNum)}
-                        style={{
-                          width: '14.28%',
-                          height: 32,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          borderRadius: 16,
-                          backgroundColor: isSelected ? '#002cf7' : 'transparent'
+                        onPress={() => {
+                          if (calMonth === 0) {
+                            setCalMonth(11);
+                            setCalYear(calYear - 1);
+                          } else {
+                            setCalMonth(calMonth - 1);
+                          }
                         }}
+                        style={{ padding: 6, borderRadius: 9999, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0' }}
                       >
-                        <Text style={{
-                          fontSize: 12,
-                          fontWeight: isSelected ? '700' : '500',
-                          color: isSelected ? '#ffffff' : (isDarkMode ? '#e4e4e7' : '#18181b')
-                        }}>
-                          {dayNum}
-                        </Text>
+                        <ChevronLeft size={16} color={isDarkMode ? '#ffffff' : '#09090b'} />
                       </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
 
-            {/* Modal Actions */}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  setActiveCalendarField(null);
-                  setCustomModalVisible(false);
-                }}
-                style={{ flex: 1, height: 44, borderRadius: 12, borderWidth: 1, borderColor: isDarkMode ? '#3f3f46' : '#e4e4e7', justifyContent: 'center', alignItems: 'center' }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#71717a' }}>{t('app.cancel', {}, 'Annuler')}</Text>
-              </TouchableOpacity>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#09090b' }}>
+                        {monthNamesFr[calMonth]} {calYear} ({activeCalendarField === 'start' ? 'Début' : 'Fin'})
+                      </Text>
 
-              <TouchableOpacity
-                onPress={() => {
-                  setCustomStartDate(customStartInput.trim());
-                  setCustomEndDate(customEndInput.trim());
-                  setRevenuePeriod('custom');
-                  setActiveCalendarField(null);
-                  setCustomModalVisible(false);
-                }}
-                style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: '#002cf7', justifyContent: 'center', alignItems: 'center' }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#ffffff' }}>{t('dashboard.appliquer', {}, 'Appliquer')}</Text>
-              </TouchableOpacity>
-            </View>
-          </MotiView>
-        </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (calMonth === 11) {
+                            setCalMonth(0);
+                            setCalYear(calYear + 1);
+                          } else {
+                            setCalMonth(calMonth + 1);
+                          }
+                        }}
+                        style={{ padding: 6, borderRadius: 9999, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0' }}
+                      >
+                        <ChevronRight size={16} color={isDarkMode ? '#ffffff' : '#09090b'} />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Day Headers */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 6 }}>
+                      {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, idx) => (
+                        <Text key={idx} style={{ width: 32, textAlign: 'center', fontSize: 11, fontWeight: '600', color: isDarkMode ? '#a1a1aa' : '#64748b' }}>
+                          {d}
+                        </Text>
+                      ))}
+                    </View>
+
+                    {/* Days Grid */}
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                      {Array.from({ length: (new Date(calYear, calMonth, 1).getDay() + 6) % 7 }).map((_, i) => (
+                        <View key={`empty-${i}`} style={{ width: '14.28%', height: 32 }} />
+                      ))}
+
+                      {Array.from({ length: new Date(calYear, calMonth + 1, 0).getDate() }).map((_, i) => {
+                        const dayNum = i + 1;
+                        const formattedMonth = String(calMonth + 1).padStart(2, '0');
+                        const formattedDay = String(dayNum).padStart(2, '0');
+                        const dateStr = `${calYear}-${formattedMonth}-${formattedDay}`;
+
+                        const isSelected = activeCalendarField === 'start'
+                          ? customStartInput === dateStr
+                          : customEndInput === dateStr;
+
+                        return (
+                          <TouchableOpacity
+                            key={`day-${dayNum}`}
+                            onPress={() => handleSelectDayTile(dayNum)}
+                            style={{
+                              width: '14.28%',
+                              height: 32,
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              borderRadius: 16,
+                              backgroundColor: isSelected ? '#002cf7' : 'transparent'
+                            }}
+                          >
+                            <Text style={{
+                              fontSize: 12,
+                              fontWeight: isSelected ? '700' : '500',
+                              color: isSelected ? '#ffffff' : (isDarkMode ? '#e4e4e7' : '#18181b')
+                            }}>
+                              {dayNum}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </Modal.Body>
+
+              <Modal.Footer>
+                <Modal.Button
+                  slot="close"
+                  variant="secondary"
+                  style={{ flex: 1 }}
+                  onPress={() => setActiveCalendarField(null)}
+                >
+                  {t('app.cancel', {}, 'Annuler')}
+                </Modal.Button>
+                <Modal.Button
+                  variant="primary"
+                  style={{ flex: 1 }}
+                  onPress={() => {
+                    setCustomStartDate(customStartInput.trim());
+                    setCustomEndDate(customEndInput.trim());
+                    setRevenuePeriod('custom');
+                    setActiveCalendarField(null);
+                    setCustomModalVisible(false);
+                  }}
+                >
+                  {t('dashboard.appliquer', {}, 'Appliquer')}
+                </Modal.Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
 
       {renderKpiDetails()}
@@ -2036,20 +1867,15 @@ const baseStyles = StyleSheet.create({
     elevation: 2,
   },
   orderCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
+    alignItems: 'stretch',
     backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 16,
+    borderRadius: 20,
+    padding: 14,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
     overflow: 'hidden',
   },
   orderLeft: {
@@ -2091,12 +1917,12 @@ const baseStyles = StyleSheet.create({
   },
   orderRight: {
     alignItems: 'flex-end',
-    paddingRight: 10,
+    justifyContent: 'center',
   },
   statusTag: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 9999,
     borderWidth: 1,
     marginBottom: 6,
   },
@@ -2120,7 +1946,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(9, 9, 11, 0.45)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     padding: 16,
   },
   modalContent: {
@@ -2130,13 +1956,13 @@ const baseStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     maxHeight: '85%',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#e4e4e7',
     overflow: 'hidden',
   },
   modalHeader: {
@@ -2338,7 +2164,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#e0e7ff',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 12,
+    borderRadius: 9999,
   },
   purpleBadgeText: {
     fontSize: 10,
@@ -2351,7 +2177,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 14,
+    borderRadius: 9999,
     alignSelf: 'flex-start',
     marginTop: 4,
   },
@@ -2361,10 +2187,12 @@ const baseStyles = StyleSheet.create({
     color: '#10b981',
   },
   filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(0, 44, 247, 0.08)',
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 9999,
     borderWidth: 1,
     borderColor: 'rgba(0, 44, 247, 0.18)',
   },
@@ -2375,29 +2203,60 @@ const baseStyles = StyleSheet.create({
   },
   dropdownMenuRoot: {
     position: 'absolute',
-    width: 145,
-    borderRadius: 14,
+    width: 200,
+    borderRadius: 16,
     borderWidth: 1,
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    backgroundColor: '#ffffff',
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 12,
     zIndex: 999999,
+  },
+  dropdownSectionHeader: {
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f4f4f5',
+    marginBottom: 3,
+  },
+  dropdownSectionHeaderText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    color: '#71717a',
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    borderRadius: 10,
     marginVertical: 1,
   },
+  dropdownItemSelected: {
+    backgroundColor: 'rgba(0, 44, 247, 0.08)',
+  },
+  dropdownItemIndicator: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
   dropdownItemText: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#18181b',
+    flex: 1,
+  },
+  dropdownItemTextSelected: {
+    color: '#002cf7',
     fontWeight: '600',
   },
   kpiCard: {
@@ -2433,7 +2292,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: 'rgba(0, 44, 247, 0.05)',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 9999,
   },
   kpiLabel: {
     fontSize: 10,
@@ -2508,7 +2367,7 @@ const baseStyles = StyleSheet.create({
   miniStatusTag: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 9999,
     borderWidth: 1,
     marginTop: 4,
   },
@@ -2651,6 +2510,12 @@ function getStyles(isDarkMode) {
     greenPillBadge: { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
     filterPill: { backgroundColor: '#27272a' },
     filterPillText: { color: '#d4d4d8' },
+    dropdownMenuRoot: { backgroundColor: '#18181b', borderColor: '#27272a', shadowOpacity: 0.45 },
+    dropdownSectionHeader: { borderBottomColor: '#27272a' },
+    dropdownSectionHeaderText: { color: '#a1a1aa' },
+    dropdownItemText: { color: '#f4f4f5' },
+    dropdownItemTextSelected: { color: '#38bdf8' },
+    dropdownItemSelected: { backgroundColor: 'rgba(0, 44, 247, 0.2)' },
     kpiLabel: { color: '#d4d4d8' },
     kpiValue: { color: '#ffffff' },
     kpiSub: { color: '#a1a1aa' },

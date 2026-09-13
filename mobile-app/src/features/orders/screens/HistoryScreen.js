@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Platform, BackHandler, Alert, RefreshControl, FlatList } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Modal as RNModal, Platform, BackHandler, Alert, RefreshControl } from 'react-native';
+import { SmoothScrollView as ScrollView, SmoothFlatList as FlatList } from '../../../components/SmoothScroll';
 import { Search, Calendar, X, Receipt, Trash2, User, Ban, ChevronRight, Tag, ArrowLeft, Download, Printer } from 'lucide-react-native';
 import { db } from '../../../services/db';
+import { Modal } from '../../../components/ui/modal';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
 import * as Print from 'expo-print';
@@ -11,6 +13,7 @@ import { MotiView } from '../../../components/SafeView';
 import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
 import { t } from '../../../services/i18n';
+import { AnimatedBadge } from '../../../components/motion/animated-badge';
 
 export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigger, onSelectClient, onShowSuccess }) {
   const { orders, customers, currentUser, isDarkMode } = useDbState();
@@ -156,6 +159,15 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
 
   const getStatusColor = (statut) => {
     switch (statut) {
+      case 'en_attente_validation':
+      case 'attente_validation':
+        return { 
+          bg: isDarkMode ? 'rgba(139, 92, 246, 0.18)' : '#f5f3ff', 
+          text: isDarkMode ? '#c4b5fd' : '#7c3aed', 
+          border: isDarkMode ? 'rgba(139, 92, 246, 0.4)' : '#ddd6fe', 
+          label: 'Validation Caisse', 
+          accent: '#7c3aed' 
+        };
       case 'pret':
         return { 
           bg: isDarkMode ? 'rgba(16, 185, 129, 0.18)' : '#d1fae5', 
@@ -697,10 +709,14 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   </Text>
                 </TouchableOpacity>
 
-                <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border }]}>
-                  <View style={[styles.statusDot, { backgroundColor: status.accent }]} />
-                  <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
-                </View>
+                <AnimatedBadge
+                  status={item.statut}
+                  statusColor={status}
+                  isDarkMode={isDarkMode}
+                  size="sm"
+                >
+                  {status.label}
+                </AnimatedBadge>
               </View>
 
               {/* Ticket Badge */}
@@ -762,31 +778,32 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
       />
 
       {/* Detailed Order Screen (FULL SCREEN PAGE) */}
-      <Modal
+      <RNModal
         visible={selectedOrder !== null}
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={() => setSelectedOrder(null)}
       >
         <View style={styles.fullPageContainer}>
-          {/* HEADER BACK BUTTON */}
-          <View style={styles.fullPageHeader}>
-            <TouchableOpacity onPress={() => setSelectedOrder(null)} style={styles.backBtn} activeOpacity={0.7}>
-              <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-              <Text style={styles.backBtnText}>Retour</Text>
-            </TouchableOpacity>
+          <View style={styles.fullPageInnerWrapper}>
+            {/* HEADER BACK BUTTON */}
+            <View style={styles.fullPageHeader}>
+              <TouchableOpacity onPress={() => setSelectedOrder(null)} style={styles.backBtn} activeOpacity={0.7}>
+                <ArrowLeft size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+              </TouchableOpacity>
 
-            <Text style={styles.fullPageTitle} numberOfLines={1}>
-              {selectedOrder ? `Commande #${getDisplayTicketId(selectedOrder)}` : ''}
-            </Text>
-            <View style={{ width: 70 }} />
-          </View>
+              <Text style={styles.fullPageTitle} numberOfLines={1}>
+                {selectedOrder ? `Commande #${getDisplayTicketId(selectedOrder)}` : ''}
+              </Text>
+              <View style={{ width: 40 }} />
+            </View>
 
-          {selectedOrder && (
-            <ScrollView 
-              contentContainerStyle={styles.fullPageScroll} 
-              showsVerticalScrollIndicator={false}
-            >
+            {selectedOrder && (
+              <ScrollView 
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.fullPageScroll} 
+                showsVerticalScrollIndicator={false}
+              >
               <View style={styles.detailCard}>
                 <TouchableOpacity
                   onPress={() => {
@@ -808,11 +825,15 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   Retrait prévu le : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
                 </Text>
                 
-                <View style={[styles.statusTag, { backgroundColor: getStatusColor(selectedOrder.statut).bg, borderColor: getStatusColor(selectedOrder.statut).border, alignSelf: 'flex-start', marginTop: 10, borderWidth: 1 }]}>
-                  <Text style={[styles.statusTagText, { color: getStatusColor(selectedOrder.statut).text }]}>
-                    {getStatusColor(selectedOrder.statut).label}
-                  </Text>
-                </View>
+                <AnimatedBadge
+                  status={selectedOrder.statut}
+                  statusColor={getStatusColor(selectedOrder.statut)}
+                  isDarkMode={isDarkMode}
+                  size="md"
+                  style={{ alignSelf: 'flex-start', marginTop: 10 }}
+                >
+                  {getStatusColor(selectedOrder.statut).label}
+                </AnimatedBadge>
 
                 {(() => {
                   const client = customers.find(c => c.id === selectedOrder.customer_id);
@@ -973,7 +994,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   <TouchableOpacity
                     onPress={() => handleCancelOrder(selectedOrder)}
                     activeOpacity={0.8}
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 9999, paddingVertical: 10 }}
                   >
                     <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
                     <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler la commande</Text>
@@ -982,266 +1003,306 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
               )}
             </ScrollView>
           )}
+          </View>
         </View>
-      </Modal>
+      </RNModal>
 
-      {/* MODAL : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
-      <MotiView
-        pointerEvents={(showInvoiceModal && invoiceOrder) ? 'auto' : 'none'}
-        animate={{
-          opacity: (showInvoiceModal && invoiceOrder) ? 1 : 0
-        }}
-        transition={{ type: 'timing', duration: 120 }}
-        style={[
-          StyleSheet.absoluteFill,
-          { 
-            zIndex: 9999,
-            bottom: 0
-          }
-        ]}
+      {/* MODAL : INVOICE / FACTURE (HEROUI POPUP DIALOG) */}
+      <Modal
+        visible={showInvoiceModal && !!invoiceOrder}
+        onClose={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+        size="md"
+        isDarkMode={isDarkMode}
       >
-        {invoiceOrder && (() => {
-          const itemsList = invoiceOrder.items || invoiceOrder.articles || [];
-          let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
-          if (itemsSum === 0 && itemsList.length === 0) {
-            const catalogItem = db.getCatalog ? db.getCatalog().find(c => c.article === invoiceOrder.type_article && c.service === invoiceOrder.type_service) : null;
-            itemsSum = catalogItem ? catalogItem.prix : 1500;
-          }
-          const isExpress = invoiceOrder.niveau_urgence === 'Express';
-          const expressMarkupItem = db.getCatalog().find(c => c.id === 'setting_express_markup');
-          const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
-          const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
-          const netPrice = invoiceOrder.prix_total || invoiceOrder.total || 0;
-          
-          const displayBrut = invoiceOrder.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
-          const displayRemiseMontant = invoiceOrder.remise_montant || Math.max(0, displayBrut - netPrice);
-          const displayRemisePourcent = invoiceOrder.remise_pourcentage || (displayBrut > 0 ? Math.round((displayRemiseMontant / displayBrut) * 100) : 0);
-          const hasDiscount = displayRemiseMontant > 0;
+        <Modal.Backdrop>
+          <Modal.Container size="md">
+            <Modal.Dialog style={{ maxHeight: '90%' }}>
+              <Modal.CloseTrigger onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }} />
+              {invoiceOrder && (() => {
+                const itemsList = invoiceOrder.items || invoiceOrder.articles || [];
+                let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+                if (itemsSum === 0 && itemsList.length === 0) {
+                  const catalogItem = db.getCatalog ? db.getCatalog().find(c => c.article === invoiceOrder.type_article && c.service === invoiceOrder.type_service) : null;
+                  itemsSum = catalogItem ? catalogItem.prix : 1500;
+                }
+                const isExpress = invoiceOrder.niveau_urgence === 'Express';
+                const expressMarkupItem = db.getCatalog().find(c => c.id === 'setting_express_markup');
+                const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+                const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+                const netPrice = invoiceOrder.prix_total || invoiceOrder.total || 0;
+                
+                const displayBrut = invoiceOrder.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
+                const displayRemiseMontant = invoiceOrder.remise_montant || Math.max(0, displayBrut - netPrice);
+                const displayRemisePourcent = invoiceOrder.remise_pourcentage || (displayBrut > 0 ? Math.round((displayRemiseMontant / displayBrut) * 100) : 0);
+                const hasDiscount = displayRemiseMontant > 0;
 
-          return (
-            <View style={styles.absoluteModalContainer}>
-              <View style={styles.popupModalOverlay}>
-                <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                  <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-                </TouchableOpacity>
-                <View style={styles.popupModalView}>
-                  <View style={styles.compactModalHeader}>
-                    <Text style={styles.compactModalTitle}>Facture Client</Text>
-                    <TouchableOpacity onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                      <X size={20} color="#71717a" />
-                    </TouchableOpacity>
-                  </View>
+                return (
+                  <>
+                    <Modal.Header layout="row">
+                      <Modal.Icon variant="primary">
+                        <Receipt size={20} color="#002cf7" />
+                      </Modal.Icon>
+                      <View style={{ flex: 1 }}>
+                        <Modal.Heading>Facture Client</Modal.Heading>
+                        <Modal.Description>
+                          Ticket #{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}
+                        </Modal.Description>
+                      </View>
+                    </Modal.Header>
 
-                  <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
-                    {/* TPE Thermal Receipt Wrapper */}
-                    <View style={styles.tpeReceiptContainer}>
-                      {/* Receipt Header */}
-                      <Text style={styles.tpeBrand}>KLIN UP</Text>
-                      <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
-                      <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
-                      <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
-                      
-                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+                    <Modal.Body scrollable={false} style={{ flexShrink: 1, paddingVertical: 4 }}>
+                      <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
+                        {/* TPE Thermal Receipt Wrapper */}
+                        <View style={styles.tpeReceiptContainer}>
+                          {/* Receipt Header */}
+                          <Text style={styles.tpeBrand}>KLIN UP</Text>
+                          <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
+                          <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
+                          <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
+                          
+                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
 
-                      {/* Receipt Metadata */}
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
-                        <Text style={styles.tpeMetaVal}>#{getDisplayTicketId(invoiceOrder)}</Text>
-                      </View>
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Code :</Text>
-                        <Text style={styles.tpeMetaVal}>{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
-                      </View>
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Date :</Text>
-                        <Text style={styles.tpeMetaVal}>
-                          {invoiceOrder.created_at ? new Date(invoiceOrder.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
-                        </Text>
-                      </View>
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Client :</Text>
-                        <Text style={styles.tpeMetaVal}>
-                          {getCustomerName(invoiceOrder.customer_id)}
-                        </Text>
-                      </View>
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Règlement :</Text>
-                        <Text style={styles.tpeMetaVal}>{invoiceOrder.mode_reglement || invoiceOrder.mode_paiement || 'Espèces'}</Text>
-                      </View>
-                      {invoiceOrder.operateur_momo ? (
-                        <View style={styles.tpeMetaRow}>
-                          <Text style={styles.tpeMetaLabel}>Opérateur MoMo :</Text>
-                          <Text style={[styles.tpeMetaVal, { fontWeight: '700', color: '#002cf7' }]}>{invoiceOrder.operateur_momo}</Text>
-                        </View>
-                      ) : null}
-                      {(invoiceOrder.reference_momo || invoiceOrder.reference_paiement) ? (
-                        <View style={styles.tpeMetaRow}>
-                          <Text style={styles.tpeMetaLabel}>N° Réf. MoMo :</Text>
-                          <Text style={[styles.tpeMetaVal, { fontWeight: '700' }]}>{invoiceOrder.reference_momo || invoiceOrder.reference_paiement}</Text>
-                        </View>
-                      ) : null}
-
-                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                      {/* Articles list */}
-                      <View style={{ marginVertical: 4 }}>
-                        {(invoiceOrder.items || invoiceOrder.articles || []).map((art) => (
-                          <View key={`${art.article}-${art.service}`} style={styles.tpeItemRow}>
-                            <Text style={styles.tpeItemName}>
-                              {art.article} x{art.quantite || art.quantity}
-                            </Text>
-                            <Text style={styles.tpeItemPrice}>
-                              {formatPrice((art.prix || 0) * (art.quantite || art.quantity || 0))}
+                          {/* Receipt Metadata */}
+                          <View style={styles.tpeMetaRow}>
+                            <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
+                            <Text style={styles.tpeMetaVal}>#{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
+                          </View>
+                          <View style={styles.tpeMetaRow}>
+                            <Text style={styles.tpeMetaLabel}>Date :</Text>
+                            <Text style={styles.tpeMetaVal}>
+                              {invoiceOrder.created_at ? new Date(invoiceOrder.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
                             </Text>
                           </View>
-                        ))}
-                      </View>
+                          <View style={styles.tpeMetaRow}>
+                            <Text style={styles.tpeMetaLabel}>Client :</Text>
+                            <Text style={styles.tpeMetaVal}>
+                              {getCustomerName(invoiceOrder.customer_id)}
+                            </Text>
+                          </View>
+                          <View style={styles.tpeMetaRow}>
+                            <Text style={styles.tpeMetaLabel}>Règlement :</Text>
+                            <Text style={styles.tpeMetaVal}>{invoiceOrder.mode_reglement || invoiceOrder.mode_paiement || 'Espèces'}</Text>
+                          </View>
+                          {invoiceOrder.operateur_momo ? (
+                            <View style={styles.tpeMetaRow}>
+                              <Text style={styles.tpeMetaLabel}>Opérateur MoMo :</Text>
+                              <Text style={[styles.tpeMetaVal, { fontWeight: '700', color: '#002cf7' }]}>{invoiceOrder.operateur_momo}</Text>
+                            </View>
+                          ) : null}
+                          {(invoiceOrder.reference_momo || invoiceOrder.reference_paiement) ? (
+                            <View style={styles.tpeMetaRow}>
+                              <Text style={styles.tpeMetaLabel}>N° Réf. MoMo :</Text>
+                              <Text style={[styles.tpeMetaVal, { fontWeight: '700' }]}>{invoiceOrder.reference_momo || invoiceOrder.reference_paiement}</Text>
+                            </View>
+                          ) : null}
 
-                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
 
-                      {/* Financial stats */}
-                      <View style={styles.tpeTotalRow}>
-                        <Text style={styles.tpeTotalLabel}>Total Brut</Text>
-                        <Text style={styles.tpeTotalVal}>
-                          {formatPrice(displayBrut)}
-                        </Text>
-                      </View>
+                          {/* Articles list */}
+                          <View style={{ marginVertical: 4 }}>
+                            {(invoiceOrder.items || invoiceOrder.articles || []).map((art) => (
+                              <View key={`${art.article}-${art.service}`} style={styles.tpeItemRow}>
+                                <Text style={styles.tpeItemName}>
+                                  {art.article} x{art.quantite || art.quantity}
+                                </Text>
+                                <Text style={styles.tpeItemPrice}>
+                                  {formatPrice((art.prix || 0) * (art.quantite || art.quantity || 0))}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
 
-                      {hasDiscount && (
-                        <View style={styles.tpeTotalRow}>
-                          <Text style={[styles.tpeTotalLabel, { color: '#ef4444' }]}>
-                            REMISE ({displayRemisePourcent}%)
-                          </Text>
-                          <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(displayRemiseMontant)}</Text>
+                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                          {/* Financial stats */}
+                          <View style={styles.tpeTotalRow}>
+                            <Text style={styles.tpeTotalLabel}>Total Brut</Text>
+                            <Text style={styles.tpeTotalVal}>
+                              {formatPrice(displayBrut)}
+                            </Text>
+                          </View>
+
+                          {hasDiscount && (
+                            <View style={styles.tpeTotalRow}>
+                              <Text style={[styles.tpeTotalLabel, { color: '#ef4444' }]}>
+                                REMISE ({displayRemisePourcent}%)
+                              </Text>
+                              <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(displayRemiseMontant)}</Text>
+                            </View>
+                          )}
+
+                          <View style={styles.tpeTotalRow}>
+                            <Text style={styles.tpeTotalLabelBold}>Net à payer</Text>
+                            <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
+                          </View>
+
+                          <View style={styles.tpeTotalRow}>
+                            <Text style={styles.tpeTotalLabel}>Avance réglée</Text>
+                            <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.avance_payee || invoiceOrder.avance || 0)}</Text>
+                          </View>
+
+                          <View style={styles.tpeTotalRow}>
+                            <Text style={styles.tpeTotalLabelBold}>Solde dû</Text>
+                            <Text style={[styles.tpeTotalValBold, { color: (invoiceOrder.reste || 0) > 0 ? '#ef4444' : '#16a34a' }]}>
+                              {formatPrice(invoiceOrder.reste || 0)}
+                            </Text>
+                          </View>
+
+                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                          {/* Footer & Barcode placeholder */}
+                          <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
+                          
+                          <View style={{ height: 16 }} />
                         </View>
-                      )}
 
-                      <View style={styles.tpeTotalRow}>
-                        <Text style={styles.tpeTotalLabelBold}>Net à payer</Text>
-                        <Text style={styles.tpeTotalValBold}>{formatPrice(invoiceOrder.prix_total || invoiceOrder.total)}</Text>
-                      </View>
+                        {/* Print/Download controls */}
+                        <View className="no-print" dataSet={{ print: 'no' }} style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                          <TouchableOpacity
+                            className="no-print"
+                            dataSet={{ print: 'no' }}
+                            onPress={() => handleSharePdf(invoiceOrder)}
+                            style={styles.invoiceDownloadBtn}
+                            activeOpacity={0.8}
+                          >
+                            <Download size={14} color="#002cf7" style={{ marginRight: 6 }} />
+                            <Text style={styles.invoiceDownloadBtnText}>Télécharger</Text>
+                          </TouchableOpacity>
 
-                      <View style={styles.tpeTotalRow}>
-                        <Text style={styles.tpeTotalLabel}>Avance réglée</Text>
-                        <Text style={styles.tpeTotalVal}>{formatPrice(invoiceOrder.avance_payee || invoiceOrder.avance || 0)}</Text>
-                      </View>
+                          <TouchableOpacity
+                            className="no-print"
+                            dataSet={{ print: 'no' }}
+                            onPress={() => handlePrintInvoice(invoiceOrder)}
+                            style={styles.invoicePrintBtn}
+                            activeOpacity={0.8}
+                          >
+                            <Printer size={14} color="#ffffff" style={{ marginRight: 6 }} />
+                            <Text style={styles.invoicePrintBtnText}>Imprimer</Text>
+                          </TouchableOpacity>
+                        </View>
 
-                      <View style={styles.tpeTotalRow}>
-                        <Text style={styles.tpeTotalLabelBold}>Solde dû</Text>
-                        <Text style={[styles.tpeTotalValBold, { color: (invoiceOrder.reste || 0) > 0 ? '#ef4444' : '#16a34a' }]}>
-                          {formatPrice(invoiceOrder.reste || 0)}
-                        </Text>
-                      </View>
+                        <TouchableOpacity
+                          className="no-print"
+                          dataSet={{ print: 'no' }}
+                          onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+                          style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
+                        >
+                          <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
+                        </TouchableOpacity>
+                      </ScrollView>
+                    </Modal.Body>
+                  </>
+                );
+              })()}
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
 
-                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                      {/* Footer & Barcode placeholder */}
-                      <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
-                      
-                      <View style={{ height: 16 }} />
-                    </View>
-
-                    {/* Print/Download controls */}
-                    <View className="no-print" dataSet={{ print: 'no' }} style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-                      <TouchableOpacity
-                        className="no-print"
-                        dataSet={{ print: 'no' }}
-                        onPress={() => handleSharePdf(invoiceOrder)}
-                        style={styles.invoiceDownloadBtn}
-                        activeOpacity={0.8}
-                      >
-                        <Download size={14} color="#002cf7" style={{ marginRight: 6 }} />
-                        <Text style={styles.invoiceDownloadBtnText}>Télécharger</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        className="no-print"
-                        dataSet={{ print: 'no' }}
-                        onPress={() => handlePrintInvoice(invoiceOrder)}
-                        style={styles.invoicePrintBtn}
-                        activeOpacity={0.8}
-                      >
-                        <Printer size={14} color="#ffffff" style={{ marginRight: 6 }} />
-                        <Text style={styles.invoicePrintBtnText}>Imprimer</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity
-                      className="no-print"
-                      dataSet={{ print: 'no' }}
-                      onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
-                      style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
-                    >
-                      <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
-                    </TouchableOpacity>
-                  </ScrollView>
-                </View>
-              </View>
-            </View>
-          );
-        })()}
-      </MotiView>
-
-      {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}
-      <MotiView
-        pointerEvents={cancelModalVisible ? 'auto' : 'none'}
-        animate={{
-          opacity: cancelModalVisible ? 1 : 0
-        }}
-        transition={{ type: 'timing', duration: 120 }}
-        style={[
-          StyleSheet.absoluteFill,
-          { 
-            zIndex: 9999,
-            bottom: 0
-          }
-        ]}
+      {/* MODAL : MOTIF D'ANNULATION (HEROUI MODAL) */}
+      <Modal
+        isOpen={cancelModalVisible}
+        onClose={() => setCancelModalVisible(false)}
+        size="sm"
+        isDarkMode={isDarkMode}
       >
-        <View style={styles.absoluteModalContainer}>
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setCancelModalVisible(false)}>
-              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
-            
-            <MotiView
-              from={{ opacity: 0, scale: 0.97, translateY: 10 }}
-              animate={{ opacity: 1, scale: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 100 }}
-              style={[styles.popupModalView, { width: '92%', maxWidth: 350, padding: 20 }]}
-            >
-              <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Annuler la commande</Text>
-                <TouchableOpacity onPress={() => setCancelModalVisible(false)}>
-                  <X size={20} color="#71717a" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={{ alignItems: 'center', marginVertical: 10 }}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
-                  <Ban size={22} color="#ef4444" />
+        <Modal.Backdrop>
+          <Modal.Container size="sm">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header layout="row">
+                <Modal.Icon variant="danger">
+                  <Ban size={20} color="#ef4444" />
+                </Modal.Icon>
+                <View style={{ flex: 1 }}>
+                  <Modal.Heading>Annuler la commande</Modal.Heading>
+                  <Modal.Description numberOfLines={1}>
+                    {orderToCancel ? `Ticket #${getDisplayTicketId(orderToCancel)}` : 'Commande'}
+                  </Modal.Description>
                 </View>
-                <Text style={{ fontSize: 13, color: isDarkMode ? '#d4d4d8' : '#64748b', textAlign: 'center', paddingHorizontal: 10 }}>
-                  Veuillez spécifier le motif d'annulation de la commande #{orderToCancel ? (orderToCancel.ticket_numero || orderToCancel.id) : ''}.
-                </Text>
-              </View>
+              </Modal.Header>
 
-              <View style={{ marginVertical: 10 }}>
-                <TextInput
-                  style={[
-                    styles.modalInput,
-                    {
-                      height: 80,
-                      textAlignVertical: 'top',
-                      padding: 12,
-                      borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#27272a' : '#e2e8f0'),
+              <Modal.Body>
+                {orderToCancel && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc',
                       borderRadius: 12,
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      marginBottom: 14,
                       borderWidth: 1,
-                      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
-                      color: isDarkMode ? '#ffffff' : '#09090b',
-                    }
-                  ]}
-                  placeholder="Ex: Erreur de saisie, client absent..."
-                  placeholderTextColor={isDarkMode ? '#a1a1aa' : '#a1a1aa'}
+                      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+                    }}
+                  >
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '700',
+                          color: isDarkMode ? '#ffffff' : '#09090b',
+                        }}
+                      >
+                        {(() => {
+                          const c = customers?.find ? customers.find(cust => cust.id === orderToCancel.customer_id) : null;
+                          return c ? `${c.prenom} ${c.nom}` : (orderToCancel.client_nom || 'Client');
+                        })()}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: isDarkMode ? '#a1a1aa' : '#64748b',
+                          marginTop: 2,
+                        }}
+                      >
+                        Ticket #{getDisplayTicketId(orderToCancel)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: isDarkMode ? '#f87171' : '#dc2626',
+                      }}
+                    >
+                      {formatPrice(orderToCancel.prix_total !== undefined ? orderToCancel.prix_total : (orderToCancel.total || 0))}
+                    </Text>
+                  </View>
+                )}
+
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '500',
+                    color: isDarkMode ? '#d4d4d8' : '#475569',
+                    marginBottom: 8,
+                    lineHeight: 18,
+                  }}
+                >
+                  Veuillez spécifier le motif d'annulation de cette commande :
+                </Text>
+
+                <TextInput
+                  style={{
+                    width: '100%',
+                    minHeight: 88,
+                    textAlignVertical: 'top',
+                    padding: 12,
+                    fontSize: 13.5,
+                    lineHeight: 19,
+                    borderWidth: 1.5,
+                    borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#3f3f46' : '#cbd5e1'),
+                    borderRadius: 14,
+                    backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
+                    color: isDarkMode ? '#ffffff' : '#09090b',
+                    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                  }}
+                  placeholder="Ex: Erreur de saisie, client absent, doublon..."
+                  placeholderTextColor={isDarkMode ? '#71717a' : '#94a3b8'}
                   multiline={true}
                   numberOfLines={3}
                   value={cancelReason}
@@ -1251,49 +1312,24 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                   }}
                 />
                 {cancelReasonError ? (
-                  <Text style={{ color: '#ef4444', fontSize: 10, marginTop: 6, fontWeight: '600' }}>
+                  <Text style={{ color: '#ef4444', fontSize: 11.5, marginTop: 6, fontWeight: '600' }}>
                     {cancelReasonError}
                   </Text>
                 ) : null}
-              </View>
+              </Modal.Body>
 
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
-                <TouchableOpacity
-                  onPress={() => setCancelModalVisible(false)}
-                  style={{
-                    flex: 1,
-                    backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5',
-                    borderRadius: 12,
-                    paddingVertical: 12,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ color: isDarkMode ? '#d4d4d8' : '#27272a', fontWeight: '700', fontSize: 13 }}>
-                    Retour
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleConfirmCancelOrder}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#ef4444',
-                    borderRadius: 12,
-                    paddingVertical: 12,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>
-                    Confirmer
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </MotiView>
-          </View>
-        </View>
-      </MotiView>
+              <Modal.Footer>
+                <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
+                  Retour
+                </Modal.Button>
+                <Modal.Button variant="danger" onPress={handleConfirmCancelOrder} style={{ flex: 1 }}>
+                  Confirmer
+                </Modal.Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
       {/* MODAL FICHE CLIENT (POPUP SUR PAGE HISTORIQUE) */}
       <ClientDetailModal
         visible={!!selectedClient}
@@ -1361,7 +1397,7 @@ const baseStyles = StyleSheet.create({
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: 9999,
     backgroundColor: '#f1f5f9',
     marginRight: 8,
   },
@@ -1428,7 +1464,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 9999,
     borderWidth: 1,
   },
   statusDot: {
@@ -1454,7 +1490,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 9999,
   },
   ticketNoText: {
     fontSize: 11,
@@ -1503,7 +1539,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: 'rgba(0, 44, 247, 0.06)',
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 10,
+    borderRadius: 9999,
     borderWidth: 1,
     borderColor: 'rgba(0, 44, 247, 0.15)',
   },
@@ -1641,7 +1677,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     padding: 16,
   },
   compactModalView: {
@@ -1651,13 +1687,13 @@ const baseStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     maxHeight: '85%',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#e4e4e7',
     overflow: 'hidden',
   },
   compactModalHeader: {
@@ -1700,7 +1736,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#eff6ff',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 9999,
     borderWidth: 1,
     borderColor: '#dbeafe',
   },
@@ -1713,7 +1749,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(9, 9, 11, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     padding: 16,
   },
   popupModalView: {
@@ -1723,13 +1759,13 @@ const baseStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     maxHeight: '90%',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#e4e4e7',
   },
   tpeScroll: {
     paddingBottom: 16,
@@ -1881,7 +1917,7 @@ const baseStyles = StyleSheet.create({
   },
   invoiceCloseBtn: {
     backgroundColor: '#09090b',
-    borderRadius: 12,
+    borderRadius: 9999,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1899,7 +1935,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#eff6ff',
     borderWidth: 1.5,
     borderColor: '#bfdbfe',
-    borderRadius: 12,
+    borderRadius: 9999,
     paddingVertical: 12,
   },
   invoiceDownloadBtnText: {
@@ -1913,7 +1949,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#002cf7',
-    borderRadius: 12,
+    borderRadius: 9999,
     paddingVertical: 12,
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
@@ -2018,7 +2054,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#dcfce7',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 9999,
   },
   subActiveBadgeText: {
     fontSize: 9,
@@ -2068,7 +2104,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#fff1f2',
     borderWidth: 1,
     borderColor: '#ffe4e6',
-    borderRadius: 12,
+    borderRadius: 9999,
     paddingVertical: 8,
     alignItems: 'center',
     marginTop: 6,
@@ -2080,7 +2116,7 @@ const baseStyles = StyleSheet.create({
   },
   subscribeBtn: {
     backgroundColor: '#002cf7',
-    borderRadius: 10,
+    borderRadius: 9999,
     height: 40,
     paddingHorizontal: 16,
     justifyContent: 'center',
@@ -2097,7 +2133,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: '#bfdbfe',
-    borderRadius: 20,
+    borderRadius: 9999,
     paddingHorizontal: 12,
     paddingVertical: 6,
     alignSelf: 'flex-start',
@@ -2109,8 +2145,22 @@ const baseStyles = StyleSheet.create({
   },
   fullPageContainer: {
     flex: 1,
+    width: '100%',
+    height: Platform.OS === 'web' ? '100vh' : '100%',
+    backgroundColor: Platform.OS === 'web' ? '#0c0c10' : '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  fullPageInnerWrapper: {
+    ...(Platform.OS === 'web' ? {} : { flex: 1 }),
+    width: Platform.OS === 'web' ? 393 : '100%',
+    height: Platform.OS === 'web' ? 852 : '100%',
+    maxWidth: '100vw',
+    maxHeight: '100vh',
     backgroundColor: '#ffffff',
     paddingTop: Platform.OS === 'ios' ? 48 : 24,
+    overflow: 'hidden',
   },
   fullPageHeader: {
     flexDirection: 'row',
@@ -2123,16 +2173,14 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   backBtn: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 4,
-    paddingRight: 10,
-  },
-  backBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
   },
   fullPageTitle: {
     fontSize: 16,
@@ -2149,14 +2197,14 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(241, 245, 249, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     padding: 16,
   },
   popupModalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(241, 245, 249, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     padding: 16,
   },
   absoluteModalContainer: {
@@ -2173,12 +2221,13 @@ function getStyles(isDarkMode) {
   if (!isDarkMode) return baseStyles;
   
   const overrides = {
-    fullPageContainer: { backgroundColor: '#000000' },
+    fullPageContainer: { backgroundColor: Platform.OS === 'web' ? '#0c0c10' : '#000000' },
+    fullPageInnerWrapper: { backgroundColor: '#000000' },
     fullPageHeader: { backgroundColor: '#09090b', borderBottomColor: '#1f2937' },
-    backBtnText: { color: '#ffffff' },
+    backBtn: { backgroundColor: '#121212', borderColor: '#27272a' },
     fullPageTitle: { color: '#ffffff' },
-    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
-    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
+    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
     compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
     compactModalTitle: { color: '#ffffff' },
     detailCard: { backgroundColor: '#09090b', borderColor: '#27272a', borderWidth: 1 },
@@ -2215,7 +2264,7 @@ function getStyles(isDarkMode) {
     factureBtn: { backgroundColor: 'rgba(56, 189, 248, 0.12)', borderColor: 'rgba(56, 189, 248, 0.3)' },
     factureBtnText: { color: '#38bdf8' },
     detailsLinkText: { color: '#38bdf8' },
-    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
     modalContent: { backgroundColor: '#121212', borderColor: '#27272a' },
     modalTitle: { color: '#ffffff' },
     modalLabel: { color: '#d4d4d8' },

@@ -32,10 +32,13 @@
     "react-native-worklets": "0.10.1"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --clear",
+    "usb": "adb reverse tcp:8081 tcp:8081 2>nul & expo start --localhost --clear",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web --clear",
+    "tunnel": "expo start --tunnel --clear",
+    "postinstall": "node scripts/patch-expo-notifications.js"
   },
   "private": true,
   "devDependencies": {

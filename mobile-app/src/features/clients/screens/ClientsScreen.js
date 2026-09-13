@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import {
-  StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity,
-  Alert, BackHandler, Platform, KeyboardAvoidingView, Modal
+  StyleSheet, Text, View, TextInput, TouchableOpacity,
+  Alert, BackHandler, Platform, KeyboardAvoidingView, Modal as RNModal
 } from "react-native";
-import { Search, Plus, MapPin, Phone, ChevronRight, X, Edit3, Trash2, Award, CreditCard, Calendar, ArrowLeft, Gift, Sparkles, Star, Crown, Zap, TrendingUp } from "lucide-react-native";
+import { SmoothScrollView as ScrollView } from "../../../components/SmoothScroll";
+import { Search, Plus, MapPin, Phone, ChevronRight, X, Edit3, Trash2, Award, CreditCard, Calendar, ArrowLeft, Gift, Sparkles, Star, Crown, Zap, TrendingUp, Check, UserPlus, UserCheck } from "lucide-react-native";
 import { db } from "../../../services/db";
+import { SlideActionButton } from "../../../components/motion/slide-action-button";
 import { MotiView } from "../../../components/SafeView";
 import SafeBlurView from "../../../components/SafeBlurView";
 const BlurView = SafeBlurView;
@@ -15,8 +17,9 @@ import { t } from "../../../services/i18n";
 import { getFidelityTier, FIDELITY_TIERS, renderTierIcon } from "../../../utils/fidelityUtils";
 import { SUPPORTED_COUNTRIES, validatePhoneNumber } from "../../../utils/phoneUtils";
 import RewardFidelityCard from "../../../components/RewardFidelityCard";
+import { ConfirmationModal } from "../../../components/ui/modal";
 
-export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, isActive }) {
+export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, isActive, embedded = false }) {
   const { currentUser, isDarkMode } = useDbState();
   const styles = getStyles(isDarkMode);
   const [customers, setCustomers] = useState(() => db.getCustomers());
@@ -29,6 +32,8 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
   const [isFicheVisible, setIsFicheVisible] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedCrmSubId, setSelectedCrmSubId] = useState("");
+  const [deleteTargetClient, setDeleteTargetClient] = useState(null);
+  const [unsubscribeTargetCustId, setUnsubscribeTargetCustId] = useState(null);
 
   const [custNom, setCustNom] = useState("");
   const [custPrenom, setCustPrenom] = useState("");
@@ -104,25 +109,19 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
   };
 
   const handleUnsubscribeCrm = (customerId) => {
-    Alert.alert(
-      "Confirmation",
-      "Êtes-vous sûr de vouloir résilier cet abonnement ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Résilier",
-          style: "destructive",
-          onPress: () => {
-            const updatedCust = db.unsubscribeCustomer(customerId);
-            if (updatedCust) {
-              Alert.alert("Succès", "Abonnement résilié avec succès !");
-              setSelectedClient({ ...updatedCust });
-              refreshCustomers();
-            }
-          }
-        }
-      ]
-    );
+    setUnsubscribeTargetCustId(customerId);
+  };
+
+  const handleConfirmUnsubscribe = () => {
+    if (!unsubscribeTargetCustId) return;
+    const id = unsubscribeTargetCustId;
+    setUnsubscribeTargetCustId(null);
+    const updatedCust = db.unsubscribeCustomer(id);
+    if (updatedCust) {
+      if (onShowSuccess) onShowSuccess("Abonnement résilié avec succès !");
+      setSelectedClient({ ...updatedCust });
+      refreshCustomers();
+    }
   };
 
   useEffect(() => {
@@ -131,12 +130,15 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
       if (showCustomerModal) { handleCloseCustomerModal(); return true; }
       if (showEditModal) { handleCloseEditModal(); return true; }
       if (selectedClient) { handleCloseFiche(); return true; }
-      onBack();
-      return true;
+      if (!embedded && onBack) {
+        onBack();
+        return true;
+      }
+      return false;
     };
     const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
     return () => backHandler.remove();
-  }, [showCustomerModal, showEditModal, selectedClient]);
+  }, [showCustomerModal, showEditModal, selectedClient, embedded, onBack]);
 
   const abonnesCount = customers.filter(c => c.active_subscription && c.active_subscription.remaining_clothes > 0).length;
   const fideliteCount = customers.filter(c => (c.points_fidelite || 0) > 0).length;
@@ -197,11 +199,14 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
   };
 
   const handleSaveCustomer = async () => {
-    if (!custNom || !custTelephone) { Alert.alert("Erreur", "Le nom et le telephone sont obligatoires."); return; }
+    if (!custNom || !custTelephone) {
+      Alert.alert("Erreur", "Le nom et le telephone sont obligatoires.");
+      return false;
+    }
 
     if (!validatePhoneNumber(custTelephone, custIndicatif)) {
       Alert.alert("Erreur", "Le format du numéro de téléphone n'est pas valide pour l'indicatif choisi.");
-      return;
+      return false;
     }
 
     try {
@@ -230,40 +235,55 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
 
       if (isEditing) {
         db.updateCustomer(editingCustomer.id, customerPayload);
-        handleCloseEditModal();
       } else {
         const newCust = await db.addCustomer(customerPayload);
         if (newCust && custSubscriptionPlanId) {
           await db.subscribeCustomer(newCust.id, custSubscriptionPlanId);
         }
-        handleCloseCustomerModal();
       }
-      refreshCustomers();
-      if (onShowSuccess) onShowSuccess(isEditing ? "Profil client modifié !" : "Nouveau client créé !");
+
+      // Délai de 2 secondes sur le spinner intégré du bouton
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      setTimeout(() => {
+        if (isEditing) {
+          handleCloseEditModal();
+        } else {
+          handleCloseCustomerModal();
+        }
+        refreshCustomers();
+        if (onShowSuccess) onShowSuccess(isEditing ? "Profil client modifié !" : "Nouveau client créé !");
+      }, 700);
+
+      return true;
     } catch (e) {
       console.error("Error saving customer:", e);
-      Alert.alert("Erreur", "Impossible d enregistrer le profil client.");
+      Alert.alert("Erreur", "Impossible d'enregistrer le profil client.");
+      return false;
     }
   };
 
   const handleDeleteCustomer = (id) => {
-    Alert.alert("Confirmation", "Voulez-vous vraiment supprimer ce client ?", [
-      { text: "Annuler", style: "cancel" },
-      {
-        text: "Supprimer", style: "destructive", onPress: () => {
-          try {
-            db.deleteCustomer(id);
-            setSelectedClient(null);
-            refreshCustomers();
-            if (onShowSuccess) onShowSuccess("Profil client supprimé avec succès.");
-          }
-          catch (e) {
-            console.error("Error deleting customer:", e);
-            Alert.alert("Erreur", "Impossible de supprimer ce client.");
-          }
-        }
+    const target = (customers || []).find(c => c && c.id === id) || (selectedClient?.id === id ? selectedClient : { id });
+    setDeleteTargetClient(target);
+  };
+
+  const handleConfirmDeleteCustomer = () => {
+    if (!deleteTargetClient) return;
+    const id = deleteTargetClient.id;
+    setDeleteTargetClient(null);
+    try {
+      db.deleteCustomer(id);
+      if (selectedClient?.id === id) {
+        setSelectedClient(null);
+        setIsFicheVisible(false);
       }
-    ]);
+      refreshCustomers();
+      if (onShowSuccess) onShowSuccess("Profil client supprimé avec succès.");
+    } catch (e) {
+      console.error("Error deleting customer:", e);
+      Alert.alert("Erreur", "Impossible de supprimer ce client.");
+    }
   };
 
   const formatPrice = (price) => (price || 0).toLocaleString("fr-FR") + " FCFA";
@@ -277,7 +297,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
   };
 
   const renderForm = (isEditing, onClose, visible) => (
-    <Modal
+    <RNModal
       visible={visible}
       animationType="slide"
       presentationStyle="fullScreen"
@@ -291,17 +311,16 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
           {/* HEADER BACK BUTTON */}
           <View style={styles.fullPageHeader}>
             <TouchableOpacity onPress={onClose} style={styles.backBtnHeader} activeOpacity={0.7}>
-              <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-              <Text style={styles.backBtnText}>Retour</Text>
+              <ArrowLeft size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
             </TouchableOpacity>
 
             <Text style={styles.fullPageTitle} numberOfLines={1}>
               {isEditing ? "Modifier le Profil Client" : "Nouveau Profil Client"}
             </Text>
-            <View style={{ width: 70 }} />
+            <View style={{ width: 40 }} />
           </View>
 
-          <ScrollView contentContainerStyle={styles.fullPageScroll} bounces={false} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.fullPageScroll} bounces={false} showsVerticalScrollIndicator={false}>
             <View style={styles.compactInputRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.compactLabel}>Prénom</Text>
@@ -539,34 +558,53 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
               </View>
             )}
 
-            <TouchableOpacity
-              onPress={handleSaveCustomer}
-              style={styles.compactSubmitBtn}
+            <SlideActionButton
+              color="#002cf7"
+              isDarkMode={isDarkMode}
+              height={46}
+              minLoadingDuration={2000}
+              icon={isEditing ? <Check size={18} color="#ffffff" /> : <UserCheck size={18} color="#ffffff" />}
+              loadingText={isEditing ? "Modification du profil..." : "Création du profil..."}
+              completeLabel={isEditing ? "Profil modifié !" : "Client enregistré !"}
+              onComplete={handleSaveCustomer}
+              style={{ marginTop: 14 }}
             >
-              <Text style={styles.compactSubmitBtnText}>Enregistrer le client</Text>
-            </TouchableOpacity>
+              {isEditing ? "Modifier le profil" : "Enregistrer le client"}
+            </SlideActionButton>
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
-    </Modal>
+    </RNModal>
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
-            <X size={18} color={isDarkMode ? '#ffffff' : '#64748b'} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Clients</Text>
+    <View style={[styles.container, embedded && { backgroundColor: 'transparent' }]}>
+      {!embedded ? (
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
+              <X size={18} color={isDarkMode ? '#ffffff' : '#64748b'} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Clients</Text>
+            <TouchableOpacity onPress={handleOpenAddCustomer} style={styles.addBtn} activeOpacity={0.8}>
+              <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
+              <Text style={styles.addBtnText}>Nouveau</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.embeddedHeaderBar}>
+          <Text style={styles.embeddedCountText}>
+            {filteredClients.length} client{filteredClients.length > 1 ? 's' : ''}
+          </Text>
           <TouchableOpacity onPress={handleOpenAddCustomer} style={styles.addBtn} activeOpacity={0.8}>
             <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
-            <Text style={styles.addBtnText}>Nouveau</Text>
+            <Text style={styles.addBtnText}>Nouveau Client</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      )}
 
-      <View style={styles.filterHeader}>
+      <View style={[styles.filterHeader, embedded && { backgroundColor: 'transparent', paddingTop: 4, paddingBottom: 10 }]}>
         <View style={styles.searchContainer}>
           <Search size={16} color={isDarkMode ? '#a1a1aa' : '#71717a'} style={styles.searchIcon} />
           <TextInput
@@ -728,7 +766,7 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
       </ScrollView>
 
       {selectedClient && (
-        <Modal
+        <RNModal
           visible={!!selectedClient}
           animationType="slide"
           presentationStyle="fullScreen"
@@ -739,15 +777,14 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
               {/* HEADER BACK BUTTON */}
               <View style={styles.fullPageHeader}>
                 <TouchableOpacity onPress={handleCloseFiche} style={styles.backBtnHeader} activeOpacity={0.7}>
-                  <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-                  <Text style={styles.backBtnText}>Retour</Text>
+                  <ArrowLeft size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
                 </TouchableOpacity>
 
                 <Text style={styles.fullPageTitle} numberOfLines={1}>Fiche Client</Text>
-                <View style={{ width: 70 }} />
+                <View style={{ width: 40 }} />
               </View>
 
-              <ScrollView contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
                 <View style={styles.compactModalHeader}>
                   <View style={styles.ficheAvatarRow}>
                     <View style={styles.ficheAvatarLarge}>
@@ -858,11 +895,21 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
                             </View>
                           );
                         } else if (canSubscribe) {
-                          const plans = catalog.subscriptions || [];
-                          const selectOptions = plans.map(p => ({
-                            label: `${p.name} (${p.total_clothes} vet. / ${formatPrice(p.price)})`,
-                            value: p.id,
-                          }));
+                          const rawPlans = Array.isArray(catalog)
+                            ? catalog.filter(item => item && (item.categorie === 'abonnement' || item.service === 'abonnement' || item.categorie === 'abonnements'))
+                            : (catalog?.subscriptions || []);
+
+                          const selectOptions = rawPlans.length > 0
+                            ? rawPlans.map(p => ({
+                                label: `${p.article || p.name} (${(p.prix || p.price || 0).toLocaleString('fr-FR')} F/mois)`,
+                                value: p.id,
+                              }))
+                            : [
+                                { label: "Offre Active (20 000 F/mois)", value: "sub1" },
+                                { label: "Abonnement Premium (35 000 F/mois)", value: "sub2" },
+                                { label: "Abonnement Prestige (60 000 F/mois)", value: "sub3" },
+                                { label: "Abonnement VIP (100 000 F/mois)", value: "sub4" }
+                              ];
 
                           subscriptionForm = (
                             <View style={{ gap: 10 }}>
@@ -926,11 +973,37 @@ export default function ClientsScreen({ onBack, onSelectClient, onShowSuccess, i
               </ScrollView>
             </View>
           </View>
-        </Modal>
+        </RNModal>
       )}
 
       {renderForm(false, handleCloseCustomerModal, showCustomerModal)}
       {renderForm(true, handleCloseEditModal, showEditModal)}
+
+      {/* CONFIRMATION MODAL : SUPPRESSION DU CLIENT */}
+      <ConfirmationModal
+        visible={!!deleteTargetClient}
+        onClose={() => setDeleteTargetClient(null)}
+        onConfirm={handleConfirmDeleteCustomer}
+        title="Supprimer le client"
+        description={`Voulez-vous vraiment supprimer ${deleteTargetClient?.prenom || ''} ${deleteTargetClient?.nom || ''} ? Cette action est irréversible.`}
+        variant="danger"
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        isDarkMode={isDarkMode}
+      />
+
+      {/* CONFIRMATION MODAL : RÉSILIATION ABONNEMENT */}
+      <ConfirmationModal
+        visible={!!unsubscribeTargetCustId}
+        onClose={() => setUnsubscribeTargetCustId(null)}
+        onConfirm={handleConfirmUnsubscribe}
+        title="Résilier l'abonnement"
+        description="Êtes-vous sûr de vouloir résilier cet abonnement ?"
+        variant="warning"
+        confirmText="Résilier"
+        cancelText="Annuler"
+        isDarkMode={isDarkMode}
+      />
     </View>
   );
 }
@@ -941,23 +1014,36 @@ const baseStyles = StyleSheet.create({
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#ffffff", borderWidth: 1.5, borderColor: "#e2e8f0", justifyContent: "center", alignItems: "center" },
   headerTitle: { fontSize: 28, fontWeight: "700", color: "#09090b", letterSpacing: -0.5 },
-  addBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#002cf7", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, shadowColor: "transparent", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
+  addBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#002cf7", borderRadius: 9999, paddingHorizontal: 14, paddingVertical: 8, shadowColor: "transparent", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
   addBtnText: { color: "#ffffff", fontSize: 13, fontWeight: "700" },
+  embeddedHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  embeddedCountText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748b',
+  },
   filterHeader: { backgroundColor: "#f8fafc", paddingVertical: 14, borderBottomWidth: 1, borderColor: "rgba(0, 0, 0, 0.03)" },
   searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#ffffff", borderRadius: 16, borderWidth: 1.5, borderColor: "#e2e8f0", marginHorizontal: 16, paddingHorizontal: 12, height: 44, marginBottom: 12 },
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, fontSize: 13, color: "#09090b", fontWeight: "500", height: "100%" },
   chipRow: { flexDirection: "row", paddingHorizontal: 16 },
-  chip: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: "#e2e8f0", marginRight: 8 },
+  chip: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9999, backgroundColor: "#e2e8f0", marginRight: 8 },
   chipActive: { backgroundColor: "#002cf7" },
   chipText: { fontSize: 11, color: "#64748b", fontWeight: "600" },
   chipTextActive: { color: "#ffffff", fontWeight: "600" },
-  tierChip: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0', marginRight: 6 },
+  tierChip: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0', marginRight: 6 },
   tierChipActive: { backgroundColor: '#0f172a', borderColor: '#0f172a' },
   tierChipText: { fontSize: 11, fontWeight: '600', color: '#475569' },
   tierChipTextActive: { color: '#ffffff', fontWeight: '700' },
   fideliteBanner: { padding: 12, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
-  tierBadgeTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, gap: 4 },
+  tierBadgeTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 9999, borderWidth: 1, gap: 4 },
   tierBadgeIcon: { fontSize: 11 },
   tierBadgeText: { fontSize: 10, fontWeight: '700' },
   cardFidelityGauge: { marginTop: 10, padding: 8, borderRadius: 10, borderWidth: 1 },
@@ -981,7 +1067,7 @@ const baseStyles = StyleSheet.create({
   clientAvatarText: { fontSize: 15, fontWeight: "800", color: "#002cf7" },
   clientNameRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
   clientName: { fontSize: 14, fontWeight: "700", color: "#09090b" },
-  subBadge: { backgroundColor: "#dcfce7", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
+  subBadge: { backgroundColor: "#dcfce7", borderRadius: 9999, paddingHorizontal: 6, paddingVertical: 1 },
   subBadgeText: { fontSize: 9, fontWeight: "700", color: "#16a34a" },
   clientPhoneRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
   clientPhone: { fontSize: 12, color: "#64748b", fontWeight: "500" },
@@ -994,7 +1080,7 @@ const baseStyles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 16,
+    borderRadius: 9999,
     backgroundColor: "rgba(0, 44, 247, 0.08)",
     borderWidth: 1,
     borderColor: "rgba(0, 44, 247, 0.18)",
@@ -1010,14 +1096,22 @@ const baseStyles = StyleSheet.create({
   cardProgressBarFill: { height: "100%", backgroundColor: "#002cf7", borderRadius: 3 },
   fullPageContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
     width: '100%',
+    height: Platform.OS === 'web' ? '100vh' : '100%',
+    backgroundColor: Platform.OS === 'web' ? '#0c0c10' : '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   fullPageInnerWrapper: {
-    flex: 1,
-    width: '100%',
+    ...(Platform.OS === 'web' ? {} : { flex: 1 }),
+    width: Platform.OS === 'web' ? 393 : '100%',
+    height: Platform.OS === 'web' ? 852 : '100%',
+    maxWidth: '100vw',
+    maxHeight: '100vh',
     backgroundColor: '#ffffff',
     paddingTop: Platform.OS === 'ios' ? 48 : 24,
+    overflow: 'hidden',
   },
   fullPageHeader: {
     flexDirection: 'row',
@@ -1030,16 +1124,14 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   backBtnHeader: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 4,
-    paddingRight: 10,
-  },
-  backBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
   },
   fullPageTitle: {
     fontSize: 16,
@@ -1052,8 +1144,8 @@ const baseStyles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  compactModalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(241, 245, 249, 0.55)", padding: 16 },
-  compactModalView: { backgroundColor: "#ffffff", borderRadius: 24, padding: 20, width: "100%", maxWidth: 380, maxHeight: "85%", shadowColor: "transparent", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0, borderWidth: 1, borderColor: "#e2e8f0", overflow: "hidden" },
+  compactModalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.65)", padding: 16 },
+  compactModalView: { backgroundColor: "#ffffff", borderRadius: 24, padding: 20, width: "100%", maxWidth: 380, maxHeight: "85%", shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10, borderWidth: 1, borderColor: "#e4e4e7", overflow: "hidden" },
   compactModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   ficheAvatarRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   ficheAvatarLarge: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#dbeafe", justifyContent: "center", alignItems: "center" },
@@ -1072,16 +1164,16 @@ const baseStyles = StyleSheet.create({
   articlePrice: { fontSize: 12, fontWeight: "600", color: "#09090b" },
   subscriptionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#f1f5f9", paddingBottom: 8, marginBottom: 10 },
   subscriptionTitle: { fontSize: 13, fontWeight: "700", color: "#09090b" },
-  subActiveBadge: { backgroundColor: "#dcfce7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  subActiveBadge: { backgroundColor: "#dcfce7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 9999 },
   subActiveBadgeText: { fontSize: 9, color: "#15803d", fontWeight: "700" },
   subPlanName: { fontSize: 14, fontWeight: "700", color: "#002cf7" },
   subPlanBalance: { fontSize: 11, color: "#475569", fontWeight: "600", marginTop: 2 },
   progressBarBg: { height: 8, backgroundColor: "#f1f5f9", borderRadius: 4, overflow: "hidden" },
   progressBarFill: { height: "100%", backgroundColor: "#002cf7", borderRadius: 4 },
   ficheActions: { flexDirection: "row", gap: 10, marginTop: 16 },
-  ficheDeleteBtn: { flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", backgroundColor: "#fff1f2", borderWidth: 1, borderColor: "#ffe4e6", borderRadius: 14, paddingVertical: 12 },
+  ficheDeleteBtn: { flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", backgroundColor: "#fff1f2", borderWidth: 1, borderColor: "#ffe4e6", borderRadius: 9999, paddingVertical: 12 },
   ficheDeleteBtnText: { fontSize: 13, fontWeight: "700", color: "#ef4444" },
-  ficheEditBtn: { flex: 2, flexDirection: "row", justifyContent: "center", alignItems: "center", backgroundColor: "#002cf7", borderRadius: 14, paddingVertical: 12 },
+  ficheEditBtn: { flex: 2, flexDirection: "row", justifyContent: "center", alignItems: "center", backgroundColor: "#002cf7", borderRadius: 9999, paddingVertical: 12 },
   ficheEditBtnText: { fontSize: 13, fontWeight: "700", color: "#ffffff" },
   compactInputRow: {
     flexDirection: 'row',
@@ -1109,7 +1201,7 @@ const baseStyles = StyleSheet.create({
   prefSelector: {
     flexDirection: 'row',
     backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    borderRadius: 9999,
     padding: 3,
     marginBottom: 16,
   },
@@ -1117,7 +1209,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   prefOptionActive: {
     backgroundColor: '#ffffff',
@@ -1139,7 +1231,7 @@ const baseStyles = StyleSheet.create({
   planChip: {
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 12,
+    borderRadius: 9999,
     backgroundColor: '#f1f5f9',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
@@ -1161,7 +1253,7 @@ const baseStyles = StyleSheet.create({
   },
   compactSubmitBtn: {
     backgroundColor: '#2563eb',
-    borderRadius: 14,
+    borderRadius: 9999,
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 10,
@@ -1180,7 +1272,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#fff1f2',
     borderWidth: 1,
     borderColor: '#ffe4e6',
-    borderRadius: 12,
+    borderRadius: 9999,
     paddingVertical: 8,
     alignItems: 'center',
     marginTop: 10,
@@ -1192,7 +1284,7 @@ const baseStyles = StyleSheet.create({
   },
   subscribeBtn: {
     backgroundColor: '#002cf7',
-    borderRadius: 12,
+    borderRadius: 9999,
     height: 44,
     paddingHorizontal: 16,
     justifyContent: 'center',
@@ -1215,7 +1307,7 @@ const baseStyles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 10,
+    borderRadius: 9999,
     marginTop: 6,
   },
   deliveryPreviewCard: {
@@ -1234,6 +1326,7 @@ function getStyles(isDarkMode) {
     header: { backgroundColor: '#000000' },
     headerTitle: { color: '#ffffff' },
     backBtn: { backgroundColor: '#121212', borderColor: '#27272a' },
+    embeddedCountText: { color: '#a1a1aa' },
     filterHeader: { backgroundColor: '#000000', borderBottomColor: '#27272a' },
     searchContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
     searchInput: { color: '#ffffff' },
@@ -1261,19 +1354,19 @@ function getStyles(isDarkMode) {
     noResultsText: { color: '#a1a1aa' },
 
     // Modal & Form overrides
-    fullPageContainer: { backgroundColor: '#000000' },
+    fullPageContainer: { backgroundColor: Platform.OS === 'web' ? '#0c0c10' : '#000000' },
     fullPageInnerWrapper: { backgroundColor: '#000000' },
     fullPageHeader: { backgroundColor: '#09090b', borderBottomColor: '#1f2937' },
-    backBtnText: { color: '#ffffff' },
+    backBtnHeader: { backgroundColor: '#121212', borderColor: '#27272a' },
     fullPageTitle: { color: '#ffffff' },
-    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
     modalContent: { backgroundColor: '#121212', borderColor: '#27272a' },
     modalTitle: { color: '#ffffff' },
     modalLabel: { color: '#d4d4d8' },
     modalInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
 
     // Compact Modal & Form overrides
-    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
     compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
     compactModalTitle: { color: '#ffffff' },
     compactLabel: { color: '#d4d4d8' },

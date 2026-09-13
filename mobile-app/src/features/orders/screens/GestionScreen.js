@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Modal, Alert, FlatList, KeyboardAvoidingView, Platform, BackHandler, RefreshControl, Linking } from 'react-native';
-import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, Download, Award, Ban, ArrowLeft } from 'lucide-react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Modal as RNModal, Alert, KeyboardAvoidingView, Platform, BackHandler, RefreshControl, Linking } from 'react-native';
+import { SmoothScrollView as ScrollView, SmoothFlatList as FlatList } from '../../../components/SmoothScroll';
+import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, UserCheck, Download, Award, Ban, ArrowLeft, Zap, Package, AlarmClock, BadgeCheck } from 'lucide-react-native';
 import { db } from '../../../services/db';
 import { CustomSelect } from '../../../components/CustomSelect';
+import { SlideActionButton } from '../../../components/motion/slide-action-button';
+import { AnimatedBadge } from '../../../components/motion/animated-badge';
+import { Modal, ConfirmationModal, Button as ModalButton } from '../../../components/ui/modal';
 import SafeBlurView from '../../../components/SafeBlurView';
 const BlurView = SafeBlurView;
 import * as Print from 'expo-print';
@@ -35,25 +39,19 @@ export default function GestionScreen({
 }) {
   const { orders, customers, catalog, currentUser, isDarkMode } = useDbState();
   const styles = getStyles(isDarkMode);
-  const [showClientsPage, setShowClientsPage] = useState(false);
+  const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
 
-  // Notify parent to disable horizontal swipe when viewing Client page in Gestion > Client
+  // Notify parent to disable horizontal swipe when viewing Client tab in Gestion
   useEffect(() => {
     if (onDisableSwipeChange) {
-      onDisableSwipeChange(!!showClientsPage);
+      onDisableSwipeChange(subTab === 'clients');
     }
     return () => {
       if (onDisableSwipeChange) {
         onDisableSwipeChange(false);
       }
     };
-  }, [showClientsPage, onDisableSwipeChange]);
-
-  useEffect(() => {
-    if (isActive === false) {
-      setShowClientsPage(false);
-    }
-  }, [isActive]);
+  }, [subTab, onDisableSwipeChange]);
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
     setRefreshing(true);
@@ -88,19 +86,20 @@ export default function GestionScreen({
   };
   const [animatingOrderIds, setAnimatingOrderIds] = useState({});
 
-  const triggerFinalStatusAnimation = (orderId, nextStatus, callback) => {
-    setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'enter' } }));
+  const triggerFinalStatusAnimation = async (orderId, nextStatus, callback) => {
+    // 1. Exécuter l'action réseau / base de données (avec spinner + confirmation de succès fusionnée dans le modal)
+    if (typeof callback === 'function') {
+      await callback();
+    }
+    // 2. Sortie fluide de la carte dans la liste
+    setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'exit' } }));
     setTimeout(() => {
-      setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'exit' } }));
-      setTimeout(async () => {
-        await callback();
-        setAnimatingOrderIds(prev => {
-          const next = { ...prev };
-          delete next[orderId];
-          return next;
-        });
-      }, 300);
-    }, 850);
+      setAnimatingOrderIds(prev => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+    }, 300);
   };
 
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
@@ -158,7 +157,6 @@ export default function GestionScreen({
 
     triggerFinalStatusAnimation(order.id, 'annule', performCancel);
   };
-  const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('actives'); // actives, urgentes, retard
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -171,6 +169,8 @@ export default function GestionScreen({
       setSelectedClient(null);
       setShowInvoiceModal(false);
       setShowOrderDetails(false);
+      setCancelModalVisible(false);
+      setPaymentModalVisible(false);
       if (setSelectedOrder) setSelectedOrder(null);
     }
   }, [closeAllModalsTrigger]);
@@ -212,9 +212,8 @@ export default function GestionScreen({
   // Switch to orders or clients tab if a dashboard filter is applied
   useEffect(() => {
     if (gestionFilter === 'clients') {
-      setShowClientsPage(true);
+      setSubTab('clients');
     } else if (gestionFilter) {
-      setShowClientsPage(false);
       setSubTab('orders');
     }
   }, [gestionFilter]);
@@ -229,7 +228,13 @@ export default function GestionScreen({
     const s = String(status || '').trim().toLowerCase();
 
     if (role === 'agent_lavage_repassage') {
-      const allowed = ['en_attente', 'attente', 'pending', 'traitement', 'processing', 'en_cours_lavage', 'lavage_cours', 'washing', 'en_cours_repassage', 'repassage_cours', 'ironing', 'retard', 'en_retard', 'late'];
+      const allowed = [
+        'en_attente', 'attente', 'pending',
+        'traitement', 'en_traitement', 'processing', 'in_treatment',
+        'en_cours_lavage', 'lavage_cours', 'washing', 'lave', 'lavé',
+        'en_cours_repassage', 'repassage_cours', 'ironing',
+        'retard', 'en_retard', 'late'
+      ];
       return allowed.includes(s) && (
         targetStatus === 'traitement' ||
         targetStatus === 'en_cours_lavage' ||
@@ -239,18 +244,23 @@ export default function GestionScreen({
     }
 
     if (role === 'agent_accueil') {
+      const isValidation = ['en_attente_validation', 'attente_validation'].includes(s);
+      const isPret = ['pret', 'prêt', 'ready', 'pret_a_livrer'].includes(s);
+      const isAttente = ['retard', 'en_retard', 'late', 'en_attente', 'attente', 'pending'].includes(s);
       return (
-        ((s === 'pret' || s === 'ready') && (targetStatus === 'a_livrer' || targetStatus === 'a_recuperer')) ||
+        (isValidation && (targetStatus === 'en_attente' || targetStatus === 'traitement')) ||
+        (isPret && (targetStatus === 'a_livrer' || targetStatus === 'a_recuperer' || targetStatus === 'restitue' || targetStatus === 'livre')) ||
         (s === 'a_recuperer' && (targetStatus === 'restitue' || targetStatus === 'livre')) ||
-        ((s === 'retard' || s === 'en_retard' || s === 'late' || s === 'en_attente' || s === 'attente' || s === 'pending') && targetStatus === 'traitement')
+        (isAttente && targetStatus === 'traitement')
       );
     }
 
     if (role === 'livreur') {
+      const isEnLivraison = ['en_cours_livraison', 'en_cours_de_livraison', 'in_delivery', 'delivering', 'livraison'].includes(s);
       return (
         (s === 'a_livrer' && targetStatus === 'en_cours_livraison') ||
-        ((s === 'en_cours_livraison' || s === 'in_delivery') && (targetStatus === 'restitue' || targetStatus === 'livre')) ||
-        ((s === 'retard' || s === 'en_retard' || s === 'late') && (targetStatus === 'en_cours_livraison' || targetStatus === 'restitue'))
+        (isEnLivraison && (targetStatus === 'restitue' || targetStatus === 'livre')) ||
+        ((s === 'retard' || s === 'en_retard' || s === 'late') && (targetStatus === 'en_cours_livraison' || targetStatus === 'restitue' || targetStatus === 'livre'))
       );
     }
 
@@ -263,35 +273,150 @@ export default function GestionScreen({
   const getNextStatusStyle = (currentStatus) => {
     const s = String(currentStatus || '').trim().toLowerCase();
     switch (s) {
+      case 'en_attente_validation':
+      case 'attente_validation':
+        return {
+          bg: '#059669',
+          text: '#ffffff',
+          label: 'Valider la commande (Caisse)',
+          completeLabel: 'Commande validée',
+          loadingText: 'Validation caisse...',
+        };
       case 'attente':
       case 'en_attente':
       case 'pending':
       case 'retard':
       case 'en_retard':
       case 'late':
-        return { bg: '#7c3aed', text: '#ffffff', label: t('orders.passer_traitement', {}, 'Passer au traitement') };
+        return {
+          bg: '#7c3aed',
+          text: '#ffffff',
+          label: t('orders.passer_traitement', {}, 'Passer au traitement'),
+          completeLabel: 'En traitement',
+          loadingText: 'Traitement en cours...',
+        };
       case 'traitement':
+      case 'en_traitement':
       case 'processing':
-        return { bg: '#002cf7', text: '#ffffff', label: t('orders.lancer_lavage', {}, 'Lancer le lavage') };
+      case 'in_treatment':
+        return {
+          bg: '#002cf7',
+          text: '#ffffff',
+          label: t('orders.lancer_lavage', {}, 'Lancer le lavage'),
+          completeLabel: 'Lavage lancé',
+          loadingText: 'Lancement du lavage...',
+        };
       case 'lavage_cours':
       case 'en_cours_lavage':
       case 'washing':
-        return { bg: '#0d9488', text: '#ffffff', label: t('orders.passer_repassage', {}, 'Passer au repassage') };
+      case 'lave':
+      case 'lavé':
+        return {
+          bg: '#0d9488',
+          text: '#ffffff',
+          label: t('orders.passer_repassage', {}, 'Passer au repassage'),
+          completeLabel: 'En repassage',
+          loadingText: 'Passage au repassage...',
+        };
       case 'repassage_cours':
       case 'en_cours_repassage':
       case 'ironing':
-        return { bg: '#059669', text: '#ffffff', label: t('orders.statut_pret', {}, 'Prêt') };
+        return {
+          bg: '#059669',
+          text: '#ffffff',
+          label: t('orders.statut_pret', {}, 'Marquer comme prêt'),
+          completeLabel: 'Commande prête',
+          loadingText: 'Validation...',
+        };
+      case 'pret':
+      case 'prêt':
+      case 'ready':
+      case 'pret_a_livrer':
+        return {
+          bg: '#2563eb',
+          text: '#ffffff',
+          label: t('orders.statut_livraison', {}, 'Lancer la livraison'),
+          completeLabel: 'En livraison',
+          loadingText: 'Préparation...',
+        };
       case 'a_livrer':
-        return { bg: '#2563eb', text: '#ffffff', label: t('orders.statut_livraison', {}, 'Lancer la livraison') };
+        return {
+          bg: '#2563eb',
+          text: '#ffffff',
+          label: 'Démarrer la livraison',
+          completeLabel: 'Livraison démarrée',
+          loadingText: 'Démarrage...',
+        };
       case 'en_cours_livraison':
+      case 'en_cours_de_livraison':
       case 'in_delivery':
       case 'delivering':
-        return { bg: '#059669', text: '#ffffff', label: 'Terminer la livraison' };
+      case 'livraison':
+        return {
+          bg: '#059669',
+          text: '#ffffff',
+          label: 'Confirmer la livraison',
+          completeLabel: 'Commande livrée',
+          loadingText: 'Confirmation...',
+        };
       case 'a_recuperer':
-        return { bg: '#059669', text: '#ffffff', label: 'Commande récupérée' };
+        return {
+          bg: '#059669',
+          text: '#ffffff',
+          label: 'Remettre au client',
+          completeLabel: 'Commande remise',
+          loadingText: 'Validation retrait...',
+        };
+      case 'restitue':
+      case 'restitué':
+      case 'livre':
+      case 'livré':
+      case 'delivered':
+        return {
+          bg: '#10b981',
+          text: '#ffffff',
+          label: 'Commande terminée',
+          completeLabel: 'Terminée',
+          loadingText: 'Clôture...',
+        };
       default:
-        return { bg: '#002cf7', text: '#ffffff', label: t('orders.statut_maj', {}, 'Mise à jour') };
+        return {
+          bg: '#002cf7',
+          text: '#ffffff',
+          label: 'Mettre à jour le statut',
+          completeLabel: 'Mis à jour',
+          loadingText: 'Mise à jour...',
+        };
     }
+  };
+
+  const getNextStatusIcon = (status) => {
+    const iconS = String(status || '').trim().toLowerCase();
+    if (iconS === 'en_attente_validation' || iconS === 'attente_validation') {
+      return <CheckCircle size={16} color="#ffffff" />;
+    }
+    if (iconS === 'attente' || iconS === 'en_attente' || iconS === 'pending' || iconS === 'retard' || iconS === 'en_retard' || iconS === 'late') {
+      return <Sparkles size={16} color="#ffffff" />;
+    }
+    if (iconS === 'traitement' || iconS === 'en_traitement' || iconS === 'processing' || iconS === 'in_treatment') {
+      return <Wind size={16} color="#ffffff" />;
+    }
+    if (iconS === 'lavage_cours' || iconS === 'en_cours_lavage' || iconS === 'washing' || iconS === 'lave' || iconS === 'lavé') {
+      return <Shirt size={16} color="#ffffff" />;
+    }
+    if (iconS === 'repassage_cours' || iconS === 'en_cours_repassage' || iconS === 'ironing') {
+      return <CheckCircle size={16} color="#ffffff" />;
+    }
+    if (iconS === 'pret' || iconS === 'prêt' || iconS === 'ready' || iconS === 'pret_a_livrer' || iconS === 'a_livrer') {
+      return <Truck size={16} color="#ffffff" />;
+    }
+    if (iconS === 'en_cours_livraison' || iconS === 'en_cours_de_livraison' || iconS === 'in_delivery' || iconS === 'delivering' || iconS === 'livraison') {
+      return <ShoppingBag size={16} color="#ffffff" />;
+    }
+    if (iconS === 'a_recuperer') {
+      return <UserCheck size={16} color="#ffffff" />;
+    }
+    return <ChevronRight size={16} color="#ffffff" strokeWidth={2.6} />;
   };
   const [selectedCategory, setSelectedCategory] = useState('Tous');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -351,10 +476,6 @@ export default function GestionScreen({
     if (Platform.OS === 'web') return;
 
     const backAction = () => {
-      if (showClientsPage) {
-        setShowClientsPage(false);
-        return true;
-      }
       if (showInvoiceModal) {
         setShowInvoiceModal(false);
         setInvoiceOrder(null);
@@ -373,6 +494,10 @@ export default function GestionScreen({
         setSelectedClient(null);
         return true;
       }
+      if (subTab === 'clients') {
+        setSubTab('orders');
+        return true;
+      }
       return false; // let it propagate to parent back handler (which changes tab to accueil)
     };
 
@@ -383,7 +508,7 @@ export default function GestionScreen({
 
     return () => backHandler.remove();
   }, [
-    showClientsPage,
+    subTab,
     showInvoiceModal,
     showCustomerModal,
     showOrderDetails,
@@ -406,19 +531,23 @@ export default function GestionScreen({
   };
 
   // Status transitions
-  const handleNextStatus = async (order, updateSelected = false) => {
-    let nextStatus = 'en_attente';
+  const handleNextStatus = async (order, updateSelected = false, explicitTarget = null) => {
+    if (!order) return;
+    let nextStatus = explicitTarget;
     const status = String(order.statut || order.status || '').trim().toLowerCase();
-    if (status === 'attente' || status === 'en_attente' || status === 'pending') nextStatus = 'traitement';
-    else if (status === 'traitement' || status === 'processing') nextStatus = 'en_cours_lavage';
-    else if (status === 'lavage_cours' || status === 'en_cours_lavage' || status === 'washing') nextStatus = 'en_cours_repassage';
-    else if (status === 'repassage_cours' || status === 'en_cours_repassage' || status === 'ironing') nextStatus = 'pret';
-    else if (status === 'pret' || status === 'ready') nextStatus = 'a_livrer';
-    else if (status === 'a_livrer') nextStatus = 'en_cours_livraison';
-    else if (status === 'en_cours_livraison' || status === 'in_delivery' || status === 'delivering') nextStatus = 'livre';
-    else if (status === 'a_recuperer') nextStatus = 'restitue';
-    else if (status === 'retard' || status === 'en_retard' || status === 'late') nextStatus = 'traitement';
-    else nextStatus = 'traitement';
+
+    if (!nextStatus) {
+      if (status === 'attente' || status === 'en_attente' || status === 'pending') nextStatus = 'traitement';
+      else if (status === 'traitement' || status === 'en_traitement' || status === 'processing' || status === 'in_treatment') nextStatus = 'en_cours_lavage';
+      else if (status === 'lavage_cours' || status === 'en_cours_lavage' || status === 'washing' || status === 'lave' || status === 'lavé') nextStatus = 'en_cours_repassage';
+      else if (status === 'repassage_cours' || status === 'en_cours_repassage' || status === 'ironing') nextStatus = 'pret';
+      else if (status === 'pret' || status === 'prêt' || status === 'ready' || status === 'pret_a_livrer') nextStatus = 'a_livrer';
+      else if (status === 'a_livrer') nextStatus = 'en_cours_livraison';
+      else if (status === 'en_cours_livraison' || status === 'en_cours_de_livraison' || status === 'in_delivery' || status === 'delivering' || status === 'livraison') nextStatus = 'restitue';
+      else if (status === 'a_recuperer') nextStatus = 'restitue';
+      else if (status === 'retard' || status === 'en_retard' || status === 'late') nextStatus = 'traitement';
+      else nextStatus = 'traitement';
+    }
 
     const isFinal = nextStatus === 'livre' || nextStatus === 'restitue';
     const total = Number(order.prix_total || order.total || 0);
@@ -436,7 +565,7 @@ export default function GestionScreen({
       setMomoRefError('');
       setMomoOperator('MTN');
       setPaymentModalVisible(true);
-      return;
+      return false;
     }
 
     const performUpdate = async () => {
@@ -448,17 +577,42 @@ export default function GestionScreen({
         }
       } catch (e) {
         Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
+        throw e;
       }
     };
+
+    // Délai de 2 secondes sur le spinner intégré du bouton pour une transition fluide
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     if (isFinal) {
       if (showOrderDetails) {
         setShowOrderDetails(false);
         setSelectedOrder(null);
       }
-      triggerFinalStatusAnimation(order.id, nextStatus, performUpdate);
+      await triggerFinalStatusAnimation(order.id, nextStatus, performUpdate);
     } else {
       await performUpdate();
+    }
+  };
+
+  const handleValidateOrder = async (order) => {
+    if (!order) return;
+    try {
+      if (typeof db.validateOrderByCashier === 'function') {
+        await db.validateOrderByCashier(order.id);
+      } else {
+        await db.updateOrderStatus(order.id, 'en_attente');
+      }
+      if (selectedOrder && selectedOrder.id === order.id) {
+        const updated = (db.getOrders ? db.getOrders() : []).find(o => o.id === order.id);
+        if (updated) setSelectedOrder(updated);
+      }
+      if (onShowSuccess) {
+        onShowSuccess("Commande validée avec succès par la caisse !");
+      }
+    } catch (e) {
+      console.error("Error validating order by cashier:", e);
+      Alert.alert("Erreur", e.message || "Impossible de valider la commande.");
     }
   };
 
@@ -508,62 +662,18 @@ export default function GestionScreen({
     }
 
     if (isFinal) {
-      triggerFinalStatusAnimation(paymentOrder.id, targetStatus, performUpdate);
+      await triggerFinalStatusAnimation(paymentOrder.id, targetStatus, performUpdate);
     } else {
       await performUpdate();
     }
   };
 
   const handleUpdateStatusDirect = async (order, nextStatus) => {
-    const total = Number(order.prix_total || order.total || 0);
-    const avance = Number(order.avance_payee || order.avance || 0);
-    const remainingToPay = Math.max(0, total - avance);
-    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
-    const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'livre', 'restitue'].includes(nextStatus);
-
-    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
-      setPaymentOrder(order);
-      setPaymentNextStatus(nextStatus);
-      setPaymentMethod('Espèces');
-      setMomoRefNumber('');
-      setMomoRefError('');
-      setMomoOperator('MTN');
-      setPaymentModalVisible(true);
-      return;
-    }
-
-    try {
-      await db.updateOrderStatus(order.id, nextStatus);
-      const updated = db.getOrders().find(o => o.id === order.id);
-      if (updated) setSelectedOrder(updated);
-    } catch (e) {
-      Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
-    }
+    return handleNextStatus(order, true, nextStatus);
   };
 
   const handleNextStatusDirectList = async (order, nextStatus) => {
-    const total = Number(order.prix_total || order.total || 0);
-    const avance = Number(order.avance_payee || order.avance || 0);
-    const remainingToPay = Math.max(0, total - avance);
-    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
-    const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'livre', 'restitue'].includes(nextStatus);
-
-    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
-      setPaymentOrder(order);
-      setPaymentNextStatus(nextStatus);
-      setPaymentMethod('Espèces');
-      setMomoRefNumber('');
-      setMomoRefError('');
-      setMomoOperator('MTN');
-      setPaymentModalVisible(true);
-      return;
-    }
-
-    try {
-      await db.updateOrderStatus(order.id, nextStatus);
-    } catch (e) {
-      Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
-    }
+    return handleNextStatus(order, false, nextStatus);
   };
 
   const handleCancelOrder = (order) => {
@@ -605,7 +715,7 @@ export default function GestionScreen({
   const handleSaveCustomer = async () => {
     if (!custNom || !custTelephone) {
       Alert.alert("Erreur", "Le nom et le téléphone sont obligatoires.");
-      return;
+      return false;
     }
 
     try {
@@ -639,20 +749,28 @@ export default function GestionScreen({
         }
       }
 
-      setCustNom('');
-      setCustPrenom('');
-      setCustTelephone('');
-      setCustAdresse('');
-      setCustPreferences('Plié');
-      setCustSubscriptionPlanId('');
-      setEditingCustomer(null);
-      setWasEditingFromFiche(null);
-      setShowCustomerModal(false);
-      if (onShowSuccess) {
-        onShowSuccess(isEditing ? "Profil client modifié avec succès !" : "Nouveau client créé avec succès !");
-      }
+      // Délai de 2 secondes sur le spinner intégré du bouton
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      setTimeout(() => {
+        setCustNom('');
+        setCustPrenom('');
+        setCustTelephone('');
+        setCustAdresse('');
+        setCustPreferences('Plié');
+        setCustSubscriptionPlanId('');
+        setEditingCustomer(null);
+        setWasEditingFromFiche(null);
+        setShowCustomerModal(false);
+        if (onShowSuccess) {
+          onShowSuccess(isEditing ? "Profil client modifié avec succès !" : "Nouveau client créé avec succès !");
+        }
+      }, 700);
+
+      return true;
     } catch (e) {
       Alert.alert("Erreur", "Impossible d'enregistrer le profil client.");
+      return false;
     }
   };
 
@@ -744,6 +862,9 @@ export default function GestionScreen({
 
   const getStatusColor = (statut) => {
     switch (statut) {
+      case 'en_attente_validation':
+      case 'attente_validation':
+        return { bg: '#f5f3ff', text: '#7c3aed', label: 'Validation Caisse' };
       case 'pret':
         return { bg: '#e8f5e9', text: '#2e7d32', label: 'Prêt' };
       case 'a_recuperer':
@@ -1073,7 +1194,7 @@ export default function GestionScreen({
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `facture_${order.identifiant_unique_marquage || order.id || displayTicketId}.pdf`;
+        link.download = `facture_${order.identifiant_unique_marquage || order.id || getDisplayTicketId(order)}.pdf`;
         link.click();
       } else {
         await Sharing.shareAsync(uri, {
@@ -1141,173 +1262,154 @@ export default function GestionScreen({
     c.article.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (showClientsPage) {
-    return (
-      <MotiView
-        from={{ opacity: 0, translateX: 40 }}
-        animate={{ opacity: 1, translateX: 0 }}
-        transition={{ type: 'timing', duration: 120 }}
-        style={{ flex: 1 }}
-      >
-        <ClientsScreen
-          onBack={() => {
-            setShowClientsPage(false);
-            if (setGestionFilter) setGestionFilter(null);
-          }}
-          onSelectClient={(client) => {
-            setShowClientsPage(false);
-            if (setGestionFilter) setGestionFilter(null);
-            setSelectedClient(client);
-          }}
-          onShowSuccess={onShowSuccess}
-        />
-      </MotiView>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      {/* HEADER */}
+      {/* HEADER sobre et épuré conforme au reste de l'app */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Gestion</Text>
       </View>
 
-      {/* TABS SELECTOR */}
-      <View style={styles.tabHeader}>
-        {/* BOUTONS SUPÉRIEURS D'ACTION */}
-        <View style={styles.topActionsRow}>
+      {/* SÉLECTEUR D'ONGLETS (Commandes / Clients) */}
+      <View style={styles.tabSelectorContainer}>
+        <View style={styles.tabSelector}>
           <TouchableOpacity
             onPress={() => {
-              setShowClientsPage(false);
               setSubTab('orders');
               if (setGestionFilter) setGestionFilter(null);
             }}
-            style={styles.topActionBtnBlue}
+            style={[styles.tabButton, subTab === 'orders' && styles.tabButtonActive]}
             activeOpacity={0.8}
           >
-            <ShoppingBag size={14} color="#ffffff" style={{ marginRight: 6 }} />
-            <Text style={styles.topActionBtnTextBlue}>Commandes</Text>
+            <Text style={[styles.tabButtonText, subTab === 'orders' && styles.tabButtonTextActive]}>
+              Commandes
+            </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => {
-              setShowClientsPage(true);
+              setSubTab('clients');
               if (setGestionFilter) setGestionFilter(null);
             }}
-            style={styles.topActionBtnWhite}
+            style={[styles.tabButton, subTab === 'clients' && styles.tabButtonActive]}
             activeOpacity={0.8}
           >
-            <User size={14} color="#002cf7" style={{ marginRight: 6 }} />
-            <Text style={styles.topActionBtnTextWhite}>Clients</Text>
+            <Text style={[styles.tabButtonText, subTab === 'clients' && styles.tabButtonTextActive]}>
+              Clients
+            </Text>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* FILTRE DE 3 BOUTONS AVEC COULEURS SÉMANTIQUES */}
-        {subTab === 'orders' && (
+      {/* CONTENU DE L'ONGLET SÉLECTIONNÉ (COMMANDES OU CLIENTS SUR LA MÊME PAGE) */}
+      {subTab === 'orders' ? (
+        <MotiView
+          key="orders-subtab"
+          from={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ type: 'timing', duration: 120 }}
+          style={{ flex: 1 }}
+        >
+          {/* BARRE DE RECHERCHE COMMANDES */}
+          <View style={styles.searchSection}>
+            <View style={styles.searchContainer}>
+              <Search size={16} color={isDarkMode ? '#71717a' : '#94a3b8'} style={styles.searchIcon} />
+              <TextInput
+                placeholder="Rechercher un ticket ou un client..."
+                placeholderTextColor={isDarkMode ? '#71717a' : '#a1a1aa'}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={styles.searchInput}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7} style={{ padding: 4 }}>
+                  <X size={14} color={isDarkMode ? '#71717a' : '#94a3b8'} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* FILTRES DE STATUT COMMANDES (puces épurées style HistoryScreen) */}
           <View style={styles.statusFilterRow}>
             <TouchableOpacity
-              onPress={() => { setStatusFilter('actives'); setGestionFilter(null); }}
+              onPress={() => { setStatusFilter('actives'); if (setGestionFilter) setGestionFilter(null); }}
               style={[
-                styles.statusFilterBtn,
-                statusFilter === 'actives' && !gestionFilter ? {
-                  backgroundColor: activeFilterStyles.actives.backgroundColor,
-                  borderColor: activeFilterStyles.actives.borderColor
-                } : null
+                styles.chip,
+                statusFilter === 'actives' && !gestionFilter && styles.chipActive
               ]}
+              activeOpacity={0.8}
             >
               <Text style={[
-                styles.statusFilterText,
-                statusFilter === 'actives' && !gestionFilter ? { color: activeFilterStyles.actives.textColor } : null
+                styles.chipText,
+                statusFilter === 'actives' && !gestionFilter && styles.chipTextActive
               ]}>
-                Actives
+                Actives ({orders.filter(o => o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule').length})
               </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
-              onPress={() => { setStatusFilter('urgentes'); setGestionFilter(null); }}
+              onPress={() => { setStatusFilter('urgentes'); if (setGestionFilter) setGestionFilter(null); }}
               style={[
-                styles.statusFilterBtn,
-                statusFilter === 'urgentes' && !gestionFilter ? {
-                  backgroundColor: activeFilterStyles.urgentes.backgroundColor,
-                  borderColor: activeFilterStyles.urgentes.borderColor
-                } : null
+                styles.chip,
+                statusFilter === 'urgentes' && !gestionFilter && styles.chipActiveUrgent
               ]}
+              activeOpacity={0.8}
             >
               <Text style={[
-                styles.statusFilterText,
-                statusFilter === 'urgentes' && !gestionFilter ? { color: activeFilterStyles.urgentes.textColor } : null
+                styles.chipText,
+                statusFilter === 'urgentes' && !gestionFilter && styles.chipTextActiveUrgent
               ]}>
-                Urgentes
+                Urgentes ({orders.filter(o => o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule' && o.niveau_urgence === 'Express').length})
               </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
-              onPress={() => { setStatusFilter('retard'); setGestionFilter(null); }}
+              onPress={() => { setStatusFilter('retard'); if (setGestionFilter) setGestionFilter(null); }}
               style={[
-                styles.statusFilterBtn,
-                statusFilter === 'retard' && !gestionFilter ? {
-                  backgroundColor: activeFilterStyles.retard.backgroundColor,
-                  borderColor: activeFilterStyles.retard.borderColor
-                } : null
+                styles.chip,
+                statusFilter === 'retard' && !gestionFilter && styles.chipActiveLate
               ]}
+              activeOpacity={0.8}
             >
               <Text style={[
-                styles.statusFilterText,
-                statusFilter === 'retard' && !gestionFilter ? { color: activeFilterStyles.retard.textColor } : null
+                styles.chipText,
+                statusFilter === 'retard' && !gestionFilter && styles.chipTextActiveLate
               ]}>
-                En retard
+                En retard ({orders.filter(o => o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule' && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < new Date()))).length})
               </Text>
             </TouchableOpacity>
           </View>
-        )}
 
-      </View>
+          {/* FILTER PILL depuis dashboard */}
+          {gestionFilter && gestionFilter !== 'clients' && (
+            <View style={styles.filterPillSection}>
+              <View style={styles.filterPill}>
+                <Text style={styles.filterPillText}>
+                  Filtre : {
+                    gestionFilter === 'en_cours' ? 'En Cours' :
+                      gestionFilter === 'pretes' ? 'Prêtes' :
+                        gestionFilter === 'retards' ? 'Retards / Urgences' : gestionFilter
+                  }
+                </Text>
+                <TouchableOpacity onPress={() => setGestionFilter(null)} style={styles.clearFilterBtn}>
+                  <Text style={styles.clearFilterText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
-      {/* SEARCH BAR */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchContainer}>
-          <Search size={16} color="#71717a" style={styles.searchIcon} />
-          <TextInput
-            placeholder={
-              subTab === 'orders' ? "Rechercher un ticket ou un client..." :
-                subTab === 'clients' ? "Rechercher par nom ou téléphone..." : "Rechercher un article..."
+          {/* CONTENT LIST COMMANDES */}
+          <ScrollView
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={['#002cf7']}
+                tintColor={isDarkMode ? '#ffffff' : '#002cf7'}
+              />
             }
-            placeholderTextColor="#a1a1aa"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={styles.searchInput}
-          />
-        </View>
-      </View>
-
-      {/* FILTER PILL */}
-      {subTab === 'orders' && gestionFilter && gestionFilter !== 'clients' && (
-        <View style={styles.filterPillSection}>
-          <View style={styles.filterPill}>
-            <Text style={styles.filterPillText}>
-              Filtre : {
-                gestionFilter === 'en_cours' ? 'En Cours' :
-                  gestionFilter === 'pretes' ? 'Prêtes' :
-                    gestionFilter === 'retards' ? 'Retards / Urgences' : gestionFilter
-              }
-            </Text>
-            <TouchableOpacity onPress={() => setGestionFilter(null)} style={styles.clearFilterBtn}>
-              <Text style={styles.clearFilterText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* CONTENT LIST */}
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#002cf7']}
-            tintColor={isDarkMode ? '#ffffff' : '#002cf7'}
-          />
-        }
-      >
+          >
 
         {/* SUBTAB 1 : ORDERS LIST */}
         {subTab === 'orders' && (
@@ -1333,47 +1435,52 @@ export default function GestionScreen({
                     type: 'timing',
                     duration: animPhase === 'exit' ? 250 : 150,
                   }}
-                  style={{ marginBottom: 16 }}
+                  style={{ marginBottom: 14 }}
                 >
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => setSelectedOrder(item)}
                     style={styles.orderCard}
                   >
-                    {/* HEADER : Ticket ID & Status pill */}
+                    {/* EN-TÊTE DE LA CARTE : CLIENT & STATUT / TICKET & PRIX */}
                     <View style={styles.cardHeader}>
-                      <Text style={styles.cardTicketNo}>Ticket #{getDisplayTicketId(item)}</Text>
-                      <View style={[styles.statusTag, { backgroundColor: status.bg }]}>
-                        <View style={[styles.statusDot, { backgroundColor: status.text }]} />
-                        <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
+                      <View style={styles.cardClientCol}>
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            if (client) setSelectedClient(client);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.cardClientName} numberOfLines={1}>
+                            {client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}
+                          </Text>
+                        </TouchableOpacity>
+                        <Text style={styles.cardTicketNo}>
+                          Ticket #{getDisplayTicketId(item)}
+                        </Text>
+                      </View>
+
+                      <View style={styles.cardRightCol}>
+                        <AnimatedBadge
+                          status={item.statut}
+                          statusColor={status}
+                          isDarkMode={isDarkMode}
+                          size="sm"
+                        >
+                          {status.label}
+                        </AnimatedBadge>
+                        <Text style={styles.cardPrice}>{formatPrice(item.prix_total || item.total)}</Text>
                       </View>
                     </View>
 
-                    {/* CLIENT & PRICE ROW */}
-                    <View style={styles.cardDetails}>
-                      <TouchableOpacity
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          if (client) setSelectedClient(client);
-                        }}
-                        activeOpacity={0.8}
-                        style={styles.clientPillBtn}
-                      >
-                        <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
-                        <Text style={styles.clientPillBtnText}>
-                          {client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}
+                      {/* ARTICLES LIST */}
+                      <View style={styles.cardExtraInfoRow}>
+                        <Shirt size={14} color={isDarkMode ? '#52525b' : '#94a3b8'} style={{ marginRight: 6 }} />
+                        <Text style={styles.cardExtraInfoText} numberOfLines={1}>
+                          {getItemsSummary(item.items || item.articles)}
                         </Text>
-                      </TouchableOpacity>
-                      <Text style={styles.cardPrice}>{formatPrice(item.prix_total || item.total)}</Text>
-                    </View>
-
-                    {/* ARTICLES LIST */}
-                    <View style={styles.cardExtraInfoRow}>
-                      <Shirt size={14} color="#64748b" style={{ marginRight: 6 }} />
-                      <Text style={styles.cardExtraInfoText} numberOfLines={1}>
-                        {getItemsSummary(item.items || item.articles)}
-                      </Text>
-                    </View>
+                      </View>
 
                     {/* ADRESSE DE LIVRAISON CLIENT (ÉTAPE LIVRAISON) */}
                     {(item.statut === 'pret' || item.statut === 'a_recuperer' || item.statut === 'a_livrer' || item.statut === 'livraison' || item.statut === 'en_cours_de_livraison') && (
@@ -1387,7 +1494,6 @@ export default function GestionScreen({
                             return;
                           }
                           const encoded = encodeURIComponent(addr.trim());
-                          // URL universelle : Android l'intercepte vers l'app Maps native, iOS vers Apple/Google Maps
                           Linking.openURL(`https://maps.google.com/?q=${encoded}`);
                         }}
                         style={{
@@ -1451,19 +1557,14 @@ export default function GestionScreen({
                       </View>
                     )}
 
+                    {/* META ROW : date + paiement */}
                     <View style={styles.cardMetaRow}>
                       <View style={styles.metaBadge}>
-                        <Calendar size={10} color="#64748b" style={{ marginRight: 4 }} />
+                        <Calendar size={10} color={isDarkMode ? '#52525b' : '#94a3b8'} style={{ marginRight: 4 }} />
                         <Text style={styles.metaBadgeText}>Retrait : {formatDate(item.due_date || item.date_retrait_prevue)}</Text>
                       </View>
-                      <View style={[styles.metaBadge, item.niveau_urgence === 'Express' && styles.metaBadgeUrgent]}>
-                        <Clock size={10} color={item.niveau_urgence === 'Express' ? '#e11d48' : '#64748b'} style={{ marginRight: 4 }} />
-                        <Text style={[styles.metaBadgeText, item.niveau_urgence === 'Express' && styles.metaBadgeUrgentText]}>
-                          {item.niveau_urgence || 'Normal'}
-                        </Text>
-                      </View>
                       <View style={styles.metaBadge}>
-                        <CreditCard size={10} color="#64748b" style={{ marginRight: 4 }} />
+                        <CreditCard size={10} color={isDarkMode ? '#52525b' : '#94a3b8'} style={{ marginRight: 4 }} />
                         <Text style={styles.metaBadgeText}>{item.mode_reglement || item.mode_paiement || 'Espèces'}</Text>
                       </View>
                     </View>
@@ -1499,69 +1600,116 @@ export default function GestionScreen({
                           )}
                       </View>
 
-                      {/* Next Status Button */}
+                      {/* Next Status / Validation Button */}
                       {(() => {
-                        const status = item.statut;
+                        const status = String(item.statut || '').trim().toLowerCase();
 
-                        if (status === 'pret') {
+                        if (status === 'en_attente_validation' || status === 'attente_validation' || (item.cree_par_livreur && !item.validee_par_caisse)) {
+                          const canValidate = currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage';
+                          return (
+                            <View style={{ gap: 8, marginTop: 6, marginHorizontal: 2 }}>
+                              {canValidate ? (
+                                <TouchableOpacity
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    handleValidateOrder(item);
+                                  }}
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#059669',
+                                    borderRadius: 14,
+                                    paddingVertical: 11,
+                                    paddingHorizontal: 16,
+                                    gap: 8,
+                                    shadowColor: '#059669',
+                                    shadowOffset: { width: 0, height: 3 },
+                                    shadowOpacity: 0.25,
+                                    shadowRadius: 8,
+                                    elevation: 4,
+                                  }}
+                                  activeOpacity={0.85}
+                                >
+                                  <CheckCircle size={16} color="#ffffff" strokeWidth={2.5} />
+                                  <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.4 }}>
+                                    VALIDER LA COMMANDE
+                                  </Text>
+                                </TouchableOpacity>
+                              ) : (
+                                <View style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: isDarkMode ? 'rgba(139, 92, 246, 0.15)' : '#f5f3ff',
+                                  borderColor: isDarkMode ? 'rgba(139, 92, 246, 0.35)' : '#ddd6fe',
+                                  borderWidth: 1,
+                                  borderRadius: 12,
+                                  paddingVertical: 8,
+                                  paddingHorizontal: 12,
+                                  gap: 6,
+                                }}>
+                                  <Clock size={13} color="#7c3aed" />
+                                  <Text style={{ color: isDarkMode ? '#c4b5fd' : '#6d28d9', fontSize: 12, fontWeight: '700' }}>
+                                    En attente de validation par la caisse
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          );
+                        }
+
+                        if (status === 'pret' || status === 'pret_a_livrer' || status === 'ready' || status === 'prêt') {
                           const canLivrer = isTransitionAllowed('pret', 'a_livrer');
-                          const canRecuperer = isTransitionAllowed('pret', 'a_recuperer');
+                          const canRecuperer = isTransitionAllowed('pret', 'restitue') || isTransitionAllowed('pret', 'a_recuperer');
 
                           return (
-                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                              <TouchableOpacity
-                                onPress={canLivrer ? (e) => {
-                                  e.stopPropagation();
-                                  handleNextStatusDirectList(item, 'a_livrer');
-                                } : null}
-                                disabled={!canLivrer}
-                                activeOpacity={canLivrer ? 0.8 : 1}
-                                style={{ flex: 1 }}
-                              >
-                                <MotiView
-                                  animate={{ backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
-                                  style={[styles.cardNextStatusBlockBtn, { minHeight: 38, marginTop: 8, backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
+                            <View style={{ gap: 8, marginTop: 6, marginHorizontal: 2 }}>
+                              {canLivrer && (
+                                <SlideActionButton
+                                  color="#4f46e5"
+                                  isDarkMode={isDarkMode}
+                                  disabled={!canLivrer}
+                                  height={42}
+                                  minLoadingDuration={2000}
+                                  icon={<Truck size={16} color="#ffffff" />}
+                                  loadingText="Préparation livraison..."
+                                  completeLabel="Prêt pour livraison"
+                                  onComplete={() => handleNextStatus(item, false, 'a_livrer')}
                                 >
-                                  <Truck size={12} color={canLivrer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 4 }} />
-                                  <Text style={[styles.cardNextStatusBlockBtnText, { fontSize: 11, color: canLivrer ? '#ffffff' : '#94a3b8' }]}>
-                                    À livrer
-                                  </Text>
-                                </MotiView>
-                              </TouchableOpacity>
-
-                              <TouchableOpacity
-                                onPress={canRecuperer ? (e) => {
-                                  e.stopPropagation();
-                                  handleNextStatusDirectList(item, 'a_recuperer');
-                                } : null}
-                                disabled={!canRecuperer}
-                                activeOpacity={canRecuperer ? 0.8 : 1}
-                                style={{ flex: 1 }}
-                              >
-                                <MotiView
-                                  animate={{ backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
-                                  style={[styles.cardNextStatusBlockBtn, { minHeight: 38, marginTop: 8, backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
+                                  Lancer la livraison
+                                </SlideActionButton>
+                              )}
+                              {canRecuperer && (
+                                <SlideActionButton
+                                  color="#d97706"
+                                  isDarkMode={isDarkMode}
+                                  disabled={!canRecuperer}
+                                  height={42}
+                                  minLoadingDuration={2000}
+                                  icon={<UserCheck size={16} color="#ffffff" />}
+                                  loadingText="Validation retrait..."
+                                  completeLabel="Remis au client"
+                                  onComplete={() => handleNextStatus(item, false, 'restitue')}
                                 >
-                                  <User size={12} color={canRecuperer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 4 }} />
-                                  <Text style={[styles.cardNextStatusBlockBtnText, { fontSize: 11, color: canRecuperer ? '#ffffff' : '#94a3b8' }]}>
-                                    À récupérer
-                                  </Text>
-                                </MotiView>
-                              </TouchableOpacity>
+                                  Remettre au client
+                                </SlideActionButton>
+                              )}
                             </View>
                           );
                         }
 
                         let targetStatus = null;
-                        const s = String(status || '').trim().toLowerCase();
-                        if (s === 'attente' || s === 'en_attente' || s === 'pending') targetStatus = 'traitement';
-                        else if (s === 'traitement' || s === 'processing') targetStatus = 'en_cours_lavage';
-                        else if (s === 'lavage_cours' || s === 'en_cours_lavage' || s === 'washing') targetStatus = 'en_cours_repassage';
-                        else if (s === 'repassage_cours' || s === 'en_cours_repassage' || s === 'ironing') targetStatus = 'pret';
-                        else if (s === 'a_livrer') targetStatus = 'en_cours_livraison';
-                        else if (s === 'en_cours_livraison' || s === 'in_delivery' || s === 'delivering') targetStatus = 'restitue';
-                        else if (s === 'a_recuperer') targetStatus = 'restitue';
-                        else if (s === 'retard' || s === 'en_retard' || s === 'late') targetStatus = 'traitement';
+                        if (status === 'en_attente_validation' || status === 'attente_validation') targetStatus = 'en_attente';
+                        else if (status === 'attente' || status === 'en_attente' || status === 'pending') targetStatus = 'traitement';
+                        else if (status === 'traitement' || status === 'en_traitement' || status === 'processing' || status === 'in_treatment') targetStatus = 'en_cours_lavage';
+                        else if (status === 'lavage_cours' || status === 'en_cours_lavage' || status === 'washing' || status === 'lave' || status === 'lavé') targetStatus = 'en_cours_repassage';
+                        else if (status === 'repassage_cours' || status === 'en_cours_repassage' || status === 'ironing') targetStatus = 'pret';
+                        else if (status === 'pret' || status === 'prêt' || status === 'ready' || status === 'pret_a_livrer') targetStatus = 'a_livrer';
+                        else if (status === 'a_livrer') targetStatus = 'en_cours_livraison';
+                        else if (status === 'en_cours_livraison' || status === 'en_cours_de_livraison' || status === 'in_delivery' || status === 'delivering' || status === 'livraison') targetStatus = 'restitue';
+                        else if (status === 'a_recuperer') targetStatus = 'restitue';
+                        else if (status === 'retard' || status === 'en_retard' || status === 'late') targetStatus = 'traitement';
                         else targetStatus = 'traitement';
 
                         if (!targetStatus) return null;
@@ -1570,66 +1718,22 @@ export default function GestionScreen({
                         const nextStyle = getNextStatusStyle(item.statut);
                         if (!nextStyle) return null;
 
-                        const getNextStatusIcon = (status) => {
-                          const iconS = String(status || '').trim().toLowerCase();
-                          if (iconS === 'attente' || iconS === 'en_attente' || iconS === 'pending' || iconS === 'retard' || iconS === 'en_retard' || iconS === 'late') return 'Sparkles';
-                          if (status === 'traitement') return 'Wind';
-                          if (status === 'lavage_cours' || status === 'en_cours_lavage') return 'Shirt';
-                          if (status === 'repassage_cours' || status === 'en_cours_repassage') return 'Check';
-                          if (status === 'a_livrer') return 'Truck';
-                          if (status === 'en_cours_livraison') return 'ShoppingBag';
-                          return 'CheckCircle';
-                        };
-
-                        const iconName = getNextStatusIcon(item.statut);
-
                         return (
-                          <TouchableOpacity
-                            onPress={canTransition ? (e) => {
-                              e.stopPropagation();
-                              handleNextStatus(item, false);
-                            } : null}
-                            disabled={!canTransition}
-                            activeOpacity={canTransition ? 0.8 : 1}
-                            style={{ marginHorizontal: 4 }}
-                          >
-                            <MotiView
-                              animate={{
-                                backgroundColor: canTransition ? nextStyle.bg : (isDarkMode ? '#27272a' : '#f1f5f9'),
-                              }}
-                              transition={{
-                                type: 'timing',
-                                duration: 150,
-                              }}
-                              style={[styles.cardNextStatusBlockBtn, { backgroundColor: canTransition ? nextStyle.bg : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
+                          <View style={{ marginHorizontal: 2, marginTop: 6 }}>
+                            <SlideActionButton
+                              color={canTransition ? nextStyle.bg : '#94a3b8'}
+                              isDarkMode={isDarkMode}
+                              disabled={!canTransition}
+                              height={42}
+                              minLoadingDuration={2000}
+                              icon={getNextStatusIcon(item.statut)}
+                              loadingText={nextStyle.loadingText}
+                              completeLabel={nextStyle.completeLabel}
+                              onComplete={() => handleNextStatus(item, false, targetStatus)}
                             >
-                              <MotiView
-                                key={iconName}
-                                from={{ opacity: 0, scale: 0.5 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ type: 'timing', duration: 120 }}
-                                style={{ marginRight: 6 }}
-                              >
-                                {iconName === 'Sparkles' && <Sparkles size={13} color={canTransition ? '#ffffff' : '#94a3b8'} />}
-                                {iconName === 'Wind' && <Wind size={13} color={canTransition ? '#ffffff' : '#94a3b8'} />}
-                                {iconName === 'Shirt' && <Shirt size={13} color={canTransition ? '#ffffff' : '#94a3b8'} />}
-                                {iconName === 'Check' && <Check size={13} color={canTransition ? '#ffffff' : '#94a3b8'} />}
-                                {iconName === 'Truck' && <Truck size={13} color={canTransition ? '#ffffff' : '#94a3b8'} />}
-                                {iconName === 'ShoppingBag' && <ShoppingBag size={13} color={canTransition ? '#ffffff' : '#94a3b8'} />}
-                                {iconName === 'CheckCircle' && <CheckCircle size={13} color={canTransition ? '#ffffff' : '#94a3b8'} />}
-                              </MotiView>
-                              <MotiView
-                                key={nextStyle.label}
-                                from={{ opacity: 0, translateX: 5 }}
-                                animate={{ opacity: 1, translateX: 0 }}
-                                transition={{ type: 'timing', duration: 120 }}
-                              >
-                                <Text style={[styles.cardNextStatusBlockBtnText, { color: canTransition ? '#ffffff' : '#94a3b8' }]}>
-                                  {nextStyle.label}
-                                </Text>
-                              </MotiView>
-                            </MotiView>
-                          </TouchableOpacity>
+                              {nextStyle.label}
+                            </SlideActionButton>
+                          </View>
                         );
                       })()}
                     </View>
@@ -1700,64 +1804,27 @@ export default function GestionScreen({
           )
         )}
 
-        {/* SUBTAB 2 : CLIENTS LIST */}
-        {subTab === 'clients' && (
-          filteredClients.length === 0 ? (
-            <Text style={styles.noResultsText}>Aucun client trouvé</Text>
-          ) : (
-            filteredClients.map((client) => (
-              <TouchableOpacity
-                key={client.id}
-                activeOpacity={0.7}
-                onPress={() => setSelectedClient(client)}
-                style={styles.clientCard}
-              >
-                <View style={styles.clientInfo}>
-                  <Text style={styles.clientName}>{client.prenom} {client.nom}</Text>
-                  <Text style={styles.clientPhone}>{client.telephone}</Text>
-                </View>
-                <ChevronRight size={16} color="#a1a1aa" />
-              </TouchableOpacity>
-            ))
-          )
-        )}
-
-        {/* SUBTAB 3 : CATALOGUE */}
-        {subTab === 'catalog' && (
-          filteredCatalog.length === 0 ? (
-            <Text style={styles.noResultsText}>Aucun article trouvé</Text>
-          ) : (
-            filteredCatalog.map((item) => (
-              <View key={item.id} style={styles.catalogCard}>
-                <View>
-                  <Text style={styles.catalogArticle}>{item.article}</Text>
-                  <Text style={styles.catalogService}>{item.service.replace(/_/g, ' ')}</Text>
-                </View>
-                <Text style={styles.catalogPrice}>{formatPrice(item.prix)}</Text>
-              </View>
-            ))
-          )
-        )}
       </ScrollView>
-
-
-
-      {subTab === 'clients' && (
+        </MotiView>
+      ) : (
         <MotiView
-          from={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', damping: 15 }}
-          style={styles.fabContainer}
+          key="clients-subtab"
+          from={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ type: 'timing', duration: 120 }}
+          style={{ flex: 1 }}
         >
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => { setEditingCustomer(null); setShowCustomerModal(true); }}
-            style={styles.fab}
-          >
-            <Plus size={24} color="#ffffff" />
-          </TouchableOpacity>
+          <ClientsScreen
+            embedded={true}
+            onShowSuccess={onShowSuccess}
+            isActive={isActive && subTab === 'clients'}
+          />
         </MotiView>
       )}
+
+
+
+
 
       {/* MODAL 1 : DETAIL COMMANDE (FULL SCREEN PAGE) */}
       <MotiView
@@ -1773,25 +1840,26 @@ export default function GestionScreen({
           { zIndex: 9000, backgroundColor: isDarkMode ? '#000000' : '#ffffff' }
         ]}
       >
-        <View style={[styles.fullPageContainer, { paddingTop: 0 }]}>
-          {/* HEADER BACK BUTTON */}
-          <View style={styles.fullPageHeader}>
-            <TouchableOpacity onPress={handleCloseOrderDetails} style={styles.backBtn} activeOpacity={0.7}>
-              <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-              <Text style={styles.backBtnText}>Retour</Text>
-            </TouchableOpacity>
+        <View style={styles.fullPageContainer}>
+          <View style={styles.fullPageInnerWrapper}>
+            {/* HEADER BACK BUTTON */}
+            <View style={styles.fullPageHeader}>
+              <TouchableOpacity onPress={handleCloseOrderDetails} style={styles.backBtn} activeOpacity={0.7}>
+                <ArrowLeft size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+              </TouchableOpacity>
 
-            <Text style={styles.fullPageTitle} numberOfLines={1}>
-              {selectedOrder ? `Commande #${getDisplayTicketId(selectedOrder)}` : ''}
-            </Text>
-            <View style={{ width: 70 }} />
-          </View>
+              <Text style={styles.fullPageTitle} numberOfLines={1}>
+                {selectedOrder ? `Commande #${getDisplayTicketId(selectedOrder)}` : ''}
+              </Text>
+              <View style={{ width: 40 }} />
+            </View>
 
-          {selectedOrder && (
-            <ScrollView
-              contentContainerStyle={styles.fullPageScroll}
-              showsVerticalScrollIndicator={false}
-            >
+            {selectedOrder && (
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.fullPageScroll}
+                showsVerticalScrollIndicator={false}
+              >
               {/* Infos Client */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>Client & Statut</Text>
@@ -1816,11 +1884,15 @@ export default function GestionScreen({
                   </TouchableOpacity>
                   <Text style={styles.detailTextMuted}>Téléphone : {customers.find(c => c.id === selectedOrder.customer_id)?.telephone || 'N/A'}</Text>
 
-                  <View style={[styles.statusTag, { backgroundColor: getStatusColor(selectedOrder.statut).bg, borderColor: getStatusColor(selectedOrder.statut).border, alignSelf: 'flex-start', marginTop: 8, borderWidth: 1 }]}>
-                    <Text style={[styles.statusTagText, { color: getStatusColor(selectedOrder.statut).text }]}>
-                      {getStatusColor(selectedOrder.statut).label}
-                    </Text>
-                  </View>
+                  <AnimatedBadge
+                    status={selectedOrder.statut}
+                    statusColor={getStatusColor(selectedOrder.statut)}
+                    isDarkMode={isDarkMode}
+                    size="md"
+                    style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                  >
+                    {getStatusColor(selectedOrder.statut).label}
+                  </AnimatedBadge>
 
                   {(() => {
                     const client = customers.find(c => c.id === selectedOrder.customer_id);
@@ -2018,7 +2090,7 @@ export default function GestionScreen({
                     <TouchableOpacity
                       onPress={() => handleCancelOrder(selectedOrder)}
                       activeOpacity={0.8}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 10, paddingVertical: 10 }}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 9999, paddingVertical: 10 }}
                     >
                       <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
                       <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler la commande</Text>
@@ -2029,57 +2101,146 @@ export default function GestionScreen({
               {/* Action Button for changing status */}
               <View style={{ paddingHorizontal: 2 }}>
                 {selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && selectedOrder.statut !== 'annule' && (() => {
-                  const status = selectedOrder.statut;
+                  const status = String(selectedOrder.statut || '').trim().toLowerCase();
 
-                  // If status is 'pret', render two buttons side by side
-                  if (status === 'pret') {
-                    const canLivrer = isTransitionAllowed('pret', 'a_livrer');
-                    const canRecuperer = isTransitionAllowed('pret', 'a_recuperer');
-
+                  if (status === 'en_attente_validation' || status === 'attente_validation' || (selectedOrder.cree_par_livreur && !selectedOrder.validee_par_caisse)) {
+                    const canValidate = currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage';
                     return (
-                      <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 20 }}>
-                        <TouchableOpacity
-                          onPress={canLivrer ? () => handleUpdateStatusDirect(selectedOrder, 'a_livrer') : null}
-                          disabled={!canLivrer}
-                          activeOpacity={canLivrer ? 0.88 : 1}
-                          style={{ flex: 1 }}
-                        >
-                          <MotiView
-                            animate={{ backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
-                            style={[styles.statusChangeBtnSide, { backgroundColor: canLivrer ? '#4f46e5' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
+                      <View style={{ gap: 10, marginTop: 20, marginBottom: 20 }}>
+                        {canValidate ? (
+                          <TouchableOpacity
+                            onPress={() => handleValidateOrder(selectedOrder)}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: '#059669',
+                              borderRadius: 14,
+                              paddingVertical: 14,
+                              paddingHorizontal: 20,
+                              gap: 8,
+                              shadowColor: '#059669',
+                              shadowOffset: { width: 0, height: 4 },
+                              shadowOpacity: 0.3,
+                              shadowRadius: 10,
+                              elevation: 5,
+                            }}
+                            activeOpacity={0.85}
                           >
-                            <Truck size={16} color={canLivrer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 6 }} />
-                            <Text style={[styles.statusChangeBtnText, { color: canLivrer ? '#ffffff' : '#94a3b8' }]}>À livrer</Text>
-                          </MotiView>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          onPress={canRecuperer ? () => handleUpdateStatusDirect(selectedOrder, 'a_recuperer') : null}
-                          disabled={!canRecuperer}
-                          activeOpacity={canRecuperer ? 0.88 : 1}
-                          style={{ flex: 1 }}
-                        >
-                          <MotiView
-                            animate={{ backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }}
-                            style={[styles.statusChangeBtnSide, { backgroundColor: canRecuperer ? '#d97706' : (isDarkMode ? '#27272a' : '#f1f5f9') }]}
-                          >
-                            <User size={16} color={canRecuperer ? '#ffffff' : '#94a3b8'} style={{ marginRight: 6 }} />
-                            <Text style={[styles.statusChangeBtnText, { color: canRecuperer ? '#ffffff' : '#94a3b8' }]}>À récupérer</Text>
-                          </MotiView>
-                        </TouchableOpacity>
+                            <CheckCircle size={18} color="#ffffff" strokeWidth={2.5} />
+                            <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 }}>
+                              VALIDER LA COMMANDE
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: isDarkMode ? 'rgba(139, 92, 246, 0.15)' : '#f5f3ff',
+                            borderColor: isDarkMode ? 'rgba(139, 92, 246, 0.35)' : '#ddd6fe',
+                            borderWidth: 1,
+                            borderRadius: 14,
+                            paddingVertical: 12,
+                            paddingHorizontal: 16,
+                            gap: 8,
+                          }}>
+                            <Clock size={16} color="#7c3aed" />
+                            <Text style={{ color: isDarkMode ? '#c4b5fd' : '#6d28d9', fontSize: 13, fontWeight: '700', textAlign: 'center' }}>
+                              Cette commande créée par livreur doit être validée par la caisse.
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     );
                   }
-                  return null;
+
+                  // If status is 'pret', render two options (delivery / counter pickup)
+                  if (status === 'pret' || status === 'pret_a_livrer' || status === 'ready' || status === 'prêt') {
+                    const canLivrer = isTransitionAllowed('pret', 'a_livrer');
+                    const canRecuperer = isTransitionAllowed('pret', 'restitue') || isTransitionAllowed('pret', 'a_recuperer');
+
+                    return (
+                      <View style={{ gap: 10, marginTop: 20, marginBottom: 20 }}>
+                        {canLivrer && (
+                          <SlideActionButton
+                            color="#4f46e5"
+                            isDarkMode={isDarkMode}
+                            disabled={!canLivrer}
+                            height={46}
+                            minLoadingDuration={2000}
+                            icon={<Truck size={17} color="#ffffff" />}
+                            loadingText="Préparation livraison..."
+                            completeLabel="Prêt pour livraison"
+                            onComplete={() => handleNextStatus(selectedOrder, true, 'a_livrer')}
+                          >
+                            Lancer la livraison
+                          </SlideActionButton>
+                        )}
+                        {canRecuperer && (
+                          <SlideActionButton
+                            color="#d97706"
+                            isDarkMode={isDarkMode}
+                            disabled={!canRecuperer}
+                            height={46}
+                            minLoadingDuration={2000}
+                            icon={<UserCheck size={17} color="#ffffff" />}
+                            loadingText="Validation retrait..."
+                            completeLabel="Remis au client"
+                            onComplete={() => handleNextStatus(selectedOrder, true, 'restitue')}
+                          >
+                            Remettre au client
+                          </SlideActionButton>
+                        )}
+                      </View>
+                    );
+                  }
+
+                  let targetStatus = null;
+                  if (status === 'en_attente_validation' || status === 'attente_validation') targetStatus = 'en_attente';
+                  else if (status === 'attente' || status === 'en_attente' || status === 'pending') targetStatus = 'traitement';
+                  else if (status === 'traitement' || status === 'en_traitement' || status === 'processing' || status === 'in_treatment') targetStatus = 'en_cours_lavage';
+                  else if (status === 'lavage_cours' || status === 'en_cours_lavage' || status === 'washing' || status === 'lave' || status === 'lavé') targetStatus = 'en_cours_repassage';
+                  else if (status === 'repassage_cours' || status === 'en_cours_repassage' || status === 'ironing') targetStatus = 'pret';
+                  else if (status === 'pret' || status === 'prêt' || status === 'ready' || status === 'pret_a_livrer') targetStatus = 'a_livrer';
+                  else if (status === 'a_livrer') targetStatus = 'en_cours_livraison';
+                  else if (status === 'en_cours_livraison' || status === 'en_cours_de_livraison' || status === 'in_delivery' || status === 'delivering' || status === 'livraison') targetStatus = 'restitue';
+                  else if (status === 'a_recuperer') targetStatus = 'restitue';
+                  else if (status === 'retard' || status === 'en_retard' || status === 'late') targetStatus = 'traitement';
+                  else targetStatus = 'traitement';
+
+                  if (!targetStatus) return null;
+                  const canTransition = isTransitionAllowed(status, targetStatus);
+                  const nextStyle = getNextStatusStyle(selectedOrder.statut);
+                  if (!nextStyle) return null;
+
+                  return (
+                    <View style={{ marginTop: 20, marginBottom: 20 }}>
+                      <SlideActionButton
+                        color={canTransition ? nextStyle.bg : '#94a3b8'}
+                        isDarkMode={isDarkMode}
+                        disabled={!canTransition}
+                        height={46}
+                        minLoadingDuration={2000}
+                        icon={getNextStatusIcon(selectedOrder.statut)}
+                        loadingText={nextStyle.loadingText}
+                        completeLabel={nextStyle.completeLabel}
+                        onComplete={() => handleNextStatus(selectedOrder, true, targetStatus)}
+                      >
+                        {nextStyle.label}
+                      </SlideActionButton>
+                    </View>
+                  );
                 })()}
               </View>
             </ScrollView>
           )}
+          </View>
         </View>
       </MotiView>
 
       {/* MODAL 3 : CRÉATION / MODIFICATION CLIENT (FULL SCREEN PAGE) */}
-      <Modal
+      <RNModal
         visible={showCustomerModal}
         animationType="slide"
         presentationStyle="fullScreen"
@@ -2089,20 +2250,20 @@ export default function GestionScreen({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.fullPageContainer}
         >
-          {/* HEADER BACK BUTTON */}
-          <View style={styles.fullPageHeader}>
-            <TouchableOpacity onPress={handleCloseCustomerModal} style={styles.backBtn} activeOpacity={0.7}>
-              <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-              <Text style={styles.backBtnText}>Retour</Text>
-            </TouchableOpacity>
+          <View style={styles.fullPageInnerWrapper}>
+            {/* HEADER BACK BUTTON */}
+            <View style={styles.fullPageHeader}>
+              <TouchableOpacity onPress={handleCloseCustomerModal} style={styles.backBtn} activeOpacity={0.7}>
+                <ArrowLeft size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
+              </TouchableOpacity>
 
-            <Text style={styles.fullPageTitle} numberOfLines={1}>
-              {editingCustomer ? "Modifier le Profil Client" : "Nouveau Profil Client"}
-            </Text>
-            <View style={{ width: 70 }} />
-          </View>
+              <Text style={styles.fullPageTitle} numberOfLines={1}>
+                {editingCustomer ? "Modifier le Profil Client" : "Nouveau Profil Client"}
+              </Text>
+              <View style={{ width: 40 }} />
+            </View>
 
-          <ScrollView contentContainerStyle={styles.fullPageScroll} bounces={false}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.fullPageScroll} bounces={false}>
             <View style={styles.compactInputRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.compactLabel}>Prénom</Text>
@@ -2195,15 +2356,23 @@ export default function GestionScreen({
               </View>
             )}
 
-            <TouchableOpacity
-              onPress={handleSaveCustomer}
-              style={styles.compactSubmitBtn}
+            <SlideActionButton
+              color="#002cf7"
+              isDarkMode={isDarkMode}
+              height={46}
+              minLoadingDuration={2000}
+              icon={editingCustomer ? <Check size={18} color="#ffffff" /> : <UserCheck size={18} color="#ffffff" />}
+              loadingText={editingCustomer ? "Modification du profil..." : "Création du profil..."}
+              completeLabel={editingCustomer ? "Profil modifié !" : "Client enregistré !"}
+              onComplete={handleSaveCustomer}
+              style={{ marginTop: 14 }}
             >
-              <Text style={styles.compactSubmitBtnText}>Enregistrer le client</Text>
-            </TouchableOpacity>
+              {editingCustomer ? "Modifier le profil" : "Enregistrer le client"}
+            </SlideActionButton>
           </ScrollView>
+          </View>
         </KeyboardAvoidingView>
-      </Modal>
+      </RNModal>
 
       {/* MODAL 4 : DETAIL CLIENT (FICHE CLIENT) */}
       <ClientDetailModal
@@ -2214,294 +2383,337 @@ export default function GestionScreen({
         onShowSuccess={onShowSuccess}
       />
 
-      {/* MODAL 5 : INVOICE / FACTURE (CENTERED POPUP DIALOG) */}
-      <MotiView
-        pointerEvents={(showInvoiceModal && invoiceOrder) ? 'auto' : 'none'}
-        animate={{
-          opacity: (showInvoiceModal && invoiceOrder) ? 1 : 0
-        }}
-        transition={{ type: 'timing', duration: 120 }}
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            zIndex: 9999,
-            bottom: 0
-          }
-        ]}
+      {/* MODAL 5 : INVOICE / FACTURE (HEROUI POPUP DIALOG) */}
+      <Modal
+        visible={showInvoiceModal && !!invoiceOrder}
+        onClose={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+        size="md"
+        isDarkMode={isDarkMode}
       >
-        {invoiceOrder && (() => {
-          const itemsList = invoiceOrder.items || invoiceOrder.articles || [];
-          let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
-          if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
-            const catalogItem = db.getCatalog().find(c => c.article === invoiceOrder.type_article && c.service === invoiceOrder.type_service);
-            itemsSum = catalogItem ? Number(catalogItem.prix || 0) : 0;
-          }
-          const isExpress = invoiceOrder.niveau_urgence === 'Express';
-          const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
-          const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+        <Modal.Backdrop>
+          <Modal.Container size="md">
+            <Modal.Dialog style={{ maxHeight: '90%' }}>
+              <Modal.CloseTrigger onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }} />
+              {invoiceOrder && (() => {
+                const itemsList = invoiceOrder.items || invoiceOrder.articles || [];
+                let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+                if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
+                  const catalogItem = db.getCatalog().find(c => c.article === invoiceOrder.type_article && c.service === invoiceOrder.type_service);
+                  itemsSum = catalogItem ? Number(catalogItem.prix || 0) : 0;
+                }
+                const isExpress = invoiceOrder.niveau_urgence === 'Express';
+                const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
+                const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
 
-          const netPrice = Number(invoiceOrder.prix_total !== undefined ? invoiceOrder.prix_total : (invoiceOrder.total || 0));
-          const fraisLivraison = Number(invoiceOrder.frais_livraison || invoiceOrder.frais_transport || invoiceOrder.delivery_fee || 0);
-          const fraisRecuperation = Number(invoiceOrder.frais_recuperation || invoiceOrder.pickup_fee || 0);
+                const netPrice = Number(invoiceOrder.prix_total !== undefined ? invoiceOrder.prix_total : (invoiceOrder.total || 0));
+                const fraisLivraison = Number(invoiceOrder.frais_livraison || invoiceOrder.frais_transport || invoiceOrder.delivery_fee || 0);
+                const fraisRecuperation = Number(invoiceOrder.frais_recuperation || invoiceOrder.pickup_fee || 0);
 
-          const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
-          const displayBrut = Number(invoiceOrder.prix_base_avant_remise) || (calculatedBrut > 0 ? calculatedBrut : Math.max(0, netPrice - fraisLivraison - fraisRecuperation));
+                const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+                const displayBrut = Number(invoiceOrder.prix_base_avant_remise) || (calculatedBrut > 0 ? calculatedBrut : Math.max(0, netPrice - fraisLivraison - fraisRecuperation));
 
-          const discountPercent = Number(invoiceOrder.remise_pourcentage || invoiceOrder.remise || invoiceOrder.discount || 0);
-          let discountAmount = Number(invoiceOrder.remise_montant || 0);
-          if (!discountAmount && discountPercent > 0) {
-            discountAmount = Math.round(displayBrut * (discountPercent / 100));
-          }
-          if (!discountAmount && displayBrut > (netPrice - fraisLivraison - fraisRecuperation)) {
-            discountAmount = Math.max(0, displayBrut - (netPrice - fraisLivraison - fraisRecuperation));
-          }
-          const hasDiscount = discountAmount > 0;
-          const avance = Number(invoiceOrder.avance_payee !== undefined ? invoiceOrder.avance_payee : (invoiceOrder.avance || 0));
-          const reste = Math.max(0, netPrice - avance);
+                const discountPercent = Number(invoiceOrder.remise_pourcentage || invoiceOrder.remise || invoiceOrder.discount || 0);
+                let discountAmount = Number(invoiceOrder.remise_montant || 0);
+                if (!discountAmount && discountPercent > 0) {
+                  discountAmount = Math.round(displayBrut * (discountPercent / 100));
+                }
+                if (!discountAmount && displayBrut > (netPrice - fraisLivraison - fraisRecuperation)) {
+                  discountAmount = Math.max(0, displayBrut - (netPrice - fraisLivraison - fraisRecuperation));
+                }
+                const hasDiscount = discountAmount > 0;
+                const avance = Number(invoiceOrder.avance_payee !== undefined ? invoiceOrder.avance_payee : (invoiceOrder.avance || 0));
+                const reste = Math.max(0, netPrice - avance);
 
-          return (
-            <View style={styles.absoluteModalContainer}>
-              <View style={styles.popupModalOverlay}>
-                <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                  <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-                </TouchableOpacity>
-                <View style={styles.popupModalView}>
-                  <View style={styles.compactModalHeader}>
-                    <Text style={styles.compactModalTitle}>Facture Client</Text>
-                    <TouchableOpacity onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}>
-                      <X size={20} color="#71717a" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
-                    {/* TPE Thermal Receipt Wrapper */}
-                    <View style={styles.tpeReceiptContainer}>
-                      {/* Receipt Header */}
-                      <Text style={styles.tpeBrand}>KLIN UP</Text>
-                      <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
-                      <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
-                      <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
-
-                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                      {/* Receipt Metadata */}
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
-                        <Text style={styles.tpeMetaVal}>#{getDisplayTicketId(invoiceOrder)}</Text>
+                return (
+                  <>
+                    <Modal.Header layout="row">
+                      <Modal.Icon variant="primary">
+                        <Receipt size={20} color="#002cf7" />
+                      </Modal.Icon>
+                      <View style={{ flex: 1 }}>
+                        <Modal.Heading>Facture Client</Modal.Heading>
+                        <Modal.Description>
+                          Ticket #{getDisplayTicketId(invoiceOrder)}
+                        </Modal.Description>
                       </View>
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Code :</Text>
-                        <Text style={styles.tpeMetaVal}>{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
-                      </View>
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Date :</Text>
-                        <Text style={styles.tpeMetaVal}>
-                          {invoiceOrder.created_at ? new Date(invoiceOrder.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
-                        </Text>
-                      </View>
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Client :</Text>
-                        <Text style={styles.tpeMetaVal}>
-                          {(() => {
-                            const c = customers.find(cust => cust.id === invoiceOrder.customer_id);
-                            return c ? `${c.prenom} ${c.nom}` : 'Client Inconnu';
-                          })()}
-                        </Text>
-                      </View>
-                      <View style={styles.tpeMetaRow}>
-                        <Text style={styles.tpeMetaLabel}>Règlement :</Text>
-                        <Text style={styles.tpeMetaVal}>{invoiceOrder.mode_reglement || invoiceOrder.mode_paiement || 'Espèces'}</Text>
-                      </View>
-                      {invoiceOrder.operateur_momo ? (
-                        <View style={styles.tpeMetaRow}>
-                          <Text style={styles.tpeMetaLabel}>Opérateur MoMo :</Text>
-                          <Text style={[styles.tpeMetaVal, { fontWeight: '700', color: '#002cf7' }]}>{invoiceOrder.operateur_momo}</Text>
-                        </View>
-                      ) : null}
-                      {(invoiceOrder.reference_momo || invoiceOrder.reference_paiement) ? (
-                        <View style={styles.tpeMetaRow}>
-                          <Text style={styles.tpeMetaLabel}>N° Réf. MoMo :</Text>
-                          <Text style={[styles.tpeMetaVal, { fontWeight: '700' }]}>{invoiceOrder.reference_momo || invoiceOrder.reference_paiement}</Text>
-                        </View>
-                      ) : null}
+                    </Modal.Header>
 
-                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+                    <Modal.Body scrollable={false} style={{ flexShrink: 1, paddingVertical: 4 }}>
+                      <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
+                        {/* TPE Thermal Receipt Wrapper */}
+                        <View style={styles.tpeReceiptContainer}>
+                          {/* Receipt Header */}
+                          <Text style={styles.tpeBrand}>KLIN UP</Text>
+                          <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
+                          <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
+                          <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
 
-                      {/* Items list */}
-                      <Text style={styles.tpeSectionTitle}>ARTICLES & SERVICES</Text>
-                      {(invoiceOrder.items || invoiceOrder.articles || []).map((art, idx) => (
-                        <View key={idx} style={styles.tpeItemRow}>
-                          <View style={{ flex: 1.8 }}>
-                            <Text style={styles.tpeItemName}>{art.article}</Text>
-                            <Text style={styles.tpeItemService}>{art.service.replace(/_/g, ' ')}</Text>
+                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                          {/* Receipt Metadata */}
+                          <View style={styles.tpeMetaRow}>
+                            <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
+                            <Text style={styles.tpeMetaVal}>#{getDisplayTicketId(invoiceOrder)}</Text>
                           </View>
-                          <Text style={styles.tpeItemQty}>x{art.quantite || art.quantity}</Text>
-                          <Text style={styles.tpeItemPrice}>{formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</Text>
+                          <View style={styles.tpeMetaRow}>
+                            <Text style={styles.tpeMetaLabel}>Code :</Text>
+                            <Text style={styles.tpeMetaVal}>{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
+                          </View>
+                          <View style={styles.tpeMetaRow}>
+                            <Text style={styles.tpeMetaLabel}>Date :</Text>
+                            <Text style={styles.tpeMetaVal}>
+                              {invoiceOrder.created_at ? new Date(invoiceOrder.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
+                            </Text>
+                          </View>
+                          <View style={styles.tpeMetaRow}>
+                            <Text style={styles.tpeMetaLabel}>Client :</Text>
+                            <Text style={styles.tpeMetaVal}>
+                              {(() => {
+                                const c = customers.find(cust => cust.id === invoiceOrder.customer_id);
+                                return c ? `${c.prenom} ${c.nom}` : 'Client Inconnu';
+                              })()}
+                            </Text>
+                          </View>
+                          <View style={styles.tpeMetaRow}>
+                            <Text style={styles.tpeMetaLabel}>Règlement :</Text>
+                            <Text style={styles.tpeMetaVal}>{invoiceOrder.mode_reglement || invoiceOrder.mode_paiement || 'Espèces'}</Text>
+                          </View>
+                          {invoiceOrder.operateur_momo ? (
+                            <View style={styles.tpeMetaRow}>
+                              <Text style={styles.tpeMetaLabel}>Opérateur MoMo :</Text>
+                              <Text style={[styles.tpeMetaVal, { fontWeight: '700', color: '#002cf7' }]}>{invoiceOrder.operateur_momo}</Text>
+                            </View>
+                          ) : null}
+                          {(invoiceOrder.reference_momo || invoiceOrder.reference_paiement) ? (
+                            <View style={styles.tpeMetaRow}>
+                              <Text style={styles.tpeMetaLabel}>N° Réf. MoMo :</Text>
+                              <Text style={[styles.tpeMetaVal, { fontWeight: '700' }]}>{invoiceOrder.reference_momo || invoiceOrder.reference_paiement}</Text>
+                            </View>
+                          ) : null}
+
+                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                          {/* Items list */}
+                          <Text style={styles.tpeSectionTitle}>ARTICLES & SERVICES</Text>
+                          {(invoiceOrder.items || invoiceOrder.articles || []).map((art, idx) => (
+                            <View key={idx} style={styles.tpeItemRow}>
+                              <View style={{ flex: 1.8 }}>
+                                <Text style={styles.tpeItemName}>{art.article}</Text>
+                                <Text style={styles.tpeItemService}>{art.service.replace(/_/g, ' ')}</Text>
+                              </View>
+                              <Text style={styles.tpeItemQty}>x{art.quantite || art.quantity}</Text>
+                              <Text style={styles.tpeItemPrice}>{formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</Text>
+                            </View>
+                          ))}
+
+                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                          {/* Billing Details */}
+                          <View style={styles.tpeTotalRow}>
+                            <Text style={styles.tpeTotalLabel}>TOTAL BRUT</Text>
+                            <Text style={styles.tpeTotalVal}>
+                              {formatPrice(displayBrut)}
+                            </Text>
+                          </View>
+
+                          {hasDiscount && (
+                            <View style={styles.tpeTotalRow}>
+                              <Text style={[styles.tpeTotalLabel, { color: '#ef4444' }]}>
+                                REMISE EN FCFA
+                              </Text>
+                              <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
+                            </View>
+                          )}
+
+                          {fraisLivraison > 0 && (
+                            <View style={styles.tpeTotalRow}>
+                              <Text style={[styles.tpeTotalLabel, { color: '#3b82f6' }]}>
+                                LIVRAISON{invoiceOrder.distance_km ? ` (${invoiceOrder.distance_km} km)` : ''}
+                              </Text>
+                              <Text style={[styles.tpeTotalVal, { color: '#3b82f6' }]}>+{formatPrice(fraisLivraison)}</Text>
+                            </View>
+                          )}
+
+                          {fraisRecuperation > 0 && (
+                            <View style={styles.tpeTotalRow}>
+                              <Text style={[styles.tpeTotalLabel, { color: '#3b82f6' }]}>
+                                RECUPERATION
+                              </Text>
+                              <Text style={[styles.tpeTotalVal, { color: '#3b82f6' }]}>+{formatPrice(fraisRecuperation)}</Text>
+                            </View>
+                          )}
+
+                          <View style={styles.tpeTotalRow}>
+                            <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
+                            <Text style={styles.tpeTotalValBold}>{formatPrice(netPrice)}</Text>
+                          </View>
+
+                          <View style={styles.tpeTotalRow}>
+                            <Text style={styles.tpeTotalLabel}>AVANCE PAYEE</Text>
+                            <Text style={styles.tpeTotalVal}>{formatPrice(avance)}</Text>
+                          </View>
+
+                          <View style={styles.tpeTotalRow}>
+                            <Text style={styles.tpeTotalLabelBold}>RESTE A PAYER</Text>
+                            <Text style={[styles.tpeTotalValBold, { color: reste > 0 ? '#ef4444' : '#10b981' }]}>
+                              {formatPrice(reste)}
+                            </Text>
+                          </View>
+
+                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+
+                          {/* Footer & Barcode placeholder */}
+                          <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
+
+                          <View style={{ height: 16 }} />
                         </View>
-                      ))}
 
-                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
+                        {/* Print/Download controls */}
+                        <View className="no-print" dataSet={{ print: 'no' }} style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                          <TouchableOpacity
+                            className="no-print"
+                            dataSet={{ print: 'no' }}
+                            onPress={() => handleSharePdf(invoiceOrder)}
+                            style={styles.invoiceDownloadBtn}
+                            activeOpacity={0.8}
+                          >
+                            <Download size={14} color="#002cf7" style={{ marginRight: 6 }} />
+                            <Text style={styles.invoiceDownloadBtnText}>Télécharger</Text>
+                          </TouchableOpacity>
 
-                      {/* Billing Details */}
-                      <View style={styles.tpeTotalRow}>
-                        <Text style={styles.tpeTotalLabel}>TOTAL BRUT</Text>
-                        <Text style={styles.tpeTotalVal}>
-                          {formatPrice(displayBrut)}
-                        </Text>
-                      </View>
-
-                      {hasDiscount && (
-                        <View style={styles.tpeTotalRow}>
-                          <Text style={[styles.tpeTotalLabel, { color: '#ef4444' }]}>
-                            REMISE EN FCFA
-                          </Text>
-                          <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
+                          <TouchableOpacity
+                            className="no-print"
+                            dataSet={{ print: 'no' }}
+                            onPress={() => handlePrintInvoice(invoiceOrder)}
+                            style={styles.invoicePrintBtn}
+                            activeOpacity={0.8}
+                          >
+                            <Printer size={14} color="#ffffff" style={{ marginRight: 6 }} />
+                            <Text style={styles.invoicePrintBtnText}>Imprimer</Text>
+                          </TouchableOpacity>
                         </View>
-                      )}
 
-                      {fraisLivraison > 0 && (
-                        <View style={styles.tpeTotalRow}>
-                          <Text style={[styles.tpeTotalLabel, { color: '#3b82f6' }]}>
-                            LIVRAISON{invoiceOrder.distance_km ? ` (${invoiceOrder.distance_km} km)` : ''}
-                          </Text>
-                          <Text style={[styles.tpeTotalVal, { color: '#3b82f6' }]}>+{formatPrice(fraisLivraison)}</Text>
-                        </View>
-                      )}
-
-                      {fraisRecuperation > 0 && (
-                        <View style={styles.tpeTotalRow}>
-                          <Text style={[styles.tpeTotalLabel, { color: '#3b82f6' }]}>
-                            RECUPERATION
-                          </Text>
-                          <Text style={[styles.tpeTotalVal, { color: '#3b82f6' }]}>+{formatPrice(fraisRecuperation)}</Text>
-                        </View>
-                      )}
-
-                      <View style={styles.tpeTotalRow}>
-                        <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
-                        <Text style={styles.tpeTotalValBold}>{formatPrice(netPrice)}</Text>
-                      </View>
-
-                      <View style={styles.tpeTotalRow}>
-                        <Text style={styles.tpeTotalLabel}>AVANCE PAYEE</Text>
-                        <Text style={styles.tpeTotalVal}>{formatPrice(avance)}</Text>
-                      </View>
-
-                      <View style={styles.tpeTotalRow}>
-                        <Text style={styles.tpeTotalLabelBold}>RESTE A PAYER</Text>
-                        <Text style={[styles.tpeTotalValBold, { color: reste > 0 ? '#ef4444' : '#10b981' }]}>
-                          {formatPrice(reste)}
-                        </Text>
-                      </View>
-
-                      <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                      {/* Footer & Barcode placeholder */}
-                      <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
-
-                      <View style={{ height: 16 }} />
-                    </View>
-
-                    {/* Print/Download controls */}
-                    <View className="no-print" dataSet={{ print: 'no' }} style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-                      <TouchableOpacity
-                        className="no-print"
-                        dataSet={{ print: 'no' }}
-                        onPress={() => handleSharePdf(invoiceOrder)}
-                        style={styles.invoiceDownloadBtn}
-                        activeOpacity={0.8}
-                      >
-                        <Download size={14} color="#002cf7" style={{ marginRight: 6 }} />
-                        <Text style={styles.invoiceDownloadBtnText}>Télécharger</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        className="no-print"
-                        dataSet={{ print: 'no' }}
-                        onPress={() => handlePrintInvoice(invoiceOrder)}
-                        style={styles.invoicePrintBtn}
-                        activeOpacity={0.8}
-                      >
-                        <Printer size={14} color="#ffffff" style={{ marginRight: 6 }} />
-                        <Text style={styles.invoicePrintBtnText}>Imprimer</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity
-                      className="no-print"
-                      dataSet={{ print: 'no' }}
-                      onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
-                      style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
-                    >
-                      <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
-                    </TouchableOpacity>
-                  </ScrollView>
-                </View>
-              </View>
-            </View>
-          );
-        })()}
-      </MotiView>
-      {/* MODAL : MOTIF D'ANNULATION (POPUP INTERACTIF) */}
-      <MotiView
-        pointerEvents={cancelModalVisible ? 'auto' : 'none'}
-        animate={{
-          opacity: cancelModalVisible ? 1 : 0
-        }}
-        transition={{ type: 'timing', duration: 120 }}
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            zIndex: 9999,
-            bottom: 0
-          }
-        ]}
+                        <TouchableOpacity
+                          className="no-print"
+                          dataSet={{ print: 'no' }}
+                          onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
+                          style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
+                        >
+                          <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
+                        </TouchableOpacity>
+                      </ScrollView>
+                    </Modal.Body>
+                  </>
+                );
+              })()}
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
+      {/* MODAL : MOTIF D'ANNULATION (HEROUI MODAL) */}
+      <Modal
+        isOpen={cancelModalVisible}
+        onClose={() => setCancelModalVisible(false)}
+        size="sm"
+        isDarkMode={isDarkMode}
       >
-        <View style={styles.absoluteModalContainer}>
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setCancelModalVisible(false)}>
-              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
-
-            <MotiView
-              from={{ opacity: 0, scale: 0.97, translateY: 10 }}
-              animate={{ opacity: 1, scale: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 150 }}
-              style={[styles.popupModalView, { width: '92%', maxWidth: 350, padding: 20 }]}
-            >
-              <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Annuler la commande</Text>
-                <TouchableOpacity onPress={() => setCancelModalVisible(false)}>
-                  <X size={20} color="#71717a" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={{ alignItems: 'center', marginVertical: 10 }}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
-                  <Ban size={22} color="#ef4444" />
+        <Modal.Backdrop>
+          <Modal.Container size="sm">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header layout="row">
+                <Modal.Icon variant="danger">
+                  <Ban size={20} color="#ef4444" />
+                </Modal.Icon>
+                <View style={{ flex: 1 }}>
+                  <Modal.Heading>Annuler la commande</Modal.Heading>
+                  <Modal.Description numberOfLines={1}>
+                    {orderToCancel ? `Ticket #${getDisplayTicketId(orderToCancel)}` : 'Commande'}
+                  </Modal.Description>
                 </View>
-                <Text style={{ fontSize: 13, color: isDarkMode ? '#d4d4d8' : '#64748b', textAlign: 'center', paddingHorizontal: 10 }}>
-                  Veuillez spécifier le motif d'annulation de la commande #{orderToCancel ? (orderToCancel.ticket_numero || orderToCancel.id) : ''}.
-                </Text>
-              </View>
+              </Modal.Header>
 
-              <View style={{ marginVertical: 10 }}>
-                <TextInput
-                  style={[
-                    styles.modalInput,
-                    {
-                      height: 80,
-                      textAlignVertical: 'top',
-                      padding: 12,
-                      borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#27272a' : '#e2e8f0'),
+              <Modal.Body>
+                {orderToCancel && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc',
                       borderRadius: 12,
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      marginBottom: 14,
                       borderWidth: 1,
-                      backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
-                      color: isDarkMode ? '#ffffff' : '#09090b',
-                    }
-                  ]}
-                  placeholder="Ex: Erreur de saisie, client absent..."
-                  placeholderTextColor={isDarkMode ? '#64748b' : '#a1a1aa'}
+                      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+                    }}
+                  >
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '700',
+                          color: isDarkMode ? '#ffffff' : '#09090b',
+                        }}
+                      >
+                        {(() => {
+                          const c = customers?.find ? customers.find(cust => cust.id === orderToCancel.customer_id) : null;
+                          return c ? `${c.prenom} ${c.nom}` : (orderToCancel.client_nom || 'Client');
+                        })()}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: isDarkMode ? '#a1a1aa' : '#64748b',
+                          marginTop: 2,
+                        }}
+                      >
+                        Ticket #{getDisplayTicketId(orderToCancel)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: isDarkMode ? '#f87171' : '#dc2626',
+                      }}
+                    >
+                      {formatPrice(orderToCancel.prix_total !== undefined ? orderToCancel.prix_total : (orderToCancel.total || 0))}
+                    </Text>
+                  </View>
+                )}
+
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '500',
+                    color: isDarkMode ? '#d4d4d8' : '#475569',
+                    marginBottom: 8,
+                    lineHeight: 18,
+                  }}
+                >
+                  Veuillez spécifier le motif d'annulation de cette commande :
+                </Text>
+
+                <TextInput
+                  style={{
+                    width: '100%',
+                    minHeight: 88,
+                    textAlignVertical: 'top',
+                    padding: 12,
+                    fontSize: 13.5,
+                    lineHeight: 19,
+                    borderWidth: 1.5,
+                    borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#3f3f46' : '#cbd5e1'),
+                    borderRadius: 14,
+                    backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
+                    color: isDarkMode ? '#ffffff' : '#09090b',
+                    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                  }}
+                  placeholder="Ex: Erreur de saisie, client absent, doublon..."
+                  placeholderTextColor={isDarkMode ? '#71717a' : '#94a3b8'}
                   multiline={true}
                   numberOfLines={3}
                   value={cancelReason}
@@ -2511,78 +2723,47 @@ export default function GestionScreen({
                   }}
                 />
                 {cancelReasonError ? (
-                  <Text style={{ color: '#ef4444', fontSize: 10, marginTop: 6, fontWeight: '600' }}>
+                  <Text style={{ color: '#ef4444', fontSize: 11.5, marginTop: 6, fontWeight: '600' }}>
                     {cancelReasonError}
                   </Text>
                 ) : null}
-              </View>
+              </Modal.Body>
 
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
-                <TouchableOpacity
-                  onPress={() => setCancelModalVisible(false)}
-                  style={{
-                    flex: 1,
-                    backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5',
-                    borderRadius: 12,
-                    paddingVertical: 12,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ color: isDarkMode ? '#e2e8f0' : '#27272a', fontWeight: '700', fontSize: 13 }}>
-                    Retour
-                  </Text>
-                </TouchableOpacity>
+              <Modal.Footer>
+                <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
+                  Retour
+                </Modal.Button>
+                <Modal.Button variant="danger" onPress={handleConfirmCancelOrder} style={{ flex: 1 }}>
+                  Confirmer
+                </Modal.Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
 
-                <TouchableOpacity
-                  onPress={handleConfirmCancelOrder}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#ef4444',
-                    borderRadius: 12,
-                    paddingVertical: 12,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>
-                    Confirmer
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </MotiView>
-          </View>
-        </View>
-      </MotiView>
-
-      {/* MODAL 5 : CONFIRMATION DU PAIEMENT DE LA COMMANDE */}
-      <MotiView
-        pointerEvents={paymentModalVisible ? 'auto' : 'none'}
-        animate={{
-          opacity: paymentModalVisible ? 1 : 0
-        }}
-        transition={{ type: 'timing', duration: 120 }}
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            zIndex: 9999,
-            bottom: 0
-          }
-        ]}
+      {/* MODAL 5 : CONFIRMATION DU PAIEMENT DE LA COMMANDE (HEROUI MODAL) */}
+      <Modal
+        isOpen={paymentModalVisible}
+        onClose={() => setPaymentModalVisible(false)}
+        size="md"
+        isDarkMode={isDarkMode}
       >
-        <View style={styles.absoluteModalContainer}>
-          <View style={styles.compactModalOverlay}>
-            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setPaymentModalVisible(false)}>
-              <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-            </TouchableOpacity>
-
-            <View style={[styles.popupModalView, { width: '92%', maxWidth: 380, padding: 22 }]}>
-              <View style={styles.compactModalHeader}>
-                <Text style={styles.compactModalTitle}>Confirmation du Règlement</Text>
-                <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
-                  <X size={20} color={isDarkMode ? '#d4d4d8' : '#64748b'} />
-                </TouchableOpacity>
-              </View>
+        <Modal.Backdrop>
+          <Modal.Container size="md">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header layout="row">
+                <Modal.Icon variant="success">
+                  <CreditCard size={20} color="#10b981" />
+                </Modal.Icon>
+                <View style={{ flex: 1 }}>
+                  <Modal.Heading>Confirmation du Règlement</Modal.Heading>
+                  <Modal.Description numberOfLines={1}>
+                    {paymentOrder ? `Commande #${paymentOrder.ticket_numero || paymentOrder.id}` : 'Règlement solde'}
+                  </Modal.Description>
+                </View>
+              </Modal.Header>
 
               {paymentOrder && (() => {
                 const total = paymentOrder.prix_total || 0;
@@ -2590,180 +2771,154 @@ export default function GestionScreen({
                 const solde = total - avance;
 
                 return (
-                  <ScrollView contentContainerStyle={{ paddingVertical: 10 }} bounces={false} showsVerticalScrollIndicator={false}>
-                    {/* Financial Summary */}
-                    <View style={{ backgroundColor: isDarkMode ? '#121212' : '#f8fafc', padding: 14, borderRadius: 10, marginBottom: 18, borderWidth: 1, borderColor: isDarkMode ? '#27272a' : '#e2e8f0' }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Total Commande</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#ffffff' : '#09090b' }}>{formatPrice(total)}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Acompte déjà payé</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: '#16a34a' }}>{formatPrice(avance)}</Text>
-                      </View>
-                      <View style={{ height: 1, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0', marginVertical: 8 }} />
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>Solde restant à régler</Text>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#ef4444' }}>{formatPrice(solde)}</Text>
-                      </View>
-                    </View>
-
-                    {/* Payment Method Selector */}
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
-                      Mode de règlement du solde
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => {
-                          setPaymentMethod('Espèces');
-                          setMomoRefError('');
-                        }}
-                        style={{
-                          flex: 1,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          paddingVertical: 12,
-                          borderRadius: 8,
-                          borderWidth: 1.5,
-                          borderColor: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
-                          backgroundColor: paymentMethod === 'Espèces' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent'
-                        }}
-                      >
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#94a3b8' : '#64748b') }}>
-                          Espèces (Cash)
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => setPaymentMethod('Mobile Money')}
-                        style={{
-                          flex: 1,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          paddingVertical: 12,
-                          borderRadius: 8,
-                          borderWidth: 1.5,
-                          borderColor: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
-                          backgroundColor: paymentMethod === 'Mobile Money' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent'
-                        }}
-                      >
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#94a3b8' : '#64748b') }}>
-                          Mobile Money
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Reference Input for Mobile Money */}
-                    {paymentMethod === 'Mobile Money' && (
-                      <View style={{ marginBottom: 18 }}>
-                        {/* Opérateur Mobile Money */}
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
-                          Opérateur Réseau <Text style={{ color: '#ef4444' }}>*</Text>
-                        </Text>
-                        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-                          {['MTN', 'MOOV', 'CELTIS'].map((op) => (
-                            <TouchableOpacity
-                              key={op}
-                              onPress={() => setMomoOperator(op)}
-                              activeOpacity={0.8}
-                              style={{
-                                flex: 1,
-                                paddingVertical: 10,
-                                borderRadius: 10,
-                                borderWidth: momoOperator === op ? 2 : 1.5,
-                                borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
-                                backgroundColor: momoOperator === op
-                                  ? (op === 'MTN' ? '#FFCC00' : op === 'MOOV' ? '#0057A8' : '#E30613')
-                                  : (isDarkMode ? '#18181b' : '#f8fafc'),
-                                alignItems: 'center'
-                              }}
-                            >
-                              <Text style={{
-                                fontWeight: '800',
-                                fontSize: 12,
-                                color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : (isDarkMode ? '#94a3b8' : '#64748b')
-                              }}>{op}</Text>
-                            </TouchableOpacity>
-                          ))}
+                  <>
+                    <Modal.Body scrollable={false}>
+                      {/* Financial Summary */}
+                      <View style={{ backgroundColor: isDarkMode ? '#121212' : '#f8fafc', padding: 14, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: isDarkMode ? '#27272a' : '#e2e8f0' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <Text style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Total Commande</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#ffffff' : '#09090b' }}>{formatPrice(total)}</Text>
                         </View>
-
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
-                          Numéro de Référence <Text style={{ color: '#ef4444' }}>*</Text>
-                        </Text>
-                        <TextInput
-                          value={momoRefNumber}
-                          onChangeText={(text) => {
-                            const val = text.replace(/\D/g, '').slice(0, 15);
-                            setMomoRefNumber(val);
-                            if (val.trim()) setMomoRefError('');
-                          }}
-                          placeholder="8 à 15 chiffres (ex: 12345678)"
-                          placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
-                          keyboardType="numeric"
-                          maxLength={15}
-                          style={{
-                            borderWidth: 1,
-                            borderColor: momoRefError ? '#ef4444' : (isDarkMode ? '#27272a' : '#d4d4d8'),
-                            borderRadius: 8,
-                            paddingHorizontal: 12,
-                            paddingVertical: 10,
-                            fontSize: 13,
-                            color: isDarkMode ? '#f8fafc' : '#09090b',
-                            backgroundColor: isDarkMode ? '#09090b' : '#ffffff'
-                          }}
-                        />
-                        {momoRefError ? (
-                          <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>{momoRefError}</Text>
-                        ) : null}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <Text style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Acompte déjà payé</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#16a34a' }}>{formatPrice(avance)}</Text>
+                        </View>
+                        <View style={{ height: 1, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0', marginVertical: 8 }} />
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>Solde restant à régler</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#ef4444' }}>{formatPrice(solde)}</Text>
+                        </View>
                       </View>
-                    )}
 
-                    {/* Action Buttons */}
-                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                      <TouchableOpacity
-                        onPress={() => setPaymentModalVisible(false)}
-                        activeOpacity={0.8}
-                        style={{
-                          flex: 1,
-                          paddingVertical: 12,
-                          borderRadius: 8,
-                          borderWidth: 1.5,
-                          borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#64748b' }}>
-                          Annuler
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={handleConfirmPaymentAndComplete}
-                        activeOpacity={0.8}
-                        style={{
-                          flex: 1,
-                          backgroundColor: '#16a34a',
-                          paddingVertical: 12,
-                          borderRadius: 8,
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: '#ffffff' }}>
-                          Confirmer
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </ScrollView>
+                      {/* Payment Method Selector */}
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
+                        Mode de règlement du solde
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            setPaymentMethod('Espèces');
+                            setMomoRefError('');
+                          }}
+                          style={{
+                            flex: 1,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingVertical: 12,
+                            borderRadius: 9999,
+                            borderWidth: 1.5,
+                            borderColor: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
+                            backgroundColor: paymentMethod === 'Espèces' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent'
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#94a3b8' : '#64748b') }}>
+                            Espèces (Cash)
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => setPaymentMethod('Mobile Money')}
+                          style={{
+                            flex: 1,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingVertical: 12,
+                            borderRadius: 9999,
+                            borderWidth: 1.5,
+                            borderColor: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
+                            backgroundColor: paymentMethod === 'Mobile Money' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent'
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#94a3b8' : '#64748b') }}>
+                            Mobile Money
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Reference Input for Mobile Money */}
+                      {paymentMethod === 'Mobile Money' && (
+                        <View style={{ marginBottom: 14 }}>
+                          {/* Opérateur Mobile Money */}
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
+                            Opérateur Réseau <Text style={{ color: '#ef4444' }}>*</Text>
+                          </Text>
+                          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                            {['MTN', 'MOOV', 'CELTIS'].map((op) => (
+                              <TouchableOpacity
+                                key={op}
+                                onPress={() => setMomoOperator(op)}
+                                activeOpacity={0.8}
+                                style={{
+                                  flex: 1,
+                                  paddingVertical: 10,
+                                  borderRadius: 9999,
+                                  borderWidth: momoOperator === op ? 2 : 1.5,
+                                  borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
+                                  backgroundColor: momoOperator === op
+                                    ? (op === 'MTN' ? '#FFCC00' : op === 'MOOV' ? '#0057A8' : '#E30613')
+                                    : (isDarkMode ? '#18181b' : '#f8fafc'),
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <Text style={{
+                                  fontWeight: '800',
+                                  fontSize: 12,
+                                  color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : (isDarkMode ? '#94a3b8' : '#64748b')
+                                }}>{op}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
+                            Numéro de Référence <Text style={{ color: '#ef4444' }}>*</Text>
+                          </Text>
+                          <TextInput
+                            value={momoRefNumber}
+                            onChangeText={(text) => {
+                              const val = text.replace(/\D/g, '').slice(0, 15);
+                              setMomoRefNumber(val);
+                              if (val.trim()) setMomoRefError('');
+                            }}
+                            placeholder="8 à 15 chiffres (ex: 12345678)"
+                            placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
+                            keyboardType="numeric"
+                            maxLength={15}
+                            style={{
+                              borderWidth: 1,
+                              borderColor: momoRefError ? '#ef4444' : (isDarkMode ? '#27272a' : '#d4d4d8'),
+                              borderRadius: 10,
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                              fontSize: 13,
+                              color: isDarkMode ? '#f8fafc' : '#09090b',
+                              backgroundColor: isDarkMode ? '#09090b' : '#ffffff'
+                            }}
+                          />
+                          {momoRefError ? (
+                            <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>{momoRefError}</Text>
+                          ) : null}
+                        </View>
+                      )}
+                    </Modal.Body>
+
+                    <Modal.Footer>
+                      <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
+                        Annuler
+                      </Modal.Button>
+                      <Modal.Button variant="success" onPress={handleConfirmPaymentAndComplete} style={{ flex: 1 }}>
+                        Confirmer
+                      </Modal.Button>
+                    </Modal.Footer>
+                  </>
                 );
               })()}
-            </View>
-          </View>
-        </View>
-      </MotiView>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
     </View>
   );
 }
@@ -2781,47 +2936,61 @@ const baseStyles = StyleSheet.create({
     right: 0,
     zIndex: 1000,
   },
-  tabHeader: {
+  // Header
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 52 : 24,
+    paddingBottom: 8,
     backgroundColor: '#ffffff',
-    paddingTop: 0,
-    paddingBottom: 10,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#09090b',
+    letterSpacing: -0.5,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+  },
+  // Sélecteur d'onglets (Commandes / Clients / Catalogue)
+  tabSelectorContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    backgroundColor: '#ffffff',
   },
   tabSelector: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(9, 9, 11, 0.05)',
-    borderRadius: 16,
-    marginHorizontal: 16,
-    padding: 4,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 9999,
+    padding: 3,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 9999,
   },
   tabButtonActive: {
     backgroundColor: '#ffffff',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
   },
   tabButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#a1a1aa',
+    color: '#64748b',
   },
   tabButtonTextActive: {
-    color: '#09090b',
-    fontWeight: '600',
+    color: '#002cf7',
+    fontWeight: '700',
   },
+  // Search section
   searchSection: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
     alignItems: 'center',
-    gap: 12,
     backgroundColor: '#ffffff',
   },
   searchContainer: {
@@ -2830,10 +2999,10 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingHorizontal: 12,
-    height: 48,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 14,
+    height: 46,
   },
   searchIcon: {
     marginRight: 8,
@@ -2845,9 +3014,54 @@ const baseStyles = StyleSheet.create({
     fontWeight: '500',
     height: '100%',
   },
-  filterPillSection: {
-    paddingHorizontal: 16,
+  // Status filter chips
+  statusFilterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
     paddingBottom: 10,
+    gap: 8,
+    backgroundColor: '#ffffff',
+  },
+  chip: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 9999,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  chipActive: {
+    backgroundColor: 'rgba(0, 44, 247, 0.08)',
+    borderColor: '#002cf7',
+  },
+  chipActiveUrgent: {
+    backgroundColor: 'rgba(225, 29, 72, 0.08)',
+    borderColor: '#e11d48',
+  },
+  chipActiveLate: {
+    backgroundColor: 'rgba(217, 119, 6, 0.08)',
+    borderColor: '#d97706',
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  chipTextActive: {
+    color: '#002cf7',
+    fontWeight: '700',
+  },
+  chipTextActiveUrgent: {
+    color: '#e11d48',
+    fontWeight: '700',
+  },
+  chipTextActiveLate: {
+    color: '#d97706',
+    fontWeight: '700',
+  },
+  filterPillSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
     flexDirection: 'row',
     backgroundColor: '#ffffff',
   },
@@ -2857,7 +3071,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: 'rgba(0, 44, 247, 0.08)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 9999,
     gap: 8,
   },
   filterPillText: {
@@ -2880,26 +3094,26 @@ const baseStyles = StyleSheet.create({
   },
   fabContainer: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 95,
     right: 20,
     zIndex: 100,
   },
   fab: {
-    backgroundColor: '#09090b',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    backgroundColor: '#002cf7',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowColor: '#002cf7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 6,
+    paddingTop: 8,
     paddingBottom: 110,
   },
   noResultsText: {
@@ -2909,10 +3123,12 @@ const baseStyles = StyleSheet.create({
     marginTop: 30,
     fontWeight: '500',
   },
+  // Order Card clean
   orderCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 24,
+    borderRadius: 22,
     padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: 'transparent',
@@ -2926,30 +3142,32 @@ const baseStyles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  cardClientCol: {
+    flex: 1,
+    marginRight: 10,
   },
   cardClientName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#09090b',
   },
-  statusTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 99,
+  cardTicketNo: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+    marginTop: 2,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+  cardRightCol: {
+    alignItems: 'flex-end',
+    gap: 4,
   },
-  statusTagText: {
-    fontSize: 9,
-    fontWeight: '600',
+  cardPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#09090b',
   },
   cardDetails: {
     flexDirection: 'row',
@@ -2957,45 +3175,21 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 6,
   },
-  cardTicketNo: {
-    fontSize: 14,
-    color: '#09090b',
-    fontWeight: '700',
-  },
-  cardPrice: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#002cf7',
-  },
   clientCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
-    borderRadius: 22,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
     padding: 16,
     marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.75)',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
+    borderWidth: 1,
+    borderColor: '#f0f4f8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
     elevation: 0,
-  },
-  clientInfo: {
-    flex: 1,
-  },
-  clientName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  clientPhone: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 3,
-    fontWeight: '500',
   },
   catalogCard: {
     flexDirection: 'row',
@@ -3130,7 +3324,7 @@ const baseStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: 9999,
     paddingVertical: 14,
     marginTop: 24,
     marginBottom: 20,
@@ -3144,7 +3338,7 @@ const baseStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: 9999,
     paddingVertical: 14,
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
@@ -3175,7 +3369,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    borderRadius: 14,
+    borderRadius: 9999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 8,
@@ -3276,7 +3470,7 @@ const baseStyles = StyleSheet.create({
   },
   submitOrderBtn: {
     backgroundColor: '#2563eb',
-    borderRadius: 16,
+    borderRadius: 9999,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 20,
@@ -3297,14 +3491,14 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(241, 245, 249, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     padding: 16,
   },
   popupModalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(241, 245, 249, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     padding: 16,
   },
   compactModalView: {
@@ -3314,13 +3508,13 @@ const baseStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     maxHeight: '85%',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#e4e4e7',
     overflow: 'hidden',
   },
   compactModalHeader: {
@@ -3362,7 +3556,7 @@ const baseStyles = StyleSheet.create({
   prefSelector: {
     flexDirection: 'row',
     backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    borderRadius: 9999,
     padding: 3,
     marginBottom: 16,
   },
@@ -3370,7 +3564,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   prefOptionActive: {
     backgroundColor: '#ffffff',
@@ -3391,7 +3585,7 @@ const baseStyles = StyleSheet.create({
   },
   compactSubmitBtn: {
     backgroundColor: '#2563eb',
-    borderRadius: 14,
+    borderRadius: 9999,
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 10,
@@ -3447,7 +3641,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#eff6ff',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   clientEditBtnText: {
     fontSize: 12,
@@ -3463,7 +3657,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#fff1f2',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   clientDeleteBtnText: {
     fontSize: 12,
@@ -3509,7 +3703,7 @@ const baseStyles = StyleSheet.create({
   categoryTabBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 9999,
     backgroundColor: '#f1f5f9',
   },
   categoryTabBtnActive: {
@@ -3554,7 +3748,7 @@ const baseStyles = StyleSheet.create({
     borderColor: 'rgba(0, 44, 247, 0.1)',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 9999,
   },
   miniServiceTagText: {
     fontSize: 9,
@@ -3572,7 +3766,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: 'rgba(0, 44, 247, 0.06)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 9999,
     borderWidth: 1,
     borderColor: 'rgba(0, 44, 247, 0.1)',
   },
@@ -3613,7 +3807,7 @@ const baseStyles = StyleSheet.create({
   paymentMethodBtn: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 9999,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     backgroundColor: '#ffffff',
@@ -3642,7 +3836,7 @@ const baseStyles = StyleSheet.create({
   formPresetBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 9999,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     backgroundColor: '#ffffff',
@@ -3732,7 +3926,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#002cf7',
-    borderRadius: 14,
+    borderRadius: 9999,
     height: 40,
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
@@ -3753,7 +3947,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderColor: '#002cf7',
     borderWidth: 1.5,
-    borderRadius: 14,
+    borderRadius: 9999,
     height: 40,
   },
   topActionBtnTextWhite: {
@@ -3774,7 +3968,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 36,
-    borderRadius: 12,
+    borderRadius: 9999,
     backgroundColor: '#ffffff',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
@@ -3802,7 +3996,7 @@ const baseStyles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 9999,
     backgroundColor: '#ffffff',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
@@ -3864,7 +4058,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 8,
+    borderRadius: 9999,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
@@ -3897,7 +4091,7 @@ const baseStyles = StyleSheet.create({
     borderColor: 'rgba(0, 44, 247, 0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   factureBtnText: {
     fontSize: 11,
@@ -3910,7 +4104,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#002cf7',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 9999,
     marginLeft: 8,
   },
   nextStatusBtnText: {
@@ -3925,7 +4119,7 @@ const baseStyles = StyleSheet.create({
   },
   popupModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
@@ -3937,13 +4131,13 @@ const baseStyles = StyleSheet.create({
     width: '95%',
     maxWidth: 370,
     maxHeight: '80%',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#e4e4e7',
     overflow: 'hidden',
   },
   cardFooterArea: {
@@ -3955,7 +4149,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    borderRadius: 14,
+    borderRadius: 9999,
     marginTop: 10,
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
@@ -4241,7 +4435,7 @@ const baseStyles = StyleSheet.create({
   },
   invoiceCloseBtn: {
     backgroundColor: '#09090b',
-    borderRadius: 14,
+    borderRadius: 9999,
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 10,
@@ -4287,7 +4481,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: 'rgba(0, 44, 247, 0.06)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   clothingAddBtnText: {
     fontSize: 11,
@@ -4298,7 +4492,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   clothingCloseBtnText: {
     fontSize: 11,
@@ -4337,7 +4531,7 @@ const baseStyles = StyleSheet.create({
     borderColor: 'rgba(0, 44, 247, 0.1)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 9999,
   },
   serviceAddBtnText: {
     fontSize: 10,
@@ -4378,7 +4572,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#eff6ff',
     borderWidth: 1.5,
     borderColor: '#bfdbfe',
-    borderRadius: 12,
+    borderRadius: 9999,
     paddingVertical: 12,
   },
   invoiceDownloadBtnText: {
@@ -4392,7 +4586,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#002cf7',
-    borderRadius: 12,
+    borderRadius: 9999,
     paddingVertical: 12,
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
@@ -4407,8 +4601,22 @@ const baseStyles = StyleSheet.create({
   },
   fullPageContainer: {
     flex: 1,
+    width: '100%',
+    height: Platform.OS === 'web' ? '100vh' : '100%',
+    backgroundColor: Platform.OS === 'web' ? '#0c0c10' : '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  fullPageInnerWrapper: {
+    ...(Platform.OS === 'web' ? {} : { flex: 1 }),
+    width: Platform.OS === 'web' ? 393 : '100%',
+    height: Platform.OS === 'web' ? 852 : '100%',
+    maxWidth: '100vw',
+    maxHeight: '100vh',
     backgroundColor: '#ffffff',
     paddingTop: Platform.OS === 'ios' ? 48 : 24,
+    overflow: 'hidden',
   },
   fullPageHeader: {
     flexDirection: 'row',
@@ -4421,16 +4629,14 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   backBtn: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 4,
-    paddingRight: 10,
-  },
-  backBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
   },
   fullPageTitle: {
     fontSize: 16,
@@ -4475,7 +4681,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#dcfce7',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 9999,
   },
   subActiveBadgeText: {
     fontSize: 9,
@@ -4525,7 +4731,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#fff1f2',
     borderWidth: 1,
     borderColor: '#ffe4e6',
-    borderRadius: 12,
+    borderRadius: 9999,
     paddingVertical: 8,
     alignItems: 'center',
     marginTop: 6,
@@ -4537,7 +4743,7 @@ const baseStyles = StyleSheet.create({
   },
   subscribeBtn: {
     backgroundColor: '#002cf7',
-    borderRadius: 10,
+    borderRadius: 9999,
     height: 40,
     paddingHorizontal: 16,
     justifyContent: 'center',
@@ -4583,7 +4789,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: 'rgba(0, 44, 247, 0.08)',
-    borderRadius: 99,
+    borderRadius: 9999,
     paddingHorizontal: 10,
     paddingVertical: 4.5,
     alignSelf: 'flex-start',
@@ -4596,7 +4802,7 @@ const baseStyles = StyleSheet.create({
   planChip: {
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 12,
+    borderRadius: 9999,
     backgroundColor: '#f1f5f9',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
@@ -4616,6 +4822,11 @@ const baseStyles = StyleSheet.create({
     color: '#002cf7',
     fontWeight: '700',
   },
+  modalInput: {
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
+    color: '#09090b',
+  },
 });
 
 function getStyles(isDarkMode) {
@@ -4626,31 +4837,33 @@ function getStyles(isDarkMode) {
     planChipActive: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8' },
     planChipText: { color: '#d4d4d8' },
     planChipTextActive: { color: '#38bdf8', fontWeight: '700' },
-    fullPageContainer: { backgroundColor: '#000000' },
+    fullPageContainer: { backgroundColor: Platform.OS === 'web' ? '#0c0c10' : '#000000' },
+    fullPageInnerWrapper: { backgroundColor: '#000000' },
     fullPageHeader: { backgroundColor: '#09090b', borderBottomColor: '#1f2937' },
-    backBtnText: { color: '#ffffff' },
+    backBtn: { backgroundColor: '#121212', borderColor: '#27272a' },
     fullPageTitle: { color: '#ffffff' },
-    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
-    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
+    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
     container: { backgroundColor: '#000000' },
     header: { backgroundColor: '#000000' },
     headerTitle: { color: '#ffffff' },
-    tabHeader: { backgroundColor: '#000000' },
-    topActionsRow: { backgroundColor: '#000000' },
-    topActionBtnWhite: { backgroundColor: '#121212', borderColor: '#27272a' },
-    topActionBtnTextWhite: { color: '#ffffff' },
+    tabSelectorContainer: { backgroundColor: '#000000' },
+    tabSelector: { backgroundColor: '#18181b' },
+    tabButtonActive: { backgroundColor: '#27272a' },
+    tabButtonText: { color: '#71717a' },
+    tabButtonTextActive: { color: '#38bdf8' },
     statusFilterRow: { backgroundColor: '#000000' },
-    statusFilterBtn: { backgroundColor: '#121212', borderColor: '#27272a' },
-    statusFilterText: { color: '#d4d4d8' },
+    chip: { backgroundColor: '#18181b', borderColor: '#27272a' },
+    chipText: { color: '#a1a1aa' },
     searchSection: { backgroundColor: '#000000' },
     searchContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
     searchInput: { color: '#ffffff' },
     filterPillSection: { backgroundColor: '#000000' },
     filterPill: { backgroundColor: 'rgba(56, 189, 248, 0.1)' },
     filterPillText: { color: '#38bdf8' },
-    orderCard: { backgroundColor: '#121212', borderColor: '#27272a', shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
+    orderCard: { backgroundColor: '#121212', borderColor: '#27272a' },
     cardClientName: { color: '#ffffff' },
-    cardTicketNo: { color: '#d4d4d8' },
+    cardTicketNo: { color: '#a1a1aa' },
     cardPrice: { color: '#ffffff' },
     cardExtraInfoText: { color: '#d4d4d8' },
     cardExtraInfoRow: { backgroundColor: '#09090b', borderColor: '#27272a' },
@@ -4676,7 +4889,7 @@ function getStyles(isDarkMode) {
     sectionTitle: { color: '#a1a1aa' },
     actionButton: { backgroundColor: '#121212', borderColor: '#27272a' },
     actionText: { color: '#ffffff' },
-    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
     modalContent: { backgroundColor: '#121212', borderColor: '#27272a' },
     modalTitle: { color: '#ffffff' },
     modalLabel: { color: '#d4d4d8' },
@@ -4708,7 +4921,7 @@ function getStyles(isDarkMode) {
     detailsListContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
 
     // Modal popup views overrides (New client form, invoice details, order details)
-    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
     compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
     compactModalTitle: { color: '#ffffff' },
     compactLabel: { color: '#d4d4d8' },
@@ -4718,7 +4931,7 @@ function getStyles(isDarkMode) {
     prefText: { color: '#d4d4d8' },
     prefTextActive: { color: '#ffffff' },
 
-    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
     popupModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
 
     detailSectionTitle: { color: '#d4d4d8' },

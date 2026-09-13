@@ -76,7 +76,7 @@ export default function CancelModal({
     onConfirm(cancelReason.trim());
   };
 
-  if (!visible || !orderToCancel) return null;
+  if (!visible || !order) return null;
 
   const inputBorderColor = cancelReasonError ? '#ef4444' : (isDarkMode ? '#27272a' : '#e2e8f0');
   return (
@@ -100,9 +100,7 @@ export default function CancelModal({
             activeOpacity={1} 
             style={StyleSheet.absoluteFill} 
             onPress={onClose}
-          >
-            <BlurView intensity={85} tint={isDarkMode ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-          </TouchableOpacity>
+          />
           
           <MotiView
             from={{ opacity: 0, scale: 0.97, translateY: 10 }}
@@ -177,7 +175,7 @@ export default function CancelModal({
                 style={{
                   flex: 1,
                   backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5',
-                  borderRadius: 12,
+                  borderRadius: 9999,
                   paddingVertical: 12,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -193,7 +191,7 @@ export default function CancelModal({
                 style={{
                   flex: 1,
                   backgroundColor: '#ef4444',
-                  borderRadius: 12,
+                  borderRadius: 9999,
                   paddingVertical: 12,
                   alignItems: 'center',
                   justifyContent: 'center',

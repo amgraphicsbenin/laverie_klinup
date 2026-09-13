@@ -5,7 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { memoryDb } from './db/dbEngine';
+import { memoryDb } from './db/memoryStore';
 
 const STORAGE_KEY_LANG = 'klin_up_language';
 
@@ -108,6 +108,7 @@ const translations = {
       filtre_aujourdhui: "Aujourd'hui",
       filtre_semaine: 'Cette Semaine',
       filtre_mois: 'Ce Mois',
+      statut_en_attente_validation: 'À valider (Livreur)',
       statut_en_attente: 'En attente',
       statut_traitement: 'En cours de traitement',
       statut_lavage: 'Lavage en cours',
@@ -404,6 +405,7 @@ const translations = {
       filtre_aujourdhui: 'Today',
       filtre_semaine: 'This Week',
       filtre_mois: 'This Month',
+      statut_en_attente_validation: 'Pending Validation (Courier)',
       statut_en_attente: 'Pending',
       statut_traitement: 'Processing',
       statut_lavage: 'Washing',
@@ -680,6 +682,7 @@ const translations = {
       filtre_aujourdhui: 'Hoy',
       filtre_semaine: 'Esta Semana',
       filtre_mois: 'Este Mes',
+      statut_en_attente_validation: 'Por validar (Repartidor)',
       statut_en_attente: 'Pendiente',
       statut_traitement: 'Procesando',
       statut_lavage: 'Lavando',
@@ -941,6 +944,7 @@ const translations = {
       filtre_aujourdhui: 'Hoje',
       filtre_semaine: 'Esta Semana',
       filtre_mois: 'Este Mês',
+      statut_en_attente_validation: 'A validar (Entregador)',
       statut_en_attente: 'Pendente',
       statut_traitement: 'Processando',
       statut_lavage: 'Lavando',

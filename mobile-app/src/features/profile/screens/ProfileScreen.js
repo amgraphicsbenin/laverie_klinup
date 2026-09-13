@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Platform, BackHandler, Switch, Image } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, Modal as RNModal, TextInput, Platform, BackHandler, Switch, Image } from 'react-native';
+import { SmoothScrollView as ScrollView } from '../../../components/SmoothScroll';
 import { Key, LogOut, X, Bell, Moon, TrendingUp, Sparkles, ChevronRight, User, Mail, Shield, Smartphone, HelpCircle, ArrowLeft, Check, BarChart2, Award, DollarSign, Package, Zap, CheckCircle2, Calendar, MapPin, Camera } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { db } from '../../../services/db';
@@ -9,6 +10,7 @@ import { MotiView } from '../../../components/SafeView';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import { useDbState } from '../../../hooks/useDbState';
 import { t } from '../../../services/i18n';
+import { Modal } from '../../../components/ui/modal';
 
 export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigger, onShowSuccess }) {
   const { currentUser, isDarkMode, currentLang = 'fr' } = useDbState();
@@ -461,25 +463,25 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
         </View>
 
         {/* MODAL : MES PERFORMANCES (FULL SCREEN PAGE) */}
-        <Modal
+        <RNModal
           visible={showPerformanceModal}
           animationType="slide"
           presentationStyle="fullScreen"
           onRequestClose={() => setShowPerformanceModal(false)}
         >
           <View style={styles.fullPageContainer}>
+            <View style={styles.fullPageInnerWrapper}>
             {/* HEADER BACK BUTTON */}
             <View style={styles.fullPageHeader}>
               <TouchableOpacity onPress={() => setShowPerformanceModal(false)} style={styles.backBtnHeader} activeOpacity={0.7}>
-                <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-                <Text style={styles.backBtnText}>{t('profile.back', {}, 'Retour')}</Text>
+                <ArrowLeft size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
               </TouchableOpacity>
 
               <Text style={styles.fullPageTitle} numberOfLines={1}>{t('profile.mes_performances', {}, 'Mes performances')}</Text>
-              <View style={{ width: 70 }} />
+              <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
               {/* AGENT SUMMARY HERO CARD */}
               <MotiView 
                 from={{ opacity: 0, translateY: 10 }}
@@ -607,68 +609,94 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
                 </View>
               </View>
             </ScrollView>
+            </View>
           </View>
-        </Modal>
+        </RNModal>
 
-        {/* MODAL : MODIFIER PIN (FULL SCREEN PAGE) */}
+        {/* MODAL : MODIFIER PIN (HEROUI UNIFIED POPUP) */}
         <Modal
           visible={showPinModal}
-          animationType="slide"
-          presentationStyle="fullScreen"
-          onRequestClose={() => setShowPinModal(false)}
+          onClose={() => {
+            setShowPinModal(false);
+            setCurrentPin('');
+            setNewPin('');
+          }}
+          size="sm"
+          isDarkMode={isDarkMode}
         >
-          <View style={styles.fullPageContainer}>
-            {/* HEADER BACK BUTTON */}
-            <View style={styles.fullPageHeader}>
-              <TouchableOpacity onPress={() => setShowPinModal(false)} style={styles.backBtnHeader} activeOpacity={0.7}>
-                <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-                <Text style={styles.backBtnText}>{t('profile.back')}</Text>
-              </TouchableOpacity>
+          <Modal.Backdrop>
+            <Modal.Container size="sm">
+              <Modal.Dialog>
+                <Modal.CloseTrigger onPress={() => {
+                  setShowPinModal(false);
+                  setCurrentPin('');
+                  setNewPin('');
+                }} />
+                <Modal.Header layout="row">
+                  <Modal.Icon variant="primary">
+                    <Key size={20} color="#002cf7" />
+                  </Modal.Icon>
+                  <View style={{ flex: 1 }}>
+                    <Modal.Heading>{t('profile.modifier_pin_title')}</Modal.Heading>
+                    <Modal.Description>
+                      {t('profile.modifier_pin_desc', {}, 'Entrez votre code actuel et le nouveau code à 6 chiffres.')}
+                    </Modal.Description>
+                  </View>
+                </Modal.Header>
 
-              <Text style={styles.fullPageTitle} numberOfLines={1}>{t('profile.modifier_pin_title')}</Text>
-              <View style={{ width: 70 }} />
-            </View>
+                <Modal.Body>
+                  <View style={{ gap: 14 }}>
+                    <View>
+                      <Text style={styles.modalLabel}>{t('profile.pin_actuel')}</Text>
+                      <TextInput
+                        keyboardType="numeric"
+                        maxLength={6}
+                        secureTextEntry
+                        value={currentPin}
+                        onChangeText={setCurrentPin}
+                        placeholder="******"
+                        placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
+                        style={styles.modalInput}
+                      />
+                    </View>
 
-            <ScrollView contentContainerStyle={styles.fullPageScroll} bounces={false}>
-              <View style={{ gap: 16 }}>
-                <View>
-                  <Text style={styles.modalLabel}>{t('profile.pin_actuel')}</Text>
-                  <TextInput
-                    keyboardType="numeric"
-                    maxLength={6}
-                    secureTextEntry
-                    value={currentPin}
-                    onChangeText={setCurrentPin}
-                    placeholder="******"
-                    placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
-                    style={styles.modalInput}
-                  />
-                </View>
+                    <View>
+                      <Text style={styles.modalLabel}>{t('profile.nouveau_pin')}</Text>
+                      <TextInput
+                        keyboardType="numeric"
+                        maxLength={6}
+                        secureTextEntry
+                        value={newPin}
+                        onChangeText={setNewPin}
+                        placeholder="******"
+                        placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
+                        style={styles.modalInput}
+                      />
+                    </View>
+                  </View>
+                </Modal.Body>
 
-                <View>
-                  <Text style={styles.modalLabel}>{t('profile.nouveau_pin')}</Text>
-                  <TextInput
-                    keyboardType="numeric"
-                    maxLength={6}
-                    secureTextEntry
-                    value={newPin}
-                    onChangeText={setNewPin}
-                    placeholder="******"
-                    placeholderTextColor={isDarkMode ? "#64748b" : "#94a3b8"}
-                    style={styles.modalInput}
-                  />
-                </View>
-
-                <TouchableOpacity
-                  onPress={handleChangePin}
-                  style={styles.modalSubmitBtn}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.modalSubmitBtnText}>{t('profile.confirmer_pin')}</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
+                <Modal.Footer>
+                  <Modal.Button
+                    variant="outline"
+                    onPress={() => {
+                      setShowPinModal(false);
+                      setCurrentPin('');
+                      setNewPin('');
+                    }}
+                  >
+                    {t('profile.cancel', {}, 'Annuler')}
+                  </Modal.Button>
+                  <Modal.Button
+                    variant="primary"
+                    onPress={handleChangePin}
+                  >
+                    {t('profile.confirmer_pin')}
+                  </Modal.Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
         </Modal>
 
       </ScrollView>
@@ -776,7 +804,7 @@ function getStyles(isDarkMode) {
       backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.06)',
       paddingHorizontal: 12,
       paddingVertical: 5,
-      borderRadius: 20,
+      borderRadius: 9999,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.12)',
     },
@@ -791,7 +819,7 @@ function getStyles(isDarkMode) {
       backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(0, 44, 247, 0.06)',
       paddingHorizontal: 12,
       paddingVertical: 5,
-      borderRadius: 20,
+      borderRadius: 9999,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 44, 247, 0.12)',
       marginBottom: 14,
@@ -949,7 +977,7 @@ function getStyles(isDarkMode) {
       alignItems: 'center',
       paddingVertical: 8,
       paddingHorizontal: 14,
-      borderRadius: 12,
+      borderRadius: 9999,
       borderWidth: 1,
       borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
       backgroundColor: isDarkMode ? '#121212' : '#ffffff',
@@ -966,8 +994,22 @@ function getStyles(isDarkMode) {
     },
     fullPageContainer: {
       flex: 1,
+      width: '100%',
+      height: Platform.OS === 'web' ? '100vh' : '100%',
+      backgroundColor: Platform.OS === 'web' ? '#0c0c10' : (isDarkMode ? '#000000' : '#ffffff'),
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    fullPageInnerWrapper: {
+      ...(Platform.OS === 'web' ? {} : { flex: 1 }),
+      width: Platform.OS === 'web' ? 393 : '100%',
+      height: Platform.OS === 'web' ? 852 : '100%',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
       backgroundColor: isDarkMode ? '#000000' : '#ffffff',
       paddingTop: Platform.OS === 'ios' ? 48 : 24,
+      overflow: 'hidden',
     },
     fullPageHeader: {
       flexDirection: 'row',
@@ -980,16 +1022,14 @@ function getStyles(isDarkMode) {
       backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
     },
     backBtnHeader: {
-      flexDirection: 'row',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+      borderWidth: 1.5,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      justifyContent: 'center',
       alignItems: 'center',
-      gap: 6,
-      paddingVertical: 4,
-      paddingRight: 10,
-    },
-    backBtnText: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
     },
     fullPageTitle: {
       fontSize: 16,
@@ -1052,7 +1092,7 @@ function getStyles(isDarkMode) {
     },
     modalSubmitBtn: {
       backgroundColor: '#002cf7',
-      borderRadius: 14,
+      borderRadius: 9999,
       paddingVertical: 13,
       alignItems: 'center',
       marginTop: 10,

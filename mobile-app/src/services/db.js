@@ -5,6 +5,7 @@
  */
 
 export { db } from './db/dbEngine';
+export { memoryDb } from './db/memoryStore';
 export { hydrateOrder } from './db/dbEngine';
 export { 
   initDb, 

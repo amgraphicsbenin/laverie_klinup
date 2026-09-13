@@ -457,6 +457,14 @@ END $$;
 -- 4. Application de la contrainte NOT NULL
 ALTER TABLE public.orders ALTER COLUMN store_id SET NOT NULL;
 
+-- 4b. Traçabilité livreur & validation par caisse
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS cree_par_livreur BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS validee_par_caisse BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_by_role TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS validated_by_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS validated_by_name TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS validated_at TIMESTAMP WITH TIME ZONE;
+
 -- 5. Trigger de sécurité PostgreSQL pour auto-rattacher et imposer store_id sur public.customers
 CREATE OR REPLACE FUNCTION public.check_customer_store_id()
 RETURNS TRIGGER AS $$

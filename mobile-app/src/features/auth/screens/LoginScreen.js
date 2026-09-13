@@ -319,7 +319,7 @@ const baseStyles = StyleSheet.create({
   },
   button: {
     backgroundColor: '#2563eb',
-    borderRadius: 16,
+    borderRadius: 9999,
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',

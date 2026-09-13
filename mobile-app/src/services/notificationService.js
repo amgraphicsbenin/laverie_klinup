@@ -62,42 +62,50 @@ export function getOrderStatusLabel(statut) {
  * Doit être appelée au démarrage de l'app (dans App.js).
  */
 export async function initSystemNotifications() {
-  try {
-    if (Platform.OS === 'android') {
-      // Canal principal pour les commandes (priorité MAX = sonnerie + heads-up banner garantis sur Pixel)
-      await Notifications.setNotificationChannelAsync('orders', {
-        name: 'Commandes KLIN UP',
-        description: 'Notifications de suivi des commandes',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 300, 150, 400],
-        lightColor: '#002cf7',
-        sound: 'default',
-        enableVibrate: true,
-        enableLights: true,
-        showBadge: true,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        bypassDnd: false,
-        audioAttributes: {
-          usage: Notifications.AndroidAudioUsage.NOTIFICATION,
-          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
-        },
-      });
+  // 1. Initialisation sécurisée des canaux Android
+  if (Platform.OS === 'android') {
+    try {
+      if (typeof Notifications.setNotificationChannelAsync === 'function') {
+        // Canal principal pour les commandes (priorité MAX = sonnerie + heads-up banner garantis sur Pixel)
+        await Notifications.setNotificationChannelAsync('orders', {
+          name: 'Commandes KLIN UP',
+          description: 'Notifications de suivi des commandes',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 300, 150, 400],
+          lightColor: '#002cf7',
+          sound: 'default',
+          enableVibrate: true,
+          enableLights: true,
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: false,
+          audioAttributes: {
+            usage: Notifications.AndroidAudioUsage.NOTIFICATION,
+            contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+          },
+        });
 
-      // Canal secondaire pour les alertes générales
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Notifications générales',
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 200, 100, 300],
-        lightColor: '#002cf7',
-        sound: 'default',
-        enableVibrate: true,
-        showBadge: true,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      });
+        // Canal secondaire pour les alertes générales
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Notifications générales',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 200, 100, 300],
+          lightColor: '#002cf7',
+          sound: 'default',
+          enableVibrate: true,
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+      }
+    } catch (channelErr) {
+      // Ignorer silencieusement si Expo Go / émulateur ne dispose pas du provider natif de canaux
+      console.log('[Notifications] Canaux Android non configurables dans cet environnement (Expo Go / provider absent).');
     }
+  }
 
-    // Demander les permissions (Android 13+ POST_NOTIFICATIONS et iOS)
-    if (Platform.OS === 'android' || Platform.OS === 'ios') {
+  // 2. Demander les permissions (Android 13+ POST_NOTIFICATIONS et iOS)
+  if (Platform.OS === 'android' || Platform.OS === 'ios') {
+    try {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
 
@@ -116,13 +124,13 @@ export async function initSystemNotifications() {
       }
 
       if (finalStatus !== 'granted') {
-        console.warn('[Notifications] Permissions non accordées. Les notifications peuvent ne pas fonctionner.');
+        console.log('[Notifications] Permissions non accordées.');
       } else {
         console.log('[Notifications] ✅ Permissions accordées.');
       }
+    } catch (permErr) {
+      console.log('[Notifications] Vérification des permissions passée:', permErr?.message || permErr);
     }
-  } catch (err) {
-    console.warn('[Notifications] Erreur d\'initialisation:', err);
   }
 }
 
@@ -143,6 +151,13 @@ export async function getExpoPushToken() {
 
   if (Platform.OS === 'web') {
     return null; // Pas de push token sur le web
+  }
+
+  // En Expo Go sur Android, les push tokens FCM distants ont été retirés par Expo depuis le SDK 53
+  // Les notifications locales restent 100% opérationnelles
+  const isExpoGo = Constants?.appOwnership === 'expo' || Constants?.executionEnvironment === 'storeClient';
+  if (isExpoGo && Platform.OS === 'android') {
+    return null;
   }
 
   try {

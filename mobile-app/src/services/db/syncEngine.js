@@ -7,7 +7,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../supabaseClient';
-import { memoryDb, db, hydrateOrder, startOrderStateCron, isPendingOrderUpdate, removePendingOrderUpdate } from './dbEngine';
+import { memoryDb, notifyListeners, isPendingOrderUpdate, removePendingOrderUpdate } from './memoryStore';
+import { hydrateOrder, startOrderStateCron } from './orderUtils';
 import {
   DEFAULT_STAFF,
   DEFAULT_CUSTOMERS,
@@ -78,7 +79,7 @@ export async function loadFromLocalStorage() {
   } catch (e) {
     console.warn('[DB] Erreur chargement session locale:', e);
   }
-  db.notify();
+  notifyListeners();
 }
 
 /**
@@ -99,6 +100,9 @@ export async function persist() {
 
 // --- NETWORK SYNC LAYER ---
 
+// Cache mémoire des colonnes absentes du schéma Supabase distant
+const knownMissingCols = new Set();
+
 /**
  * Filtre les données pour éviter d'envoyer des propriétés calculées localement à Supabase.
  */
@@ -106,14 +110,26 @@ function sanitizePayload(table, data) {
   if (!data) return data;
   const sanitized = { ...data };
   if (table === 'orders') {
+    delete sanitized.total;
     delete sanitized.remise_pourcentage;
     delete sanitized.remise_montant;
     delete sanitized.prix_base_avant_remise;
+    delete sanitized.applied_reward_id;
+    delete sanitized.applied_reward_title;
+    delete sanitized.applied_reward_discount;
   } else if (table === 'catalog') {
     delete sanitized.sku;
     delete sanitized.prix_urgent;
     delete sanitized.is_active;
   }
+
+  // Retrait proactif des colonnes identifiées comme non présentes dans le schéma Supabase
+  for (const key of Object.keys(sanitized)) {
+    if (knownMissingCols.has(`${table}:${key}`)) {
+      delete sanitized[key];
+    }
+  }
+
   return sanitized;
 }
 
@@ -148,17 +164,27 @@ export async function performMutation(action, table, recordId, data) {
     return res?.data ?? null;
   }
 
-  const errCode = res.error.code || '';
-  const errMsg = res.error.message || '';
+  const errCode = res.error?.code || '';
+  const errMsg = res.error?.message || '';
 
-  console.error(`[KLIN UP DB] ❌ Erreur Supabase sur table '${table}' [${action}] :`, errCode, errMsg);
-
-  // Schéma cache / colonne manquante → repli itératif (jusqu'à 5 essais)
+  // Schéma cache / colonne manquante → repli itératif dynamique
   let currentErrCode = errCode;
   let currentErrMsg = errMsg;
   let retriedData = { ...sanitizedData };
 
-  for (let attempt = 1; attempt <= 5; attempt++) {
+  const isSchemaMismatch = 
+    currentErrCode === 'PGRST204' ||
+    currentErrCode === '42703' ||
+    currentErrMsg.includes('column') ||
+    currentErrMsg.includes('schema cache');
+
+  if (!isSchemaMismatch) {
+    console.error(`[KLIN UP DB] ❌ Erreur Supabase sur table '${table}' [${action}] :`, errCode, errMsg);
+  }
+
+  const maxAttempts = Math.min(Math.max(Object.keys(retriedData).length + 2, 10), 25);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (
       currentErrCode === 'PGRST204' ||
       currentErrCode === '42703' ||
@@ -171,14 +197,22 @@ export async function performMutation(action, table, recordId, data) {
                   || currentErrMsg.match(/column ([a-z0-9_]+)/i);
       const missingCol = match?.[1];
 
-      if (missingCol && Object.prototype.hasOwnProperty.call(retriedData, missingCol)) {
-        console.warn(`[KLIN UP DB] ⚠️ Colonne '${missingCol}' absente — retrait automatique (essai ${attempt}).`);
+      if (missingCol) {
+        knownMissingCols.add(`${table}:${missingCol}`);
         delete retriedData[missingCol];
+        console.warn(`[KLIN UP DB] ⚠️ Colonne '${missingCol}' absente de la table '${table}' — retrait automatique (essai ${attempt}).`);
       } else {
-        const optionalCols = ['ville', 'responsable_id', 'responsable_nom', 'created_by_id', 'created_by_name',
+        const optionalCols = ['store_id', 'user_name', 'ville', 'quartier', 'responsable_id', 'responsable_nom', 'created_by_id', 'created_by_name',
                               'push_token', 'push_token_updated_at', 'user_picture', 'motif_annulation', 'solde_paid_at',
-                              'reference_paiement', 'reference_momo', 'acompte_paid_at', 'operateur_momo'];
-        for (const col of optionalCols) delete retriedData[col];
+                              'reference_paiement', 'reference_momo', 'acompte_paid_at', 'operateur_momo',
+                              'with_pickup', 'frais_recuperation', 'frais_livraison', 'distance_km',
+                              'latitude', 'longitude', 'coordonnees_livraison',
+                              'total', 'applied_reward_id', 'applied_reward_title', 'applied_reward_discount',
+                              'cree_par_livreur', 'validee_par_caisse', 'created_by_role', 'validated_by_id', 'validated_by_name', 'validated_at'];
+        for (const col of optionalCols) {
+          knownMissingCols.add(`${table}:${col}`);
+          delete retriedData[col];
+        }
       }
 
       let retryRes;
@@ -186,6 +220,7 @@ export async function performMutation(action, table, recordId, data) {
         if (action === 'insert') retryRes = await supabase.from(table).insert(retriedData);
         else if (action === 'update') retryRes = await supabase.from(table).update(retriedData).eq('id', recordId);
         else if (action === 'delete') retryRes = await supabase.from(table).delete().eq('id', recordId);
+        else if (action === 'upsert') retryRes = await supabase.from(table).upsert(retriedData, { onConflict: 'id' });
       } catch (retryErr) {
         throw new Error(`[KLIN UP DB] Erreur réseau lors du repli (table: ${table}) : ${retryErr.message}`);
       }
@@ -202,19 +237,19 @@ export async function performMutation(action, table, recordId, data) {
     }
   }
 
-  throw new Error(
-    `[KLIN UP DB] Échec persistant sur '${table}' après repli de schéma. Erreur : ${currentErrMsg} (code: ${currentErrCode})`
-  );
+  console.error(`[KLIN UP DB] ❌ Échec persistant sur table '${table}' [${action}] :`, currentErrCode, currentErrMsg);
 
   // RLS ou autre erreur → toujours lever une exception
-  if (errCode === '42501' || errMsg.toLowerCase().includes('row-level security')) {
+  if (currentErrCode === '42501' || currentErrMsg.toLowerCase().includes('row-level security')) {
     throw new Error(
       `[KLIN UP DB] Accès refusé par Supabase (RLS) sur la table '${table}'. ` +
-      `Exécutez le script de migration SQL dans Supabase pour activer les politiques d'accès. Détail : ${errMsg}`
+      `Exécutez le script de migration SQL dans Supabase pour activer les politiques d'accès. Détail : ${currentErrMsg}`
     );
   }
 
-  throw new Error(`[KLIN UP DB] Supabase a rejeté l'opération sur '${table}' : ${errMsg} (code: ${errCode})`);
+  throw new Error(
+    `[KLIN UP DB] Échec persistant sur '${table}' après repli de schéma. Erreur : ${currentErrMsg} (code: ${currentErrCode})`
+  );
 }
 
 // Timeout helper
@@ -233,7 +268,7 @@ function withTimeout(promise, ms, label) {
 export async function initDb(isRetry = false) {
   if (!supabase) {
     console.warn("[DB Sync] Client Supabase indisponible.");
-    db.notify();
+    notifyListeners();
     return;
   }
 
@@ -341,10 +376,9 @@ export async function initDb(isRetry = false) {
       isUsingRemote = true;
 
       console.log("[DB Sync] ✅ Connecté à Supabase.");
-      await syncOfflineQueue();
       checkAndEvictDisabledCurrentUser();
       await persist();
-      db.notify();
+      notifyListeners();
 
       try { setupRealtime(); } catch (e) { console.warn("[DB Sync] Realtime non disponible :", e.message); }
       startPeriodicSync();
@@ -356,7 +390,7 @@ export async function initDb(isRetry = false) {
         await new Promise(r => setTimeout(r, retryDelayMs));
       } else {
         console.warn("[DB Sync] Échec de connexion globale. Fonctionnement hors-ligne.");
-        db.notify();
+        notifyListeners();
         startAutoReconnect();
       }
     }
@@ -380,7 +414,7 @@ export async function refreshStaff() {
       memoryDb.staff = validStaff;
       checkAndEvictDisabledCurrentUser();
       await persist();
-      db.notify();
+      notifyListeners();
     }
   } catch (e) {
     console.error("[DB Sync] Échec du rafraîchissement du personnel :", e);
@@ -456,7 +490,7 @@ export async function startPeriodicSync() {
       if (JSON.stringify(memoryDb.orders) !== JSON.stringify(mergedOrders)) {
         memoryDb.orders = mergedOrders;
         await persist();
-        db.notify();
+        notifyListeners();
       }
     } catch (e) {
       // Sync silencieuse — le Realtime WebSocket prend le relais
@@ -464,190 +498,193 @@ export async function startPeriodicSync() {
   }, 5000);
 }
 
-let realtimeChannels = [];
+let activeRealtimeChannel = null;
 
-// Abonnements en temps réel
+// Abonnements en temps réel (Multiplexé sur un canal unique propre)
 export function setupRealtime() {
-  if (realtimeChannels.length > 0) {
-    realtimeChannels.forEach(ch => {
-      try {
-        supabase.removeChannel(ch);
-      } catch (e) { }
-    });
-    realtimeChannels = [];
+  if (!supabase) return;
+
+  if (activeRealtimeChannel) {
+    try {
+      supabase.removeChannel(activeRealtimeChannel);
+    } catch (e) { }
+    activeRealtimeChannel = null;
   }
 
   const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores', 'order_notifications'];
+  const channelName = 'mobile_realtime_' + Math.random().toString(36).substring(2, 9);
+  let channel = supabase.channel(channelName);
 
   tables.forEach(table => {
-    const ch = supabase
-      .channel(`${table}_channel`)
-      .on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
-        const { eventType, new: newRow, old: oldRow } = payload;
+    channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
+      const { eventType, new: newRow, old: oldRow } = payload;
 
-        let targetList = [];
-        if (table === 'staff') targetList = memoryDb.staff;
-        else if (table === 'customers') targetList = memoryDb.customers;
-        else if (table === 'orders') targetList = memoryDb.orders;
-        else if (table === 'activity_logs') targetList = memoryDb.logs;
-        else if (table === 'catalog') targetList = memoryDb.catalog;
-        else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
-        else if (table === 'stores') targetList = memoryDb.stores;
+      let targetList = [];
+      if (table === 'staff') targetList = memoryDb.staff;
+      else if (table === 'customers') targetList = memoryDb.customers;
+      else if (table === 'orders') targetList = memoryDb.orders;
+      else if (table === 'activity_logs') targetList = memoryDb.logs;
+      else if (table === 'catalog') targetList = memoryDb.catalog;
+      else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
+      else if (table === 'stores') targetList = memoryDb.stores;
 
-        // ── Notifications centralisées en base de données (order_notifications) ──
-        if (table === 'order_notifications' && eventType === 'INSERT' && newRow) {
-          const currentUser = memoryDb.current_user;
-          if (currentUser) {
-            const notifStoreId = newRow.store_id || 'store_central';
-            const userStoreId = currentUser.store_id || 'store_central';
-            const isSuperAdmin = currentUser.role === 'super_admin' || userStoreId === 'all';
+      // ── Notifications centralisées en base de données (order_notifications) ──
+      if (table === 'order_notifications' && eventType === 'INSERT' && newRow) {
+        const currentUser = memoryDb.current_user;
+        if (currentUser) {
+          const notifStoreId = newRow.store_id || 'store_central';
+          const userStoreId = currentUser.store_id || 'store_central';
+          const isSuperAdmin = currentUser.role === 'super_admin' || userStoreId === 'all';
 
-            if (isSuperAdmin || userStoreId === notifStoreId) {
-              // 1. Déclencher l'alerte sonore et visuelle immédiate sur l'appareil
-              const sendSystemNotification = require('../notificationService').sendSystemNotification;
-              sendSystemNotification(newRow.titre, newRow.message, {
-                orderId: newRow.order_id,
-                statut: newRow.metadata?.statut,
-                screen: 'gestion'
+          if (isSuperAdmin || userStoreId === notifStoreId) {
+            // 1. Déclencher l'alerte sonore et visuelle immédiate sur l'appareil
+            const sendSystemNotification = require('../notificationService').sendSystemNotification;
+            sendSystemNotification(newRow.titre, newRow.message, {
+              orderId: newRow.order_id,
+              statut: newRow.metadata?.statut,
+              screen: 'gestion'
+            });
+
+            // 2. Ajouter l'entrée dans la liste locale des notifications
+            if (!memoryDb.notifications) memoryDb.notifications = [];
+            const notifExists = memoryDb.notifications.some(n => n.id === newRow.id);
+            if (!notifExists) {
+              memoryDb.notifications.unshift({
+                id: newRow.id,
+                action: newRow.titre,
+                details: newRow.message,
+                timestamp: newRow.created_at || new Date().toISOString(),
+                read: false,
+                type: 'order'
               });
+            }
 
-              // 2. Ajouter l'entrée dans la liste locale des notifications
-              if (!memoryDb.notifications) memoryDb.notifications = [];
-              const notifExists = memoryDb.notifications.some(n => n.id === newRow.id);
-              if (!notifExists) {
-                memoryDb.notifications.unshift({
-                  id: newRow.id,
-                  action: newRow.titre,
-                  details: newRow.message,
-                  timestamp: newRow.created_at || new Date().toISOString(),
-                  read: false,
-                  type: 'order'
+            // 3. Fallback : invoquer l'Edge Function pour les push distants
+            if (supabase && typeof supabase.functions?.invoke === 'function') {
+              setTimeout(() => {
+                supabase.functions.invoke('send-push-notification', {
+                  body: {
+                    type: newRow.type_action || 'INSERT',
+                    record: {
+                      id: newRow.id,
+                      order_id: newRow.order_id,
+                      store_id: newRow.store_id,
+                      titre: newRow.titre,
+                      message: newRow.message,
+                      metadata: newRow.metadata,
+                      ...newRow.metadata
+                    }
+                  }
+                }).then(res => {
+                  if (res?.data?.skipped) {
+                    console.log('[Push Fallback] ⏭ Déjà envoyé par le trigger serveur (idempotence OK)');
+                  } else if (res?.data) {
+                    console.log('[Push Fallback] ✅ Push envoyé (fallback client):', res.data.sent, 'appareil(s)');
+                  }
+                }).catch(err => {
+                  console.warn('[Push Fallback] Edge Function indisponible:', err?.message || err);
                 });
-              }
-
-              // 3. Fallback : invoquer l'Edge Function pour les push distants
-              // Le trigger serveur `trg_dispatch_push` (pg_net) devrait déjà l'avoir fait,
-              // mais si pg_net/Vault n'est pas configuré, on s'assure que les appareils
-              // fermés/en arrière-plan reçoivent quand même la notification.
-              // L'Edge Function est idempotente (colonne push_sent) : pas de doublons.
-              if (supabase && typeof supabase.functions?.invoke === 'function') {
-                setTimeout(() => {
-                  supabase.functions.invoke('send-push-notification', {
-                    body: {
-                      type: newRow.type_action || 'INSERT',
-                      record: {
-                        id: newRow.id,
-                        order_id: newRow.order_id,
-                        store_id: newRow.store_id,
-                        titre: newRow.titre,
-                        message: newRow.message,
-                        metadata: newRow.metadata,
-                        ...newRow.metadata
-                      }
-                    }
-                  }).then(res => {
-                    if (res?.data?.skipped) {
-                      console.log('[Push Fallback] ⏭ Déjà envoyé par le trigger serveur (idempotence OK)');
-                    } else if (res?.data) {
-                      console.log('[Push Fallback] ✅ Push envoyé (fallback client):', res.data.sent, 'appareil(s)');
-                    }
-                  }).catch(err => {
-                    console.warn('[Push Fallback] Edge Function indisponible:', err?.message || err);
-                  });
-                }, 2000); // Délai de 2s pour laisser le trigger serveur agir en premier
-              }
+              }, 2000);
             }
           }
         }
+      }
 
-        // ── Capture de l'ancien statut pour détecter les vrais changements ──
-        let oldOrderStatus = null;
-        if (table === 'orders' && eventType === 'UPDATE') {
-          const existingOrder = targetList.find(x => x.id === newRow.id);
-          oldOrderStatus = existingOrder ? (existingOrder.statut || existingOrder.status) : null;
-        }
+      // ── Capture de l'ancien statut pour détecter les vrais changements ──
+      let oldOrderStatus = null;
+      if (table === 'orders' && eventType === 'UPDATE') {
+        const existingOrder = targetList.find(x => x.id === newRow.id);
+        oldOrderStatus = existingOrder ? (existingOrder.statut || existingOrder.status) : null;
+      }
 
-        if (eventType === 'INSERT') {
-          const exists = targetList.some(x => x.id === newRow.id);
-          if (!exists) {
-            const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
-            if (table === 'activity_logs') {
-              targetList.unshift(rowToAdd);
-            } else {
-              targetList.push(rowToAdd);
-            }
-          }
-        } else if (eventType === 'UPDATE') {
-          // ── Libérer le verrou "pending" : l'événement Realtime confirme que la mutation a réussi côté Supabase ──
-          if (table === 'orders' && newRow?.id) {
-            removePendingOrderUpdate(newRow.id);
-          }
-          const idx = targetList.findIndex(x => x.id === newRow.id);
-          if (idx !== -1) {
-            let mergedRow = { ...newRow };
-            if (table === 'orders' && targetList[idx].motif_annulation && !mergedRow.motif_annulation) {
-              mergedRow.motif_annulation = targetList[idx].motif_annulation;
-            }
-            if (table === 'orders') {
-              mergedRow = hydrateOrder(mergedRow);
-            }
-            targetList[idx] = mergedRow;
+      if (eventType === 'INSERT') {
+        const exists = targetList.some(x => x.id === newRow.id);
+        if (!exists) {
+          const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
+          if (table === 'activity_logs') {
+            targetList.unshift(rowToAdd);
           } else {
-            const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
             targetList.push(rowToAdd);
           }
-        } else if (eventType === 'DELETE') {
-          const idx = targetList.findIndex(x => x.id === oldRow.id);
-          if (idx !== -1) {
-            targetList.splice(idx, 1);
+        }
+      } else if (eventType === 'UPDATE') {
+        // ── Libérer le verrou "pending" : l'événement Realtime confirme que la mutation a réussi côté Supabase ──
+        if (table === 'orders' && newRow?.id) {
+          removePendingOrderUpdate(newRow.id);
+        }
+        const idx = targetList.findIndex(x => x.id === newRow.id);
+        if (idx !== -1) {
+          let mergedRow = { ...newRow };
+          if (table === 'orders' && targetList[idx].motif_annulation && !mergedRow.motif_annulation) {
+            mergedRow.motif_annulation = targetList[idx].motif_annulation;
+          }
+          if (table === 'orders') {
+            mergedRow = hydrateOrder(mergedRow);
+          }
+          targetList[idx] = mergedRow;
+        } else {
+          const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
+          targetList.push(rowToAdd);
+        }
+      } else if (eventType === 'DELETE') {
+        const idx = targetList.findIndex(x => x.id === oldRow.id);
+        if (idx !== -1) {
+          targetList.splice(idx, 1);
+        }
+      }
+
+      // ── Notification en temps réel ciblée par Point de Laverie (store_id) ──
+      if (table === 'orders' && newRow && (eventType === 'INSERT' || eventType === 'UPDATE')) {
+        const hydratedNewOrder = hydrateOrder(newRow);
+        const currentUser = memoryDb.current_user;
+
+        if (currentUser) {
+          const orderStoreId = hydratedNewOrder.store_id || 'store_central';
+          const userStoreId = currentUser.store_id || 'store_central';
+          const isSuperAdmin = currentUser.role === 'super_admin' || userStoreId === 'all';
+
+          // Seuls les utilisateurs rattachés au même point de laverie (ou super_admin) reçoivent la notification
+          if (isSuperAdmin || userStoreId === orderStoreId) {
+            sendOrderNotification(eventType, hydratedNewOrder, oldOrderStatus).catch(() => { });
           }
         }
+      }
 
-        // ── Notification en temps réel ciblée par Point de Laverie (store_id) ──
-        if (table === 'orders' && newRow && (eventType === 'INSERT' || eventType === 'UPDATE')) {
-          const hydratedNewOrder = hydrateOrder(newRow);
-          const currentUser = memoryDb.current_user;
+      // Éviction automatique immédiate si l'utilisateur actuellement connecté est désactivé ou supprimé
+      if (table === 'staff' && memoryDb.current_user) {
+        const currentId = memoryDb.current_user.id;
+        const currentEmail = (memoryDb.current_user.email || '').toLowerCase();
 
-          if (currentUser) {
-            const orderStoreId = hydratedNewOrder.store_id || 'store_central';
-            const userStoreId = currentUser.store_id || 'store_central';
-            const isSuperAdmin = currentUser.role === 'super_admin' || userStoreId === 'all';
+        const isDeleted = eventType === 'DELETE' && (
+          (oldRow && (oldRow.id === currentId || (oldRow.email && oldRow.email.toLowerCase() === currentEmail))) ||
+          !memoryDb.staff.some(s => s.id === currentId || (s.email && s.email.toLowerCase() === currentEmail))
+        );
 
-            // Seuls les utilisateurs rattachés au même point de laverie (ou super_admin) reçoivent la notification
-            if (isSuperAdmin || userStoreId === orderStoreId) {
-              sendOrderNotification(eventType, hydratedNewOrder, oldOrderStatus).catch(() => { });
-            }
-          }
+        const isUpdatedDisabled = eventType === 'UPDATE' && newRow && (
+          (newRow.id === currentId || (newRow.email && newRow.email.toLowerCase() === currentEmail)) &&
+          (newRow.statut === 'suspendu' || newRow.statut === 'inactif')
+        );
+
+        if (isDeleted || isUpdatedDisabled) {
+          console.warn("[Auth Realtime] Compte personnel supprimé ou désactivé à distance. Déconnexion immédiate !");
+          memoryDb.current_user = null;
         }
+      }
 
-        // Éviction automatique immédiate si l'utilisateur actuellement connecté est désactivé ou supprimé
-        if (table === 'staff' && memoryDb.current_user) {
-          const currentId = memoryDb.current_user.id;
-          const currentEmail = (memoryDb.current_user.email || '').toLowerCase();
-
-          const isDeleted = eventType === 'DELETE' && (
-            (oldRow && (oldRow.id === currentId || (oldRow.email && oldRow.email.toLowerCase() === currentEmail))) ||
-            !memoryDb.staff.some(s => s.id === currentId || (s.email && s.email.toLowerCase() === currentEmail))
-          );
-
-          const isUpdatedDisabled = eventType === 'UPDATE' && newRow && (
-            (newRow.id === currentId || (newRow.email && newRow.email.toLowerCase() === currentEmail)) &&
-            (newRow.statut === 'suspendu' || newRow.statut === 'inactif')
-          );
-
-          if (isDeleted || isUpdatedDisabled) {
-            console.warn("[Auth Realtime] Compte personnel supprimé ou désactivé à distance. Déconnexion immédiate !");
-            memoryDb.current_user = null;
-          }
-        }
-
-        persist();
-        db.notify();
-      })
-      .subscribe();
-
-    realtimeChannels.push(ch);
+      persist();
+      notifyListeners();
+    });
   });
+
+  channel.subscribe((status, err) => {
+    if (status === 'SUBSCRIBED') {
+      console.log('[DB Sync] 🟢 Realtime connecté avec succès.');
+    } else if (status === 'CHANNEL_ERROR') {
+      console.warn('[DB Sync] ⚠️ Erreur Realtime:', err?.message || err);
+    }
+  });
+
+  activeRealtimeChannel = channel;
 }
 
 /**
@@ -668,7 +705,7 @@ export function checkAndEvictDisabledCurrentUser() {
     console.warn("[Auth] Détection d'un compte supprimé, suspendu ou inactif. Déconnexion forcée !");
     memoryDb.current_user = null;
     persist();
-    db.notify();
+    notifyListeners();
     return true;
   }
   return false;
@@ -699,7 +736,7 @@ function startSecurityHeartbeat() {
           console.warn(`[Security Heartbeat] Compte mobile supprimé ou désactivé (statut: ${data?.statut || 'SUPPRIME'}). Déconnexion forcée immédiate !`);
           memoryDb.current_user = null;
           await persist();
-          db.notify();
+          notifyListeners();
         }
       } catch (e) {
         // Erreurs réseau temporaires ignorées
@@ -716,5 +753,5 @@ export async function initializeDatabase() {
   await initDb();
   checkAndEvictDisabledCurrentUser();
   startSecurityHeartbeat();
-  startOrderStateCron();
+  startOrderStateCron(persist);
 }

@@ -1,30 +1,44 @@
 @echo off
-title KLIN UP - Apercu Web Mobile
+title KLIN UP - Serveur Expo
+color 0B
 
-echo ===================================================
-echo   KLIN UP - Apercu Web (Vue Telephone)
-echo ===================================================
-echo.
+:: ── Réparation automatique de l'index Git ─────────────────────────────────────
+set GIT_EXE=C:\Users\ANDRE\AppData\Local\Programs\Git\cmd\git.exe
+set REPO=%~dp0
+set INDEX=%REPO%.git\index
+set BACKUP=%REPO%.git\index.backup
+
+if exist "%INDEX%" (
+    for %%F in ("%INDEX%") do set IDX_SIZE=%%~zF
+) else (
+    set IDX_SIZE=0
+)
+
+if "%IDX_SIZE%"=="0" (
+    echo [GIT] Index corrompu detecte. Reparation automatique...
+    if exist "%BACKUP%" (
+        for %%B in ("%BACKUP%") do set BK_SIZE=%%~zB
+        if not "%BK_SIZE%"=="0" (
+            copy /Y "%BACKUP%" "%INDEX%" >nul
+            echo [GIT] Index restaure depuis backup.
+            goto :git_ok
+        )
+    )
+    del /f "%INDEX%" 2>nul
+    "%GIT_EXE%" -C "%REPO%" reset HEAD . >nul 2>&1
+    echo [GIT] Index reconstruit depuis HEAD.
+    if exist "%INDEX%" copy /Y "%INDEX%" "%BACKUP%" >nul
+) else (
+    copy /Y "%INDEX%" "%BACKUP%" >nul
+)
+
+:git_ok
+:: ──────────────────────────────────────────────────────────────────────────────
 
 cd /d "%~dp0mobile-app"
-
-if not exist node_modules (
-    echo Installation des dependances...
-    call npm install --legacy-peer-deps
+call start.bat
+if %ERRORLEVEL% neq 0 (
+    echo.
+    echo Le serveur s'est termine avec le code %ERRORLEVEL%.
+    pause
 )
-
-:: Liberer le port 8081 si occupe
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8081 ^| findstr LISTENING') do (
-    echo Liberation du port 8081 [PID: %%a]...
-    taskkill /PID %%a /F >nul 2>&1
-)
-
-echo Demarrage du serveur...
-echo L'apercu s'ouvrira sur : http://localhost:8081
-echo.
-echo (Appuyez sur Ctrl+C pour arreter)
-echo.
-
-call npx expo start --web --port 8081
-
-pause

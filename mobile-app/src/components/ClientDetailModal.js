@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Modal, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, Modal as RNModal, Platform } from 'react-native';
+import { SmoothScrollView as ScrollView } from './SmoothScroll';
 import { User, Phone, MapPin, Edit3, Trash2, ArrowLeft, Award, CreditCard, Calendar, CheckCircle2 } from 'lucide-react-native';
 import SafeBlurView from './SafeBlurView';
 const BlurView = SafeBlurView;
@@ -9,6 +10,8 @@ import { useDbState } from '../hooks/useDbState';
 import { CustomSelect } from './CustomSelect';
 import { t } from '../services/i18n';
 import RewardFidelityCard from './RewardFidelityCard';
+import AnimatedBadge from './AnimatedBadge';
+import { ConfirmationModal } from './ui/modal';
 
 export default function ClientDetailModal({
   visible,
@@ -19,6 +22,8 @@ export default function ClientDetailModal({
 }) {
   const { customers, orders, catalog, currentUser, isDarkMode } = useDbState();
   const [selectedCrmSubId, setSelectedCrmSubId] = useState('');
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [unsubscribeModalVisible, setUnsubscribeModalVisible] = useState(false);
   const styles = getStyles(isDarkMode);
 
   if (!visible || !client) return null;
@@ -35,6 +40,9 @@ export default function ClientDetailModal({
 
   const getStatusColor = (statut) => {
     switch (statut) {
+      case 'en_attente_validation':
+      case 'attente_validation':
+        return { label: 'Validation Caisse', bg: isDarkMode ? 'rgba(139, 92, 246, 0.15)' : '#f5f3ff', text: isDarkMode ? '#a78bfa' : '#7c3aed', border: isDarkMode ? '#7c3aed' : '#ddd6fe' };
       case 'restitue':
       case 'livre':
         return { label: 'Livré / Restitué', bg: isDarkMode ? 'rgba(34, 197, 94, 0.15)' : '#ecfdf5', text: isDarkMode ? '#4ade80' : '#059669', border: isDarkMode ? '#059669' : '#a7f3d0' };
@@ -63,45 +71,29 @@ export default function ClientDetailModal({
     if (onShowSuccess) onShowSuccess("Abonnement activé pour ce client !");
   };
 
-  const handleUnsubscribeCrm = (clientId) => {
-    Alert.alert(
-      "Résiliation",
-      "Êtes-vous sûr de vouloir résilier l'abonnement actif de ce client ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Résilier",
-          style: "destructive",
-          onPress: () => {
-            db.unsubscribeCustomer(clientId);
-            if (onShowSuccess) onShowSuccess("Abonnement résilié avec succès.");
-          }
-        }
-      ]
-    );
+  const handleUnsubscribeCrm = () => {
+    setUnsubscribeModalVisible(true);
   };
 
-  const handleDeleteCustomer = (clientId) => {
-    Alert.alert(
-      "Confirmation",
-      "Voulez-vous vraiment supprimer ce client ?",
-      [
-        { text: "Non", style: "cancel" },
-        {
-          text: "Oui, Supprimer",
-          style: "destructive",
-          onPress: () => {
-            db.deleteCustomer(clientId);
-            if (onShowSuccess) onShowSuccess("Client supprimé avec succès.");
-            onClose();
-          }
-        }
-      ]
-    );
+  const handleConfirmUnsubscribe = () => {
+    setUnsubscribeModalVisible(false);
+    db.unsubscribeCustomer(activeClient.id);
+    if (onShowSuccess) onShowSuccess("Abonnement résilié avec succès.");
+  };
+
+  const handleDeleteCustomer = () => {
+    setDeleteModalVisible(true);
+  };
+
+  const handleConfirmDeleteCustomer = () => {
+    setDeleteModalVisible(false);
+    db.deleteCustomer(activeClient.id);
+    if (onShowSuccess) onShowSuccess("Client supprimé avec succès.");
+    onClose();
   };
 
   return (
-    <Modal
+    <RNModal
       visible={visible && !!client}
       animationType="slide"
       presentationStyle="fullScreen"
@@ -112,15 +104,14 @@ export default function ClientDetailModal({
           {/* EN-TÊTE PAGE ENTIÈRE AVEC BOUTON RETOUR */}
           <View style={styles.fullPageHeader}>
             <TouchableOpacity onPress={onClose} style={styles.backBtn} activeOpacity={0.7}>
-              <ArrowLeft size={22} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-              <Text style={styles.backBtnText}>Retour</Text>
+              <ArrowLeft size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
             </TouchableOpacity>
 
             <Text style={styles.fullPageTitle} numberOfLines={1}>Fiche Client</Text>
-            <View style={{ width: 70 }} />
+            <View style={{ width: 40 }} />
           </View>
 
-          <ScrollView contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.fullPageScroll} showsVerticalScrollIndicator={false}>
           {/* PROFILE CARD */}
           <View style={styles.detailCard}>
             <View style={styles.profileHeaderRow}>
@@ -263,10 +254,18 @@ export default function ClientDetailModal({
                     onChange={(val) => setSelectedCrmSubId(val)}
                     options={[
                       { label: "-- Choisir une formule d'abonnement --", value: "" },
-                      ...(catalog || []).filter(item => item && item.service === 'abonnement').map(sub => ({
-                        label: `${sub.article} (${(sub.prix || 0).toLocaleString('fr-FR')} F/m)`,
-                        value: sub.id
-                      }))
+                      ...((catalog || []).filter(item => item && (item.service === 'abonnement' || item.categorie === 'abonnement' || item.categorie === 'abonnements')).length > 0
+                        ? (catalog || []).filter(item => item && (item.service === 'abonnement' || item.categorie === 'abonnement' || item.categorie === 'abonnements')).map(sub => ({
+                            label: `${sub.article || sub.name} (${(sub.prix || sub.price || 0).toLocaleString('fr-FR')} F/mois)`,
+                            value: sub.id
+                          }))
+                        : [
+                            { label: "Offre Active (20 000 F/mois)", value: "sub1" },
+                            { label: "Abonnement Premium (35 000 F/mois)", value: "sub2" },
+                            { label: "Abonnement Prestige (60 000 F/mois)", value: "sub3" },
+                            { label: "Abonnement VIP (100 000 F/mois)", value: "sub4" }
+                          ]
+                      )
                     ]}
                     placeholder="Choisir une formule"
                   />
@@ -304,9 +303,14 @@ export default function ClientDetailModal({
                       <Text style={styles.orderHistoryDate}>Enregistrée le {item.created_at ? item.created_at.split('T')[0] : 'N/A'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                      <View style={[styles.statusTag, { backgroundColor: status.bg, borderColor: status.border, borderWidth: 1 }]}>
-                        <Text style={[styles.statusTagText, { color: status.text }]}>{status.label}</Text>
-                      </View>
+                      <AnimatedBadge
+                        status={item.statut}
+                        statusColor={status}
+                        isDarkMode={isDarkMode}
+                        size="sm"
+                      >
+                        {status.label}
+                      </AnimatedBadge>
                       <Text style={styles.orderHistoryTotal}>{formatPrice(item.prix_total || item.total)}</Text>
                     </View>
                   </View>
@@ -314,10 +318,36 @@ export default function ClientDetailModal({
               })
             );
           })()}
-        </ScrollView>
+          </ScrollView>
+
+          {/* CONFIRMATION MODAL : SUPPRESSION DU CLIENT */}
+          <ConfirmationModal
+            visible={deleteModalVisible}
+            onClose={() => setDeleteModalVisible(false)}
+            onConfirm={handleConfirmDeleteCustomer}
+            title="Supprimer le client"
+            description={`Voulez-vous vraiment supprimer ${activeClient.prenom || ''} ${activeClient.nom || ''} ? Cette action est irréversible.`}
+            variant="danger"
+            confirmText="Supprimer"
+            cancelText="Annuler"
+            isDarkMode={isDarkMode}
+          />
+
+          {/* CONFIRMATION MODAL : RÉSILIATION ABONNEMENT */}
+          <ConfirmationModal
+            visible={unsubscribeModalVisible}
+            onClose={() => setUnsubscribeModalVisible(false)}
+            onConfirm={handleConfirmUnsubscribe}
+            title="Résilier l'abonnement"
+            description="Êtes-vous sûr de vouloir résilier l'abonnement actif de ce client ?"
+            variant="warning"
+            confirmText="Résilier"
+            cancelText="Annuler"
+            isDarkMode={isDarkMode}
+          />
         </View>
       </View>
-    </Modal>
+    </RNModal>
   );
 }
 
@@ -325,14 +355,22 @@ function getStyles(isDarkMode) {
   return {
     fullPageContainer: {
       flex: 1,
-      backgroundColor: isDarkMode ? '#000000' : '#ffffff',
       width: '100%',
+      height: Platform.OS === 'web' ? '100vh' : '100%',
+      backgroundColor: Platform.OS === 'web' ? '#0c0c10' : (isDarkMode ? '#000000' : '#ffffff'),
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
     },
     fullPageInnerWrapper: {
-      flex: 1,
-      width: '100%',
+      ...(Platform.OS === 'web' ? {} : { flex: 1 }),
+      width: Platform.OS === 'web' ? 393 : '100%',
+      height: Platform.OS === 'web' ? 852 : '100%',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
       backgroundColor: isDarkMode ? '#000000' : '#ffffff',
       paddingTop: Platform.OS === 'ios' ? 48 : 24,
+      overflow: 'hidden',
     },
     fullPageHeader: {
       flexDirection: 'row',
@@ -345,16 +383,14 @@ function getStyles(isDarkMode) {
       backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
     },
     backBtn: {
-      flexDirection: 'row',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+      borderWidth: 1.5,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      justifyContent: 'center',
       alignItems: 'center',
-      gap: 6,
-      paddingVertical: 4,
-      paddingRight: 10,
-    },
-    backBtnText: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: isDarkMode ? '#ffffff' : '#0f172a',
     },
     fullPageTitle: {
       fontSize: 16,
@@ -457,7 +493,7 @@ function getStyles(isDarkMode) {
       gap: 6,
       backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#eff6ff',
       paddingVertical: 10,
-      borderRadius: 12,
+      borderRadius: 9999,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.2)',
     },
@@ -474,7 +510,7 @@ function getStyles(isDarkMode) {
       gap: 6,
       backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
       paddingVertical: 10,
-      borderRadius: 12,
+      borderRadius: 9999,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)',
     },
@@ -513,7 +549,7 @@ function getStyles(isDarkMode) {
       backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.15)' : '#ecfdf5',
       paddingHorizontal: 10,
       paddingVertical: 3,
-      borderRadius: 12,
+      borderRadius: 9999,
       borderWidth: 1,
       borderColor: isDarkMode ? '#059669' : '#a7f3d0',
     },
@@ -561,7 +597,7 @@ function getStyles(isDarkMode) {
     unsubscribeBtn: {
       backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
       paddingVertical: 10,
-      borderRadius: 12,
+      borderRadius: 9999,
       alignItems: 'center',
       marginTop: 6,
       borderWidth: 1,
@@ -575,7 +611,7 @@ function getStyles(isDarkMode) {
     subscribeBtn: {
       backgroundColor: '#002cf7',
       paddingVertical: 12,
-      borderRadius: 12,
+      borderRadius: 9999,
       alignItems: 'center',
     },
     subscribeBtnText: {
@@ -612,7 +648,7 @@ function getStyles(isDarkMode) {
     statusTag: {
       paddingHorizontal: 8,
       paddingVertical: 2,
-      borderRadius: 8,
+      borderRadius: 9999,
     },
     statusTagText: {
       fontSize: 11,

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KLIN UP • Splash Screen Design Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-blue: #002cf7;
+      --brand-blue-hover: #0025d0;
+      --brand-emerald: #10b981;
+      --bg-dark: #08080a;
+      --bg-light: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f1015;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justifyContent: center;
+      padding: 24px 16px;
+      overflow-x: hidden;
+    }
+
+    /* Controls Bar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(12px);
+      padding: 8px 16px;
+      border-radius: 9999px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    .toolbar-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #94a3b8;
+      margin-right: 6px;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn.primary {
+      background: var(--brand-blue);
+      border-color: var(--brand-blue);
+    }
+
+    .btn.primary:hover {
+      background: var(--brand-blue-hover);
+    }
+
+    /* Phone Mockup Canvas */
+    .phone-wrapper {
+      position: relative;
+      width: 380px;
+      height: 780px;
+      border-radius: 46px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 10px #181920, 0 0 0 12px #262833;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.4s ease;
+    }
+
+    /* Notch Dynamic Island */
+    .notch {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 110px;
+      height: 28px;
+      background: #000000;
+      border-radius: 20px;
+      z-index: 1000;
+    }
+
+    /* Splash Screen View */
+    .splash-container {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justifyContent: center;
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 100;
+    }
+
+    .splash-container.hidden {
+      opacity: 0;
+      transform: scale(1.04);
+      pointer-events: none;
+    }
+
+    /* Ambient Pulsing Aura */
+    .ambient-halo {
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: rgba(0, 44, 247, 0.2);
+      filter: blur(55px);
+      pointer-events: none;
+      animation: pulseGlow 3.6s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      0% {
+        transform: scale(0.88);
+        opacity: 0.25;
+      }
+      100% {
+        transform: scale(1.22);
+        opacity: 0.55;
+      }
+    }
+
+    /* Main Branding Content */
+    .brand-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 10;
+      animation: enterContent 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes enterContent {
+      0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.9);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Icon Box */
+    .logo-box {
+      width: 104px;
+      height: 104px;
+      border-radius: 28px;
+      border: 1.5px solid rgba(0, 44, 247, 0.15);
+      display: flex;
+      align-items: center;
+      justifyContent: center;
+      margin-bottom: 24px;
+      box-shadow: 0 16px 36px -10px rgba(0, 44, 247, 0.3);
+      position: relative;
+      overflow: hidden;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .logo-box svg {
+      width: 72px;
+      height: 72px;
+    }
+
+    /* Typography */
+    .brand-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .title-blue {
+      font-size: 36px;
+      font-weight: 900;
+      color: var(--brand-blue);
+      letter-spacing: -1px;
+    }
+
+    .title-white {
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      transition: color 0.3s ease;
+    }
+
+    .brand-subtitle {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 2.4px;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      transition: color 0.3s ease;
+    }
+
+    /* Progress Capsule */
+    .progress-track {
+      width: 140px;
+      height: 4px;
+      border-radius: 9999px;
+      background: rgba(0, 44, 247, 0.1);
+      overflow: hidden;
+      margin-bottom: 14px;
+      position: relative;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--brand-blue);
+      border-radius: 9999px;
+      transition: width 1.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+    }
+
+    .status-text {
+      font-size: 12px;
+      font-weight: 600;
+      height: 18px;
+      transition: color 0.3s ease;
+    }
+
+    /* Footer */
+    .splash-footer {
+      position: absolute;
+      bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      transition: all 0.3s ease;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--brand-emerald);
+      box-shadow: 0 0 8px var(--brand-emerald);
+    }
+
+    /* Mock App Screen Underneath */
+    .app-screen-mock {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justifyContent: center;
+      padding: 32px;
+      text-align: center;
+    }
+
+    .app-screen-mock h2 {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .app-screen-mock p {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 24px;
+    }
+
+    /* Theme Variants */
+    .dark-mode {
+      background-color: var(--bg-dark);
+    }
+    .dark-mode .title-white {
+      color: #ffffff;
+    }
+    .dark-mode .brand-subtitle {
+      color: #94a3b8;
+    }
+    .dark-mode .logo-box {
+      background: #111116;
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    .dark-mode .status-text {
+      color: #71717a;
+    }
+    .dark-mode .splash-footer {
+      background: rgba(255, 255, 255, 0.04);
+      color: #52525b;
+    }
+    .dark-mode .app-screen-mock {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    .light-mode {
+      background-color: var(--bg-light);
+    }
+    .light-mode .title-white {
+      color: #09090b;
+    }
+    .light-mode .brand-subtitle {
+      color: #64748b;
+    }
+    .light-mode .logo-box {
+      background: #ffffff;
+      border-color: rgba(0, 44, 247, 0.12);
+    }
+    .light-mode .status-text {
+      color: #94a3b8;
+    }
+    .light-mode .splash-footer {
+      background: rgba(0, 0, 0, 0.04);
+      color: #94a3b8;
+    }
+    .light-mode .app-screen-mock {
+      background: #ffffff;
+      color: #09090b;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Controls -->
+  <div class="toolbar">
+    <span class="toolbar-title">KLIN UP Splash Preview</span>
+    <button class="btn primary" id="replayBtn">
+      ↻ Relancer l'animation
+    </button>
+    <button class="btn" id="themeBtn">
+      🌓 Mode Sombre / Clair
+    </button>
+  </div>
+
+  <!-- Phone Frame -->
+  <div class="phone-wrapper dark-mode" id="phoneMockup">
+    <div class="notch"></div>
+
+    <!-- Underlying App Preview (revealed upon splash exit) -->
+    <div class="app-screen-mock">
+      <h2>Espace KLIN UP</h2>
+      <p>Prêt pour les commandes et le traitement</p>
+      <button class="btn primary" onclick="replayAnimation()">Tester à nouveau</button>
+    </div>
+
+    <!-- Splash Screen Component -->
+    <div class="splash-container" id="splashScreen">
+      <div class="ambient-halo"></div>
+
+      <div class="brand-content">
+        <!-- Logo Icon: Washing Machine -->
+        <div class="logo-box">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Top Dashboard Bar -->
+            <rect x="14" y="16" width="72" height="14" rx="7" fill="#09090b"/>
+            <circle cx="24" cy="23" r="2.5" fill="#ffffff"/>
+            <circle cx="33" cy="23" r="2.5" fill="#ffffff"/>
+            <!-- Body -->
+            <rect x="14" y="32" width="72" height="52" rx="14" fill="#002cf7"/>
+            <!-- Drum Outer Rim -->
+            <circle cx="50" cy="58" r="21" stroke="#09090b" stroke-width="7" fill="#ffffff"/>
+            <!-- Window Glare -->
+            <path d="M42 49 C46 45, 54 45, 58 49" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+            <!-- Sparkles -->
+            <path d="M25 42 L26.5 45 L29.5 46.5 L26.5 48 L25 51 L23.5 48 L20.5 46.5 L23.5 45 Z" fill="#ffffff"/>
+            <path d="M33 37 L34 39 L36 40 L34 41 L33 43 L32 41 L30 40 L32 39 Z" fill="#ffffff"/>
+          </svg>
+        </div>
+
+        <!-- Typography -->
+        <div class="brand-title-row">
+          <span class="title-blue">KLIN</span>
+          <span class="title-white">UP</span>
+        </div>
+
+        <div class="brand-subtitle">Pressing & Blanchisserie Professionnelle</div>
+
+        <!-- Progress Track -->
+        <div class="progress-track">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <!-- Dynamic Status Message -->
+        <div class="status-text" id="statusLabel">Initialisation de votre espace...</div>
+      </div>
+
+      <!-- Footer Badge -->
+      <div class="splash-footer">
+        <div class="status-dot"></div>
+        <span>KLIN UP OS • v1.0.0</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const phone = document.getElementById('phoneMockup');
+    const splash = document.getElementById('splashScreen');
+    const bar = document.getElementById('progressBar');
+    const statusLabel = document.getElementById('statusLabel');
+    const replayBtn = document.getElementById('replayBtn');
+    const themeBtn = document.getElementById('themeBtn');
+
+    let isDark = true;
+    let animTimeout;
+
+    function replayAnimation() {
+      clearTimeout(animTimeout);
+
+      // Reset
+      splash.classList.remove('hidden');
+      bar.style.transition = 'none';
+      bar.style.width = '5%';
+      statusLabel.textContent = 'Initialisation de votre espace...';
+
+      // Start sequence
+      setTimeout(() => {
+        bar.style.transition = 'width 1.4s cubic-bezier(0.2, 0.8, 0.3, 1)';
+        bar.style.width = '85%';
+      }, 50);
+
+      setTimeout(() => {
+        statusLabel.textContent = 'Synchronisation sécurisée...';
+      }, 600);
+
+      setTimeout(() => {
+        statusLabel.textContent = 'Chargement des données...';
+      }, 1100);
+
+      setTimeout(() => {
+        bar.style.width = '100%';
+        statusLabel.textContent = 'Prêt !';
+      }, 1500);
+
+      // Dissolve exit transition
+      animTimeout = setTimeout(() => {
+        splash.classList.add('hidden');
+      }, 1800);
+    }
+
+    replayBtn.addEventListener('click', replayAnimation);
+
+    themeBtn.addEventListener('click', () => {
+      isDark = !isDark;
+      if (isDark) {
+        phone.classList.remove('light-mode');
+        phone.classList.add('dark-mode');
+      } else {
+        phone.classList.remove('dark-mode');
+        phone.classList.add('light-mode');
+      }
+    });
+
+    // Run on first load
+    replayAnimation();
+  </script>
+</body>
+</html>
