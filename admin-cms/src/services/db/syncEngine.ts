@@ -237,11 +237,13 @@ export async function initDb(): Promise<void> {
     if (!storeRes.error) memoryDb.stores = storeRes.data || [];
     else console.warn('[KLIN UP DB] ⚠️ Chargement stores partiel :', storeRes.error.message);
 
-    if (!catRes.error && catRes.data && catRes.data.length > 0) {
-      memoryDb.catalog = catRes.data.map((item: any) => {
+    if (!catRes.error) {
+      memoryDb.catalog = (catRes.data || []).map((item: any) => {
         const isActive = item.is_active === false || item.statut === 'inactif' ? false : true;
         return { ...item, is_active: isActive, statut: isActive ? 'actif' : 'inactif' };
       });
+    } else {
+      console.warn('[KLIN UP DB] ⚠️ Chargement catalog partiel :', catRes.error.message);
     }
 
     if (!rewardRes.error && rewardRes.data) {

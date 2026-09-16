@@ -34,3 +34,4 @@ jobs:
 
       - name: Run SQL Production Safety Linter
         run: node scripts/check-sql-safety.js
+

@@ -19,7 +19,7 @@ export const memoryDb: MemoryStore = {
   customers: DEFAULT_CUSTOMERS as any,
   orders: DEFAULT_ORDERS as any,
   logs: DEFAULT_LOGS as any,
-  catalog: DEFAULT_CATALOG as any,
+  catalog: [],
   rewards: [],
   delivery_zones: [],
   pickup_zones: [],
