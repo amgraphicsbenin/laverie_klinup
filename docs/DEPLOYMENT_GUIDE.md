@@ -63,14 +63,14 @@ Allez dans **Settings > Environments** et cliquez sur **New environment** pour c
 ### Étape 3.2 : Renseigner les Secrets par Environnement
 Dans chaque environnement, ajoutez les secrets correspondants :
 
-| Nom du Secret | Valeur pour `test` | Valeur pour `staging` | Valeur pour `production` |
-|---|---|---|---|
-| `SUPABASE_URL` | URL de `klinup-test` | URL de `klinup-staging` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
-| `SUPABASE_ANON_KEY` | Clé Anon de `klinup-test` | Clé Anon de `klinup-staging` | Clé Anon officielle Prod |
-| `EXPO_PUBLIC_SUPABASE_URL` | URL de `klinup-test` | URL de `klinup-staging` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Clé Anon de `klinup-test` | Clé Anon de `klinup-staging` | Clé Anon officielle Prod |
-| `VITE_SUPABASE_URL` | URL de `klinup-test` | URL de `klinup-staging` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Clé Anon de `klinup-test` | Clé Anon de `klinup-staging` | Clé Anon officielle Prod |
+| Nom du Secret | Valeur pour `test` & `staging` | Valeur pour `production` |
+|---|---|---|
+| `SUPABASE_URL` | `https://ryjwrjzggfwglfmyovhk.supabase.co` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
+| `SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5andyanpnZ2Z3Z2xmbXlvdmhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NDE4NDcsImV4cCI6MjEwNTExNzg0N30.SuL0HAWzX2EmISFgf01wt5huArlRw5Dcd4fayMpVt8c` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjbnF3cWtqbmxzcmJkYm11a3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzA1NzEsImV4cCI6MjA5Njg0NjU3MX0.8RdoITBg_AXDqN2DxuZlarrF_sx-ya1DCSyS-FLy0mo` |
+| `EXPO_PUBLIC_SUPABASE_URL` | `https://ryjwrjzggfwglfmyovhk.supabase.co` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | *(Même clé anon que ci-dessus)* | *(Même clé anon que ci-dessus)* |
+| `VITE_SUPABASE_URL` | `https://ryjwrjzggfwglfmyovhk.supabase.co` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | *(Même clé anon que ci-dessus)* | *(Même clé anon que ci-dessus)* |
 
 ---
 
