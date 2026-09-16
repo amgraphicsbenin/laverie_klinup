@@ -5,6 +5,28 @@
 -- Désactive temporairement le RLS pendant la création
 -- (Il sera réactivé à la fin avec des politiques restrictives)
 
+-- 0. Table: stores (Points de Laverie - entité racine)
+CREATE TABLE IF NOT EXISTS public.stores (
+  id TEXT PRIMARY KEY,
+  nom TEXT NOT NULL,
+  code TEXT UNIQUE NOT NULL,
+  adresse TEXT,
+  ville TEXT DEFAULT 'Cotonou',
+  telephone TEXT,
+  responsable_id TEXT,
+  responsable_nom TEXT,
+  statut TEXT DEFAULT 'actif',
+  latitude NUMERIC DEFAULT 6.3703,
+  longitude NUMERIC DEFAULT 2.3912,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insertion des points de laverie initiaux
+INSERT INTO public.stores (id, nom, code, adresse, ville, telephone, statut) VALUES
+  ('store_akpakpa', 'Point Akpakpa - Saint Jean', 'KLP-AKP', 'Carrefour Saint-Jean, Akpakpa', 'Cotonou', '+229 97 02 02 02', 'actif'),
+  ('store_calavi', 'Point Calavi - Université', 'KLP-CAL', 'Carrefour Kpota, Face Université', 'Abomey-Calavi', '+229 97 03 03 03', 'actif')
+ON CONFLICT (id) DO NOTHING;
+
 -- 1. Table: staff
 CREATE TABLE IF NOT EXISTS public.staff (
   id TEXT PRIMARY KEY,

@@ -10,7 +10,7 @@ ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stores ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.catalog_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.catalog ENABLE ROW LEVEL SECURITY;
 
 -- 2. Suppression des anciennes politiques si existantes
 DROP POLICY IF EXISTS "Public access staff" ON public.staff;
@@ -18,7 +18,7 @@ DROP POLICY IF EXISTS "Public access activity_logs" ON public.activity_logs;
 DROP POLICY IF EXISTS "Public access orders" ON public.orders;
 DROP POLICY IF EXISTS "Public access customers" ON public.customers;
 DROP POLICY IF EXISTS "Public access stores" ON public.stores;
-DROP POLICY IF EXISTS "Public access catalog" ON public.catalog_items;
+DROP POLICY IF EXISTS "Public access catalog" ON public.catalog;
 
 -- ============================================================================
 -- POLITIQUES SUR LA TABLE `staff`
@@ -76,16 +76,16 @@ FOR ALL
 USING (auth.role() = 'authenticated' OR auth.role() = 'anon');
 
 -- ============================================================================
--- POLITIQUES SUR LA TABLE `catalog_items`
+-- POLITIQUES SUR LA TABLE `catalog`
 -- ============================================================================
 
 -- Consultation du catalogue publique (Mobile & Caisse)
-CREATE POLICY "Catalog public read" ON public.catalog_items
+CREATE POLICY "Catalog public read" ON public.catalog
 FOR SELECT
 USING (true);
 
 -- Modification du catalogue réservée au rôle d'administration avec `can_edit_catalog`
-CREATE POLICY "Catalog admin write" ON public.catalog_items
+CREATE POLICY "Catalog admin write" ON public.catalog
 FOR ALL
 USING (
   auth.role() = 'authenticated' AND (
@@ -100,4 +100,4 @@ USING (
 SELECT tablename, rowsecurity 
 FROM pg_tables 
 WHERE schemaname = 'public' 
-AND tablename IN ('staff', 'activity_logs', 'orders', 'customers', 'stores', 'catalog_items');
+AND tablename IN ('staff', 'activity_logs', 'orders', 'customers', 'stores', 'catalog');
