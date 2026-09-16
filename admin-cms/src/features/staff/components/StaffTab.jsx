@@ -239,6 +239,14 @@ export default function StaffTab({
 
   useEffect(() => {
     refreshRoles();
+    if (typeof db.subscribe === 'function') {
+      const unsubscribe = db.subscribe(() => {
+        refreshRoles();
+      });
+      return () => {
+        if (typeof unsubscribe === 'function') unsubscribe();
+      };
+    }
   }, []);
 
   // Méta rôle helper (BUG-13)
@@ -314,14 +322,21 @@ export default function StaffTab({
 
   useEffect(() => {
     if (selectedRoleObj) {
-      if (!selectedRoleId) {
-        setSelectedRoleId(selectedRoleObj.id);
+      if (!selectedRoleId || (selectedRoleId !== selectedRoleObj.id && selectedRoleId !== selectedRoleObj.key)) {
+        setSelectedRoleId(selectedRoleObj.id || selectedRoleObj.key);
       }
       setEditRoleLabel(selectedRoleObj.label || '');
       setEditRoleShortLabel(selectedRoleObj.shortLabel || selectedRoleObj.label || '');
       setEditRoleColor(selectedRoleObj.color || '#2563eb');
       setEditRoleDesc(selectedRoleObj.description || '');
       setEditRolePermissions(selectedRoleObj.permissions || {});
+    } else {
+      setSelectedRoleId('');
+      setEditRoleLabel('');
+      setEditRoleShortLabel('');
+      setEditRoleColor('#2563eb');
+      setEditRoleDesc('');
+      setEditRolePermissions({});
     }
   }, [selectedRoleId, rolesList, selectedRoleObj]);
 
@@ -1092,7 +1107,16 @@ export default function StaffTab({
 
               {/* Liste défilante des rôles */}
               <div style={{ overflowY: 'auto', maxHeight: '600px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {rolesList.map(role => {
+                {rolesList.length === 0 ? (
+                  <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <ShieldCheck size={36} style={{ margin: '0 auto 0.5rem', opacity: 0.35, color: 'var(--primary)' }} />
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Aucun rôle répertorié</div>
+                    <p style={{ fontSize: '0.75rem', margin: '0.35rem 0 0', color: 'var(--text-muted)' }}>
+                      Aucun rôle n'a été trouvé dans la base de données.
+                    </p>
+                  </div>
+                ) : (
+                  rolesList.map(role => {
                   const isSelected = selectedRoleId === role.id || selectedRoleId === role.key;
                   const assignedCount = staffList.filter(s => s.role === role.key || s.role === role.id).length;
                   const roleColor = role.color || '#2563eb';
@@ -1174,7 +1198,7 @@ export default function StaffTab({
                       </div>
                     </div>
                   );
-                })}
+                }))}
               </div>
             </div>
 
@@ -1551,8 +1575,20 @@ export default function StaffTab({
                     <ShieldCheck size={48} />
                   </div>
                   <span style={{ fontSize: '0.95rem', fontWeight: 600, textAlign: 'center' }}>
-                    Sélectionnez un rôle dans la liste pour consulter ses propriétés et définir ses habilitations rattachées.
+                    {rolesList.length === 0
+                      ? "Aucun rôle n'est configuré en base de données. Créez un premier rôle pour commencer."
+                      : "Sélectionnez un rôle dans la liste pour consulter ses propriétés et définir ses habilitations rattachées."}
                   </span>
+                  {rolesList.length === 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => setShowNewRoleModal(true)}
+                      style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', borderRadius: '12px', padding: '0.6rem 1.25rem', fontWeight: 700 }}
+                    >
+                      <Plus size={16} /> Créer un Rôle
+                    </button>
+                  )}
                 </div>
               )}
             </div>

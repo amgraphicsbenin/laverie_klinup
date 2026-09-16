@@ -280,15 +280,17 @@ export async function initDb(): Promise<void> {
 
     try {
       const { data: rData, error: rErr } = await supabase.from('roles').select('*').order('created_at', { ascending: true });
-      if (!rErr && rData && rData.length > 0) {
-        memoryDb.roles = rData.map((r: any) => ({
+      if (!rErr) {
+        memoryDb.roles = (rData || []).map((r: any) => ({
           ...r,
           shortLabel: r.short_label || r.shortLabel || r.label,
           isSystem: r.is_system !== undefined ? r.is_system : (r.isSystem !== undefined ? r.isSystem : false)
         }));
+      } else {
+        console.warn('[KLIN UP DB] ⚠️ Chargement roles partiel :', rErr.message);
       }
-    } catch (e) {
-      // Conserver DEFAULT_ROLES si la table n'existe pas encore
+    } catch (e: any) {
+      console.warn('[KLIN UP DB] ⚠️ Erreur récupération roles :', e.message);
     }
 
     if (!reqRes.error) memoryDb.pin_reset_requests = reqRes.data || [];

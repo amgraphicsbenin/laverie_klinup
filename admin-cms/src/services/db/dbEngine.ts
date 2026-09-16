@@ -473,10 +473,10 @@ export const dbEngine = {
 
   getCatalog: (): CatalogItem[] => [...memoryDb.catalog],
   getCurrentUser: (): Staff | null => memoryDb.current_user ? { ...memoryDb.current_user } : null,
-  getRoles: () => memoryDb.roles || DEFAULT_ROLES,
+  getRoles: () => memoryDb.roles || [],
   saveRole: (roleData: any): any => {
     if (!memoryDb.roles) {
-      memoryDb.roles = [...DEFAULT_ROLES];
+      memoryDb.roles = [];
     }
 
     const existingIdx = memoryDb.roles.findIndex(

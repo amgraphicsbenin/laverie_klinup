@@ -14,12 +14,12 @@ const savedInitialSettings = loadInitialSettings();
 export const memoryDb: MemoryStore = {
   stores: [],
   selected_store_id: 'all',
-  roles: DEFAULT_ROLES as any,
   staff: DEFAULT_STAFF as any,
   customers: DEFAULT_CUSTOMERS as any,
   orders: DEFAULT_ORDERS as any,
   logs: DEFAULT_LOGS as any,
   catalog: [],
+  roles: [],
   rewards: [],
   delivery_zones: [],
   pickup_zones: [],

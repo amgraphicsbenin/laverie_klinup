@@ -2493,15 +2493,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     value={newStaffRole}
                     onChange={(e) => setNewStaffRole(e.target.value)}
                   >
-                    {((db.getRoles ? db.getRoles() : []).length > 0 ? db.getRoles() : [
-                      { key: 'super_admin', label: 'Super Administrateur' },
-                      { key: 'manager', label: 'Gérant (Manager)' },
-                      { key: 'editeur_catalogue', label: 'Éditeur Catalogue' },
-                      { key: 'agent_accueil', label: 'Agent d\'Accueil / Caisse' },
-                      { key: 'agent_lavage_repassage', label: 'Agent Atelier (Lavage / Repassage)' },
-                      { key: 'livreur', label: 'Livreur / Agent de Collecte' }
-                    ]).map(r => (
-                      <option key={r.id || r.key} value={r.key}>
+                    {(db.getRoles ? db.getRoles() : []).map(r => (
+                      <option key={r.id || r.key} value={r.key || r.id}>
                         {r.label}
                       </option>
                     ))}
