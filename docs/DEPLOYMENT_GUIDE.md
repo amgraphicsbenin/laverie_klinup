@@ -127,3 +127,4 @@ git push origin production
 * **Résultat automatique** :
   - Génération de l'APK Release finale `klinup-production-vX.X.X-bY.apk` connecté à la vraie base de données.
   - Déploiement de l'Admin CMS officiel en direct.
+

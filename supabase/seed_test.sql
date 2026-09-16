@@ -80,3 +80,4 @@ INSERT INTO public.activity_logs (id, user_id, user_name, action, details, times
 VALUES
   ('log-test-init', 'staff-test-admin', 'ADMIN Testeur', 'INITIALISATION_ENVIRONNEMENT', 'Données de test initialisées avec succès pour la base klinup-test.', CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO NOTHING;
+
