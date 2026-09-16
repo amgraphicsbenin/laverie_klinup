@@ -1,5 +1,5 @@
 import React from 'react';
-import { appEnv } from '../services/supabaseClient';
+import { appEnv, supabaseUrl } from '../services/supabaseClient';
 
 export default function EnvironmentBanner() {
   if (!appEnv || appEnv === 'production' || appEnv === 'prod') {
@@ -7,7 +7,7 @@ export default function EnvironmentBanner() {
   }
 
   const isTest = appEnv === 'test';
-  const isStaging = appEnv === 'staging' || appEnv === 'beta';
+  const dbProjectRef = (supabaseUrl || '').replace('https://', '').split('.')[0] || 'supabase';
 
   const config = isTest
     ? {
@@ -17,7 +17,7 @@ export default function EnvironmentBanner() {
         badgeBg: '#ca8a04',
         badgeText: '#ffffff',
         title: 'ENVIRONNEMENT DE TEST (QA)',
-        message: 'Base de données Supabase Test active. Les données sont fictives et peuvent être réinitialisées.',
+        message: 'Base isolée de Test active.',
       }
     : {
         bg: '#ffedd5',
@@ -26,7 +26,7 @@ export default function EnvironmentBanner() {
         badgeBg: '#ea580c',
         badgeText: '#ffffff',
         title: 'ENVIRONNEMENT DE STAGING (BÊTA)',
-        message: 'Base de données Supabase Staging. Validation métier avant mise en production finale.',
+        message: 'Base isolée de Staging active.',
       };
 
   return (
@@ -39,7 +39,8 @@ export default function EnvironmentBanner() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '12px',
+        flexWrap: 'wrap',
+        gap: '10px',
         fontSize: '12px',
         fontWeight: '600',
         zIndex: 99999,
@@ -64,7 +65,18 @@ export default function EnvironmentBanner() {
         {config.title}
       </span>
       <span>{config.message}</span>
+      <span
+        style={{
+          backgroundColor: 'rgba(0,0,0,0.08)',
+          padding: '2px 8px',
+          borderRadius: '6px',
+          fontSize: '11px',
+          fontFamily: 'monospace',
+          fontWeight: 600,
+        }}
+      >
+        Projet DB: {dbProjectRef}
+      </span>
     </div>
   );
 }
-
