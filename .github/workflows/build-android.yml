@@ -6,7 +6,6 @@ on:
       - test
       - staging
       - production
-      - main
     tags:
       - 'v*'
   workflow_dispatch:

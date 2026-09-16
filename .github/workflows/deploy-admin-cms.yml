@@ -6,7 +6,6 @@ on:
       - test
       - staging
       - production
-      - main
     paths:
       - 'admin-cms/**'
       - '.github/workflows/deploy-admin-cms.yml'
