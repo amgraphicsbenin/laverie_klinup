@@ -83,8 +83,15 @@ CREATE TABLE IF NOT EXISTS public.orders (
   subscription_details JSONB,
   -- Traçabilité : agent ayant créé la commande
   created_by_id TEXT,
-  created_by_name TEXT
+  created_by_name TEXT,
+  deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
+
+-- Support Soft Deletes (Suppression logique non destructive)
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+CREATE INDEX IF NOT EXISTS idx_customers_deleted_at ON public.customers(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_orders_deleted_at ON public.orders(deleted_at);
 
 -- 4. Table: activity_logs
 CREATE TABLE IF NOT EXISTS public.activity_logs (

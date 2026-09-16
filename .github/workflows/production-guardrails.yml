@@ -1,0 +1,36 @@
+name: Production Safety Guardrails (Zero-Data-Loss)
+
+on:
+  push:
+    branches:
+      - production
+    paths:
+      - 'supabase/**'
+      - 'scripts/**'
+      - '.github/workflows/production-guardrails.yml'
+  pull_request:
+    branches:
+      - production
+    paths:
+      - 'supabase/**'
+      - 'scripts/**'
+      - '.github/workflows/production-guardrails.yml'
+  workflow_dispatch:
+
+jobs:
+  sql-safety-audit:
+    name: 🛡️ Audit Anti-Destruction SQL Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run SQL Production Safety Linter
+        run: node scripts/check-sql-safety.js

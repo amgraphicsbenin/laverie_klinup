@@ -120,11 +120,21 @@ git push origin staging
 ### 4. Mise en Production Finale
 Une fois la bêta approuvée :
 ```bash
-git checkout production   # ou main
+git checkout production
 git merge staging
 git push origin production
 ```
 * **Résultat automatique** :
-  - Génération de l'APK Release finale `klinup-production-vX.X.X-bY.apk` connecté à la vraie base de données.
-  - Déploiement de l'Admin CMS officiel en direct.
+  - L'audit de sécurité SQL automatique (`production-guardrails.yml`) s'exécute et vérifie qu'aucune commande destructive (`TRUNCATE`, `DROP TABLE`, `DROP COLUMN`) n'est présente.
+  - Si l'audit passe, compilation de l'APK Release `klinup-production-vX.X.X-bY.apk` et build CMS officiel.
+
+---
+
+## 🛡️ 6. Les 4 Règles d'Or pour Protéger la Production
+
+1. **Zéro `schema.sql` en Production** : On ne rejoue jamais `schema.sql` complet sur une base de production existante. Les évolutions se font par petits fichiers additifs (`ADD COLUMN IF NOT EXISTS`).
+2. **Linter SQL Automatisé** : Le script [`scripts/check-sql-safety.js`](../scripts/check-sql-safety.js) bloque automatiquement tout commit ou PR vers `production` s'il détecte des commandes destructrices.
+3. **Soft Deletes Actifs** : Les commandes et clients utilisent `deleted_at`. Une suppression par un utilisateur ne détruit rien physiquement sur le disque et peut être restaurée immédiatement.
+4. **Étanchéité des Seeds** : Le fichier [`supabase/seed_test.sql`](../supabase/seed_test.sql) est strictement réservé au projet de test et ignoré par les pipelines de production.
+
 
