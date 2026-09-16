@@ -526,6 +526,18 @@ export const dbEngine = {
       });
     }
 
+    // Persister le rôle vers Supabase (asynchrone sans bloquer l'UI)
+    performMutation('upsert', 'roles', savedRole.id, {
+      id: savedRole.id,
+      key: savedRole.key || savedRole.id,
+      label: savedRole.label,
+      short_label: savedRole.shortLabel || savedRole.label,
+      color: savedRole.color,
+      description: savedRole.description || '',
+      is_system: savedRole.isSystem ?? false,
+      permissions: savedRole.permissions || {}
+    }).catch(e => console.warn('[KLIN UP DB] ⚠️ Persistance rôle Supabase :', e.message));
+
     notifyListeners();
     return savedRole;
   },
@@ -543,6 +555,12 @@ export const dbEngine = {
 
     memoryDb.roles.splice(idx, 1);
     dbEngine.logAction('SUPPRESSION_ROLE', `Rôle supprimé : ${roleToDelete.label}`);
+
+    // Supprimer le rôle sur Supabase (asynchrone sans bloquer l'UI)
+    performMutation('delete', 'roles', roleToDelete.id).catch(e =>
+      console.warn('[KLIN UP DB] ⚠️ Suppression rôle Supabase :', e.message)
+    );
+
     notifyListeners();
     return true;
   },

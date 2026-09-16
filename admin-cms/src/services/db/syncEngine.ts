@@ -278,6 +278,19 @@ export async function initDb(): Promise<void> {
       // Ignorer si la table n'existe pas encore
     }
 
+    try {
+      const { data: rData, error: rErr } = await supabase.from('roles').select('*').order('created_at', { ascending: true });
+      if (!rErr && rData && rData.length > 0) {
+        memoryDb.roles = rData.map((r: any) => ({
+          ...r,
+          shortLabel: r.short_label || r.shortLabel || r.label,
+          isSystem: r.is_system !== undefined ? r.is_system : (r.isSystem !== undefined ? r.isSystem : false)
+        }));
+      }
+    } catch (e) {
+      // Conserver DEFAULT_ROLES si la table n'existe pas encore
+    }
+
     if (!reqRes.error) memoryDb.pin_reset_requests = reqRes.data || [];
 
     startOrderStateCron();
@@ -332,7 +345,7 @@ export function setupRealtime(): void {
     try { supabase.removeChannel(activeRealtimeChannel); } catch (e) {}
   }
 
-  const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores'];
+  const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores', 'roles'];
   let channel = supabase.channel('admin_global_realtime');
 
   tables.forEach(table => {
@@ -347,20 +360,33 @@ export function setupRealtime(): void {
       else if (table === 'catalog') targetList = memoryDb.catalog;
       else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
       else if (table === 'stores') targetList = memoryDb.stores;
+      else if (table === 'roles') targetList = memoryDb.roles;
+
+      const formatRow = (r: any) => {
+        if (table === 'orders') return hydrateOrder(r);
+        if (table === 'roles') {
+          return {
+            ...r,
+            shortLabel: r.short_label || r.shortLabel || r.label,
+            isSystem: r.is_system !== undefined ? r.is_system : (r.isSystem !== undefined ? r.isSystem : false)
+          };
+        }
+        return r;
+      };
 
       if (eventType === 'INSERT') {
         const exists = targetList.some(x => x.id === newRow.id);
         if (!exists) {
-          const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
+          const rowToAdd = formatRow(newRow);
           if (table === 'activity_logs') targetList.unshift(rowToAdd);
           else targetList.push(rowToAdd);
         }
       } else if (eventType === 'UPDATE') {
         const idx = targetList.findIndex(x => x.id === newRow.id);
         if (idx !== -1) {
-          targetList[idx] = table === 'orders' ? hydrateOrder({ ...newRow }) : { ...newRow };
+          targetList[idx] = formatRow({ ...newRow });
         } else {
-          const rowToAdd = table === 'orders' ? hydrateOrder(newRow) : newRow;
+          const rowToAdd = formatRow(newRow);
           targetList.push(rowToAdd);
         }
       } else if (eventType === 'DELETE') {
