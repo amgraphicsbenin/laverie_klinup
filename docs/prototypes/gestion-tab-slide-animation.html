@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>KLIN UP - Étude de Motion & Transition d'Onglets Gestion</title>
+  <style>
+    :root {
+      --bg-canvas: #090a0f;
+      --panel-bg: #13151f;
+      --panel-border: #1e2235;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #002cf7;
+      --accent-glow: rgba(0, 44, 247, 0.35);
+      --accent-cyan: #38bdf8;
+      --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, sans-serif;
+      
+      /* Mobile theme variables (Light default) */
+      --app-bg: #f8fafc;
+      --app-surface: #ffffff;
+      --app-border: #e2e8f0;
+      --app-text: #09090b;
+      --app-subtext: #64748b;
+      --tab-bg: #f1f5f9;
+      --pill-bg: #ffffff;
+      --pill-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --tag-active: rgba(0, 44, 247, 0.08);
+      --tag-active-border: #002cf7;
+      --tag-active-text: #002cf7;
+
+      /* Motion parameters default */
+      --anim-duration: 280ms;
+      --anim-easing: cubic-bezier(0.22, 1, 0.36, 1); /* iOS fluid spring style */
+    }
+
+    [data-theme="dark"] {
+      --app-bg: #000000;
+      --app-surface: #121212;
+      --app-border: #27272a;
+      --app-text: #ffffff;
+      --app-subtext: #a1a1aa;
+      --tab-bg: #18181b;
+      --pill-bg: #27272a;
+      --pill-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+      --card-bg: #121212;
+      --card-border: #27272a;
+      --tag-active: rgba(56, 189, 248, 0.15);
+      --tag-active-border: #38bdf8;
+      --tag-active-text: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Studio Header */
+    header.studio-bar {
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(19, 21, 31, 0.85);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #002cf7, #38bdf8);
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .pill-badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.12);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Workspace Layout */
+    .workspace {
+      display: flex;
+      flex: 1;
+      padding: 24px;
+      gap: 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    @media (max-width: 1024px) {
+      .workspace {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+
+    /* Interactive Controls Panel */
+    .controls-panel {
+      flex: 1;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .card-panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .panel-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-title svg {
+      color: #38bdf8;
+    }
+
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .control-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    .control-header span.val {
+      color: #38bdf8;
+      font-weight: 600;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #272d45;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      box-shadow: 0 0 10px #38bdf8;
+      transition: transform 0.15s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .btn-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .btn-option {
+      background: #1a1e2e;
+      border: 1px solid #2a314b;
+      color: #cbd5e1;
+      padding: 9px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .btn-option:hover {
+      border-color: #38bdf8;
+      color: #fff;
+    }
+
+    .btn-option.active {
+      background: #002cf7;
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: #181c2b;
+      border-radius: 10px;
+      border: 1px solid #283049;
+    }
+
+    .switch-label {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .switch-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* iOS Style Toggle Switch */
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider-toggle {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #2e3650;
+      transition: 0.25s;
+      border-radius: 24px;
+    }
+    .slider-toggle:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.25s;
+      border-radius: 50%;
+    }
+    input:checked + .slider-toggle {
+      background-color: #002cf7;
+    }
+    input:checked + .slider-toggle:before {
+      transform: translateX(20px);
+    }
+
+    /* Metrics and Comparison Card */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .compare-item {
+      background: #181c2a;
+      border: 1px solid #283049;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .compare-item.highlight {
+      border-color: #002cf7;
+      background: rgba(0, 44, 247, 0.08);
+    }
+    .compare-tag {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .compare-tag.red { color: #f87171; }
+    .compare-tag.green { color: #4ade80; }
+    .compare-desc {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    /* ====================================================
+       MOBILE SIMULATOR VIEWPORT
+       ==================================================== */
+    .device-viewport-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      position: relative;
+    }
+
+    .device-mockup {
+      width: 380px;
+      height: 780px;
+      background: var(--app-bg);
+      border: 12px solid #1e2235;
+      border-radius: 46px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8),
+                  0 0 0 1px rgba(255, 255, 255, 0.08),
+                  0 0 40px rgba(0, 44, 247, 0.15);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: background-color 0.3s ease;
+    }
+
+    /* Phone Speaker / Dynamic Island */
+    .phone-notch {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 24px;
+      background: #000;
+      border-radius: 20px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 10px;
+    }
+    .notch-camera {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #111a2e;
+      border: 1px solid #1e263d;
+    }
+
+    /* Mobile Status Bar */
+    .phone-status-bar {
+      height: 44px;
+      padding: 0 24px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding-bottom: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--app-text);
+      z-index: 90;
+    }
+
+    /* Mobile App Header */
+    .mobile-header {
+      padding: 10px 20px 8px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--app-bg);
+      z-index: 80;
+    }
+    .mobile-header-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.6px;
+      color: var(--app-text);
+    }
+
+    /* ====================================================
+       TAB SELECTOR CONTAINER (THE ANIMATED PILL HEADER)
+       ==================================================== */
+    .tab-selector-container {
+      padding: 4px 20px 12px 20px;
+      background: var(--app-bg);
+      z-index: 80;
+    }
+
+    .tab-selector-track {
+      position: relative;
+      display: flex;
+      background: var(--tab-bg);
+      border-radius: 9999px;
+      padding: 4px;
+      height: 42px;
+      user-select: none;
+    }
+
+    /* The Animated Sliding Pill */
+    .tab-active-pill {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: 4px;
+      width: calc(50% - 4px);
+      background: var(--pill-bg);
+      border-radius: 9999px;
+      box-shadow: var(--pill-shadow);
+      z-index: 1;
+      transform: translateX(0%);
+      transition: transform var(--anim-duration) var(--anim-easing);
+      pointer-events: none;
+    }
+
+    /* Tab Button Items */
+    .tab-item-btn {
+      position: relative;
+      z-index: 2;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border: none;
+      background: transparent;
+      color: var(--app-subtext);
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color var(--anim-duration) ease;
+    }
+
+    .tab-item-btn.active {
+      color: var(--app-text);
+      font-weight: 700;
+    }
+
+    .tab-count-badge {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      background: rgba(148, 163, 184, 0.16);
+      color: var(--app-subtext);
+      transition: all var(--anim-duration) ease;
+    }
+    .tab-item-btn.active .tab-count-badge {
+      background: rgba(0, 44, 247, 0.12);
+      color: #002cf7;
+    }
+    [data-theme="dark"] .tab-item-btn.active .tab-count-badge {
+      background: rgba(56, 189, 248, 0.18);
+      color: #38bdf8;
+    }
+
+    /* ====================================================
+       CONTENT PANES SLIDING CONTAINER
+       ==================================================== */
+    .sliding-content-viewport {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+    }
+
+    .sliding-content-track {
+      display: flex;
+      width: 200%;
+      height: 100%;
+      transform: translateX(0%);
+      transition: transform var(--anim-duration) var(--anim-easing);
+      will-change: transform;
+    }
+
+    /* Individual Content Pane */
+    .content-pane {
+      width: 50%;
+      height: 100%;
+      overflow-y: auto;
+      padding: 0 16px 80px 16px;
+      scrollbar-width: none; /* Hide scrollbar Firefox */
+    }
+    .content-pane::-webkit-scrollbar {
+      display: none; /* Hide scrollbar Chrome/Safari */
+    }
+
+    /* SEARCH BAR */
+    .mobile-search-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+    .mobile-search-bar svg {
+      color: var(--app-subtext);
+      flex-shrink: 0;
+    }
+    .mobile-search-bar input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 13px;
+      color: var(--app-text);
+      width: 100%;
+    }
+
+    /* Filter Chips Row */
+    .filter-chips-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .filter-chip {
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      color: var(--app-subtext);
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .filter-chip.active {
+      border-color: var(--tag-active-border);
+      background: var(--tag-active);
+      color: var(--tag-active-text);
+    }
+
+    /* ORDER CARD */
+    .order-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .order-card:active {
+      transform: scale(0.985);
+    }
+    .order-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .order-client-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--app-text);
+    }
+    .order-ticket-no {
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      font-weight: 600;
+      color: var(--app-subtext);
+    }
+    .order-status-badge {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .status-urgent {
+      background: rgba(225, 29, 72, 0.12);
+      color: #e11d48;
+    }
+    .status-traitement {
+      background: rgba(0, 44, 247, 0.1);
+      color: #002cf7;
+    }
+    [data-theme="dark"] .status-traitement {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+    }
+    .status-pret {
+      background: rgba(16, 185, 129, 0.12);
+      color: #059669;
+    }
+    [data-theme="dark"] .status-pret {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+
+    .order-desc-row {
+      font-size: 12px;
+      color: var(--app-subtext);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .order-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px dashed var(--app-border);
+      font-size: 12px;
+    }
+    .order-price {
+      font-weight: 800;
+      font-size: 14px;
+      color: var(--app-text);
+    }
+    .order-action-btn {
+      background: #002cf7;
+      color: #ffffff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    [data-theme="dark"] .order-action-btn {
+      background: #38bdf8;
+      color: #000;
+    }
+
+    /* CLIENT CARD */
+    .client-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .client-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: #334155;
+      flex-shrink: 0;
+    }
+    [data-theme="dark"] .client-avatar {
+      background: linear-gradient(135deg, #27272a, #3f3f46);
+      color: #fafafa;
+    }
+    .client-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .client-name-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .client-name {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--app-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tier-badge {
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .tier-gold {
+      background: rgba(234, 179, 8, 0.15);
+      color: #ca8a04;
+    }
+    [data-theme="dark"] .tier-gold {
+      color: #facc15;
+    }
+    .tier-silver {
+      background: rgba(148, 163, 184, 0.2);
+      color: #64748b;
+    }
+    .client-phone {
+      font-size: 11.5px;
+      color: var(--app-subtext);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 3px;
+    }
+
+    .client-action-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--tab-bg);
+      display: grid;
+      place-items: center;
+      color: var(--app-text);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* Bottom Navigation Bar Mock */
+    .mobile-tab-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 68px;
+      background: var(--app-surface);
+      border-top: 1px solid var(--app-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding-bottom: 12px;
+      z-index: 90;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      color: var(--app-subtext);
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .nav-item.active {
+      color: #002cf7;
+    }
+    [data-theme="dark"] .nav-item.active {
+      color: #38bdf8;
+    }
+    .nav-center-add {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #002cf7;
+      color: white;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 4px 12px var(--accent-glow);
+      margin-top: -16px;
+    }
+    [data-theme="dark"] .nav-center-add {
+      background: #38bdf8;
+      color: black;
+    }
+
+    /* Helper Indicator Overlay */
+    .motion-indicator-hint {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .key-badge {
+      background: #1e2438;
+      border: 1px solid #333d5e;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #e2e8f0;
+    }
+  </style>
+</head>
+<body data-theme="light">
+
+  <!-- TOP STUDIO TOOLBAR -->
+  <header class="studio-bar">
+    <div class="brand-mark">
+      <div class="brand-logo">K</div>
+      <div>
+        <div class="brand-title">KLIN UP Motion Studio</div>
+        <div class="brand-subtitle">Transition Latérale Onglet Gestion (Commandes ⇄ Clients)</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <span class="pill-badge">Prototype Interactif</span>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="workspace">
+
+    <!-- CONTROLS & TWEAKS PANEL -->
+    <section class="controls-panel">
+      
+      <!-- MODE COMPARISON -->
+      <div class="card-panel">
+        <div class="panel-title">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+          Comportement de Transition
+        </div>
+        
+        <div class="switch-row" style="margin-bottom: 14px;">
+          <div>
+            <div class="switch-label">Glissement Latéral Fluide (Nouveau)</div>
+            <div class="switch-sub">Anime le titre + contenu en tandem</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggleFluidMotion" checked />
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+
+        <div class="comparison-grid">
+          <div class="compare-item" id="cardBrutal">
+            <div class="compare-tag red">Avant : Brutal</div>
+            <div class="compare-desc">Saut instantané du sélecteur, fondu 120ms qui fait clignoter la liste et coupe la continuité spatiale.</div>
+          </div>
+          <div class="compare-item highlight" id="cardFluid">
+            <div class="compare-tag green">Après : Glissement</div>
+            <div class="compare-desc">Pilule magnétique fluide et glissement latéral coordonné 60fps de la table Commandes et Clients.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MOTION TUNING TWEAKS -->
+      <div class="card-panel">
+        <div class="panel-title">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+          Réglages Physiques & Cinématique
+        </div>
+
+        <!-- Duration Slider -->
+        <div class="control-row">
+          <div class="control-header">
+            <span>Durée de translation</span>
+            <span class="val" id="durationValue">280ms</span>
+          </div>
+          <input type="range" id="durationSlider" min="150" max="600" step="10" value="280" />
+        </div>
+
+        <!-- Easing Preset -->
+        <div class="control-row">
+          <div class="control-header">
+            <span>Courbe d'amortissement (Easing)</span>
+          </div>
+          <div class="btn-group">
+            <button class="btn-option active" data-easing="spring">iOS Spring</button>
+            <button class="btn-option" data-easing="cubic">Cubic Out</button>
+            <button class="btn-option" data-easing="smooth">Smooth Flow</button>
+          </div>
+        </div>
+
+        <!-- Theme Toggle -->
+        <div class="switch-row" style="margin-top: 14px;">
+          <div>
+            <div class="switch-label">Thème Sombre (Dark Mode)</div>
+            <div class="switch-sub">Palette native KLIN UP (#000000 / #18181b)</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggleDarkMode" />
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS -->
+      <div class="card-panel">
+        <div class="panel-title">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          Déclencheurs Rapides
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button id="btnSwitchOrders" class="btn-option active" style="flex: 1; padding: 12px;">
+            Onglet Commandes
+          </button>
+          <button id="btnSwitchClients" class="btn-option" style="flex: 1; padding: 12px;">
+            Onglet Clients
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- MOBILE SIMULATOR DEVICE -->
+    <section class="device-viewport-container">
+      
+      <div class="device-mockup" id="deviceMockup">
+        
+        <!-- DYNAMIC ISLAND / NOTCH -->
+        <div class="phone-notch">
+          <div class="notch-camera"></div>
+        </div>
+
+        <!-- STATUS BAR -->
+        <div class="phone-status-bar">
+          <span>09:41</span>
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9z"/></svg>
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"/></svg>
+            <div style="width: 18px; height: 9px; border: 1.5px solid currentColor; border-radius: 3px; padding: 1px;">
+              <div style="width: 100%; height: 100%; background: currentColor; border-radius: 1px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- APP HEADER (GESTION) -->
+        <div class="mobile-header">
+          <div class="mobile-header-title">Gestion</div>
+          <div style="display: flex; gap: 10px;">
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--tab-bg); display: grid; place-items: center; color: var(--app-text);">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- ANIMATED TAB SELECTOR -->
+        <div class="tab-selector-container">
+          <div class="tab-selector-track" id="tabTrack">
+            <!-- Gliding Active Pill -->
+            <div class="tab-active-pill" id="activePill"></div>
+
+            <!-- Tab Buttons -->
+            <button class="tab-item-btn active" id="tabBtnOrders">
+              <span>Commandes</span>
+              <span class="tab-count-badge" id="badgeOrders">24</span>
+            </button>
+            <button class="tab-item-btn" id="tabBtnClients">
+              <span>Clients</span>
+              <span class="tab-count-badge" id="badgeClients">148</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SLIDING CONTENT VIEWPORT -->
+        <div class="sliding-content-viewport" id="contentViewport">
+          <div class="sliding-content-track" id="contentTrack">
+            
+            <!-- PANE 1: COMMANDES -->
+            <div class="content-pane" id="paneOrders">
+              
+              <!-- Search bar -->
+              <div class="mobile-search-bar">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" placeholder="Rechercher un ticket ou un client..." readonly value="" />
+              </div>
+
+              <!-- Filter chips -->
+              <div class="filter-chips-row">
+                <div class="filter-chip active">Toutes (24)</div>
+                <div class="filter-chip">En traitement (8)</div>
+                <div class="filter-chip">Prêtes (11)</div>
+                <div class="filter-chip">Urgentes (3)</div>
+              </div>
+
+              <!-- Order Cards -->
+              <div class="order-card">
+                <div class="order-card-header">
+                  <div>
+                    <div class="order-client-name">Koffi Mensah</div>
+                    <div class="order-ticket-no">#KLIN-2026-0842</div>
+                  </div>
+                  <span class="order-status-badge status-urgent">URGENT</span>
+                </div>
+                <div class="order-desc-row">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
+                  <span>3 Costumes 2 pièces, 4 Chemises</span>
+                </div>
+                <div class="order-footer">
+                  <div class="order-price">18 500 FCFA</div>
+                  <button class="order-action-btn">
+                    <span>Lancer lavage</span>
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"></path></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="order-card">
+                <div class="order-card-header">
+                  <div>
+                    <div class="order-client-name">Amina Dossou</div>
+                    <div class="order-ticket-no">#KLIN-2026-0841</div>
+                  </div>
+                  <span class="order-status-badge status-traitement">LAVAGE</span>
+                </div>
+                <div class="order-desc-row">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
+                  <span>1 Couette 2 places, 2 Draps</span>
+                </div>
+                <div class="order-footer">
+                  <div class="order-price">12 000 FCFA</div>
+                  <button class="order-action-btn" style="background: #0d9488;">
+                    <span>Passer repassage</span>
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"></path></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="order-card">
+                <div class="order-card-header">
+                  <div>
+                    <div class="order-client-name">Sébastien Agbodjan</div>
+                    <div class="order-ticket-no">#KLIN-2026-0839</div>
+                  </div>
+                  <span class="order-status-badge status-pret">PRÊT</span>
+                </div>
+                <div class="order-desc-row">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>
+                  <span>5 Pantalons Jeans, 6 T-Shirts</span>
+                </div>
+                <div class="order-footer">
+                  <div class="order-price">9 500 FCFA</div>
+                  <button class="order-action-btn" style="background: #059669;">
+                    <span>Remettre client</span>
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"></path></svg>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- PANE 2: CLIENTS -->
+            <div class="content-pane" id="paneClients">
+              
+              <!-- Search bar -->
+              <div class="mobile-search-bar">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" placeholder="Rechercher par nom ou numéro..." readonly value="" />
+              </div>
+
+              <!-- Filter chips -->
+              <div class="filter-chips-row">
+                <div class="filter-chip active">Tous (148)</div>
+                <div class="filter-chip">Abonnés (42)</div>
+                <div class="filter-chip">Gold VIP (18)</div>
+                <div class="filter-chip">Récents</div>
+              </div>
+
+              <!-- Client Cards -->
+              <div class="client-card">
+                <div class="client-avatar">KM</div>
+                <div class="client-info">
+                  <div class="client-name-row">
+                    <span class="client-name">Koffi Mensah</span>
+                    <span class="tier-badge tier-gold">GOLD VIP</span>
+                  </div>
+                  <div class="client-phone">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                    <span>+229 97 12 34 56</span>
+                  </div>
+                </div>
+                <div class="client-action-icon">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+              </div>
+
+              <div class="client-card">
+                <div class="client-avatar">AD</div>
+                <div class="client-info">
+                  <div class="client-name-row">
+                    <span class="client-name">Amina Dossou</span>
+                    <span class="tier-badge tier-silver">SILVER</span>
+                  </div>
+                  <div class="client-phone">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                    <span>+229 66 88 99 00</span>
+                  </div>
+                </div>
+                <div class="client-action-icon">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+              </div>
+
+              <div class="client-card">
+                <div class="client-avatar">SA</div>
+                <div class="client-info">
+                  <div class="client-name-row">
+                    <span class="client-name">Sébastien Agbodjan</span>
+                  </div>
+                  <div class="client-phone">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                    <span>+229 95 44 22 11</span>
+                  </div>
+                </div>
+                <div class="client-action-icon">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+              </div>
+
+              <div class="client-card">
+                <div class="client-avatar">CK</div>
+                <div class="client-info">
+                  <div class="client-name-row">
+                    <span class="client-name">Chantal Koudjo</span>
+                    <span class="tier-badge tier-gold">GOLD VIP</span>
+                  </div>
+                  <div class="client-phone">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+                    <span>+229 96 33 55 77</span>
+                  </div>
+                </div>
+                <div class="client-action-icon">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- BOTTOM NAV BAR MOCKUP -->
+        <div class="mobile-tab-bar">
+          <div class="nav-item">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            <span>Accueil</span>
+          </div>
+          <div class="nav-item active">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            <span>Gestion</span>
+          </div>
+          <div class="nav-center-add">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </div>
+          <div class="nav-item">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/></svg>
+            <span>Livreurs</span>
+          </div>
+          <div class="nav-item">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <span>Paramètres</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="motion-indicator-hint">
+        Astuce : Appuyez sur <span class="key-badge">←</span> ou <span class="key-badge">→</span> au clavier pour basculer rapidement
+      </div>
+
+    </section>
+
+  </main>
+
+  <script>
+    // State
+    let currentTab = 'orders'; // 'orders' | 'clients'
+    let isFluidMotion = true;
+    let currentDuration = 280;
+    let currentEasing = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
+    // DOM Elements
+    const activePill = document.getElementById('activePill');
+    const contentTrack = document.getElementById('contentTrack');
+    const tabBtnOrders = document.getElementById('tabBtnOrders');
+    const tabBtnClients = document.getElementById('tabBtnClients');
+    const btnSwitchOrders = document.getElementById('btnSwitchOrders');
+    const btnSwitchClients = document.getElementById('btnSwitchClients');
+    const toggleFluidMotion = document.getElementById('toggleFluidMotion');
+    const durationSlider = document.getElementById('durationSlider');
+    const durationValue = document.getElementById('durationValue');
+    const toggleDarkMode = document.getElementById('toggleDarkMode');
+    const cardBrutal = document.getElementById('cardBrutal');
+    const cardFluid = document.getElementById('cardFluid');
+    const easingButtons = document.querySelectorAll('[data-easing]');
+
+    const easingMap = {
+      spring: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      cubic: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      smooth: 'cubic-bezier(0.4, 0, 0.2, 1)'
+    };
+
+    function updateTheme() {
+      const isDark = toggleDarkMode.checked;
+      document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    }
+
+    function updateMotionParams() {
+      const root = document.documentElement;
+      if (isFluidMotion) {
+        root.style.setProperty('--anim-duration', `${currentDuration}ms`);
+        root.style.setProperty('--anim-easing', currentEasing);
+      } else {
+        root.style.setProperty('--anim-duration', '0ms');
+        root.style.setProperty('--anim-easing', 'linear');
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+
+      if (tab === 'orders') {
+        // Tab buttons UI
+        tabBtnOrders.classList.add('active');
+        tabBtnClients.classList.remove('active');
+        btnSwitchOrders.classList.add('active');
+        btnSwitchClients.classList.remove('active');
+
+        // Sliding animations
+        activePill.style.transform = 'translateX(0%)';
+        contentTrack.style.transform = 'translateX(0%)';
+      } else {
+        // Tab buttons UI
+        tabBtnClients.classList.add('active');
+        tabBtnOrders.classList.remove('active');
+        btnSwitchClients.classList.add('active');
+        btnSwitchOrders.classList.remove('active');
+
+        // Sliding animations
+        activePill.style.transform = 'translateX(100%)';
+        contentTrack.style.transform = 'translateX(-50%)';
+      }
+    }
+
+    // Event Listeners
+    tabBtnOrders.addEventListener('click', () => switchTab('orders'));
+    tabBtnClients.addEventListener('click', () => switchTab('clients'));
+    btnSwitchOrders.addEventListener('click', () => switchTab('orders'));
+    btnSwitchClients.addEventListener('click', () => switchTab('clients'));
+
+    toggleFluidMotion.addEventListener('change', (e) => {
+      isFluidMotion = e.target.checked;
+      if (isFluidMotion) {
+        cardFluid.classList.add('highlight');
+        cardBrutal.classList.remove('highlight');
+      } else {
+        cardFluid.classList.remove('highlight');
+        cardBrutal.classList.add('highlight');
+      }
+      updateMotionParams();
+    });
+
+    durationSlider.addEventListener('input', (e) => {
+      currentDuration = parseInt(e.target.value, 10);
+      durationValue.textContent = `${currentDuration}ms`;
+      updateMotionParams();
+    });
+
+    easingButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        easingButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const key = btn.getAttribute('data-easing');
+        currentEasing = easingMap[key] || easingMap.spring;
+        updateMotionParams();
+      });
+    });
+
+    toggleDarkMode.addEventListener('change', updateTheme);
+
+    // Keyboard navigation
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') {
+        switchTab('orders');
+      } else if (e.key === 'ArrowRight') {
+        switchTab('clients');
+      }
+    });
+
+    // Touch swipe gesture simulation on the phone viewport
+    let touchStartX = 0;
+    let touchEndX = 0;
+    const contentViewport = document.getElementById('contentViewport');
+
+    contentViewport.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    contentViewport.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleGesture();
+    }, { passive: true });
+
+    function handleGesture() {
+      const diff = touchEndX - touchStartX;
+      if (Math.abs(diff) > 40) {
+        if (diff < 0) {
+          // Swipe left -> go to clients
+          switchTab('clients');
+        } else {
+          // Swipe right -> go to orders
+          switchTab('orders');
+        }
+      }
+    }
+
+    // Initial setup
+    updateMotionParams();
+  </script>
+</body>
+</html>

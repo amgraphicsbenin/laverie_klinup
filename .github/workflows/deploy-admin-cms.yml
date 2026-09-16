@@ -1,0 +1,90 @@
+name: Build & Deploy Admin CMS (Multi-Environment)
+
+on:
+  push:
+    branches:
+      - test
+      - staging
+      - production
+      - main
+    paths:
+      - 'admin-cms/**'
+      - '.github/workflows/deploy-admin-cms.yml'
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Environnement cible du build CMS'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - staging
+          - production
+
+jobs:
+  build-and-deploy:
+    name: Build Admin CMS (${{ github.ref_name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve Target Environment
+        id: resolve-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET_ENV="${{ github.event.inputs.target_env }}"
+          elif [ "${{ github.ref_name }}" = "test" ]; then
+            TARGET_ENV="test"
+          elif [ "${{ github.ref_name }}" = "staging" ]; then
+            TARGET_ENV="staging"
+          else
+            TARGET_ENV="production"
+          fi
+          
+          echo "APP_ENV=${TARGET_ENV}" >> $GITHUB_ENV
+          echo "TARGET_ENV=${TARGET_ENV}" >> $GITHUB_OUTPUT
+          echo "🖥️ Build CMS ciblé pour : ${TARGET_ENV}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: admin-cms/package-lock.json
+
+      - name: Install dependencies
+        working-directory: admin-cms
+        run: npm ci
+
+      - name: Build Admin CMS with Vite
+        working-directory: admin-cms
+        env:
+          VITE_APP_ENV: ${{ env.APP_ENV }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Upload Admin CMS Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-cms-dist-${{ env.APP_ENV }}
+          path: admin-cms/dist
+          if-no-files-found: error
+          retention-days: 14
+
+      # ========================================================================
+      # DÉPLOIEMENT HÉBERGEUR (Optionnel selon votre fournisseur Web)
+      # Exemples activables : Vercel / Cloudflare Pages / Netlify / GitHub Pages
+      # ========================================================================
+      # - name: Deploy to Cloudflare Pages / Vercel
+      #   if: env.APP_ENV == 'production'
+      #   uses: cloudflare/pages-action@v1
+      #   with:
+      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #     projectName: 'klinup-admin'
+      #     directory: 'admin-cms/dist'

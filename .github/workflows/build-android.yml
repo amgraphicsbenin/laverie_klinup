@@ -1,13 +1,25 @@
-name: Build Android APK
+name: Build Android APK (Multi-Environment)
 
 on:
   push:
     branches:
+      - test
+      - staging
+      - production
       - main
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
+      target_env:
+        description: 'Environnement cible du build'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - staging
+          - production
       build_type:
         description: 'Type de build'
         required: false
@@ -18,15 +30,33 @@ on:
 
 jobs:
   build:
-    name: Build Android Release APK
+    name: Build Android APK (${{ github.ref_name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Resolve Target Environment
+        id: resolve-env
+        run: |
+          # Priorité à l'input manuel si workflow_dispatch, sinon détection via la branche git
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET_ENV="${{ github.event.inputs.target_env }}"
+          elif [ "${{ github.ref_name }}" = "test" ]; then
+            TARGET_ENV="test"
+          elif [ "${{ github.ref_name }}" = "staging" ]; then
+            TARGET_ENV="staging"
+          else
+            TARGET_ENV="production"
+          fi
+          
+          echo "APP_ENV=${TARGET_ENV}" >> $GITHUB_ENV
+          echo "TARGET_ENV=${TARGET_ENV}" >> $GITHUB_OUTPUT
+          echo "🎯 Environnement sélectionné : ${TARGET_ENV}"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -35,16 +65,22 @@ jobs:
           cache: 'npm'
           cache-dependency-path: mobile-app/package-lock.json
 
-      - name: Configure Versioning
+      - name: Configure Versioning & Dynamic Environment
         working-directory: mobile-app
         run: |
           VERSION_NAME=$(node -p "require('./app.json').expo.version")
           BUILD_NUMBER=${{ github.run_number }}
+          ENV_LABEL="${{ env.APP_ENV }}"
+          
+          APK_FILE_NAME="klinup-${ENV_LABEL}-v${VERSION_NAME}-b${BUILD_NUMBER}.apk"
+          
           echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
           echo "BUILD_NUMBER=${BUILD_NUMBER}" >> $GITHUB_ENV
-          echo "APK_NAME=klinup-v${VERSION_NAME}-build${BUILD_NUMBER}" >> $GITHUB_ENV
-          echo "🏗️ Building KLIN UP v${VERSION_NAME} (Build #${BUILD_NUMBER})"
+          echo "APK_NAME=${APK_FILE_NAME}" >> $GITHUB_ENV
           
+          echo "🏗️ Building KLIN UP [${ENV_LABEL}] v${VERSION_NAME} (Build #${BUILD_NUMBER})"
+          
+          # Met à jour versionCode dans app.json
           node -e "
             const fs = require('fs');
             const app = JSON.parse(fs.readFileSync('./app.json', 'utf8'));
@@ -63,12 +99,18 @@ jobs:
           path: |
             mobile-app/android
             !mobile-app/android/app/build
-          key: expo-prebuild-${{ hashFiles('mobile-app/package-lock.json', 'mobile-app/app.json') }}
+          key: expo-prebuild-${{ env.APP_ENV }}-${{ hashFiles('mobile-app/package-lock.json', 'mobile-app/app.json', 'mobile-app/app.config.js') }}
           restore-keys: |
+            expo-prebuild-${{ env.APP_ENV }}-
             expo-prebuild-
 
-      - name: Expo prebuild (generate Android native layer)
+      - name: Expo prebuild (Generate Native Layer for ${{ env.APP_ENV }})
         working-directory: mobile-app
+        env:
+          APP_ENV: ${{ env.APP_ENV }}
+          EXPO_PUBLIC_APP_ENV: ${{ env.APP_ENV }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || secrets.SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
         run: npx expo prebuild --platform android --no-install
 
       - name: Set up JDK 17
@@ -96,15 +138,11 @@ jobs:
           cat >> gradle.properties << 'EOF'
 
           # === KLIN UP Build Optimizations ===
-          # Limit to arm64-v8a only (modern Android devices 99%+)
           reactNativeArchitectures=arm64-v8a
-          # Parallel & caching
           org.gradle.parallel=true
           org.gradle.caching=true
           org.gradle.configureondemand=true
-          # Memory optimization
           org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError
-          # Disable unused features
           android.enableJetifier=false
           EOF
 
@@ -113,9 +151,13 @@ jobs:
 
       - name: Build Release APK
         working-directory: mobile-app/android
-        run: ./gradlew assembleRelease --no-daemon --build-cache --parallel -x lint -x test
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m"
+          APP_ENV: ${{ env.APP_ENV }}
+          EXPO_PUBLIC_APP_ENV: ${{ env.APP_ENV }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || secrets.SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+        run: ./gradlew assembleRelease --no-daemon --build-cache --parallel -x lint -x test
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

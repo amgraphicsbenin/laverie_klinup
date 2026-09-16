@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from './services/db';
 import AdminView from './components/AdminView';
 import CustomSelect from './components/CustomSelect';
+import EnvironmentBanner from './components/EnvironmentBanner';
 import logoDark from './assets/logo_dark.png';
 import logoGold from './assets/logo_gold.png';
 // Composant utilitaire pour les icônes Google Material Symbols
@@ -615,6 +616,7 @@ function App() {
   if (!currentUser) {
     return (
       <div className="lockscreen-container">
+        <EnvironmentBanner />
         <div className="lockscreen-logo-area" style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
           <h1 style={{ color: '#ffffff', fontSize: '2.2rem', fontWeight: 800, margin: '0 0 0.25rem', letterSpacing: '-0.5px' }}>
             Laverie - Admin
@@ -826,6 +828,7 @@ function App() {
 
   return (
     <div className="app-container">
+      <EnvironmentBanner />
 
       {/* ================= OVERLAY MOBILE SIDEBAR ================= */}
       {hasAdminAccess && sidebarOpen && (

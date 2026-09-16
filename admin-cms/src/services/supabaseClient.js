@@ -18,5 +18,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
+export const appEnv = ((typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APP_ENV) || 'production').toLowerCase();
 export const supabase = supabaseInstance;
 

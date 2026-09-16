@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 14,
     borderRadius: 2,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#002cf7',
   },
   ribbonLeft: {
     left: 4,
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
+    borderRadius: 9999,
   },
   tierChip: {
     backgroundColor: '#FEF3C7',

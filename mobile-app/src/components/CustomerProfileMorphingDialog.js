@@ -238,8 +238,8 @@ function DialogInnerBody({
               onPress={handleCall}
               style={[styles.contactCard, isDarkMode && styles.contactCardDark]}
             >
-              <View style={styles.contactIconBox}>
-                <Phone size={16} color="#0284C7" />
+              <View style={[styles.contactIconBox, isDarkMode && styles.contactIconBoxDark]}>
+                <Phone size={16} color="#002cf7" />
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={[styles.contactLabel, isDarkMode && styles.contactLabelDark]}>
@@ -276,7 +276,7 @@ function DialogInnerBody({
             {/* Commandes */}
             <View style={[styles.metricCard, isDarkMode && styles.metricCardDark]}>
               <View style={styles.metricIconRow}>
-                <ShoppingBag size={15} color={isDarkMode ? '#38BDF8' : '#0284C7'} />
+                <ShoppingBag size={15} color={isDarkMode ? '#60a5fa' : '#002cf7'} />
                 <Text style={[styles.metricLabel, isDarkMode && styles.metricLabelDark]}>Commandes</Text>
               </View>
               <Text style={[styles.metricNumber, isDarkMode && styles.metricNumberDark]}>
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 14,
     borderRadius: 2,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#002cf7',
   },
   ribbonLeft: {
     left: 4,
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF3C7',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 9999,
   },
   tierChipDark: {
     backgroundColor: 'rgba(254, 243, 199, 0.15)',
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECFDF5',
     paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 9999,
   },
   subChipDark: {
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -587,10 +587,13 @@ const styles = StyleSheet.create({
   contactIconBox: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E0F2FE',
+    borderRadius: 9999,
+    backgroundColor: 'rgba(0, 44, 247, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  contactIconBoxDark: {
+    backgroundColor: 'rgba(0, 44, 247, 0.2)',
   },
   contactLabel: {
     fontSize: 10,
@@ -612,10 +615,10 @@ const styles = StyleSheet.create({
     color: '#F8FAFC',
   },
   callPill: {
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 10,
+    backgroundColor: '#002cf7',
+    paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 9999,
   },
   callPillText: {
     color: '#FFFFFF',
@@ -632,7 +635,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '46%',
     backgroundColor: '#F8FAFC',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -665,7 +668,7 @@ const styles = StyleSheet.create({
   },
   progressBox: {
     backgroundColor: '#FFFBEB',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
     marginTop: 12,
     borderWidth: 1,
@@ -726,9 +729,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0284C7',
-    paddingVertical: 12,
-    borderRadius: 14,
+    backgroundColor: '#002cf7',
+    paddingVertical: 13,
+    borderRadius: 9999,
   },
   primaryCtaText: {
     color: '#FFFFFF',
@@ -741,8 +744,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#F1F5F9',
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingVertical: 12,
+    borderRadius: 9999,
   },
   secondaryCtaBtnDark: {
     backgroundColor: '#27272a',

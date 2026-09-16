@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Modal as RNModal, Alert, KeyboardAvoidingView, Platform, BackHandler, RefreshControl, Linking } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Modal as RNModal, Alert, KeyboardAvoidingView, Platform, BackHandler, RefreshControl, Linking, Animated, Dimensions } from 'react-native';
 import { SmoothScrollView as ScrollView, SmoothFlatList as FlatList } from '../../../components/SmoothScroll';
 import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, UserCheck, Download, Award, Ban, ArrowLeft, Zap, Package, AlarmClock, BadgeCheck } from 'lucide-react-native';
 import { db } from '../../../services/db';
@@ -39,8 +39,27 @@ export default function GestionScreen({
   onDisableSwipeChange
 }) {
   const { orders, customers, catalog, currentUser, isDarkMode } = useDbState();
-  const styles = getStyles(isDarkMode);
+  const styles = useMemo(() => getStyles(isDarkMode), [isDarkMode]);
   const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
+  const [tabBarWidth, setTabBarWidth] = useState(() => Dimensions.get('window').width - 40);
+  const [pagerWidth, setPagerWidth] = useState(() => Dimensions.get('window').width);
+  const [hasMountedClients, setHasMountedClients] = useState(subTab === 'clients');
+
+  // Animation de glissement latéral coordonné (0 = Commandes, 1 = Clients)
+  const slideAnim = useRef(new Animated.Value(subTab === 'orders' ? 0 : 1)).current;
+
+  useEffect(() => {
+    if (subTab === 'clients') {
+      setHasMountedClients(true);
+    }
+    Animated.spring(slideAnim, {
+      toValue: subTab === 'orders' ? 0 : 1,
+      damping: 24,
+      stiffness: 220,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [subTab]);
 
   // Notify parent to disable horizontal swipe when viewing Client tab in Gestion
   useEffect(() => {
@@ -307,6 +326,11 @@ export default function GestionScreen({
           label: t('orders.lancer_lavage', {}, 'Lancer le lavage'),
           completeLabel: 'Lavage lancé',
           loadingText: 'Lancement du lavage...',
+          indeterminateText: 'Lavage en cours...',
+          completionLabel: 'Toucher pour repasser',
+          // Immediate shimmer on tap — no loading flash
+          transitionsToIndeterminate: true,
+          persistIntermediate: true,
         };
       case 'lavage_cours':
       case 'en_cours_lavage':
@@ -319,6 +343,9 @@ export default function GestionScreen({
           label: t('orders.passer_repassage', {}, 'Passer au repassage'),
           completeLabel: 'En repassage',
           loadingText: 'Passage au repassage...',
+          indeterminateText: 'Lavage en cours...',
+          completionLabel: 'Toucher pour repasser',
+          persistIntermediate: true,
         };
       case 'repassage_cours':
       case 'en_cours_repassage':
@@ -329,6 +356,9 @@ export default function GestionScreen({
           label: t('orders.statut_pret', {}, 'Marquer comme prêt'),
           completeLabel: 'Commande prête',
           loadingText: 'Validation...',
+          indeterminateText: 'Repassage en cours...',
+          completionLabel: 'Toucher pour finaliser',
+          persistIntermediate: true,
         };
       case 'pret':
       case 'prêt':
@@ -340,6 +370,11 @@ export default function GestionScreen({
           label: t('orders.statut_livraison', {}, 'Lancer la livraison'),
           completeLabel: 'En livraison',
           loadingText: 'Préparation...',
+          indeterminateText: 'Livraison en cours...',
+          completionLabel: 'Toucher pour valider la remise',
+          // Immediate shimmer on tap — livraison is a continuous process
+          transitionsToIndeterminate: true,
+          persistIntermediate: true,
         };
       case 'a_livrer':
         return {
@@ -348,6 +383,10 @@ export default function GestionScreen({
           label: 'Démarrer la livraison',
           completeLabel: 'Livraison démarrée',
           loadingText: 'Démarrage...',
+          indeterminateText: 'Livraison en cours...',
+          completionLabel: 'Toucher pour valider la remise',
+          transitionsToIndeterminate: true,
+          persistIntermediate: true,
         };
       case 'en_cours_livraison':
       case 'en_cours_de_livraison':
@@ -360,6 +399,9 @@ export default function GestionScreen({
           label: 'Confirmer la livraison',
           completeLabel: 'Commande livrée',
           loadingText: 'Confirmation...',
+          indeterminateText: 'Livraison en cours...',
+          completionLabel: 'Toucher pour valider la remise',
+          persistIntermediate: true,
         };
       case 'a_recuperer':
         return {
@@ -391,6 +433,7 @@ export default function GestionScreen({
         };
     }
   };
+
 
   const getNextStatusIcon = (status) => {
     const iconS = String(status || '').trim().toLowerCase();
@@ -1275,15 +1318,44 @@ export default function GestionScreen({
         <Text style={styles.headerTitle}>Gestion</Text>
       </View>
 
-      {/* SÉLECTEUR D'ONGLETS (Commandes / Clients) */}
+      {/* SÉLECTEUR D'ONGLETS (Commandes / Clients) AVEC GLISSEMENT LATÉRAL FLUIDE */}
       <View style={styles.tabSelectorContainer}>
-        <View style={styles.tabSelector}>
+        <View
+          style={styles.tabSelector}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            if (w > 0 && Math.abs(w - tabBarWidth) > 1) {
+              setTabBarWidth(w);
+            }
+          }}
+        >
+          {/* Pilule d'onglet coulissante avec animation spring fluide */}
+          {tabBarWidth > 0 && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.slidingTabPill,
+                {
+                  width: (tabBarWidth - 6) / 2,
+                  transform: [
+                    {
+                      translateX: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, (tabBarWidth - 6) / 2],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+          )}
+
           <TouchableOpacity
             onPress={() => {
               setSubTab('orders');
               if (setGestionFilter) setGestionFilter(null);
             }}
-            style={[styles.tabButton, subTab === 'orders' && styles.tabButtonActive]}
+            style={styles.tabButton}
             activeOpacity={0.8}
           >
             <Text style={[styles.tabButtonText, subTab === 'orders' && styles.tabButtonTextActive]}>
@@ -1296,7 +1368,7 @@ export default function GestionScreen({
               setSubTab('clients');
               if (setGestionFilter) setGestionFilter(null);
             }}
-            style={[styles.tabButton, subTab === 'clients' && styles.tabButtonActive]}
+            style={styles.tabButton}
             activeOpacity={0.8}
           >
             <Text style={[styles.tabButtonText, subTab === 'clients' && styles.tabButtonTextActive]}>
@@ -1306,16 +1378,35 @@ export default function GestionScreen({
         </View>
       </View>
 
-      {/* CONTENU DE L'ONGLET SÉLECTIONNÉ (COMMANDES OU CLIENTS SUR LA MÊME PAGE) */}
-      {subTab === 'orders' ? (
-        <MotiView
-          key="orders-subtab"
-          from={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ type: 'timing', duration: 120 }}
-          style={{ flex: 1 }}
+      {/* CONTENEUR À GLISSEMENT LATÉRAL SYNCHRONISÉ (COMMANDES ⇄ CLIENTS) */}
+      <View
+        style={styles.slidingContentOuter}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          if (w > 0 && Math.abs(w - pagerWidth) > 1) {
+            setPagerWidth(w);
+          }
+        }}
+      >
+        <Animated.View
+          style={[
+            styles.slidingContentTrack,
+            {
+              width: pagerWidth * 2,
+              transform: [
+                {
+                  translateX: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -pagerWidth],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          {/* BARRE DE RECHERCHE COMMANDES */}
+          {/* PANE 1: COMMANDES */}
+          <View style={[styles.slidingPane, { width: pagerWidth }]}>
+            {/* BARRE DE RECHERCHE COMMANDES */}
           <View style={styles.searchSection}>
             <View style={styles.searchContainer}>
               <Search size={16} color={isDarkMode ? '#71717a' : '#94a3b8'} style={styles.searchIcon} />
@@ -1418,10 +1509,9 @@ export default function GestionScreen({
           >
 
         {/* SUBTAB 1 : ORDERS LIST */}
-        {subTab === 'orders' && (
-          filteredOrders.length === 0 ? (
-            <Text style={styles.noResultsText}>Aucune commande trouvée</Text>
-          ) : (
+        {filteredOrders.length === 0 ? (
+          <Text style={styles.noResultsText}>Aucune commande trouvée</Text>
+        ) : (
             filteredOrders.map((item) => {
               const status = getStatusColor(item.statut);
               const client = customers.find(c => c.id === item.customer_id);
@@ -1751,9 +1841,29 @@ export default function GestionScreen({
                         const nextStyle = getNextStatusStyle(item.statut);
                         if (!nextStyle) return null;
 
+                        const isIntermediate = [
+                          'en_cours_lavage',
+                          'lavage_cours',
+                          'washing',
+                          'en_cours_repassage',
+                          'repassage_cours',
+                          'ironing',
+                          'en_cours_livraison',
+                          'en_cours_de_livraison',
+                          'in_delivery',
+                          'delivering',
+                          'livraison',
+                        ].includes(status);
+
                         return (
                           <View style={{ marginHorizontal: 2, marginTop: 6 }}>
                             <SlideActionButton
+                              key={`btn-${item.id}-${item.statut}`}
+                              state={isIntermediate ? 'indeterminate' : undefined}
+                              transitionsToIndeterminate={nextStyle.transitionsToIndeterminate}
+                              persistIntermediate={nextStyle.persistIntermediate}
+                              indeterminateText={nextStyle.indeterminateText}
+                              completionLabel={nextStyle.completionLabel}
                               color={canTransition ? nextStyle.bg : '#94a3b8'}
                               isDarkMode={isDarkMode}
                               disabled={!canTransition}
@@ -1763,12 +1873,14 @@ export default function GestionScreen({
                               loadingText={nextStyle.loadingText}
                               completeLabel={nextStyle.completeLabel}
                               onComplete={() => handleNextStatus(item, false, targetStatus)}
+                              onHumanComplete={() => handleNextStatus(item, false, targetStatus)}
                             >
                               {nextStyle.label}
                             </SlideActionButton>
                           </View>
                         );
                       })()}
+
                     </View>
 
                     {/* OVERLAY FINISHED ANIMATION */}
@@ -1835,25 +1947,23 @@ export default function GestionScreen({
               );
             })
           )
-        )}
+        }
 
       </ScrollView>
-        </MotiView>
-      ) : (
-        <MotiView
-          key="clients-subtab"
-          from={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ type: 'timing', duration: 120 }}
-          style={{ flex: 1 }}
-        >
-          <ClientsScreen
-            embedded={true}
-            onShowSuccess={onShowSuccess}
-            isActive={isActive && subTab === 'clients'}
-          />
-        </MotiView>
-      )}
+          </View>
+
+          {/* PANE 2: CLIENTS */}
+          <View style={[styles.slidingPane, { width: pagerWidth }]}>
+            {hasMountedClients && (
+              <ClientsScreen
+                embedded={true}
+                onShowSuccess={onShowSuccess}
+                isActive={isActive && subTab === 'clients'}
+              />
+            )}
+          </View>
+        </Animated.View>
+      </View>
 
 
 
@@ -2271,9 +2381,29 @@ export default function GestionScreen({
                   const nextStyle = getNextStatusStyle(selectedOrder.statut);
                   if (!nextStyle) return null;
 
+                  const isIntermediate = [
+                    'en_cours_lavage',
+                    'lavage_cours',
+                    'washing',
+                    'en_cours_repassage',
+                    'repassage_cours',
+                    'ironing',
+                    'en_cours_livraison',
+                    'en_cours_de_livraison',
+                    'in_delivery',
+                    'delivering',
+                    'livraison',
+                  ].includes(status);
+
                   return (
                     <View style={{ marginTop: 20, marginBottom: 20 }}>
                       <SlideActionButton
+                        key={`detail-btn-${selectedOrder.id}-${selectedOrder.statut}`}
+                        state={isIntermediate ? 'indeterminate' : undefined}
+                        transitionsToIndeterminate={nextStyle.transitionsToIndeterminate}
+                        persistIntermediate={nextStyle.persistIntermediate}
+                        indeterminateText={nextStyle.indeterminateText}
+                        completionLabel={nextStyle.completionLabel}
                         color={canTransition ? nextStyle.bg : '#94a3b8'}
                         isDarkMode={isDarkMode}
                         disabled={!canTransition}
@@ -2283,12 +2413,14 @@ export default function GestionScreen({
                         loadingText={nextStyle.loadingText}
                         completeLabel={nextStyle.completeLabel}
                         onComplete={() => handleNextStatus(selectedOrder, true, targetStatus)}
+                        onHumanComplete={() => handleNextStatus(selectedOrder, true, targetStatus)}
                       >
                         {nextStyle.label}
                       </SlideActionButton>
                     </View>
                   );
                 })()}
+
               </View>
             </ScrollView>
           )}
@@ -3032,24 +3164,35 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   tabSelector: {
+    position: 'relative',
     flexDirection: 'row',
     backgroundColor: '#f1f5f9',
     borderRadius: 9999,
     padding: 3,
+  },
+  slidingTabPill: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    left: 3,
+    backgroundColor: '#ffffff',
+    borderRadius: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+    zIndex: 1,
   },
   tabButton: {
     flex: 1,
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: 9999,
+    zIndex: 2,
   },
   tabButtonActive: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 1,
+    backgroundColor: 'transparent',
   },
   tabButtonText: {
     fontSize: 12,
@@ -3059,6 +3202,18 @@ const baseStyles = StyleSheet.create({
   tabButtonTextActive: {
     color: '#002cf7',
     fontWeight: '700',
+  },
+  slidingContentOuter: {
+    flex: 1,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  slidingContentTrack: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  slidingPane: {
+    height: '100%',
   },
   // Search section
   searchSection: {
@@ -4924,7 +5079,8 @@ function getStyles(isDarkMode) {
     headerTitle: { color: '#ffffff' },
     tabSelectorContainer: { backgroundColor: '#000000' },
     tabSelector: { backgroundColor: '#18181b' },
-    tabButtonActive: { backgroundColor: '#27272a' },
+    slidingTabPill: { backgroundColor: '#27272a', shadowColor: '#000', shadowOpacity: 0.4 },
+    tabButtonActive: { backgroundColor: 'transparent' },
     tabButtonText: { color: '#71717a' },
     tabButtonTextActive: { color: '#38bdf8' },
     statusFilterRow: { backgroundColor: '#000000' },
