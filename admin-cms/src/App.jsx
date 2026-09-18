@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from './services/db';
 import AdminView from './components/AdminView';
 import CustomSelect from './components/CustomSelect';
-import EnvironmentBanner from './components/EnvironmentBanner';
+import { appEnv } from './services/supabaseClient';
 import logoDark from './assets/logo_dark.png';
 import logoGold from './assets/logo_gold.png';
 // Composant utilitaire pour les icônes Google Material Symbols
@@ -615,13 +615,42 @@ function App() {
 
   if (!currentUser) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%', position: 'relative' }}>
-        <EnvironmentBanner />
-        <div className="lockscreen-container" style={{ flex: 1, minHeight: 0 }}>
-          <div className="lockscreen-logo-area" style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
+      <div className="lockscreen-container">
+        <div className="lockscreen-logo-area" style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
           <h1 style={{ color: '#ffffff', fontSize: '2.2rem', fontWeight: 800, margin: '0 0 0.25rem', letterSpacing: '-0.5px' }}>
             Laverie - Admin
           </h1>
+          {appEnv && (appEnv === 'test' || appEnv === 'staging' || appEnv === 'beta') && (
+            <div style={{ marginBottom: '0.4rem' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '2px 9px',
+                  borderRadius: '9999px',
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  background: appEnv === 'test' ? 'rgba(234, 179, 8, 0.18)' : 'rgba(249, 115, 22, 0.18)',
+                  color: appEnv === 'test' ? '#facc15' : '#fb923c',
+                  border: `1px solid ${appEnv === 'test' ? 'rgba(234, 179, 8, 0.35)' : 'rgba(249, 115, 22, 0.35)'}`,
+                }}
+              >
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: appEnv === 'test' ? '#facc15' : '#fb923c',
+                    boxShadow: `0 0 6px ${appEnv === 'test' ? '#facc15' : '#fb923c'}`,
+                  }}
+                />
+                {appEnv === 'test' ? 'Test' : 'Staging'}
+              </span>
+            </div>
+          )}
           <p className="lockscreen-subtitle" style={{ color: 'rgba(255, 255, 255, 0.6)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
             Plateforme Laverie Admin CMS
           </p>
@@ -815,7 +844,6 @@ function App() {
             </div>
           </div>
         )}
-        </div>
       </div>
     );
   }
@@ -829,9 +857,7 @@ function App() {
   };
 
   return (
-    <div className="app-shell" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-      <EnvironmentBanner />
-      <div className="app-container" style={{ flex: 1, minHeight: 0, height: 'auto', overflow: 'hidden' }}>
+    <div className="app-container">
 
       {/* ================= OVERLAY MOBILE SIDEBAR ================= */}
       {hasAdminAccess && sidebarOpen && (
@@ -842,11 +868,41 @@ function App() {
       {hasAdminAccess && (
         <aside className={`sidebar theme-dark-blue${sidebarOpen ? ' sidebar-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
 
-          {/* ── Header: Title ── */}
-          <div className="sidebar-header">
-            <div className="sidebar-title-text">
+          {/* ── Header: Title & Environment Pill ── */}
+          <div className="sidebar-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '0.35rem' }}>
+            <div className="sidebar-title-text" style={{ lineHeight: 1.2 }}>
               Laverie - Admin
             </div>
+            {appEnv && (appEnv === 'test' || appEnv === 'staging' || appEnv === 'beta') && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  fontSize: '0.65rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.6px',
+                  textTransform: 'uppercase',
+                  background: appEnv === 'test' ? 'rgba(234, 179, 8, 0.16)' : 'rgba(249, 115, 22, 0.16)',
+                  color: appEnv === 'test' ? '#facc15' : '#fb923c',
+                  border: `1px solid ${appEnv === 'test' ? 'rgba(234, 179, 8, 0.35)' : 'rgba(249, 115, 22, 0.35)'}`,
+                  lineHeight: 1.4,
+                }}
+              >
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: appEnv === 'test' ? '#facc15' : '#fb923c',
+                    boxShadow: `0 0 6px ${appEnv === 'test' ? '#facc15' : '#fb923c'}`,
+                  }}
+                />
+                {appEnv === 'test' ? 'Test' : 'Staging'}
+              </span>
+            )}
           </div>
 
 
@@ -1525,7 +1581,6 @@ function App() {
       )}
 
       </div>
-    </div>
   );
 }
 
