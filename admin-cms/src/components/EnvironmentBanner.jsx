@@ -47,6 +47,7 @@ export default function EnvironmentBanner() {
         position: 'sticky',
         top: 0,
         width: '100%',
+        flexShrink: 0,
         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
       }}
     >

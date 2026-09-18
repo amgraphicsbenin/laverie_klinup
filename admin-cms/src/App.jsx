@@ -615,9 +615,10 @@ function App() {
 
   if (!currentUser) {
     return (
-      <div className="lockscreen-container">
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%', position: 'relative' }}>
         <EnvironmentBanner />
-        <div className="lockscreen-logo-area" style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
+        <div className="lockscreen-container" style={{ flex: 1, minHeight: 0 }}>
+          <div className="lockscreen-logo-area" style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
           <h1 style={{ color: '#ffffff', fontSize: '2.2rem', fontWeight: 800, margin: '0 0 0.25rem', letterSpacing: '-0.5px' }}>
             Laverie - Admin
           </h1>
@@ -814,6 +815,7 @@ function App() {
             </div>
           </div>
         )}
+        </div>
       </div>
     );
   }
@@ -827,8 +829,9 @@ function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className="app-shell" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       <EnvironmentBanner />
+      <div className="app-container" style={{ flex: 1, minHeight: 0, height: 'auto', overflow: 'hidden' }}>
 
       {/* ================= OVERLAY MOBILE SIDEBAR ================= */}
       {hasAdminAccess && sidebarOpen && (
@@ -1521,6 +1524,7 @@ function App() {
         </div>
       )}
 
+      </div>
     </div>
   );
 }

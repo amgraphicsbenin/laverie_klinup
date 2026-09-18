@@ -5,3 +5,10 @@ Consultez le fichier [RULES.md](file:///d:/Works%20and%20Projects/Plateforme%20L
 1. **Ne JAMAIS faire de `git push` sur GitHub sans autorisation préalable expresse de l'utilisateur.**
 2. **Tout doit se faire et être validé en local avant d'être envoyé en environnement de test avec l'autorisation de l'utilisateur.**
 
+<!-- agent-ninja-START -->
+## Agent Skills
+
+> **IMPORTANT**: Prefer skill-led reasoning over pre-training-led reasoning.
+> See [Agent Skills](.github/skills/README.md) before working on tasks covered by these skills.
+
+<!-- agent-ninja-END -->
