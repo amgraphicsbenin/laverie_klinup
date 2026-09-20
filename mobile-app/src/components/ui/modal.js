@@ -128,9 +128,9 @@ export function ModalContainer({ size: propSize, children, style }) {
     switch (activeSize) {
       case 'alert':
       case 'xs':
-        return { width: '84%', maxWidth: 330 };
+        return { width: '80%', maxWidth: 310, minWidth: 280 };
       case 'sm':
-        return { width: '88%', maxWidth: 360 };
+        return { width: '86%', maxWidth: 350 };
       case 'md':
         return { width: '92%', maxWidth: 440 };
       case 'lg':
@@ -150,7 +150,7 @@ export function ModalContainer({ size: propSize, children, style }) {
           borderRadius: 0,
         };
       default:
-        return { width: '92%', maxWidth: 390 };
+        return { width: '88%', maxWidth: 360 };
     }
   }, [activeSize]);
 
@@ -214,8 +214,8 @@ export function ModalDialog({ children, style }) {
         {
           backgroundColor: isDarkMode ? '#18181b' : '#ffffff',
           borderColor: isDarkMode ? '#27272a' : '#e4e4e7',
-          borderRadius: isFull ? 0 : 26,
-          padding: isFull ? 18 : 24,
+          borderRadius: isFull ? 0 : 24,
+          padding: isFull ? 18 : 22,
           opacity: opacityAnim,
           transform: [{ scale: scaleAnim }, { translateY: translateYAnim }],
         },
@@ -506,6 +506,7 @@ export function ConfirmationModal({
   confirmIcon,
   size = 'alert',
   isDarkMode,
+  showCloseButton = false,
   children,
 }) {
   const activeOpen = isOpen !== undefined ? isOpen : visible;
@@ -516,33 +517,33 @@ export function ConfirmationModal({
     <Modal isOpen={activeOpen} onClose={onClose} size={size} isDarkMode={isDarkMode}>
       <Modal.Backdrop>
         <Modal.Container size={size}>
-          <Modal.Dialog style={{ alignItems: 'center', paddingHorizontal: 22, paddingVertical: 24 }}>
-            <Modal.CloseTrigger />
-            <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 4, width: '100%' }}>
+          <Modal.Dialog style={{ alignItems: 'center', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 }}>
+            {showCloseButton && <Modal.CloseTrigger />}
+            <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 0, width: '100%', gap: 6 }}>
               {icon ? (
-                <Modal.Icon variant={variant} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}>{icon}</Modal.Icon>
+                <Modal.Icon variant={variant} style={{ width: 48, height: 48, borderRadius: 24, marginBottom: 6 }}>{icon}</Modal.Icon>
               ) : variant === 'danger' ? (
-                <Modal.Icon variant="danger" style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}><Ban size={24} color="#ef4444" strokeWidth={2.4} /></Modal.Icon>
+                <Modal.Icon variant="danger" style={{ width: 48, height: 48, borderRadius: 24, marginBottom: 6 }}><Ban size={22} color="#ef4444" strokeWidth={2.4} /></Modal.Icon>
               ) : (
-                <Modal.Icon variant="warning" style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}><AlertTriangle size={24} color="#f59e0b" strokeWidth={2.4} /></Modal.Icon>
+                <Modal.Icon variant="warning" style={{ width: 48, height: 48, borderRadius: 24, marginBottom: 6 }}><AlertTriangle size={22} color="#f59e0b" strokeWidth={2.4} /></Modal.Icon>
               )}
-              <Modal.Heading style={{ textAlign: 'center', fontSize: 18, fontWeight: '800', paddingHorizontal: 10 }}>{title}</Modal.Heading>
+              <Modal.Heading style={{ textAlign: 'center', fontSize: 17, fontWeight: '700', paddingHorizontal: 6 }}>{title}</Modal.Heading>
               {activeDescription && (
-                <Modal.Description style={{ textAlign: 'center', marginTop: 6, lineHeight: 20, fontSize: 13.5, paddingHorizontal: 8 }}>
+                <Modal.Description style={{ textAlign: 'center', marginTop: 4, lineHeight: 19, fontSize: 13, paddingHorizontal: 4 }}>
                   {activeDescription}
                 </Modal.Description>
               )}
             </Modal.Header>
 
-            {children && <Modal.Body style={{ width: '100%' }}>{children}</Modal.Body>}
+            {children && <Modal.Body style={{ width: '100%', marginTop: 8 }}>{children}</Modal.Body>}
 
             <Modal.Footer
               style={{
                 width: '100%',
                 flexDirection: 'row',
                 justifyContent: 'center',
-                gap: 12,
-                marginTop: 22,
+                gap: 10,
+                marginTop: 18,
               }}
             >
               <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
@@ -615,6 +616,7 @@ export function AlertModal({
   onButtonPress,
   isDarkMode,
   size = 'alert',
+  showCloseButton = false,
   children,
 }) {
   const activeOpen = isOpen !== undefined ? isOpen : visible;
@@ -641,37 +643,37 @@ export function AlertModal({
     >
       <Modal.Backdrop closeOnPress={canDismissOnBackdrop}>
         <Modal.Container size={size}>
-          <Modal.Dialog style={{ alignItems: 'center', paddingHorizontal: 22, paddingVertical: 24 }}>
-            {canDismissOnBackdrop && <Modal.CloseTrigger onPress={onClose} />}
-            <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 4, width: '100%' }}>
-              <Modal.Icon variant={variant} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}>
+          <Modal.Dialog style={{ alignItems: 'center', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 }}>
+            {showCloseButton && <Modal.CloseTrigger onPress={onClose} />}
+            <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 0, width: '100%', gap: 6 }}>
+              <Modal.Icon variant={variant} style={{ width: 48, height: 48, borderRadius: 24, marginBottom: 6 }}>
                 {variant === 'danger' ? (
-                  <Ban size={24} color="#ef4444" strokeWidth={2.4} />
+                  <Ban size={22} color="#ef4444" strokeWidth={2.4} />
                 ) : variant === 'warning' ? (
-                  <AlertTriangle size={24} color="#f59e0b" strokeWidth={2.4} />
+                  <AlertTriangle size={22} color="#f59e0b" strokeWidth={2.4} />
                 ) : variant === 'success' ? (
-                  <Check size={24} color="#10b981" strokeWidth={2.4} />
+                  <Check size={22} color="#10b981" strokeWidth={2.4} />
                 ) : (
-                  <AlertTriangle size={24} color="#002cf7" strokeWidth={2.4} />
+                  <AlertTriangle size={22} color="#002cf7" strokeWidth={2.4} />
                 )}
               </Modal.Icon>
-              <Modal.Heading style={{ textAlign: 'center', fontSize: 18, fontWeight: '800', paddingHorizontal: 10 }}>{title}</Modal.Heading>
+              <Modal.Heading style={{ textAlign: 'center', fontSize: 17, fontWeight: '700', paddingHorizontal: 6 }}>{title}</Modal.Heading>
               {activeMessage && (
-                <Modal.Description style={{ textAlign: 'center', marginTop: 6, lineHeight: 20, fontSize: 13.5, paddingHorizontal: 8 }}>
+                <Modal.Description style={{ textAlign: 'center', marginTop: 4, lineHeight: 19, fontSize: 13, paddingHorizontal: 4 }}>
                   {activeMessage}
                 </Modal.Description>
               )}
             </Modal.Header>
 
-            {children && <Modal.Body style={{ width: '100%' }}>{children}</Modal.Body>}
+            {children && <Modal.Body style={{ width: '100%', marginTop: 8 }}>{children}</Modal.Body>}
 
             <Modal.Footer
               style={{
                 width: '100%',
                 flexDirection: hasMultipleButtons ? 'column' : 'row',
                 justifyContent: 'center',
-                gap: 12,
-                marginTop: 22,
+                gap: 10,
+                marginTop: 18,
               }}
             >
               {buttons && buttons.length > 0 ? (
@@ -747,7 +749,8 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
     zIndex: 1,
     ...StyleSheet.absoluteFillObject,
   },
@@ -760,11 +763,12 @@ const styles = StyleSheet.create({
     maxHeight: Platform.OS === 'web' ? '90vh' : '90%',
     borderWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.22,
-    shadowRadius: 32,
-    elevation: 14,
-    overflow: 'visible',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 8,
+    borderRadius: 24,
+    overflow: 'hidden',
   },
   closeTrigger: {
     position: 'absolute',
@@ -790,7 +794,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     textAlign: 'center',
-    gap: 10,
+    gap: 6,
   },
   iconBadge: {
     width: 44,
@@ -824,16 +828,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: 16,
     borderRadius: 9999,
-    minHeight: 46,
+    minHeight: 44,
   },
   buttonIcon: {
     marginRight: 6,
   },
   buttonText: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
     letterSpacing: 0.1,
     textAlign: 'center',
