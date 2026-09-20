@@ -71,6 +71,8 @@ Dans chaque environnement, ajoutez les secrets correspondants :
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | *(Même clé anon que ci-dessus)* | *(Même clé anon que ci-dessus)* |
 | `VITE_SUPABASE_URL` | `https://ryjwrjzggfwglfmyovhk.supabase.co` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | *(Même clé anon que ci-dessus)* | *(Même clé anon que ci-dessus)* |
+| `FIREBASE_APP_ID` | `1:735467305399:android:170a40ff0cb9af8069032` (Test) | *(ID app Firebase Prod si configuré)* |
+| `FIREBASE_SERVICE_ACCOUNT` | *(Contenu JSON clé privée service account Firebase)* | *(Contenu JSON clé privée)* |
 
 ---
 

@@ -57,6 +57,24 @@ jobs:
           echo "TARGET_ENV=${TARGET_ENV}" >> $GITHUB_OUTPUT
           echo "🎯 Environnement sélectionné : ${TARGET_ENV}"
 
+          # Détection et configuration Firebase App Distribution
+          if [ "${TARGET_ENV}" = "staging" ] && [ -n "${{ secrets.FIREBASE_APP_ID_STAGING }}" ]; then
+            TARGET_FIREBASE_APP_ID="${{ secrets.FIREBASE_APP_ID_STAGING }}"
+          elif [ -n "${{ secrets.FIREBASE_APP_ID }}" ]; then
+            TARGET_FIREBASE_APP_ID="${{ secrets.FIREBASE_APP_ID }}"
+          else
+            TARGET_FIREBASE_APP_ID=""
+          fi
+
+          if [ -n "${TARGET_FIREBASE_APP_ID}" ] && [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+            echo "HAS_FIREBASE=true" >> $GITHUB_ENV
+            echo "FIREBASE_APP_ID=${TARGET_FIREBASE_APP_ID}" >> $GITHUB_ENV
+            echo "📱 Firebase App Distribution configuré pour ${TARGET_ENV}"
+          else
+            echo "HAS_FIREBASE=false" >> $GITHUB_ENV
+            echo "ℹ️ Firebase App Distribution non configuré pour ${TARGET_ENV} (étape ignorée)"
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -166,3 +184,19 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
+
+      - name: Distribute APK to Firebase App Tester
+        if: ${{ env.HAS_FIREBASE == 'true' }}
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ env.FIREBASE_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          groups: testers
+          file: mobile-app/android/app/build/outputs/apk/release/app-release.apk
+          releaseNotes: |
+            🚀 KLIN UP (${{ env.APP_ENV }})
+            Version: ${{ env.VERSION_NAME }} (Build #${{ env.BUILD_NUMBER }})
+            Environnement: ${{ env.APP_ENV }}
+            Branche: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+
