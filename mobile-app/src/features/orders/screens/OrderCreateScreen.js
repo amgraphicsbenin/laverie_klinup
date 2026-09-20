@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Alert, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Alert, RefreshControl, Animated, Dimensions } from 'react-native';
 import { SmoothScrollView as ScrollView } from '../../../components/SmoothScroll';
 import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus, Gift, MapPin, UserCheck } from 'lucide-react-native';
 import { CustomSelect } from '../../../components/CustomSelect';
@@ -28,6 +28,21 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
 
   // Active sub-page tab: 'commande' | 'client'
   const [activeMode, setActiveMode] = useState('commande');
+  const [tabBarWidth, setTabBarWidth] = useState(0);
+  const [pagerWidth, setPagerWidth] = useState(() => Dimensions.get('window').width);
+
+  // Animation fluide de glissement latéral coordonné (0 = Nouvelle Commande, 1 = Nouveau Client)
+  const slideAnim = useRef(new Animated.Value(activeMode === 'commande' ? 0 : 1)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: activeMode === 'commande' ? 0 : 1,
+      damping: 24,
+      stiffness: 220,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [activeMode]);
 
   // Mode Commande state
   const [orderClient, setOrderClient] = useState('');
@@ -473,16 +488,46 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
     <View style={styles.container}>
       {/* Header Bar with Segmented Buttons (Nouvelle Commande / Nouveau Client) */}
       <View style={styles.headerBar}>
-        <View style={styles.segmentedContainer}>
+        <View
+          style={styles.segmentedContainer}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            if (w > 0 && Math.abs(w - tabBarWidth) > 1) {
+              setTabBarWidth(w);
+            }
+          }}
+        >
+          {/* Pilule d'onglet coulissante avec animation spring fluide */}
+          {tabBarWidth > 0 && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.slidingTabPill,
+                {
+                  width: (tabBarWidth - 8) / 2,
+                  transform: [
+                    {
+                      translateX: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, (tabBarWidth - 8) / 2],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+          )}
+
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setActiveMode('commande')}
-            style={[
-              styles.segmentedBtn,
-              activeMode === 'commande' && styles.segmentedBtnActive
-            ]}
+            style={styles.segmentedBtn}
           >
-            <ShoppingBag size={15} color={activeMode === 'commande' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')} style={{ marginRight: 6 }} />
+            <ShoppingBag
+              size={15}
+              color={activeMode === 'commande' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
+              style={{ marginRight: 6 }}
+            />
             <Text style={[
               styles.segmentedBtnText,
               activeMode === 'commande' && styles.segmentedBtnTextActive
@@ -494,12 +539,13 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setActiveMode('client')}
-            style={[
-              styles.segmentedBtn,
-              activeMode === 'client' && styles.segmentedBtnActive
-            ]}
+            style={styles.segmentedBtn}
           >
-            <UserPlus size={15} color={activeMode === 'client' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')} style={{ marginRight: 6 }} />
+            <UserPlus
+              size={15}
+              color={activeMode === 'client' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b')}
+              style={{ marginRight: 6 }}
+            />
             <Text style={[
               styles.segmentedBtnText,
               activeMode === 'client' && styles.segmentedBtnTextActive
@@ -510,296 +556,34 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
         </View>
       </View>
 
-      {activeMode === 'client' ? (
-        /* PAGE 2: NOUVEAU CLIENT */
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+      {/* CONTENEUR À GLISSEMENT LATÉRAL SYNCHRONISÉ (NOUVELLE COMMANDE ⇄ NOUVEAU CLIENT) */}
+      <View
+        style={styles.slidingContentOuter}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          if (w > 0 && Math.abs(w - pagerWidth) > 1) {
+            setPagerWidth(w);
+          }
+        }}
+      >
+        <Animated.View
+          style={[
+            styles.slidingContentTrack,
+            {
+              width: pagerWidth * 2,
+              transform: [
+                {
+                  translateX: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -pagerWidth],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <View style={styles.cardSection}>
-            <View style={styles.sectionHeader}>
-              <UserPlus size={16} color="#002cf7" />
-              <Text style={styles.sectionTitle}>Création d'un Nouveau Client</Text>
-            </View>
-
-            <View style={styles.formRowInline}>
-              <View style={styles.formFieldInline}>
-                <Text style={styles.formLabel}>Prénom *</Text>
-                <TextInput
-                  value={clientPrenom}
-                  onChangeText={setClientPrenom}
-                  placeholder="Ex: Jean"
-                  placeholderTextColor="#a1a1aa"
-                  style={styles.formInput}
-                />
-              </View>
-              <View style={styles.formFieldInline}>
-                <Text style={styles.formLabel}>Nom *</Text>
-                <TextInput
-                  value={clientNom}
-                  onChangeText={setClientNom}
-                  placeholder="Ex: KOFFI"
-                  placeholderTextColor="#a1a1aa"
-                  style={styles.formInput}
-                />
-              </View>
-            </View>
-
-            <Text style={styles.formLabel}>Téléphone</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ flex: 0.4, marginRight: 8 }}>
-                <CustomSelect
-                  value={clientIndicatif}
-                  onChange={setClientIndicatif}
-                  options={SUPPORTED_COUNTRIES.map(c => ({ label: `${c.flag} +${c.code}`, value: c.code }))}
-                />
-              </View>
-              <View style={{ flex: 0.6 }}>
-                <TextInput
-                  style={[styles.formInput, { marginBottom: 0 }]}
-                  placeholder="Ex: 0197979797"
-                  placeholderTextColor={isDarkMode ? '#52525b' : '#a1a1aa'}
-                  keyboardType="phone-pad"
-                  value={clientTelephone}
-                  onChangeText={setClientTelephone}
-                />
-              </View>
-            </View>
-
-            <Text style={styles.formLabel}>Adresse (Rue / Domicile)</Text>
-            <TextInput
-              value={clientAdresse}
-              onChangeText={setClientAdresse}
-              placeholder="Ex: Rue 123, Immeuble..."
-              placeholderTextColor="#a1a1aa"
-              style={styles.formInput}
-            />
-
-            <View style={styles.formRowInline}>
-              <View style={styles.formFieldInline}>
-                <Text style={styles.formLabel}>Quartier</Text>
-                <TextInput
-                  value={clientQuartier}
-                  onChangeText={setClientQuartier}
-                  placeholder="Ex: Cadjehoun"
-                  placeholderTextColor="#a1a1aa"
-                  style={styles.formInput}
-                />
-              </View>
-              <View style={styles.formFieldInline}>
-                <Text style={styles.formLabel}>Ville</Text>
-                <TextInput
-                  value={clientVille}
-                  onChangeText={setClientVille}
-                  placeholder="Ex: Cotonou"
-                  placeholderTextColor="#a1a1aa"
-                  style={styles.formInput}
-                />
-              </View>
-            </View>
-
-            <View style={{ marginTop: 16 }}>
-              <Text style={styles.formLabel}>Point de laverie rattaché</Text>
-              <CustomSelect
-                value={clientStoreId}
-                onChange={setClientStoreId}
-                options={[
-                  { label: "-- Aucun point spécifique --", value: "" },
-                  ...(stores || []).map(st => ({ label: `${st.nom} (${st.ville || 'Cotonou'})`, value: st.id }))
-                ]}
-                placeholder="-- Choisir un point --"
-                isDarkMode={isDarkMode}
-                disabled={currentUser?.store_id && currentUser.store_id !== 'all'}
-              />
-            </View>
-
-            {/* Section Position GPS & Estimation des Frais de Livraison */}
-            <View style={{
-              borderRadius: 14,
-              borderWidth: 1,
-              padding: 12,
-              marginBottom: 16,
-              marginTop: 16,
-              backgroundColor: isDarkMode ? '#1e293b' : '#f0f7ff',
-              borderColor: isDarkMode ? '#1d4ed8' : '#93c5fd'
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                <MapPin size={16} color="#002cf7" />
-                <Text style={[styles.formLabel, { marginLeft: 6, marginBottom: 0, color: '#002cf7', fontWeight: '700' }]}>
-                  Position GPS (Calcul de livraison)
-                </Text>
-              </View>
-              <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 11, marginBottom: 10 }}>
-                Saisissez la latitude et la longitude du domicile du client pour calculer automatiquement les frais de livraison.
-              </Text>
-
-              <View style={styles.formRowInline}>
-                <View style={styles.formFieldInline}>
-                  <Text style={styles.formLabel}>Latitude</Text>
-                  <TextInput
-                    keyboardType="decimal-pad"
-                    value={clientLatitude}
-                    onChangeText={(v) => {
-                      setClientLatitude(v);
-                      setClientDeliveryPreview(null);
-                    }}
-                    placeholder="Ex: 6.3650"
-                    placeholderTextColor="#a1a1aa"
-                    style={styles.formInput}
-                  />
-                </View>
-                <View style={styles.formFieldInline}>
-                  <Text style={styles.formLabel}>Longitude</Text>
-                  <TextInput
-                    keyboardType="decimal-pad"
-                    value={clientLongitude}
-                    onChangeText={(v) => {
-                      setClientLongitude(v);
-                      setClientDeliveryPreview(null);
-                    }}
-                    placeholder="Ex: 2.4100"
-                    placeholderTextColor="#a1a1aa"
-                    style={styles.formInput}
-                  />
-                </View>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => {
-                  const lat = parseFloat(clientLatitude.trim());
-                  const lng = parseFloat(clientLongitude.trim());
-                  if (isNaN(lat) || isNaN(lng)) {
-                    Alert.alert("Coordonnées invalides", "Veuillez saisir une latitude et une longitude valides.");
-                    return;
-                  }
-                  const storeId = currentUser?.store_id;
-                  const result = db.calculateDeliveryFee(storeId, null, lat, lng);
-                  setClientDeliveryPreview(result);
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingVertical: 10,
-                  paddingHorizontal: 14,
-                  borderRadius: 9999,
-                  marginTop: 6,
-                  backgroundColor: '#002cf7'
-                }}
-                activeOpacity={0.85}
-              >
-                <MapPin size={14} color="#fff" />
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, marginLeft: 6 }}>
-                  Estimer les frais de livraison
-                </Text>
-              </TouchableOpacity>
-
-              {clientDeliveryPreview && (
-                <View style={{
-                  marginTop: 10,
-                  padding: 10,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  backgroundColor: clientDeliveryPreview.fee > 0 ? (isDarkMode ? '#0f2a1a' : '#f0fff4') : (isDarkMode ? '#1a1a2e' : '#fff8f0'),
-                  borderColor: clientDeliveryPreview.fee > 0 ? '#22c55e' : '#f97316'
-                }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
-                      📍 Distance estimée
-                    </Text>
-                    <Text style={{ fontWeight: '700', color: isDarkMode ? '#fff' : '#0f172a', fontSize: 13 }}>
-                      {clientDeliveryPreview.distanceKm} km
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
-                      🚚 Zone
-                    </Text>
-                    <Text style={{ fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#475569', fontSize: 12 }}>
-                      {clientDeliveryPreview.zoneLabel}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
-                      💰 Frais de livraison
-                    </Text>
-                    <Text style={{ fontWeight: '800', fontSize: 15, color: clientDeliveryPreview.fee > 0 ? '#22c55e' : '#f97316' }}>
-                      {clientDeliveryPreview.fee > 0 ? `${clientDeliveryPreview.fee.toLocaleString('fr-FR')} FCFA` : 'Hors zone'}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.formLabel}>Préférence de pliage</Text>
-            <View style={styles.urgencyRow}>
-              {['Plié', 'Sur Cintre'].map((pref) => {
-                const isActive = clientPrefPliage === pref;
-                return (
-                  <TouchableOpacity
-                    key={pref}
-                    onPress={() => setClientPrefPliage(pref)}
-                    style={[
-                      styles.urgencyBtn,
-                      isActive && { backgroundColor: '#002cf7', borderColor: '#002cf7' }
-                    ]}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.urgencyBtnText, isActive && { color: '#ffffff' }]}>
-                      {pref}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={[styles.formLabel, { marginTop: 14 }]}>Forfait d'abonnement (Facultatif)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-              <TouchableOpacity
-                onPress={() => setClientSubscriptionPlanId("")}
-                style={[
-                  styles.planChip,
-                  !clientSubscriptionPlanId && styles.planChipActive
-                ]}
-              >
-                <Text style={[styles.planChipText, !clientSubscriptionPlanId && styles.planChipTextActive]}>
-                  Aucun
-                </Text>
-              </TouchableOpacity>
-              {((catalog || []).filter(c => (c.categorie === 'abonnement' || c.service === 'abonnement') && c.is_active !== false && c.statut !== 'inactif')).map((p) => {
-                const isSelected = clientSubscriptionPlanId === p.id;
-                return (
-                  <TouchableOpacity
-                    key={p.id}
-                    onPress={() => setClientSubscriptionPlanId(isSelected ? "" : p.id)}
-                    style={[styles.planChip, isSelected && styles.planChipActive]}
-                  >
-                    <Text style={[styles.planChipText, isSelected && styles.planChipTextActive]}>
-                      {p.article} ({(p.prix || 0).toLocaleString('fr-FR')} FCFA)
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          <SlideActionButton
-            color="#002cf7"
-            isDarkMode={isDarkMode}
-            height={48}
-            minLoadingDuration={2000}
-            icon={<UserCheck size={18} color="#ffffff" />}
-            loadingText="Création du profil..."
-            completeLabel="Client enregistré !"
-            onComplete={handleCreateClient}
-            style={{ marginTop: 16, marginBottom: 12 }}
-          >
-            Enregistrer le Client
-          </SlideActionButton>
-        </ScrollView>
-      ) : (
-        /* PAGE 1: NOUVELLE COMMANDE */
+          {/* PANE 1: NOUVELLE COMMANDE */}
+          <View style={[styles.slidingPane, { width: pagerWidth }]}>
         <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
           showsVerticalScrollIndicator={false}
@@ -1560,12 +1344,303 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               >
                 Créer la Commande
               </SlideActionButton>
-            </View>
           </View>
         </ScrollView>
-      )}
-    </View>
-  );
+      </View>
+
+      {/* PANE 2: NOUVEAU CLIENT */}
+      <View style={[styles.slidingPane, { width: pagerWidth }]}>
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.cardSection}>
+            <View style={styles.sectionHeader}>
+              <UserPlus size={16} color="#002cf7" />
+              <Text style={styles.sectionTitle}>Création d'un Nouveau Client</Text>
+            </View>
+
+            <View style={styles.formRowInline}>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Prénom *</Text>
+                <TextInput
+                  value={clientPrenom}
+                  onChangeText={setClientPrenom}
+                  placeholder="Ex: Jean"
+                  placeholderTextColor="#a1a1aa"
+                  style={styles.formInput}
+                />
+              </View>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Nom *</Text>
+                <TextInput
+                  value={clientNom}
+                  onChangeText={setClientNom}
+                  placeholder="Ex: KOFFI"
+                  placeholderTextColor="#a1a1aa"
+                  style={styles.formInput}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.formLabel}>Téléphone</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flex: 0.4, marginRight: 8 }}>
+                <CustomSelect
+                  value={clientIndicatif}
+                  onChange={setClientIndicatif}
+                  options={SUPPORTED_COUNTRIES.map(c => ({ label: `${c.flag} +${c.code}`, value: c.code }))}
+                />
+              </View>
+              <View style={{ flex: 0.6 }}>
+                <TextInput
+                  style={[styles.formInput, { marginBottom: 0 }]}
+                  placeholder="Ex: 0197979797"
+                  placeholderTextColor={isDarkMode ? '#52525b' : '#a1a1aa'}
+                  keyboardType="phone-pad"
+                  value={clientTelephone}
+                  onChangeText={setClientTelephone}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.formLabel}>Adresse (Rue / Domicile)</Text>
+            <TextInput
+              value={clientAdresse}
+              onChangeText={setClientAdresse}
+              placeholder="Ex: Rue 123, Immeuble..."
+              placeholderTextColor="#a1a1aa"
+              style={styles.formInput}
+            />
+
+            <View style={styles.formRowInline}>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Quartier</Text>
+                <TextInput
+                  value={clientQuartier}
+                  onChangeText={setClientQuartier}
+                  placeholder="Ex: Cadjehoun"
+                  placeholderTextColor="#a1a1aa"
+                  style={styles.formInput}
+                />
+              </View>
+              <View style={styles.formFieldInline}>
+                <Text style={styles.formLabel}>Ville</Text>
+                <TextInput
+                  value={clientVille}
+                  onChangeText={setClientVille}
+                  placeholder="Ex: Cotonou"
+                  placeholderTextColor="#a1a1aa"
+                  style={styles.formInput}
+                />
+              </View>
+            </View>
+
+            <View style={{ marginTop: 16 }}>
+              <Text style={styles.formLabel}>Point de laverie rattaché</Text>
+              <CustomSelect
+                value={clientStoreId}
+                onChange={setClientStoreId}
+                options={[
+                  { label: "-- Aucun point spécifique --", value: "" },
+                  ...(stores || []).map(st => ({ label: `${st.nom} (${st.ville || 'Cotonou'})`, value: st.id }))
+                ]}
+                placeholder="-- Choisir un point --"
+                isDarkMode={isDarkMode}
+                disabled={currentUser?.store_id && currentUser.store_id !== 'all'}
+              />
+            </View>
+
+            {/* Section Position GPS & Estimation des Frais de Livraison */}
+            <View style={{
+              borderRadius: 14,
+              borderWidth: 1,
+              padding: 12,
+              marginBottom: 16,
+              marginTop: 16,
+              backgroundColor: isDarkMode ? '#1e293b' : '#f0f7ff',
+              borderColor: isDarkMode ? '#1d4ed8' : '#93c5fd'
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                <MapPin size={16} color="#002cf7" />
+                <Text style={[styles.formLabel, { marginLeft: 6, marginBottom: 0, color: '#002cf7', fontWeight: '700' }]}>
+                  Position GPS (Calcul de livraison)
+                </Text>
+              </View>
+              <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 11, marginBottom: 10 }}>
+                Saisissez la latitude et la longitude du domicile du client pour calculer automatiquement les frais de livraison.
+              </Text>
+
+              <View style={styles.formRowInline}>
+                <View style={styles.formFieldInline}>
+                  <Text style={styles.formLabel}>Latitude</Text>
+                  <TextInput
+                    keyboardType="decimal-pad"
+                    value={clientLatitude}
+                    onChangeText={(v) => {
+                      setClientLatitude(v);
+                      setClientDeliveryPreview(null);
+                    }}
+                    placeholder="Ex: 6.3650"
+                    placeholderTextColor="#a1a1aa"
+                    style={styles.formInput}
+                  />
+                </View>
+                <View style={styles.formFieldInline}>
+                  <Text style={styles.formLabel}>Longitude</Text>
+                  <TextInput
+                    keyboardType="decimal-pad"
+                    value={clientLongitude}
+                    onChangeText={(v) => {
+                      setClientLongitude(v);
+                      setClientDeliveryPreview(null);
+                    }}
+                    placeholder="Ex: 2.4100"
+                    placeholderTextColor="#a1a1aa"
+                    style={styles.formInput}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const lat = parseFloat(clientLatitude.trim());
+                  const lng = parseFloat(clientLongitude.trim());
+                  if (isNaN(lat) || isNaN(lng)) {
+                    Alert.alert("Coordonnées invalides", "Veuillez saisir une latitude et une longitude valides.");
+                    return;
+                  }
+                  const storeId = currentUser?.store_id;
+                  const result = db.calculateDeliveryFee(storeId, null, lat, lng);
+                  setClientDeliveryPreview(result);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 9999,
+                  marginTop: 6,
+                  backgroundColor: '#002cf7'
+                }}
+                activeOpacity={0.85}
+              >
+                <MapPin size={14} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, marginLeft: 6 }}>
+                  Estimer les frais de livraison
+                </Text>
+              </TouchableOpacity>
+
+              {clientDeliveryPreview && (
+                <View style={{
+                  marginTop: 10,
+                  padding: 10,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  backgroundColor: clientDeliveryPreview.fee > 0 ? (isDarkMode ? '#0f2a1a' : '#f0fff4') : (isDarkMode ? '#1a1a2e' : '#fff8f0'),
+                  borderColor: clientDeliveryPreview.fee > 0 ? '#22c55e' : '#f97316'
+                }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
+                      📍 Distance estimée
+                    </Text>
+                    <Text style={{ fontWeight: '700', color: isDarkMode ? '#fff' : '#0f172a', fontSize: 13 }}>
+                      {clientDeliveryPreview.distanceKm} km
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
+                      🚚 Zone
+                    </Text>
+                    <Text style={{ fontWeight: '600', color: isDarkMode ? '#cbd5e1' : '#475569', fontSize: 12 }}>
+                      {clientDeliveryPreview.zoneLabel}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 12 }}>
+                      💰 Frais de livraison
+                    </Text>
+                    <Text style={{ fontWeight: '800', fontSize: 15, color: clientDeliveryPreview.fee > 0 ? '#22c55e' : '#f97316' }}>
+                      {clientDeliveryPreview.fee > 0 ? `${clientDeliveryPreview.fee.toLocaleString('fr-FR')} FCFA` : 'Hors zone'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.formLabel}>Préférence de pliage</Text>
+            <View style={styles.urgencyRow}>
+              {['Plié', 'Sur Cintre'].map((pref) => {
+                const isActive = clientPrefPliage === pref;
+                return (
+                  <TouchableOpacity
+                    key={pref}
+                    onPress={() => setClientPrefPliage(pref)}
+                    style={[
+                      styles.urgencyBtn,
+                      isActive && { backgroundColor: '#002cf7', borderColor: '#002cf7' }
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.urgencyBtnText, isActive && { color: '#ffffff' }]}>
+                      {pref}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[styles.formLabel, { marginTop: 14 }]}>Forfait d'abonnement (Facultatif)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => setClientSubscriptionPlanId("")}
+                style={[
+                  styles.planChip,
+                  !clientSubscriptionPlanId && styles.planChipActive
+                ]}
+              >
+                <Text style={[styles.planChipText, !clientSubscriptionPlanId && styles.planChipTextActive]}>
+                  Aucun
+                </Text>
+              </TouchableOpacity>
+              {((catalog || []).filter(c => (c.categorie === 'abonnement' || c.service === 'abonnement') && c.is_active !== false && c.statut !== 'inactif')).map((p) => {
+                const isSelected = clientSubscriptionPlanId === p.id;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    onPress={() => setClientSubscriptionPlanId(isSelected ? "" : p.id)}
+                    style={[styles.planChip, isSelected && styles.planChipActive]}
+                  >
+                    <Text style={[styles.planChipText, isSelected && styles.planChipTextActive]}>
+                      {p.article} ({(p.prix || 0).toLocaleString('fr-FR')} FCFA)
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <SlideActionButton
+            color="#002cf7"
+            isDarkMode={isDarkMode}
+            height={48}
+            minLoadingDuration={2000}
+            icon={<UserCheck size={18} color="#ffffff" />}
+            loadingText="Création du profil..."
+            completeLabel="Client enregistré !"
+            onComplete={handleCreateClient}
+            style={{ marginTop: 16, marginBottom: 12 }}
+          >
+            Enregistrer le Client
+          </SlideActionButton>
+        </ScrollView>
+      </View>
+    </Animated.View>
+  </View>
+</View>
+);
 }
 
 function getStyles(isDarkMode) {
@@ -1582,10 +1657,20 @@ function getStyles(isDarkMode) {
       borderBottomColor: isDarkMode ? '#27272a' : '#f1f5f9',
     },
     segmentedContainer: {
+      position: 'relative',
       flexDirection: 'row',
       backgroundColor: isDarkMode ? '#121212' : '#f1f5f9',
       borderRadius: 9999,
       padding: 4,
+    },
+    slidingTabPill: {
+      position: 'absolute',
+      top: 4,
+      bottom: 4,
+      left: 4,
+      backgroundColor: '#002cf7',
+      borderRadius: 9999,
+      zIndex: 1,
     },
     segmentedBtn: {
       flex: 1,
@@ -1594,14 +1679,11 @@ function getStyles(isDarkMode) {
       justifyContent: 'center',
       paddingVertical: 10,
       borderRadius: 9999,
+      zIndex: 2,
+      backgroundColor: 'transparent',
     },
     segmentedBtnActive: {
-      backgroundColor: '#002cf7',
-      shadowColor: 'transparent',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0,
-      shadowRadius: 0,
-      elevation: 0,
+      backgroundColor: 'transparent',
     },
     segmentedBtnText: {
       fontSize: 13,
@@ -1611,6 +1693,18 @@ function getStyles(isDarkMode) {
     segmentedBtnTextActive: {
       color: '#ffffff',
       fontWeight: '700',
+    },
+    slidingContentOuter: {
+      flex: 1,
+      overflow: 'hidden',
+      width: '100%',
+    },
+    slidingContentTrack: {
+      flex: 1,
+      flexDirection: 'row',
+    },
+    slidingPane: {
+      height: '100%',
     },
     scrollContent: {
       padding: 20,
