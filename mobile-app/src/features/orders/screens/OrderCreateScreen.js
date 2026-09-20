@@ -1344,6 +1344,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               >
                 Créer la Commande
               </SlideActionButton>
+            </View>
           </View>
         </ScrollView>
       </View>
