@@ -41,6 +41,10 @@ jobs:
 
       - name: Resolve Target Environment
         id: resolve-env
+        env:
+          FIREBASE_APP_ID_SECRET: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_APP_ID_STAGING_SECRET: ${{ secrets.FIREBASE_APP_ID_STAGING }}
+          FIREBASE_SERVICE_ACCOUNT_SECRET: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           # Priorité à l'input manuel si workflow_dispatch, sinon détection via la branche git
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -58,15 +62,15 @@ jobs:
           echo "🎯 Environnement sélectionné : ${TARGET_ENV}"
 
           # Détection et configuration Firebase App Distribution
-          if [ "${TARGET_ENV}" = "staging" ] && [ -n "${{ secrets.FIREBASE_APP_ID_STAGING }}" ]; then
-            TARGET_FIREBASE_APP_ID="${{ secrets.FIREBASE_APP_ID_STAGING }}"
-          elif [ -n "${{ secrets.FIREBASE_APP_ID }}" ]; then
-            TARGET_FIREBASE_APP_ID="${{ secrets.FIREBASE_APP_ID }}"
+          if [ "${TARGET_ENV}" = "staging" ] && [ -n "${FIREBASE_APP_ID_STAGING_SECRET}" ]; then
+            TARGET_FIREBASE_APP_ID="${FIREBASE_APP_ID_STAGING_SECRET}"
+          elif [ -n "${FIREBASE_APP_ID_SECRET}" ]; then
+            TARGET_FIREBASE_APP_ID="${FIREBASE_APP_ID_SECRET}"
           else
             TARGET_FIREBASE_APP_ID=""
           fi
 
-          if [ -n "${TARGET_FIREBASE_APP_ID}" ] && [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+          if [ -n "${TARGET_FIREBASE_APP_ID}" ] && [ -n "${FIREBASE_SERVICE_ACCOUNT_SECRET}" ]; then
             echo "HAS_FIREBASE=true" >> $GITHUB_ENV
             echo "FIREBASE_APP_ID=${TARGET_FIREBASE_APP_ID}" >> $GITHUB_ENV
             echo "📱 Firebase App Distribution configuré pour ${TARGET_ENV}"
@@ -137,7 +141,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Cache Gradle dependencies
         uses: actions/cache@v4
