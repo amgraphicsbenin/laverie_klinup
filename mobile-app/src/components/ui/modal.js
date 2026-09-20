@@ -126,12 +126,13 @@ export function ModalContainer({ size: propSize, children, style }) {
 
   const containerStyle = useMemo(() => {
     switch (activeSize) {
+      case 'alert':
       case 'xs':
-        return { width: '92%', maxWidth: 360 };
+        return { width: '84%', maxWidth: 330 };
       case 'sm':
-        return { width: '92%', maxWidth: 390 };
+        return { width: '88%', maxWidth: 360 };
       case 'md':
-        return { width: '94%', maxWidth: 480 };
+        return { width: '92%', maxWidth: 440 };
       case 'lg':
         return { width: '96%', maxWidth: 580 };
       case 'cover':
@@ -503,7 +504,7 @@ export function ConfirmationModal({
   confirmText = 'Confirmer',
   confirmVariant,
   confirmIcon,
-  size = 'sm',
+  size = 'alert',
   isDarkMode,
   children,
 }) {
@@ -515,9 +516,9 @@ export function ConfirmationModal({
     <Modal isOpen={activeOpen} onClose={onClose} size={size} isDarkMode={isDarkMode}>
       <Modal.Backdrop>
         <Modal.Container size={size}>
-          <Modal.Dialog style={{ alignItems: 'center' }}>
+          <Modal.Dialog style={{ alignItems: 'center', paddingHorizontal: 22, paddingVertical: 24 }}>
             <Modal.CloseTrigger />
-            <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 4 }}>
+            <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 4, width: '100%' }}>
               {icon ? (
                 <Modal.Icon variant={variant} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}>{icon}</Modal.Icon>
               ) : variant === 'danger' ? (
@@ -525,9 +526,9 @@ export function ConfirmationModal({
               ) : (
                 <Modal.Icon variant="warning" style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}><AlertTriangle size={24} color="#f59e0b" strokeWidth={2.4} /></Modal.Icon>
               )}
-              <Modal.Heading style={{ textAlign: 'center', fontSize: 18, fontWeight: '800' }}>{title}</Modal.Heading>
+              <Modal.Heading style={{ textAlign: 'center', fontSize: 18, fontWeight: '800', paddingHorizontal: 10 }}>{title}</Modal.Heading>
               {activeDescription && (
-                <Modal.Description style={{ textAlign: 'center', marginTop: 6, lineHeight: 20, fontSize: 13.5 }}>
+                <Modal.Description style={{ textAlign: 'center', marginTop: 6, lineHeight: 20, fontSize: 13.5, paddingHorizontal: 8 }}>
                   {activeDescription}
                 </Modal.Description>
               )}
@@ -541,7 +542,7 @@ export function ConfirmationModal({
                 flexDirection: 'row',
                 justifyContent: 'center',
                 gap: 12,
-                marginTop: 20,
+                marginTop: 22,
               }}
             >
               <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
@@ -613,6 +614,7 @@ export function AlertModal({
   buttons = [],
   onButtonPress,
   isDarkMode,
+  size = 'alert',
   children,
 }) {
   const activeOpen = isOpen !== undefined ? isOpen : visible;
@@ -633,15 +635,15 @@ export function AlertModal({
     <Modal
       isOpen={activeOpen}
       onClose={onClose}
-      size="sm"
+      size={size}
       isDarkMode={isDarkMode}
       closeOnBackdropPress={canDismissOnBackdrop}
     >
       <Modal.Backdrop closeOnPress={canDismissOnBackdrop}>
-        <Modal.Container size="sm">
-          <Modal.Dialog style={{ alignItems: 'center' }}>
+        <Modal.Container size={size}>
+          <Modal.Dialog style={{ alignItems: 'center', paddingHorizontal: 22, paddingVertical: 24 }}>
             {canDismissOnBackdrop && <Modal.CloseTrigger onPress={onClose} />}
-            <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 4 }}>
+            <Modal.Header layout="column" style={{ alignItems: 'center', marginBottom: 4, width: '100%' }}>
               <Modal.Icon variant={variant} style={{ width: 52, height: 52, borderRadius: 26, marginBottom: 12 }}>
                 {variant === 'danger' ? (
                   <Ban size={24} color="#ef4444" strokeWidth={2.4} />
@@ -653,9 +655,9 @@ export function AlertModal({
                   <AlertTriangle size={24} color="#002cf7" strokeWidth={2.4} />
                 )}
               </Modal.Icon>
-              <Modal.Heading style={{ textAlign: 'center', fontSize: 18, fontWeight: '800' }}>{title}</Modal.Heading>
+              <Modal.Heading style={{ textAlign: 'center', fontSize: 18, fontWeight: '800', paddingHorizontal: 10 }}>{title}</Modal.Heading>
               {activeMessage && (
-                <Modal.Description style={{ textAlign: 'center', marginTop: 6, lineHeight: 20, fontSize: 13.5 }}>
+                <Modal.Description style={{ textAlign: 'center', marginTop: 6, lineHeight: 20, fontSize: 13.5, paddingHorizontal: 8 }}>
                   {activeMessage}
                 </Modal.Description>
               )}
@@ -669,7 +671,7 @@ export function AlertModal({
                 flexDirection: hasMultipleButtons ? 'column' : 'row',
                 justifyContent: 'center',
                 gap: 12,
-                marginTop: 20,
+                marginTop: 22,
               }}
             >
               {buttons && buttons.length > 0 ? (
@@ -745,7 +747,7 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     zIndex: 1,
     ...StyleSheet.absoluteFillObject,
   },
@@ -766,8 +768,8 @@ const styles = StyleSheet.create({
   },
   closeTrigger: {
     position: 'absolute',
-    top: 18,
-    right: 18,
+    top: 16,
+    right: 16,
     width: 32,
     height: 32,
     borderRadius: 16,
