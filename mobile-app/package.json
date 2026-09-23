@@ -38,7 +38,12 @@
     "ios": "expo run:ios",
     "web": "expo start --web --clear",
     "tunnel": "expo start --tunnel --clear",
-    "postinstall": "node scripts/patch-expo-notifications.js"
+    "postinstall": "node scripts/patch-expo-notifications.js",
+    "build:prod:apk": "eas build --platform android --profile production-apk",
+    "build:prod:bundle": "eas build --platform android --profile production",
+    "build:test:apk": "eas build --platform android --profile test",
+    "distribute:prod": "node scripts/distribute-firebase.js --env production",
+    "distribute:test": "node scripts/distribute-firebase.js --env test"
   },
   "private": true,
   "devDependencies": {

@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "735467305399",
+    "project_id": "klinup-apps",
+    "storage_bucket": "klinup-apps.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:735467305399:android:43c1e315d66b4c56069032",
+        "android_client_info": {
+          "package_name": "com.klinup.laverie"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3m41_YxT64vv9-8YPmpZhEt1Dx_JCyzI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:735467305399:android:170a40fff0cb9af8069032",
+        "android_client_info": {
+          "package_name": "com.klinup.laverie.test"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3m41_YxT64vv9-8YPmpZhEt1Dx_JCyzI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+

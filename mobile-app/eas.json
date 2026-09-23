@@ -11,6 +11,26 @@
         "buildType": "apk"
       }
     },
+    "test": {
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "test",
+        "EXPO_PUBLIC_APP_ENV": "test"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "staging": {
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "staging",
+        "EXPO_PUBLIC_APP_ENV": "staging"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {
@@ -20,7 +40,21 @@
         "simulator": false
       }
     },
+    "production-apk": {
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_APP_ENV": "production"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_APP_ENV": "production"
+      },
       "android": {
         "buildType": "app-bundle"
       }

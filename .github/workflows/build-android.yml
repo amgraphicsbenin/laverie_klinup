@@ -44,6 +44,7 @@ jobs:
         env:
           FIREBASE_APP_ID_SECRET: ${{ secrets.FIREBASE_APP_ID }}
           FIREBASE_APP_ID_STAGING_SECRET: ${{ secrets.FIREBASE_APP_ID_STAGING }}
+          FIREBASE_APP_ID_PROD_SECRET: ${{ secrets.FIREBASE_APP_ID_PROD }}
           FIREBASE_SERVICE_ACCOUNT_SECRET: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           # Priorité à l'input manuel si workflow_dispatch, sinon détection via la branche git
@@ -62,12 +63,14 @@ jobs:
           echo "🎯 Environnement sélectionné : ${TARGET_ENV}"
 
           # Détection et configuration Firebase App Distribution
-          if [ "${TARGET_ENV}" = "staging" ] && [ -n "${FIREBASE_APP_ID_STAGING_SECRET}" ]; then
+          if [ "${TARGET_ENV}" = "production" ]; then
+            TARGET_FIREBASE_APP_ID="${FIREBASE_APP_ID_PROD_SECRET:-1:735467305399:android:43c1e315d66b4c56069032}"
+          elif [ "${TARGET_ENV}" = "staging" ] && [ -n "${FIREBASE_APP_ID_STAGING_SECRET}" ]; then
             TARGET_FIREBASE_APP_ID="${FIREBASE_APP_ID_STAGING_SECRET}"
           elif [ -n "${FIREBASE_APP_ID_SECRET}" ]; then
             TARGET_FIREBASE_APP_ID="${FIREBASE_APP_ID_SECRET}"
           else
-            TARGET_FIREBASE_APP_ID=""
+            TARGET_FIREBASE_APP_ID="1:735467305399:android:170a40fff0cb9af8069032"
           fi
 
           if [ -n "${TARGET_FIREBASE_APP_ID}" ] && [ -n "${FIREBASE_SERVICE_ACCOUNT_SECRET}" ]; then
