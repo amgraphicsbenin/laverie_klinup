@@ -43,7 +43,8 @@
     "build:prod:bundle": "eas build --platform android --profile production",
     "build:test:apk": "eas build --platform android --profile test",
     "distribute:prod": "node scripts/distribute-firebase.js --env production",
-    "distribute:test": "node scripts/distribute-firebase.js --env test"
+    "distribute:test": "node scripts/distribute-firebase.js --env test",
+    "fix:icons": "node scripts/fix-android-icons.js"
   },
   "private": true,
   "devDependencies": {
