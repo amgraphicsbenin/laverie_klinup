@@ -2,7 +2,7 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#0f0f13" />
     <title>Pressing Pro — Aperçu Mobile</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -216,8 +216,10 @@
         top: 0 !important;
         left: 0 !important;
         width: 100% !important;
+        max-width: 100% !important;
         height: 100% !important;
         overflow: hidden !important;
+        overflow-x: hidden !important;
         padding-top: 0;
       }
 
@@ -229,8 +231,10 @@
         right: 0 !important;
         bottom: 0 !important;
         width: 100% !important;
+        max-width: 100% !important;
         height: 100% !important;
         overflow: hidden !important;
+        overflow-x: hidden !important;
       }
 
       /* ─── Reflet écran ─── */
@@ -325,6 +329,13 @@
       }
       scaleFrame();
       window.addEventListener('resize', scaleFrame);
+
+      // Lock horizontal scroll: prevent any browser scroll displacement
+      window.addEventListener('scroll', () => {
+        if (window.scrollX !== 0) {
+          window.scrollTo(0, window.scrollY);
+        }
+      }, { passive: true });
     </script>
   </body>
 </html>

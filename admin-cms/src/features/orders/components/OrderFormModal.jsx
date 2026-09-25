@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Search, Smartphone, Check } from 'lucide-react';
 import { db } from '../../../services/db';
+import StatefulButton from '../../../components/ui/StatefulButton';
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -18,9 +19,8 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
   const [orderClient, setOrderClient] = useState('');
   const [selectedOrderStoreId, setSelectedOrderStoreId] = useState(() => {
     const sid = db.getSelectedStoreId();
-    if (sid && sid !== 'all') return sid;
-    const stores = db.getStores();
-    return stores.length > 0 ? stores[0].id : '';
+    if (sid && sid !== 'all' && sid !== 'GLOBAL') return sid;
+    return '';
   });
   const [selectedArticles, setSelectedArticles] = useState([]); // [{ id, article, service, price, quantity }]
   const [orderAvance, setOrderAvance] = useState('0');
@@ -66,8 +66,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
   const resetForm = () => {
     setOrderClient('');
     const sid = db.getSelectedStoreId();
-    const stores = db.getStores();
-    setSelectedOrderStoreId(sid && sid !== 'all' ? sid : (stores.length > 0 ? stores[0].id : ''));
+    setSelectedOrderStoreId(sid && sid !== 'all' && sid !== 'GLOBAL' ? sid : '');
     setSelectedArticles([]);
     setOrderAvance('0');
     setOrderPaymentMethod('Espèce');
@@ -176,6 +175,10 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
   };
 
   const handleCreateOrder = async () => {
+    if (!selectedOrderStoreId || selectedOrderStoreId === 'all' || selectedOrderStoreId === 'GLOBAL') {
+      alert("Veuillez sélectionner un point de laverie valide. La sélection d'un point de laverie non global est obligatoire pour créer une commande.");
+      return;
+    }
     if (!orderClient) {
       alert("Veuillez sélectionner le client.");
       return;
@@ -375,8 +378,10 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
               }}
               value={selectedOrderStoreId}
               onChange={(e) => setSelectedOrderStoreId(e.target.value)}
+              required
             >
-              {db.getStores().map(s => (
+              <option value="" disabled>-- Sélectionner obligatoirement un point de laverie --</option>
+              {(db.getStores() || []).filter(s => s && s.id !== 'all' && s.code !== 'GLOBAL').map(s => (
                 <option key={s.id} value={s.id}>
                   {s.nom} ({s.code})
                 </option>
@@ -1306,9 +1311,11 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
               Annuler
             </button>
 
-            <button
+            <StatefulButton
               type="button"
+              variant="primary"
               onClick={handleCreateOrder}
+              loadingText="Enregistrement..."
               style={{
                 flex: 2,
                 height: '48px',
@@ -1318,11 +1325,10 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                 color: '#ffffff',
                 fontSize: '14px',
                 fontWeight: 600,
-                cursor: 'pointer'
               }}
             >
               Enregistrer la Commande
-            </button>
+            </StatefulButton>
           </div>
 
         </div>

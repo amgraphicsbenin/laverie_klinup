@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
   Users,
@@ -30,7 +30,10 @@ import {
   Navigation,
   Save,
   CheckCircle,
-  Trash2
+  Trash2,
+  Eye,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import { exportCustomersCSV } from '../../../utils/exportUtils';
@@ -38,6 +41,7 @@ import { getFidelityTier, FIDELITY_TIERS, REWARD_CATALOG, renderTierIcon, render
 import { countries } from '../../../utils/countriesData';
 import { validatePhoneNumber, normalizePhoneNumber } from '../../../utils/phoneUtils';
 import { db } from '../../../services/db';
+import StatefulButton from '../../../components/ui/StatefulButton';
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -69,6 +73,26 @@ export default function CustomersTab({
   const [tierFilter, setTierFilter] = useState('all'); // 'all', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM'
   const [storeFilter, setStoreFilter] = useState('all'); // 'all' or store_id
   const [copiedId, setCopiedId] = useState(null);
+  const [sortField, setSortField] = useState('points'); // 'name' | 'points' | 'dette' | 'created_at'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
+  const [showViewCustomerModal, setShowViewCustomerModal] = useState(false);
+  const prevSelectedCustomerIdRef = useRef(selectedCrmCustomer?.id);
+
+  useEffect(() => {
+    if (selectedCrmCustomer && selectedCrmCustomer.id !== prevSelectedCustomerIdRef.current) {
+      setShowViewCustomerModal(true);
+    }
+    prevSelectedCustomerIdRef.current = selectedCrmCustomer?.id;
+  }, [selectedCrmCustomer]);
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortOrder(field === 'name' ? 'asc' : 'desc');
+    }
+  };
 
   // Liste des points de laverie
   const availableStores = (stores && stores.length > 0) ? stores : (db.getStores ? db.getStores() : []);
@@ -522,884 +546,1062 @@ export default function CustomersTab({
         </div>
       </div>
 
-      {/* DISPOSITION PRINCIPALE CRM (PORTEFEUILLE A GAUCHE, FICHE DETAILLEE A DROITE) */}
-      <div className="grid-2" style={{ gridTemplateColumns: '0.85fr 1.15fr', gap: '1.5rem', alignItems: 'start' }}>
-        
-        {/* COLONNE GAUCHE : RECHERCHE & LISTE DES CLIENTS */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem', borderRadius: '20px' }}>
-          
-          {/* Header Liste Clients */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.9rem' }}>
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                Portefeuille Clients
-              </h3>
-              <p style={{ margin: '0.15rem 0 0', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                Fiches CRM, abonnements & programme fidélité
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => exportCustomersCSV(customers, availableStores || stores)}
-                style={{ padding: '0.45rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                title="Exporter la liste des clients en CSV"
-              >
-                <Download size={14} /> CSV
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setShowNewCustomerModal(true)}
-                style={{ padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--primary)', color: '#fff', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)' }}
-              >
-                <UserPlus size={15} /> Nouveau
-              </button>
-            </div>
-          </div>
+      {/* DISPOSITION TABLEAU CRM RESPONSIVE & MODALE FICHE CLIENT */}
+      {(() => {
+        const query = (crmSearch || '').toLowerCase().trim();
+        let filteredCrm = (customers || []).filter(c => {
+          const nom = (c.nom || '').toLowerCase();
+          const prenom = (c.prenom || '').toLowerCase();
+          const fullName = `${prenom} ${nom}`.trim();
+          const reverseFullName = `${nom} ${prenom}`.trim();
+          const tel = (c.telephone || '').toLowerCase();
+          const matchesQuery = !query ||
+            nom.includes(query) ||
+            prenom.includes(query) ||
+            fullName.includes(query) ||
+            reverseFullName.includes(query) ||
+            tel.includes(query);
 
-          {/* Search Input & Point de Laverie Filter */}
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <div className="search-control-container" style={{ flex: 1 }}>
-              <Search size={15} className="search-control-icon" />
-              <input
-                type="text"
-                className="search-control-input"
-                placeholder="Rechercher par Nom, Prénom ou Tél..."
-                value={crmSearch}
-                onChange={(e) => setCrmSearch(e.target.value)}
-              />
-            </div>
-            {availableStores.length > 0 && (
-              <div style={{ minWidth: '150px' }}>
-                <CustomSelect
-                  value={storeFilter}
-                  onChange={(e) => setStoreFilter(e.target.value)}
-                  style={{
-                    height: '42px',
-                    borderRadius: '12px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    padding: '0 0.65rem'
-                  }}
-                  title="Filtrer par point de laverie"
-                >
-                  <option value="all">🏢 Tous les points</option>
-                  {availableStores.map(st => (
-                    <option key={st.id} value={st.id}>{st.nom}</option>
-                  ))}
-                </CustomSelect>
-              </div>
-            )}
-          </div>
+          if (!matchesQuery) return false;
+          if (storeFilter !== 'all' && c.store_id !== storeFilter) return false;
+          if (filterMode === 'abonne') return !!c.active_subscription;
+          if (filterMode === 'dette') return (c.solde_dette || 0) > 0;
+          if (filterMode === 'fidelite') {
+            if (tierFilter === 'all') return true;
+            const tier = getFidelityTier(c.points_fidelite || 0);
+            return tier.key === tierFilter;
+          }
+          return true;
+        });
 
-          {/* Filter Chips Pills */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div className="filter-pills-group" style={{ width: '100%' }}>
-              <button
-                type="button"
-                className={`filter-pill-btn ${filterMode === 'all' ? 'active' : ''}`}
-                onClick={() => setFilterMode('all')}
-                style={{ flex: 1, justifyContent: 'center' }}
-              >
-                Tous ({customers.length})
-              </button>
-              <button
-                type="button"
-                className={`filter-pill-btn ${filterMode === 'abonne' ? 'active' : ''}`}
-                onClick={() => setFilterMode('abonne')}
-                style={{ flex: 1, justifyContent: 'center' }}
-              >
-                Abonnés ({activeSubscribers})
-              </button>
-              <button
-                type="button"
-                className={`filter-pill-btn ${filterMode === 'fidelite' ? 'active' : ''}`}
-                onClick={() => setFilterMode('fidelite')}
-                style={{ flex: 1, justifyContent: 'center', gap: '0.25rem' }}
-              >
-                <Award size={13} /> Fidélité
-              </button>
-              <button
-                type="button"
-                className={`filter-pill-btn ${filterMode === 'dette' ? 'active' : ''}`}
-                onClick={() => setFilterMode('dette')}
-                style={{ flex: 1, justifyContent: 'center' }}
-              >
-                Dettes ({indebtedCustomers.length})
-              </button>
-            </div>
+        filteredCrm = filteredCrm.sort((a, b) => {
+          let comparison = 0;
+          if (sortField === 'name') {
+            const nameA = `${a.prenom || ''} ${a.nom || ''}`.trim().toLowerCase();
+            const nameB = `${b.prenom || ''} ${b.nom || ''}`.trim().toLowerCase();
+            comparison = nameA.localeCompare(nameB);
+          } else if (sortField === 'points') {
+            const ptsDiff = (b.points_fidelite || 0) - (a.points_fidelite || 0);
+            if (ptsDiff !== 0) comparison = ptsDiff;
+            else comparison = (a.prenom || '').localeCompare(b.prenom || '');
+          } else if (sortField === 'dette') {
+            comparison = (b.solde_dette || 0) - (a.solde_dette || 0);
+          } else if (sortField === 'created_at') {
+            const dateA = new Date(a.created_at || 0).getTime();
+            const dateB = new Date(b.created_at || 0).getTime();
+            comparison = dateB - dateA;
+          }
+          return sortOrder === 'asc' ? -comparison : comparison;
+        });
 
-            {/* Sub-Pills pour filtrer par statut de fidélité */}
-            {filterMode === 'fidelite' && (
-              <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setTierFilter('all')}
-                  style={{
-                    padding: '0.25rem 0.55rem',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-color)',
-                    background: tierFilter === 'all' ? 'var(--primary)' : 'var(--bg-app)',
-                    color: tierFilter === 'all' ? '#ffffff' : 'var(--text-secondary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Tous Tiers
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTierFilter('BRONZE')}
-                  style={{
-                    padding: '0.25rem 0.55rem',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    borderRadius: '8px',
-                    border: '1px solid rgba(217, 119, 6, 0.4)',
-                    background: tierFilter === 'BRONZE' ? '#d97706' : 'rgba(217, 119, 6, 0.08)',
-                    color: tierFilter === 'BRONZE' ? '#ffffff' : '#d97706',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Bronze
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTierFilter('SILVER')}
-                  style={{
-                    padding: '0.25rem 0.55rem',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    borderRadius: '8px',
-                    border: '1px solid rgba(2, 132, 199, 0.4)',
-                    background: tierFilter === 'SILVER' ? '#0284c7' : 'rgba(2, 132, 199, 0.08)',
-                    color: tierFilter === 'SILVER' ? '#ffffff' : '#0284c7',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Argent
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTierFilter('GOLD')}
-                  style={{
-                    padding: '0.25rem 0.55rem',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    borderRadius: '8px',
-                    border: '1px solid rgba(202, 138, 4, 0.4)',
-                    background: tierFilter === 'GOLD' ? '#ca8a04' : 'rgba(202, 138, 4, 0.08)',
-                    color: tierFilter === 'GOLD' ? '#ffffff' : '#ca8a04',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Or
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTierFilter('PLATINUM')}
-                  style={{
-                    padding: '0.25rem 0.55rem',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    borderRadius: '8px',
-                    border: '1px solid rgba(124, 58, 237, 0.4)',
-                    background: tierFilter === 'PLATINUM' ? '#7c3aed' : 'rgba(124, 58, 237, 0.08)',
-                    color: tierFilter === 'PLATINUM' ? '#ffffff' : '#7c3aed',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Platine VIP
-                </button>
-              </div>
-            )}
-          </div>
+        const activeCustomer = selectedCrmCustomer;
+        const currentTier = activeCustomer ? getFidelityTier(activeCustomer.points_fidelite || 0) : null;
+        const customerRewards = (activeCustomer && Array.isArray(activeCustomer.rewards)) ? activeCustomer.rewards : [];
 
-          {/* List of Customers */}
-          <div style={{ overflowY: 'auto', maxHeight: '580px', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem' }}>
-            {(() => {
-              const query = crmSearch.toLowerCase().trim();
-              let filteredCrm = customers.filter(c => {
-                const nom = (c.nom || '').toLowerCase();
-                const prenom = (c.prenom || '').toLowerCase();
-                const fullName = `${prenom} ${nom}`.trim();
-                const reverseFullName = `${nom} ${prenom}`.trim();
-                const tel = (c.telephone || '').toLowerCase();
-                const matchesQuery = !query ||
-                  nom.includes(query) ||
-                  prenom.includes(query) ||
-                  fullName.includes(query) ||
-                  reverseFullName.includes(query) ||
-                  tel.includes(query);
-                
-                if (!matchesQuery) return false;
-                if (storeFilter !== 'all' && c.store_id !== storeFilter) return false;
-                if (filterMode === 'abonne') return !!c.active_subscription;
-                if (filterMode === 'dette') return c.solde_dette > 0;
-                if (filterMode === 'fidelite') {
-                  if (tierFilter === 'all') return true;
-                  const tier = getFidelityTier(c.points_fidelite || 0);
-                  return tier.key === tierFilter;
-                }
-                return true;
-              });
-
-              filteredCrm = filteredCrm.sort((a, b) => {
-                const ptsDiff = (b.points_fidelite || 0) - (a.points_fidelite || 0);
-                if (ptsDiff !== 0) return ptsDiff;
-                return (a.prenom || '').localeCompare(b.prenom || '');
-              });
-
-              if (filteredCrm.length === 0) {
-                return (
-                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem 1.5rem', background: 'var(--bg-app)', borderRadius: '14px', border: '1px dashed var(--border-color)' }}>
-                    <Users size={32} style={{ margin: '0 auto 0.5rem', color: 'var(--text-muted)', opacity: 0.6 }} />
-                    <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600 }}>Aucun client correspondant.</p>
-                  </div>
-                );
-              }
-
-              return filteredCrm.map(c => {
-                const isSelected = selectedCrmCustomer?.id === c.id;
-                const avatarBg = getAvatarColor(`${c.prenom} ${c.nom}`);
-                const tier = getFidelityTier(c.points_fidelite || 0);
-
-                return (
-                  <button
-                    type="button"
-                    key={c.id}
-                    className="card-clickable"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.85rem',
-                      width: '100%',
-                      textAlign: 'left',
-                      fontFamily: 'inherit',
-                      color: 'inherit',
-                      padding: '0.85rem 1rem',
-                      borderRadius: '14px',
-                      border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
-                      background: isSelected ? 'var(--primary-light)' : 'var(--bg-card)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      boxShadow: isSelected ? '0 4px 12px rgba(59, 130, 246, 0.12)' : 'none'
-                    }}
-                    onClick={() => setSelectedCrmCustomer(c)}
-                  >
-                    {/* Circle Avatar */}
-                    <div style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '50%',
-                      background: avatarBg,
-                      color: '#fff',
-                      fontSize: '1rem',
-                      fontWeight: 800,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      {c.prenom.charAt(0)}{c.nom.charAt(0)}
-                    </div>
-
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: '0.88rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {c.prenom} {c.nom}
-                        </strong>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: tier.color, background: tier.bgLight, border: `1px solid ${tier.border}`, padding: '0.1rem 0.45rem', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                          {renderTierIcon(tier.iconName, 11, tier.color)} {tier.name} • {c.points_fidelite || 0} pts
-                        </span>
-                      </div>
-
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem' }}>
-                        <span>Tél: {c.telephone}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          {(() => {
-                            const storeObj = availableStores.find(s => s.id === c.store_id);
-                            if (storeObj) {
-                              return (
-                                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--primary, #002cf7)', background: 'var(--primary-light, rgba(0,44,247,0.08))', padding: '0.1rem 0.4rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                                  <Store size={10} /> {storeObj.nom}
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-
-                          {c.solde_dette > 0 ? (
-                            <span style={{ color: '#ef4444', fontWeight: 800, background: 'rgba(239, 68, 68, 0.1)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.68rem' }}>
-                              Dette: {c.solde_dette.toLocaleString()} F
-                            </span>
-                          ) : c.active_subscription ? (
-                            <span style={{ color: '#10b981', fontWeight: 700, background: 'rgba(16, 185, 129, 0.1)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.65rem' }}>
-                              ✨ Abonné
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              });
-            })()}
-          </div>
-        </div>
-
-        {/* COLONNE DROITE : PROFIL CLIENT DETAILLE, FIDELITE & HISTORIQUE */}
-        <div className="card" style={{ minHeight: '500px', display: 'flex', flexDirection: 'column', padding: '1.5rem', borderRadius: '20px' }}>
-          {selectedCrmCustomer ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%' }}>
+        return (
+          <>
+            {/* CARTE TABLEAU PRINCIPALE */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem', borderRadius: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
               
-              {/* Header profil client */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{
-                    width: '54px',
-                    height: '54px',
-                    borderRadius: '16px',
-                    background: getAvatarColor(`${selectedCrmCustomer.prenom} ${selectedCrmCustomer.nom}`),
-                    color: '#fff',
-                    fontSize: '1.35rem',
-                    fontWeight: 900,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                  }}>
-                    {selectedCrmCustomer.prenom.charAt(0)}{selectedCrmCustomer.nom.charAt(0)}
+              {/* Header Tableau */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.9rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                      Portefeuille Clients CRM
+                    </h3>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '12px', background: 'var(--primary-light)', color: 'var(--primary)' }}>
+                      {filteredCrm.length} {filteredCrm.length > 1 ? 'clients' : 'client'}
+                    </span>
                   </div>
-                  <div>
-                    <h4 style={{ fontSize: '1.2rem', fontWeight: 900, fontFamily: 'var(--font-title)', margin: 0, color: 'var(--text-primary)' }}>
-                      {selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}
-                    </h4>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <Phone size={13} color="var(--primary)" /> +{selectedCrmCustomer.indicatif || '229'} {selectedCrmCustomer.telephone}
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <MapPin size={13} color="var(--primary)" /> {selectedCrmCustomer.adresse || 'Adresse non renseignée'}
-                      </span>
-                    </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => exportCustomersCSV(customers, availableStores || stores)}
+                      style={{ padding: '0.45rem 0.8rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                      title="Exporter la liste des clients en CSV"
+                    >
+                      <Download size={14} /> CSV
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => setShowNewCustomerModal(true)}
+                      style={{ padding: '0.45rem 0.9rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--primary)', color: '#fff', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)' }}
+                    >
+                      <UserPlus size={15} /> Nouveau
+                    </button>
                   </div>
                 </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    style={{
-                      padding: '0.45rem 0.85rem',
-                      fontSize: '0.76rem',
-                      fontWeight: 700,
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      background: 'var(--primary, #002cf7)',
-                      color: '#ffffff',
-                      border: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 6px rgba(0, 44, 247, 0.25)'
-                    }}
-                    onClick={() => handleOpenEditModal(selectedCrmCustomer)}
-                  >
-                    <Edit size={14} /> Modifier le profil
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    style={{ padding: '0.45rem 0.75rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.3rem', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-                    onClick={() => handleCopyCustomer(selectedCrmCustomer)}
-                  >
-                    {copiedId === selectedCrmCustomer.id ? <Check size={14} /> : <Copy size={14} />}
-                    {copiedId === selectedCrmCustomer.id ? 'Copié !' : 'Copier'}
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    style={{
-                      padding: '0.45rem 0.75rem',
-                      fontSize: '0.74rem',
-                      fontWeight: 700,
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.3rem',
-                      borderColor: 'rgba(239, 68, 68, 0.35)',
-                      color: '#ef4444',
-                      background: 'rgba(239, 68, 68, 0.05)',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => handleOpenDeleteCustomerModal(selectedCrmCustomer)}
-                    title="Supprimer définitivement ce profil client"
-                  >
-                    <Trash2 size={14} /> Supprimer
-                  </button>
-                </div>
+                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                  Fiches CRM, abonnements et programme fidélité
+                </p>
               </div>
 
-              {/* KPI Mini-Cards Client */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem' }}>
-                
-                {/* 1. Statut Fidélité */}
-                <div style={{ padding: '0.85rem 1rem', background: selectedTier.bgLight, borderRadius: '14px', border: `1px solid ${selectedTier.border}`, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <span style={{ fontSize: '0.7rem', color: selectedTier.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    {renderTierIcon(selectedTier.iconName, 13, selectedTier.color)} Statut {selectedTier.name}
-                  </span>
-                  <strong style={{ fontSize: '1.25rem', fontFamily: 'var(--font-title)', color: selectedTier.color, fontWeight: 900 }}>
-                    {selectedCrmCustomer.points_fidelite || 0} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>pts</span>
-                  </strong>
+              {/* Barre de Recherche & Filtre Point de Laverie */}
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="search-control-container" style={{ flex: 1, minWidth: '260px' }}>
+                  <Search size={15} className="search-control-icon" />
+                  <input
+                    type="text"
+                    className="search-control-input"
+                    placeholder="Rechercher par Nom, Prénom ou Tél..."
+                    value={crmSearch}
+                    onChange={(e) => setCrmSearch(e.target.value)}
+                  />
                 </div>
-
-                {/* 2. Solde Dette & Bouton de Règlement */}
-                <div style={{ padding: '0.85rem 1rem', background: 'var(--bg-app)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <CreditCard size={13} color={selectedCrmCustomer.solde_dette > 0 ? '#ef4444' : '#10b981'} /> Dette Restante
-                  </span>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong style={{ fontSize: '1.25rem', fontFamily: 'var(--font-title)', color: selectedCrmCustomer.solde_dette > 0 ? '#ef4444' : '#10b981', fontWeight: 900 }}>
-                      {selectedCrmCustomer.solde_dette.toLocaleString()} <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>F</span>
-                    </strong>
-                    {selectedCrmCustomer.solde_dette > 0 && (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => {
-                          setDebtPaymentAmount(selectedCrmCustomer.solde_dette.toString());
-                          setShowDebtPaymentModal(true);
-                        }}
-                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.68rem', fontWeight: 700, borderRadius: '6px', background: '#ef4444', border: 'none', color: '#fff' }}
-                      >
-                        Régler
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. Préférence Pliage */}
-                <div style={{ padding: '0.85rem 1rem', background: 'var(--bg-app)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <Tag size={13} color="var(--primary)" /> Préférence Pliage
-                  </span>
-                  <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)', marginTop: '0.1rem', fontWeight: 800 }}>
-                    {selectedCrmCustomer.preferences_pliage || 'Plié'}
-                  </strong>
-                </div>
-              </div>
-
-              {/* CARD POINT DE LAVERIE RATTACHÉ */}
-              {(() => {
-                const assignedStore = availableStores.find(s => s.id === selectedCrmCustomer.store_id);
-                return (
-                  <div style={{
-                    padding: '1rem 1.2rem',
-                    background: 'var(--bg-app)',
-                    borderRadius: '16px',
-                    border: assignedStore ? '1px solid rgba(0, 44, 247, 0.2)' : '1px solid var(--border-color)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    flexWrap: 'wrap'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                      <div style={{
-                        width: '42px',
+                {availableStores.length > 0 && (
+                  <div style={{ minWidth: '180px' }}>
+                    <CustomSelect
+                      value={storeFilter}
+                      onChange={(e) => setStoreFilter(e.target.value)}
+                      style={{
                         height: '42px',
                         borderRadius: '12px',
-                        background: assignedStore ? 'rgba(0, 44, 247, 0.12)' : 'rgba(100, 116, 139, 0.1)',
-                        color: assignedStore ? 'var(--primary, #002cf7)' : 'var(--text-secondary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
-                        <Store size={22} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Point de Laverie Rattaché
-                        </div>
-                        <div style={{ fontSize: '0.98rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          {assignedStore ? (
-                            <>
-                              <span style={{ color: 'var(--primary, #002cf7)' }}>{assignedStore.nom}</span>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                                • {assignedStore.ville || 'Cotonou'}
-                              </span>
-                            </>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
-                              Aucun point spécifique (Tous les points)
-                            </span>
-                          )}
-                        </div>
-                        {assignedStore?.adresse && (
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                            📍 {assignedStore.adresse}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '240px' }}>
-                      <CustomSelect
-                        value={selectedCrmCustomer.store_id || ''}
-                        onChange={(e) => handleQuickAssignStore(e.target.value)}
-                        style={{
-                          height: '38px',
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          borderRadius: '10px',
-                          padding: '0 0.75rem',
-                          borderColor: 'var(--border-color)',
-                          backgroundColor: 'var(--bg-card)'
-                        }}
-                      >
-                        <option value="">-- Tous les points (Non assigné) --</option>
-                        {availableStores.map(st => (
-                          <option key={st.id} value={st.id}>
-                            {st.nom} ({st.ville || 'Cotonou'})
-                          </option>
-                        ))}
-                      </CustomSelect>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* SECTION FIDÉLITÉ & RÉCOMPENSES DU CLIENT */}
-              <div style={{ padding: '1.1rem', background: 'var(--bg-app)', border: `1px solid ${selectedTier.border}`, borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: selectedTier.bgLight, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${selectedTier.border}` }}>
-                      {renderTierIcon(selectedTier.iconName, 20, selectedTier.color)}
-                    </div>
-                    <div>
-                      <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: 'var(--text-primary)' }}>{selectedTier.title}</h5>
-                      <span style={{ fontSize: '0.72rem', color: selectedTier.color, fontWeight: 700 }}>Statut Fidélité Actif</span>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <strong style={{ fontSize: '1.25rem', fontWeight: 900, color: selectedTier.color }}>{selectedCrmCustomer.points_fidelite || 0} pts</strong>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Solde disponible</div>
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>
-                      {selectedTier.ptsToNext > 0 ? `${selectedTier.ptsToNext} pts restants vers ${selectedTier.nextTierName}` : 'Niveau VIP Maximale Atteint'}
-                    </span>
-                    <strong style={{ color: selectedTier.color }}>{selectedTier.progressPct}%</strong>
-                  </div>
-                  <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${selectedTier.progressPct}%`, background: selectedTier.color, borderRadius: '10px', transition: 'width 0.4s ease' }} />
-                  </div>
-                </div>
-
-                {/* Perks */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'var(--bg-card)', padding: '0.65rem 0.85rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Avantages du statut {selectedTier.name} :</span>
-                  {selectedTier.advantages.map((adv, idx) => (
-                    <div key={idx} style={{ fontSize: '0.74rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <CheckCircle2 size={12} color={selectedTier.color} /> {adv}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '0.65rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => handleOpenRewardModal('redeem')}
-                    style={{ flex: 1, padding: '0.55rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', background: selectedTier.color, color: '#fff', border: 'none' }}
-                  >
-                    <Gift size={15} /> Échanger des Points
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => handleOpenRewardModal('adjust')}
-                    style={{ padding: '0.55rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--primary)', borderColor: 'var(--primary-light)' }}
-                  >
-                    <Zap size={14} /> Ajuster
-                  </button>
-                </div>
-
-                {/* Bons & Récompenses Débloqués */}
-                {Array.isArray(selectedCrmCustomer.rewards) && selectedCrmCustomer.rewards.length > 0 && (
-                  <div style={{
-                    marginTop: '0.4rem',
-                    padding: '0.75rem',
-                    background: 'var(--bg-card)',
-                    borderRadius: '12px',
-                    border: '1px solid var(--border-color)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <Ticket size={13} color="var(--primary)" /> Bons & Récompenses débloqués ({selectedCrmCustomer.rewards.length})
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
-                      {selectedCrmCustomer.rewards.map((vch, vIdx) => {
-                        const isUsed = vch.status === 'used';
-                        return (
-                          <div
-                            key={vch.id || vIdx}
-                            style={{
-                              padding: '0.55rem 0.75rem',
-                              borderRadius: '10px',
-                              background: isUsed ? 'var(--bg-app)' : 'rgba(16, 185, 129, 0.06)',
-                              border: `1px solid ${isUsed ? 'var(--border-color)' : 'rgba(16, 185, 129, 0.25)'}`,
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              gap: '0.5rem'
-                            }}
-                          >
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                <strong style={{ fontSize: '0.76rem', color: isUsed ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: isUsed ? 'line-through' : 'none' }}>
-                                  {vch.title}
-                                </strong>
-                                <span style={{
-                                  fontSize: '0.62rem',
-                                  fontWeight: 800,
-                                  padding: '0.1rem 0.4rem',
-                                  borderRadius: '8px',
-                                  background: isUsed ? 'rgba(148, 163, 184, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                                  color: isUsed ? 'var(--text-muted)' : '#10b981'
-                                }}>
-                                  {isUsed ? 'Utilisé' : 'Disponible'}
-                                </span>
-                              </div>
-                              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', gap: '0.5rem' }}>
-                                <span>Code: <code style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{vch.id}</code></span>
-                                {vch.discount_amount > 0 && <span>• Valeur: {vch.discount_amount.toLocaleString()} FCFA</span>}
-                              </div>
-                            </div>
-                            {!isUsed && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (navigator.clipboard) {
-                                    navigator.clipboard.writeText(vch.id);
-                                    alert(`Code coupon "${vch.id}" copié dans le presse-papiers !`);
-                                  }
-                                }}
-                                style={{
-                                  padding: '0.3rem 0.5rem',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 700,
-                                  borderRadius: '8px',
-                                  border: '1px solid var(--border-color)',
-                                  background: 'var(--bg-app)',
-                                  color: 'var(--text-primary)',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem'
-                                }}
-                                title="Copier le code coupon"
-                              >
-                                <Copy size={11} /> Copier
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        padding: '0 0.75rem'
+                      }}
+                      title="Filtrer par point de laverie"
+                    >
+                      <option value="all">🏢 Tous les points de laverie</option>
+                      {availableStores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
+                        <option key={st.id} value={st.id}>{st.nom}</option>
+                      ))}
+                    </CustomSelect>
                   </div>
                 )}
               </div>
 
-              {/* Section Abonnement CRM */}
-              <div style={{ padding: '1.1rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Award size={16} color="var(--primary)" />
-                    Forfait d'Abonnement Actif
-                  </span>
-                  {selectedCrmCustomer.active_subscription && (
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-                      Actif
-                    </span>
-                  )}
+              {/* Pilules de Filtrage */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <div className="filter-pills-group" style={{ width: '100%', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className={`filter-pill-btn ${filterMode === 'all' ? 'active' : ''}`}
+                    onClick={() => setFilterMode('all')}
+                    style={{ flex: 1, minWidth: '90px', justifyContent: 'center' }}
+                  >
+                    Tous ({customers.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-pill-btn ${filterMode === 'abonne' ? 'active' : ''}`}
+                    onClick={() => setFilterMode('abonne')}
+                    style={{ flex: 1, minWidth: '100px', justifyContent: 'center' }}
+                  >
+                    Abonnés ({activeSubscribers})
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-pill-btn ${filterMode === 'fidelite' ? 'active' : ''}`}
+                    onClick={() => setFilterMode('fidelite')}
+                    style={{ flex: 1, minWidth: '100px', justifyContent: 'center', gap: '0.25rem' }}
+                  >
+                    <Award size={13} /> Fidélité
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-pill-btn ${filterMode === 'dette' ? 'active' : ''}`}
+                    onClick={() => setFilterMode('dette')}
+                    style={{ flex: 1, minWidth: '95px', justifyContent: 'center' }}
+                  >
+                    Dettes ({indebtedCustomers.length})
+                  </button>
                 </div>
 
-                {selectedCrmCustomer.active_subscription ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ fontSize: '0.95rem', color: 'var(--primary)', fontWeight: 800 }}>{selectedCrmCustomer.active_subscription.name}</strong>
-                      {(() => {
-                        const isExpired = selectedCrmCustomer.active_subscription.expires_at && new Date(selectedCrmCustomer.active_subscription.expires_at) < new Date();
+                {/* Sub-Pills pour filtrer par statut de fidélité */}
+                {filterMode === 'fidelite' && (
+                  <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setTierFilter('all')}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-color)',
+                        background: tierFilter === 'all' ? 'var(--primary)' : 'var(--bg-app)',
+                        color: tierFilter === 'all' ? '#ffffff' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Tous Tiers
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTierFilter('BRONZE')}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        borderRadius: '8px',
+                        border: '1px solid rgba(217, 119, 6, 0.4)',
+                        background: tierFilter === 'BRONZE' ? '#d97706' : 'rgba(217, 119, 6, 0.08)',
+                        color: tierFilter === 'BRONZE' ? '#ffffff' : '#d97706',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Bronze
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTierFilter('SILVER')}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        borderRadius: '8px',
+                        border: '1px solid rgba(2, 132, 199, 0.4)',
+                        background: tierFilter === 'SILVER' ? '#0284c7' : 'rgba(2, 132, 199, 0.08)',
+                        color: tierFilter === 'SILVER' ? '#ffffff' : '#0284c7',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Argent
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTierFilter('GOLD')}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        borderRadius: '8px',
+                        border: '1px solid rgba(202, 138, 4, 0.4)',
+                        background: tierFilter === 'GOLD' ? '#ca8a04' : 'rgba(202, 138, 4, 0.08)',
+                        color: tierFilter === 'GOLD' ? '#ffffff' : '#ca8a04',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Or
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTierFilter('PLATINUM')}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        borderRadius: '8px',
+                        border: '1px solid rgba(124, 58, 237, 0.4)',
+                        background: tierFilter === 'PLATINUM' ? '#7c3aed' : 'rgba(124, 58, 237, 0.08)',
+                        color: tierFilter === 'PLATINUM' ? '#ffffff' : '#7c3aed',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Platine VIP
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Structure Tableau Responsive */}
+              <div className="table-container" style={{ width: '100%', overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+                <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-app)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                      <th style={{ padding: '0.85rem 1rem', cursor: 'pointer' }} onClick={() => handleSort('name')}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>Client</span>
+                          {sortField === 'name' && (sortOrder === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                        </div>
+                      </th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Point de Laverie</th>
+                      <th style={{ padding: '0.85rem 1rem', cursor: 'pointer' }} onClick={() => handleSort('points')}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>Programme Fidélité</span>
+                          {sortField === 'points' && (sortOrder === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                        </div>
+                      </th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Abonnement</th>
+                      <th style={{ padding: '0.85rem 1rem', cursor: 'pointer' }} onClick={() => handleSort('dette')}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>Solde Dette</span>
+                          {sortField === 'dette' && (sortOrder === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                        </div>
+                      </th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCrm.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-secondary)' }}>
+                          <Users size={36} style={{ margin: '0 auto 0.6rem', color: 'var(--text-muted)', opacity: 0.6 }} />
+                          <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>Aucun client trouvé</p>
+                          <p style={{ margin: '0.25rem 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                            Modifiez vos critères de recherche ou ajoutez un nouveau profil client.
+                          </p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredCrm.map(c => {
+                        const isSelected = selectedCrmCustomer?.id === c.id;
+                        const avatarBg = getAvatarColor(`${c.prenom} ${c.nom}`);
+                        const tier = getFidelityTier(c.points_fidelite || 0);
+                        const storeObj = availableStores.find(s => s.id === c.store_id);
+
                         return (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            {isExpired && (
-                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ef4444', background: 'rgba(239, 68, 68, 0.12)', padding: '0.1rem 0.4rem', borderRadius: '6px' }}>
-                                ⚠️ Expiré
+                          <tr
+                            key={c.id}
+                            style={{
+                              borderBottom: '1px solid var(--border-color)',
+                              background: isSelected ? 'var(--primary-light)' : 'transparent',
+                              transition: 'background 0.15s ease'
+                            }}
+                          >
+                            {/* 1. Client Cell */}
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <button
+                                type="button"
+                                className="card-clickable"
+                                onClick={() => {
+                                  setSelectedCrmCustomer(c);
+                                  setShowViewCustomerModal(true);
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem',
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: 0,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  fontFamily: 'inherit',
+                                  color: 'inherit',
+                                  width: '100%'
+                                }}
+                              >
+                                <div style={{
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '50%',
+                                  background: avatarBg,
+                                  color: '#fff',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 800,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  {c.prenom.charAt(0)}{c.nom.charAt(0)}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0 }}>
+                                  <strong style={{ fontSize: '0.88rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {c.prenom} {c.nom}
+                                  </strong>
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                    <span>+{c.indicatif || '229'} {c.telephone}</span>
+                                    {c.solde_dette > 0 && (
+                                      <span style={{ color: '#ef4444', fontWeight: 800, background: 'rgba(239, 68, 68, 0.1)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.68rem' }}>
+                                        Dette: {c.solde_dette.toLocaleString()} F
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            </td>
+
+                            {/* 2. Point de Laverie */}
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              {storeObj ? (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary, #002cf7)', background: 'var(--primary-light, rgba(0,44,247,0.08))', padding: '0.2rem 0.5rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                  <Store size={12} /> {storeObj.nom}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                  Non rattaché
+                                </span>
+                              )}
+                            </td>
+
+                            {/* 3. Fidélité */}
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: tier.color, background: tier.bgLight, border: `1px solid ${tier.border}`, padding: '0.2rem 0.55rem', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                {renderTierIcon(tier.iconName, 12, tier.color)} {tier.name} • {c.points_fidelite || 0} pts
                               </span>
-                            )}
-                            <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
-                              Solde : {selectedCrmCustomer.active_subscription.remaining_clothes} / {selectedCrmCustomer.active_subscription.total_clothes} vêtements
+                            </td>
+
+                            {/* 4. Abonnement */}
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              {c.active_subscription ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    ✨ {c.active_subscription.name}
+                                  </span>
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                                    {c.active_subscription.remaining_clothes}/{c.active_subscription.total_clothes} vêtements
+                                  </span>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                  Sans abonnement
+                                </span>
+                              )}
+                            </td>
+
+                            {/* 5. Solde Dette */}
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              {c.solde_dette > 0 ? (
+                                <span style={{ color: '#ef4444', fontWeight: 800, background: 'rgba(239, 68, 68, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem' }}>
+                                  {c.solde_dette.toLocaleString()} F
+                                </span>
+                              ) : (
+                                <span style={{ color: '#10b981', fontWeight: 700, background: 'rgba(16, 185, 129, 0.08)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem' }}>
+                                  À jour (0 F)
+                                </span>
+                              )}
+                            </td>
+
+                            {/* 6. Actions */}
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  onClick={() => {
+                                    setSelectedCrmCustomer(c);
+                                    setShowViewCustomerModal(true);
+                                  }}
+                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                  title="Consulter le profil et l'historique"
+                                >
+                                  <Eye size={13} /> Voir
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  onClick={() => {
+                                    setSelectedCrmCustomer(c);
+                                    handleOpenEditModal(c);
+                                  }}
+                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                  title="Modifier les coordonnées"
+                                >
+                                  <Edit size={13} /> Modifier
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  onClick={() => handleOpenDeleteCustomerModal(c)}
+                                  style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                                  title="Supprimer ce client"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* MODALE DÉDIÉE : FICHE PROFIL CLIENT (SLIDE-OVER / SHEET) */}
+            {showViewCustomerModal && activeCustomer && currentTier && (
+              <ModalPortal>
+                <div
+                  className="customer-view-overlay"
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    zIndex: 9990,
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    padding: '16px',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <div
+                    className="card customer-view-dialog-card"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      width: '640px',
+                      maxWidth: '100%',
+                      height: 'calc(100vh - 32px)',
+                      maxHeight: 'calc(100vh - 32px)',
+                      background: 'var(--bg-card)',
+                      borderRadius: '24px',
+                      border: '1px solid var(--border-color)',
+                      boxShadow: '-8px 0 32px rgba(15, 23, 42, 0.22)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                      pointerEvents: 'auto',
+                      animation: 'fadeIn 0.2s ease-out'
+                    }}
+                  >
+                    {/* Barre supérieure Modale avec bouton fermer */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-app)', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Users size={18} color="var(--primary)" />
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        Fiche Client CRM
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowViewCustomerModal(false)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                      title="Fermer"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Contenu Déroulant Fiche Client */}
+                  <div style={{ overflowY: 'auto', flex: 1, padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    
+                    {/* Header profil client */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                        <div style={{
+                          width: '52px',
+                          height: '52px',
+                          borderRadius: '16px',
+                          background: getAvatarColor(`${activeCustomer.prenom} ${activeCustomer.nom}`),
+                          color: '#fff',
+                          fontSize: '1.25rem',
+                          fontWeight: 900,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }}>
+                          {activeCustomer.prenom.charAt(0)}{activeCustomer.nom.charAt(0)}
+                        </div>
+                        <div>
+                          <h4 style={{ fontSize: '1.2rem', fontWeight: 900, fontFamily: 'var(--font-title)', margin: 0, color: 'var(--text-primary)' }}>
+                            {activeCustomer.prenom} {activeCustomer.nom}
+                          </h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <Phone size={13} color="var(--primary)" /> +{activeCustomer.indicatif || '229'} {activeCustomer.telephone}
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <MapPin size={13} color="var(--primary)" /> {activeCustomer.adresse || 'Adresse non renseignée'}
                             </span>
                           </div>
-                        );
-                      })()}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.76rem',
+                            fontWeight: 700,
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            background: 'var(--primary, #002cf7)',
+                            color: '#ffffff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(0, 44, 247, 0.25)'
+                          }}
+                          onClick={() => handleOpenEditModal(activeCustomer)}
+                        >
+                          <Edit size={14} /> Modifier le profil
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{ padding: '0.45rem 0.75rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.3rem', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+                          onClick={() => handleCopyCustomer(activeCustomer)}
+                        >
+                          {copiedId === activeCustomer.id ? <Check size={14} /> : <Copy size={14} />}
+                          {copiedId === activeCustomer.id ? 'Copié !' : 'Copier'}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{
+                            padding: '0.45rem 0.75rem',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            borderColor: 'rgba(239, 68, 68, 0.35)',
+                            color: '#ef4444',
+                            background: 'rgba(239, 68, 68, 0.05)',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => handleOpenDeleteCustomerModal(activeCustomer)}
+                          title="Supprimer définitivement ce profil client"
+                        >
+                          <Trash2 size={14} /> Supprimer
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Progress Bar */}
+                    {/* KPI Mini-Cards Client */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+                      {/* 1. Statut Fidélité */}
+                      <div style={{ padding: '0.8rem 0.95rem', background: currentTier.bgLight, borderRadius: '14px', border: `1px solid ${currentTier.border}`, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <span style={{ fontSize: '0.68rem', color: currentTier.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          {renderTierIcon(currentTier.iconName, 12, currentTier.color)} Statut {currentTier.name}
+                        </span>
+                        <strong style={{ fontSize: '1.2rem', fontFamily: 'var(--font-title)', color: currentTier.color, fontWeight: 900 }}>
+                          {activeCustomer.points_fidelite || 0} <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>pts</span>
+                        </strong>
+                      </div>
+
+                      {/* 2. Solde Dette */}
+                      <div style={{ padding: '0.8rem 0.95rem', background: 'var(--bg-app)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <CreditCard size={12} color={activeCustomer.solde_dette > 0 ? '#ef4444' : '#10b981'} /> Dette Restante
+                        </span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <strong style={{ fontSize: '1.2rem', fontFamily: 'var(--font-title)', color: activeCustomer.solde_dette > 0 ? '#ef4444' : '#10b981', fontWeight: 900 }}>
+                            {activeCustomer.solde_dette.toLocaleString()} <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>F</span>
+                          </strong>
+                          {activeCustomer.solde_dette > 0 && (
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              onClick={() => {
+                                setDebtPaymentAmount(activeCustomer.solde_dette.toString());
+                                setShowDebtPaymentModal(true);
+                              }}
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.65rem', fontWeight: 700, borderRadius: '6px', background: '#ef4444', border: 'none', color: '#fff' }}
+                            >
+                              Régler
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3. Préférence Pliage */}
+                      <div style={{ padding: '0.8rem 0.95rem', background: 'var(--bg-app)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <Tag size={12} color="var(--primary)" /> Préférence Pliage
+                        </span>
+                        <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', marginTop: '0.1rem', fontWeight: 800 }}>
+                          {activeCustomer.preferences_pliage || 'Plié'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* CARD POINT DE LAVERIE RATTACHÉ */}
                     {(() => {
-                      const remaining = selectedCrmCustomer.active_subscription.remaining_clothes;
-                      const total = selectedCrmCustomer.active_subscription.total_clothes;
-                      const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                      const assignedStore = availableStores.find(s => s.id === activeCustomer.store_id);
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                          <div style={{ height: '10px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${percentUsed}%`, background: 'var(--primary)', borderRadius: '10px', transition: 'width 0.4s ease' }}></div>
+                        <div style={{
+                          padding: '0.9rem 1.1rem',
+                          background: 'var(--bg-app)',
+                          borderRadius: '16px',
+                          border: assignedStore ? '1px solid rgba(0, 44, 247, 0.2)' : '1px solid var(--border-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '1rem',
+                          flexWrap: 'wrap'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: '12px',
+                              background: assignedStore ? 'rgba(0, 44, 247, 0.12)' : 'rgba(100, 116, 139, 0.1)',
+                              color: assignedStore ? 'var(--primary, #002cf7)' : 'var(--text-secondary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <Store size={20} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Point de Laverie Rattaché
+                              </div>
+                              <div style={{ fontSize: '0.92rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                {assignedStore ? (
+                                  <>
+                                    <span style={{ color: 'var(--primary, #002cf7)' }}>{assignedStore.nom}</span>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                      • {assignedStore.ville || 'Cotonou'}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                                    Aucun point spécifique (Tous les points)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                            <span>Vêtements lavés : {total - remaining}</span>
-                            <span>Restants : {remaining} vêtements</span>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '220px' }}>
+                            <CustomSelect
+                              value={activeCustomer.store_id || ''}
+                              onChange={(e) => handleQuickAssignStore(e.target.value)}
+                              style={{
+                                height: '36px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                borderRadius: '10px',
+                                padding: '0 0.65rem',
+                                borderColor: 'var(--border-color)',
+                                backgroundColor: 'var(--bg-card)'
+                              }}
+                            >
+                              <option value="" disabled>-- Changer le point de laverie --</option>
+                              {availableStores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
+                                <option key={st.id} value={st.id}>
+                                  {st.nom} ({st.ville || 'Cotonou'})
+                                </option>
+                              ))}
+                            </CustomSelect>
                           </div>
                         </div>
                       );
                     })()}
 
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', marginTop: '0.1rem' }}>
-                      <span>Souscrit le : <strong>{new Date(selectedCrmCustomer.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}</strong></span>
-                      <span style={{ color: selectedCrmCustomer.active_subscription.expires_at && new Date(selectedCrmCustomer.active_subscription.expires_at) < new Date() ? '#ef4444' : 'var(--text-secondary)' }}>
-                        Expire le : <strong>{new Date(selectedCrmCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}</strong>
-                      </span>
+                    {/* SECTION FIDÉLITÉ & RÉCOMPENSES DU CLIENT */}
+                    <div style={{ padding: '1rem', background: 'var(--bg-app)', border: `1px solid ${currentTier.border}`, borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: currentTier.bgLight, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${currentTier.border}` }}>
+                            {renderTierIcon(currentTier.iconName, 18, currentTier.color)}
+                          </div>
+                          <div>
+                            <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: 'var(--text-primary)' }}>{currentTier.title}</h5>
+                            <span style={{ fontSize: '0.7rem', color: currentTier.color, fontWeight: 700 }}>Statut Fidélité Actif</span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <strong style={{ fontSize: '1.2rem', fontWeight: 900, color: currentTier.color }}>{activeCustomer.points_fidelite || 0} pts</strong>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Solde disponible</div>
+                        </div>
+                      </div>
+
+                      {/* Barre de progression */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            {currentTier.ptsToNext > 0 ? `${currentTier.ptsToNext} pts restants vers ${currentTier.nextTierName}` : 'Niveau VIP Maximal Atteint'}
+                          </span>
+                          <strong style={{ color: currentTier.color }}>{currentTier.progressPct}%</strong>
+                        </div>
+                        <div style={{ height: '7px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${currentTier.progressPct}%`, background: currentTier.color, borderRadius: '10px', transition: 'width 0.4s ease' }} />
+                        </div>
+                      </div>
+
+                      {/* Avantages */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'var(--bg-card)', padding: '0.65rem 0.85rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Avantages du statut {currentTier.name} :</span>
+                        {currentTier.advantages.map((adv, idx) => (
+                          <div key={idx} style={{ fontSize: '0.74rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <CheckCircle2 size={12} color={currentTier.color} /> {adv}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Boutons d'Action Fidélité */}
+                      <div style={{ display: 'flex', gap: '0.6rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => handleOpenRewardModal('redeem')}
+                          style={{ flex: 1, padding: '0.5rem 0.85rem', fontSize: '0.76rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', background: currentTier.color, color: '#fff', border: 'none' }}
+                        >
+                          <Gift size={14} /> Échanger des Points
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => handleOpenRewardModal('adjust')}
+                          style={{ padding: '0.5rem 0.85rem', fontSize: '0.76rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--primary)', borderColor: 'var(--primary-light)' }}
+                        >
+                          <Zap size={14} /> Ajuster
+                        </button>
+                      </div>
+
+                      {/* Bons & Récompenses Débloqués */}
+                      <div style={{
+                        marginTop: '0.3rem',
+                        padding: '0.75rem',
+                        background: 'var(--bg-card)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Ticket size={13} color="var(--primary)" /> Bons & Récompenses débloqués ({customerRewards.length})
+                          </span>
+                        </div>
+                        {customerRewards.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
+                            {customerRewards.map((vch, vIdx) => {
+                              const isUsed = vch.status === 'used';
+                              return (
+                                <div
+                                  key={vch.id || vIdx}
+                                  style={{
+                                    padding: '0.55rem 0.75rem',
+                                    borderRadius: '10px',
+                                    background: isUsed ? 'var(--bg-app)' : 'rgba(16, 185, 129, 0.06)',
+                                    border: `1px solid ${isUsed ? 'var(--border-color)' : 'rgba(16, 185, 129, 0.25)'}`,
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                  }}
+                                >
+                                  <div style={{ minWidth: 0, flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      <strong style={{ fontSize: '0.76rem', color: isUsed ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: isUsed ? 'line-through' : 'none' }}>
+                                        {vch.title}
+                                      </strong>
+                                      <span style={{
+                                        fontSize: '0.62rem',
+                                        fontWeight: 800,
+                                        padding: '0.1rem 0.4rem',
+                                        borderRadius: '8px',
+                                        background: isUsed ? 'rgba(148, 163, 184, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                        color: isUsed ? 'var(--text-muted)' : '#10b981'
+                                      }}>
+                                        {isUsed ? 'Utilisé' : 'Disponible'}
+                                      </span>
+                                    </div>
+                                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', gap: '0.5rem' }}>
+                                      <span>Code: <code style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{vch.id}</code></span>
+                                      {vch.discount_amount > 0 && <span>• Valeur: {vch.discount_amount.toLocaleString()} FCFA</span>}
+                                    </div>
+                                  </div>
+                                  {!isUsed && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (navigator.clipboard) {
+                                          navigator.clipboard.writeText(vch.id);
+                                          alert(`Code coupon "${vch.id}" copié dans le presse-papiers !`);
+                                        }
+                                      }}
+                                      style={{
+                                        padding: '0.3rem 0.5rem',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 700,
+                                        borderRadius: '8px',
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-app)',
+                                        color: 'var(--text-primary)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem'
+                                      }}
+                                      title="Copier le code coupon"
+                                    >
+                                      <Copy size={11} /> Copier
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            Aucune récompense débloquée pour ce client pour le moment.
+                          </p>
+                        )}
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => handleUnsubscribeCrm(selectedCrmCustomer.id)}
-                      style={{ padding: '0.45rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '10px', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)', marginTop: '0.2rem' }}
-                    >
-                      Résilier l'abonnement
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
-                    <CustomSelect
-                      className="input-control"
-                      style={{ flexGrow: 1, padding: '0.5rem', fontSize: '0.78rem', borderRadius: '10px' }}
-                      value={selectedCrmSubId}
-                      onChange={(e) => setSelectedCrmSubId(e.target.value)}
-                    >
-                      <option value="">-- Choisir une formule d'abonnement --</option>
-                      {catalog.filter(item => item.service === 'abonnement').map(sub => (
-                        <option key={sub.id} value={sub.id}>{sub.article} ({sub.prix.toLocaleString()} F/mois)</option>
-                      ))}
-                    </CustomSelect>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => handleSubscribeCrm(selectedCrmCustomer.id, selectedCrmSubId)}
-                      style={{ padding: '0.5rem 1rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', background: 'var(--primary)', color: '#fff' }}
-                    >
-                      Souscrire
-                    </button>
-                  </div>
-                )}
-              </div>
+                    {/* Section Forfait Abonnement */}
+                    <div style={{ padding: '1rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <Award size={15} color="var(--primary)" />
+                          Forfait d'Abonnement Actif
+                        </span>
+                        {activeCustomer.active_subscription && (
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                            Actif
+                          </span>
+                        )}
+                      </div>
 
-              {/* Historique individuel des commandes du client */}
-              <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.3rem' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 900, fontFamily: 'var(--font-title)', margin: 0, color: 'var(--text-primary)' }}>
-                  Historique des Dépôts du Client
-                </h4>
+                      {activeCustomer.active_subscription ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <strong style={{ fontSize: '0.92rem', color: 'var(--primary)', fontWeight: 800 }}>{activeCustomer.active_subscription.name}</strong>
+                            {(() => {
+                              const isExpired = activeCustomer.active_subscription.expires_at && new Date(activeCustomer.active_subscription.expires_at) < new Date();
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  {isExpired && (
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ef4444', background: 'rgba(239, 68, 68, 0.12)', padding: '0.1rem 0.4rem', borderRadius: '6px' }}>
+                                      ⚠️ Expiré
+                                    </span>
+                                  )}
+                                  <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                                    Solde : {activeCustomer.active_subscription.remaining_clothes} / {activeCustomer.active_subscription.total_clothes} vêtements
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </div>
 
-                <div className="table-container" style={{ maxHeight: '280px', overflowY: 'auto', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                  <table style={{ width: '100%', fontSize: '0.78rem' }}>
-                    <thead>
-                      <tr>
-                        <th>Code</th>
-                        <th>Article & Service</th>
-                        <th>Montant</th>
-                        <th>Statut</th>
-                        <th>Ticket</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const clientOrders = orders.filter(o => o.customer_id === selectedCrmCustomer.id)
-                          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                        if (clientOrders.length === 0) {
-                          return (
+                          {/* Barre de progression vêtements */}
+                          {(() => {
+                            const remaining = activeCustomer.active_subscription.remaining_clothes;
+                            const total = activeCustomer.active_subscription.total_clothes;
+                            const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                                <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: '10px', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${percentUsed}%`, background: 'var(--primary)', borderRadius: '10px', transition: 'width 0.4s ease' }}></div>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                  <span>Vêtements lavés : {total - remaining}</span>
+                                  <span>Restants : {remaining} vêtements</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.45rem', marginTop: '0.1rem' }}>
+                            <span>Souscrit le : <strong>{new Date(activeCustomer.active_subscription.subscribed_at).toLocaleDateString('fr-FR')}</strong></span>
+                            <span style={{ color: activeCustomer.active_subscription.expires_at && new Date(activeCustomer.active_subscription.expires_at) < new Date() ? '#ef4444' : 'var(--text-secondary)' }}>
+                              Expire le : <strong>{new Date(activeCustomer.active_subscription.expires_at).toLocaleDateString('fr-FR')}</strong>
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => handleUnsubscribeCrm(activeCustomer.id)}
+                            style={{ padding: '0.45rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '10px', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)', marginTop: '0.2rem' }}
+                          >
+                            Résilier l'abonnement
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+                          <CustomSelect
+                            className="input-control"
+                            style={{ flexGrow: 1, padding: '0.5rem', fontSize: '0.78rem', borderRadius: '10px' }}
+                            value={selectedCrmSubId}
+                            onChange={(e) => setSelectedCrmSubId(e.target.value)}
+                          >
+                            <option value="">-- Choisir une formule d'abonnement --</option>
+                            {catalog.filter(item => item.service === 'abonnement').map(sub => (
+                              <option key={sub.id} value={sub.id}>{sub.article} ({sub.prix.toLocaleString()} F/mois)</option>
+                            ))}
+                          </CustomSelect>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => handleSubscribeCrm(activeCustomer.id, selectedCrmSubId)}
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', background: 'var(--primary)', color: '#fff' }}
+                          >
+                            Souscrire
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Historique individuel des commandes du client */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.2rem' }}>
+                      <h4 style={{ fontSize: '0.92rem', fontWeight: 900, fontFamily: 'var(--font-title)', margin: 0, color: 'var(--text-primary)' }}>
+                        Historique des Dépôts du Client
+                      </h4>
+
+                      <div className="table-container" style={{ maxHeight: '240px', overflowY: 'auto', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <table style={{ width: '100%', fontSize: '0.76rem' }}>
+                          <thead>
                             <tr>
-                              <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                                Aucune commande enregistrée pour ce client.
-                              </td>
+                              <th>Code</th>
+                              <th>Article & Service</th>
+                              <th>Montant</th>
+                              <th>Statut</th>
+                              <th>Ticket</th>
                             </tr>
-                          );
-                        }
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const clientOrders = (orders || []).filter(o => o.customer_id === activeCustomer.id)
+                                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                              if (clientOrders.length === 0) {
+                                return (
+                                  <tr>
+                                    <td colSpan="5" style={{ textAlign: 'center', padding: '1.75rem', color: 'var(--text-secondary)' }}>
+                                      Aucune commande enregistrée pour ce client.
+                                    </td>
+                                  </tr>
+                                );
+                              }
 
-                        return clientOrders.map(o => {
-                          const statusCfg = statusBadgesConfig[o.statut] || { bg: 'rgba(100,116,139,0.1)', color: 'var(--text-secondary)', label: getOrderStatusLabel(o) };
-                          return (
-                            <tr key={o.id}>
-                              <td><strong style={{ fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>{o.identifiant_unique_marquage}</strong></td>
-                              <td>
-                                <span style={{ fontWeight: 600 }}>{o.type_article}</span>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{serviceLabels[o.type_service] || o.type_service}</div>
-                              </td>
-                              <td style={{ fontWeight: 800, color: 'var(--primary)' }}>{o.prix_total.toLocaleString()} F</td>
-                              <td>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '0.12rem 0.45rem', borderRadius: '10px', background: statusCfg.bg, color: statusCfg.color }}>
-                                  {getOrderStatusLabel(o)}
-                                </span>
-                              </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="btn btn-outline"
-                                  style={{ padding: '0.25rem 0.55rem', fontSize: '0.68rem', fontWeight: 700, borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                                  onClick={() => setCreatedOrder(o)}
-                                >
-                                  <Ticket size={12} /> Reçu
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        });
-                      })()}
-                    </tbody>
-                  </table>
+                              return clientOrders.map(o => {
+                                const statusCfg = statusBadgesConfig[o.statut] || { bg: 'rgba(100,116,139,0.1)', color: 'var(--text-secondary)', label: getOrderStatusLabel(o) };
+                                return (
+                                  <tr key={o.id}>
+                                    <td><strong style={{ fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>{o.identifiant_unique_marquage}</strong></td>
+                                    <td>
+                                      <span style={{ fontWeight: 600 }}>{o.type_article}</span>
+                                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{serviceLabels[o.type_service] || o.type_service}</div>
+                                    </td>
+                                    <td style={{ fontWeight: 800, color: 'var(--primary)' }}>{o.prix_total.toLocaleString()} F</td>
+                                    <td>
+                                      <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '0.12rem 0.45rem', borderRadius: '10px', background: statusCfg.bg, color: statusCfg.color }}>
+                                        {getOrderStatusLabel(o)}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline"
+                                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.68rem', fontWeight: 700, borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                                        onClick={() => setCreatedOrder(o)}
+                                      >
+                                        <Ticket size={12} /> Reçu
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '0.75rem', padding: '3rem 1.5rem', textAlign: 'center' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Users size={32} />
-              </div>
-              <h4 style={{ margin: 0, fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>Aucun client sélectionné</h4>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', maxWidth: '280px' }}>
-                Sélectionnez un client dans la liste de gauche pour consulter sa fiche complète, ses abonnements et son historique.
-              </p>
-            </div>
+            </ModalPortal>
           )}
-        </div>
-      </div>
+          </>
+        );
+      })()}
 
       {/* MODAL ADMIN FIDÉLITÉ & RÉCOMPENSES */}
       {showRewardModal && selectedCrmCustomer && (
@@ -2035,9 +2237,12 @@ export default function CustomersTab({
 
                 {/* Boutons d'action */}
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                  <button
+                  <StatefulButton
                     type="submit"
-                    className="btn btn-primary"
+                    variant="primary"
+                    state={isSavingEdit ? "loading" : "idle"}
+                    loadingText="Enregistrement..."
+                    icon={<Save size={16} />}
                     disabled={isSavingEdit}
                     style={{
                       flex: 1,
@@ -2052,12 +2257,10 @@ export default function CustomersTab({
                       background: 'var(--primary, #002cf7)',
                       color: '#ffffff',
                       border: 'none',
-                      cursor: isSavingEdit ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    <Save size={16} />
-                    {isSavingEdit ? 'Enregistrement...' : 'Enregistrer les modifications'}
-                  </button>
+                    Enregistrer les modifications
+                  </StatefulButton>
                   <button
                     type="button"
                     className="btn btn-outline"
@@ -2324,9 +2527,12 @@ export default function CustomersTab({
                 {/* Boutons d'action */}
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                   {!hasActiveOrders && (
-                    <button
+                    <StatefulButton
                       type="button"
-                      className="btn btn-primary"
+                      variant="danger"
+                      state={isDeletingCustomer ? "loading" : "idle"}
+                      loadingText="Suppression..."
+                      icon={<Trash2 size={16} />}
                       disabled={isDeletingCustomer}
                       onClick={handleConfirmDeleteCustomer}
                       style={{
@@ -2342,12 +2548,10 @@ export default function CustomersTab({
                         background: '#dc2626',
                         color: '#ffffff',
                         border: 'none',
-                        cursor: isDeletingCustomer ? 'not-allowed' : 'pointer'
                       }}
                     >
-                      <Trash2 size={16} />
-                      {isDeletingCustomer ? 'Suppression en cours...' : 'Confirmer la suppression'}
-                    </button>
+                      Confirmer la suppression
+                    </StatefulButton>
                   )}
                   <button
                     type="button"

@@ -103,90 +103,20 @@ function App() {
   const [profileAnimTrigger, setProfileAnimTrigger] = useState(0);
   const [, forceUpdate] = useState(0);
 
-  const scrollViewRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(393);
 
   const availableTabs = currentUser?.role === 'agent_lavage_repassage' 
     ? ['accueil', 'profile'] 
     : ['accueil', 'gestion', 'creer_commande', 'historique', 'profile'];
 
-  const switchTab = (tabName, animated = false) => {
+  const switchTab = (tabName) => {
     setActiveTab(tabName);
     if (tabName === 'accueil') setHomeAnimTrigger(c => c + 1);
     else if (tabName === 'gestion') setGestionAnimTrigger(c => c + 1);
     else if (tabName === 'creer_commande') setAddAnimTrigger(c => c + 1);
     else if (tabName === 'historique') setHistoryAnimTrigger(c => c + 1);
     else if (tabName === 'profile') setProfileAnimTrigger(c => c + 1);
-
-    const targetIndex = availableTabs.indexOf(tabName);
-    if (targetIndex !== -1 && containerWidth > 0) {
-      const targetX = targetIndex * containerWidth;
-      const doScroll = () => {
-        if (scrollViewRef.current) {
-          if (typeof scrollViewRef.current.scrollTo === 'function') {
-            scrollViewRef.current.scrollTo({ x: targetX, animated });
-          }
-          if (Platform.OS === 'web') {
-            try {
-              const node = typeof scrollViewRef.current.getScrollableNode === 'function'
-                ? scrollViewRef.current.getScrollableNode()
-                : scrollViewRef.current;
-              if (node) {
-                node.scrollLeft = targetX;
-              }
-            } catch (e) {}
-          }
-        }
-      };
-
-      doScroll();
-      setTimeout(doScroll, 40);
-      setTimeout(doScroll, 120);
-    }
   };
-
-  const handleScroll = (e) => {
-    const offsetX = e.nativeEvent.contentOffset.x;
-    if (containerWidth > 0) {
-      const pageIndex = Math.round(offsetX / containerWidth);
-      if (pageIndex >= 0 && pageIndex < availableTabs.length) {
-        const targetTab = availableTabs[pageIndex];
-        if (targetTab !== activeTab) {
-          setActiveTab(targetTab);
-        }
-      }
-    }
-  };
-
-  const handleMomentumScrollEnd = (e) => {
-    handleScroll(e);
-  };
-
-  useEffect(() => {
-    const targetIndex = availableTabs.indexOf(activeTab);
-    if (targetIndex !== -1 && containerWidth > 0) {
-      const targetX = targetIndex * containerWidth;
-      const doScroll = () => {
-        if (scrollViewRef.current) {
-          if (typeof scrollViewRef.current.scrollTo === 'function') {
-            scrollViewRef.current.scrollTo({ x: targetX, animated: false });
-          }
-          if (Platform.OS === 'web') {
-            try {
-              const node = typeof scrollViewRef.current.getScrollableNode === 'function'
-                ? scrollViewRef.current.getScrollableNode()
-                : scrollViewRef.current;
-              if (node) {
-                node.scrollLeft = targetX;
-              }
-            } catch (e) {}
-          }
-        }
-      };
-      doScroll();
-      setTimeout(doScroll, 50);
-    }
-  }, [activeTab, containerWidth, currentUser?.role]);
 
   useEffect(() => {
     registerAlertHandler(({ title, message, buttons }) => {
@@ -513,7 +443,7 @@ function App() {
         ) : (
           <View style={[styles.container, { backgroundColor: isDarkMode ? '#000000' : '#ffffff', paddingTop: insets.top }]}>
           <View 
-            style={styles.content}
+            style={[styles.content, { width: '100%', overflow: 'hidden' }]}
             onLayout={(e) => {
               const w = e.nativeEvent.layout.width;
               if (w > 0 && Math.abs(w - containerWidth) > 1) {
@@ -521,23 +451,30 @@ function App() {
               }
             }}
           >
-            <ScrollView
-              ref={scrollViewRef}
-              horizontal
-              pagingEnabled={true}
-              showsHorizontalScrollIndicator={false}
-              bounces={false}
-              style={{ flex: 1 }}
-              contentContainerStyle={{ width: containerWidth * availableTabs.length }}
-              keyboardShouldPersistTaps="handled"
-              scrollEnabled={false}
-            >
-              {availableTabs.map((tabKey) => (
-                <View key={tabKey} style={{ width: containerWidth, flex: 1, overflow: 'hidden' }}>
+            {availableTabs.map((tabKey) => {
+              const isCurrent = activeTab === tabKey;
+              return (
+                <View
+                  key={tabKey}
+                  style={[
+                    StyleSheet.absoluteFill,
+                    {
+                      width: '100%',
+                      height: '100%',
+                      overflow: 'hidden',
+                      display: isCurrent ? 'flex' : 'none',
+                      zIndex: isCurrent ? 1 : 0,
+                    },
+                    Platform.OS === 'web' && {
+                      overflowX: 'hidden',
+                    }
+                  ]}
+                  pointerEvents={isCurrent ? 'auto' : 'none'}
+                >
                   {renderTabScreen(tabKey)}
                 </View>
-              ))}
-            </ScrollView>
+              );
+            })}
           </View>
 
       {/* BOTTOM TAB BAR WITH SMOOTH ANIMATED TRANSITION */}
@@ -880,6 +817,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    width: '100%',
+    overflow: 'hidden',
   },
   loadingContainer: {
     flex: 1,

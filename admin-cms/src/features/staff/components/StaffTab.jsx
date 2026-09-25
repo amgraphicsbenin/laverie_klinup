@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import { db } from '../../../services/db';
+import StatefulButton from '../../../components/ui/StatefulButton';
 
 const PERMISSIONS_CONFIG = [
   // --- PLATAFORME ADMIN CMS ---
@@ -226,6 +227,7 @@ export default function StaffTab({
   const [newRoleDesc, setNewRoleDesc] = useState('');
   const [roleSaveSuccess, setRoleSaveSuccess] = useState(false);
   const [userSaveSuccess, setUserSaveSuccess] = useState(false);
+  const [isSavingUser, setIsSavingUser] = useState(false);
 
   const staffList = staff || [];
 
@@ -369,14 +371,19 @@ export default function StaffTab({
     setShowEditUserModal(true);
   };
 
-  const handleUserModalSave = (e) => {
-    const success = handleSaveStaff(e);
-    if (success) {
-      setUserSaveSuccess(true);
-      setTimeout(() => {
-        setUserSaveSuccess(false);
-        setShowEditUserModal(false);
-      }, 1200);
+  const handleUserModalSave = async (e) => {
+    setIsSavingUser(true);
+    try {
+      const success = await handleSaveStaff(e);
+      if (success) {
+        setUserSaveSuccess(true);
+        setTimeout(() => {
+          setUserSaveSuccess(false);
+          setShowEditUserModal(false);
+        }, 1200);
+      }
+    } finally {
+      setIsSavingUser(false);
     }
   };
 
@@ -1885,9 +1892,16 @@ export default function StaffTab({
                 <button type="button" className="btn btn-outline" onClick={() => setShowEditUserModal(false)}>
                   Annuler
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 1.5rem', fontWeight: 700 }}>
+                <StatefulButton
+                  type="submit"
+                  variant="primary"
+                  state={userSaveSuccess ? 'success' : isSavingUser ? 'loading' : 'idle'}
+                  loadingText="Enregistrement..."
+                  successText="Profil Enregistré !"
+                  style={{ padding: '0.6rem 1.5rem', fontWeight: 700 }}
+                >
                   <CheckCircle2 size={16} /> Enregistrer le Profil & Permissions
-                </button>
+                </StatefulButton>
               </div>
 
             </form>
@@ -1979,7 +1993,7 @@ export default function StaffTab({
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn btn-outline" onClick={() => setShowNewRoleModal(false)}>Annuler</button>
-                <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 1.25rem', fontWeight: 700 }}>Créer le Rôle</button>
+                <StatefulButton type="submit" variant="primary" style={{ padding: '0.6rem 1.25rem', fontWeight: 700 }} loadingText="Création...">Créer le Rôle</StatefulButton>
               </div>
             </form>
           </div>

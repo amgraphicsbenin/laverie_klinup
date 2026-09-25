@@ -1020,12 +1020,16 @@ export const dbEngine = {
   addCustomer: async (customerData: Partial<Customer>): Promise<Customer> => {
     const currentUser = dbEngine.getCurrentUser();
     const staffMatch = currentUser ? memoryDb.staff.find(s => s.id === currentUser.id || (s.email && s.email.toLowerCase() === (currentUser.email || '').toLowerCase())) : null;
-    const userStoreId = (currentUser && currentUser.store_id && currentUser.store_id !== 'all') ? currentUser.store_id : (staffMatch && staffMatch.store_id && staffMatch.store_id !== 'all' ? staffMatch.store_id : null);
+    const userStoreId = (currentUser && currentUser.store_id && currentUser.store_id !== 'all' && currentUser.store_id !== 'GLOBAL') ? currentUser.store_id : (staffMatch && staffMatch.store_id && staffMatch.store_id !== 'all' && staffMatch.store_id !== 'GLOBAL' ? staffMatch.store_id : null);
 
-    const currentStoreId = customerData.store_id ||
-      userStoreId ||
-      (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
-      (memoryDb.stores?.[0]?.id || '');
+    const currentStoreId = (customerData.store_id && customerData.store_id !== 'all' && customerData.store_id !== 'GLOBAL')
+      ? customerData.store_id
+      : (userStoreId ||
+         (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' && memoryDb.selected_store_id !== 'GLOBAL' ? memoryDb.selected_store_id : null));
+
+    if (!currentStoreId || currentStoreId === 'all' || currentStoreId === 'GLOBAL') {
+      throw new Error("Un point de laverie valide et non global est obligatoire pour créer un profil client.");
+    }
 
     const newCustomer: Customer = {
       id: 'c_' + Math.random().toString(36).substr(2, 9),
@@ -1087,6 +1091,10 @@ export const dbEngine = {
 
     const updateData: Partial<Customer> = { ...updatedFields };
     delete updateData.id;
+
+    if (updateData.store_id !== undefined && (!updateData.store_id || updateData.store_id === 'all' || updateData.store_id === 'GLOBAL')) {
+      throw new Error("Un point de laverie valide et non global est obligatoire pour un profil client.");
+    }
 
     await performMutation('update', 'customers', customerId, updateData);
     Object.assign(customer, updateData);
@@ -1194,10 +1202,14 @@ export const dbEngine = {
 
   createOrder: async (orderData: Partial<Order>): Promise<Order> => {
     const currentUser = dbEngine.getCurrentUser();
-    const currentStoreId = orderData.store_id ||
-      (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null) ||
-      (currentUser && currentUser.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : null) ||
-      (memoryDb.stores?.[0]?.id || '');
+    const currentStoreId = (orderData.store_id && orderData.store_id !== 'all' && orderData.store_id !== 'GLOBAL')
+      ? orderData.store_id
+      : ((memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' && memoryDb.selected_store_id !== 'GLOBAL' ? memoryDb.selected_store_id : null) ||
+         (currentUser && currentUser.store_id && currentUser.store_id !== 'all' && currentUser.store_id !== 'GLOBAL' ? currentUser.store_id : null));
+
+    if (!currentStoreId || currentStoreId === 'all' || currentStoreId === 'GLOBAL') {
+      throw new Error("Un point de laverie valide et non global est obligatoire pour créer une commande.");
+    }
 
     const basePriceBeforeRemise = Number(orderData.prix_base_avant_remise || orderData.prix_total || orderData.total || 0);
     let discountAmount = Number(orderData.remise_montant || 0);
@@ -1604,7 +1616,7 @@ export const dbEngine = {
     prix?: number,
     categorie?: 'individuel' | 'abonnement' | 'exclusif',
     description?: string,
-    prix_urgent?: number,
+    prix_urgent?: number | null,
     nombre_vetements?: number,
     ramassage?: boolean,
     nombre_ramassages?: number,
@@ -1619,10 +1631,10 @@ export const dbEngine = {
         article: itemDataOrArticle,
         service: service || 'lavage_simple',
         prix: Number(prix || 0),
-        prix_urgent: prix_urgent ? Number(prix_urgent) : Math.round(Number(prix || 0) * 1.5),
+        prix_urgent: (prix_urgent !== undefined && prix_urgent !== null && prix_urgent !== '' && !isNaN(Number(prix_urgent)) && Number(prix_urgent) > 0) ? Number(prix_urgent) : null,
         categorie: cat,
         description: description || '',
-        store_id: store_id !== undefined ? store_id : (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null)
+        store_id: store_id !== undefined ? store_id : (memoryDb.selected_store_id !== 'all' && memoryDb.selected_store_id !== 'GLOBAL' ? memoryDb.selected_store_id : null)
       };
     } else {
       itemData = itemDataOrArticle || {};
@@ -1633,16 +1645,24 @@ export const dbEngine = {
 
     const effectiveStoreId = itemData.store_id !== undefined 
       ? itemData.store_id 
-      : (memoryDb.selected_store_id !== 'all' ? memoryDb.selected_store_id : null);
+      : (memoryDb.selected_store_id !== 'all' && memoryDb.selected_store_id !== 'GLOBAL' ? memoryDb.selected_store_id : null);
+
+    if (!effectiveStoreId || effectiveStoreId === 'all' || effectiveStoreId === 'GLOBAL') {
+      throw new Error("Un point de laverie valide et non global est obligatoire pour créer un article de catalogue.");
+    }
 
     const calculatedCat = itemData.categorie || (itemData.service === 'abonnement' ? 'abonnement' : 'individuel');
+    const rawPrixUrgent = itemData.prix_urgent !== undefined ? itemData.prix_urgent : prix_urgent;
+    const calculatedPrixUrgent = (rawPrixUrgent !== undefined && rawPrixUrgent !== null && (rawPrixUrgent as any) !== '' && !isNaN(Number(rawPrixUrgent)) && Number(rawPrixUrgent) > 0)
+      ? Number(rawPrixUrgent)
+      : null;
 
     const newItem: CatalogItem = {
       id: 'cat_' + Math.random().toString(36).substr(2, 9),
       article: itemData.article || 'Article',
       service: itemData.service || 'lavage_simple',
       prix: Number(itemData.prix || 0),
-      prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : (prix_urgent ? Number(prix_urgent) : Math.round(Number(itemData.prix || 0) * 1.5)),
+      prix_urgent: calculatedPrixUrgent,
       categorie: calculatedCat,
       description: itemData.description || '',
       nombre_vetements: itemData.nombre_vetements !== undefined ? itemData.nombre_vetements : (nombre_vetements || null),
@@ -1669,6 +1689,14 @@ export const dbEngine = {
 
     const updateData: Partial<CatalogItem> = { ...updatedFields };
     delete updateData.id;
+
+    if (updateData.store_id !== undefined && (!updateData.store_id || updateData.store_id === 'all' || updateData.store_id === 'GLOBAL')) {
+      throw new Error("Un point de laverie valide et non global est obligatoire pour un article de catalogue.");
+    }
+
+    if (updateData.prix_urgent !== undefined) {
+      updateData.prix_urgent = (updateData.prix_urgent !== null && (updateData.prix_urgent as any) !== '' && !isNaN(Number(updateData.prix_urgent)) && Number(updateData.prix_urgent) > 0) ? Number(updateData.prix_urgent) : null;
+    }
 
     const finalCategory = updateData.categorie || item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel');
     if (finalCategory === 'individuel') {

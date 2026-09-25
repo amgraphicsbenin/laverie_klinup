@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../services/db';
 import OrderFormModal from '../features/orders/components/OrderFormModal';
@@ -61,6 +61,8 @@ import LogsTab from '../features/logs/components/LogsTab';
 import SettingsTab from '../features/settings/components/SettingsTab';
 import StoresTab from '../features/stores/components/StoresTab';
 import HelpTab from '../features/help/components/HelpTab';
+import StatefulButton from './ui/StatefulButton';
+import PageShimmer from './ui/PageShimmer';
 
 export default function AdminView({ activeTab, onManageStaff }) {
   const currentUser = db.getCurrentUser();
@@ -216,6 +218,29 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setActiveDetailsCard(null);
   }, [activeTab]);
 
+  // Page Shimmer State on Tab Navigation (Durée : 2 secondes)
+  const [isPageShimmering, setIsPageShimmering] = useState(false);
+  const currentTabRef = useRef(activeTab);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    // Déclencher le shimmer de 2 secondes lors de la navigation entre onglets
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    if (currentTabRef.current !== activeTab) {
+      currentTabRef.current = activeTab;
+      setIsPageShimmering(true);
+      const timer = setTimeout(() => {
+        setIsPageShimmering(false);
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab]);
+
   const handleSaveSettings = (e) => {
     e.preventDefault();
     const expHours = Number(inputExpressHours);
@@ -295,17 +320,21 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const [editArtTraitementActive, setEditArtTraitementActive] = useState(false);
   const [editArtTraitementPrice, setEditArtTraitementPrice] = useState('');
   const [editArtTraitementUrgentPrice, setEditArtTraitementUrgentPrice] = useState('');
+  const [editArtTraitementHasExpress, setEditArtTraitementHasExpress] = useState(false);
   const [editArtRepassageActive, setEditArtRepassageActive] = useState(false);
   const [editArtRepassagePrice, setEditArtRepassagePrice] = useState('');
   const [editArtRepassageUrgentPrice, setEditArtRepassageUrgentPrice] = useState('');
+  const [editArtRepassageHasExpress, setEditArtRepassageHasExpress] = useState(false);
 
   // Service-specific add prices (Traitement / Repassage)
   const [newArtTraitementActive, setNewArtTraitementActive] = useState(true);
   const [newArtTraitementPrice, setNewArtTraitementPrice] = useState('');
   const [newArtTraitementUrgentPrice, setNewArtTraitementUrgentPrice] = useState('');
+  const [newArtTraitementHasExpress, setNewArtTraitementHasExpress] = useState(false);
   const [newArtRepassageActive, setNewArtRepassageActive] = useState(false);
   const [newArtRepassagePrice, setNewArtRepassagePrice] = useState('');
   const [newArtRepassageUrgentPrice, setNewArtRepassageUrgentPrice] = useState('');
+  const [newArtRepassageHasExpress, setNewArtRepassageHasExpress] = useState(false);
 
   // Validation errors
   const [newArtNameError, setNewArtNameError] = useState('');
@@ -346,9 +375,11 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setNewArtTraitementActive(true);
     setNewArtTraitementPrice('');
     setNewArtTraitementUrgentPrice('');
+    setNewArtTraitementHasExpress(false);
     setNewArtRepassageActive(false);
     setNewArtRepassagePrice('');
     setNewArtRepassageUrgentPrice('');
+    setNewArtRepassageHasExpress(false);
   }, [catalogCategory]);
 
   useEffect(() => {
@@ -1197,7 +1228,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
       const itemCat = item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel');
 
       if (itemCat === 'individuel') {
-        const articleKey = item.article.trim().toLowerCase();
+        const articleKey = (selectedStoreId === 'all' && item.store_id)
+          ? `${item.article.trim().toLowerCase()}__${item.store_id}`
+          : item.article.trim().toLowerCase();
         if (!groups[articleKey]) {
           groups[articleKey] = {
             id: item.id,
@@ -1218,13 +1251,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
           groups[articleKey].repassage = {
             id: item.id,
             prix: item.prix,
-            prix_urgent: item.prix_urgent || Math.round(item.prix * 1.5)
+            prix_urgent: (item.prix_urgent != null && item.prix_urgent !== '' && Number(item.prix_urgent) > 0) ? Number(item.prix_urgent) : null
           };
         } else {
           groups[articleKey].traitement = {
             id: item.id,
             prix: item.prix,
-            prix_urgent: item.prix_urgent || Math.round(item.prix * 1.5)
+            prix_urgent: (item.prix_urgent != null && item.prix_urgent !== '' && Number(item.prix_urgent) > 0) ? Number(item.prix_urgent) : null
           };
         }
       } else if (itemCat === 'abonnement' && catalogCategory === 'abonnement') {
@@ -1405,7 +1438,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
     setEditingItem(groupedItem);
     setEditArtName(groupedItem.article);
     setEditArtDescription(groupedItem.description || '');
-    setEditArtStoreId(groupedItem.store_id || 'all');
+    const storeToSet = (groupedItem.store_id && groupedItem.store_id !== 'all' && groupedItem.store_id !== 'GLOBAL')
+      ? groupedItem.store_id
+      : (selectedStoreId && selectedStoreId !== 'all' && selectedStoreId !== 'GLOBAL' ? selectedStoreId : '');
+    setEditArtStoreId(storeToSet);
     
     // Parse description for vertical draggable list
     const desc = groupedItem.description || '';
@@ -1420,9 +1456,12 @@ export default function AdminView({ activeTab, onManageStaff }) {
       if (groupedItem.traitement) {
         setEditArtTraitementActive(true);
         setEditArtTraitementPrice(groupedItem.traitement.prix.toString());
-        setEditArtTraitementUrgentPrice(groupedItem.traitement.prix_urgent.toString());
+        const hasUrgent = groupedItem.traitement.prix_urgent != null && groupedItem.traitement.prix_urgent !== '' && Number(groupedItem.traitement.prix_urgent) > 0;
+        setEditArtTraitementHasExpress(hasUrgent);
+        setEditArtTraitementUrgentPrice(hasUrgent ? groupedItem.traitement.prix_urgent.toString() : '');
       } else {
         setEditArtTraitementActive(false);
+        setEditArtTraitementHasExpress(false);
         setEditArtTraitementPrice('');
         setEditArtTraitementUrgentPrice('');
       }
@@ -1430,9 +1469,12 @@ export default function AdminView({ activeTab, onManageStaff }) {
       if (groupedItem.repassage) {
         setEditArtRepassageActive(true);
         setEditArtRepassagePrice(groupedItem.repassage.prix.toString());
-        setEditArtRepassageUrgentPrice(groupedItem.repassage.prix_urgent.toString());
+        const hasUrgent = groupedItem.repassage.prix_urgent != null && groupedItem.repassage.prix_urgent !== '' && Number(groupedItem.repassage.prix_urgent) > 0;
+        setEditArtRepassageHasExpress(hasUrgent);
+        setEditArtRepassageUrgentPrice(hasUrgent ? groupedItem.repassage.prix_urgent.toString() : '');
       } else {
         setEditArtRepassageActive(false);
+        setEditArtRepassageHasExpress(false);
         setEditArtRepassagePrice('');
         setEditArtRepassageUrgentPrice('');
       }
@@ -1453,17 +1495,30 @@ export default function AdminView({ activeTab, onManageStaff }) {
     e.preventDefault();
     if (!editingItem || !editArtName) return;
 
+    if (!editArtStoreId || editArtStoreId === 'all' || editArtStoreId === 'GLOBAL') {
+      alert("Veuillez sélectionner un point de laverie valide. La sélection d'un point non global est obligatoire.");
+      return;
+    }
+
     if (editArtCategory === 'individuel') {
       if (!editArtTraitementActive && !editArtRepassageActive) {
         alert("Veuillez sélectionner au moins un service (Traitement ou Repassage) pour cet article.");
         return;
       }
-      if (editArtTraitementActive && (!editArtTraitementPrice || !editArtTraitementUrgentPrice)) {
-        alert("Veuillez saisir les tarifs de traitement.");
+      if (editArtTraitementActive && !editArtTraitementPrice) {
+        alert("Veuillez saisir le tarif de base du traitement.");
         return;
       }
-      if (editArtRepassageActive && (!editArtRepassagePrice || !editArtRepassageUrgentPrice)) {
-        alert("Veuillez saisir les tarifs de repassage.");
+      if (editArtTraitementActive && editArtTraitementHasExpress && !editArtTraitementUrgentPrice) {
+        alert("Veuillez saisir le tarif express du traitement ou désactiver l'option express.");
+        return;
+      }
+      if (editArtRepassageActive && !editArtRepassagePrice) {
+        alert("Veuillez saisir le tarif de base du repassage.");
+        return;
+      }
+      if (editArtRepassageActive && editArtRepassageHasExpress && !editArtRepassageUrgentPrice) {
+        alert("Veuillez saisir le tarif express du repassage ou désactiver l'option express.");
         return;
       }
     } else {
@@ -1481,6 +1536,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
     try {
       if (editArtCategory === 'individuel') {
+        const finalTraitementUrgent = (editArtTraitementHasExpress && editArtTraitementUrgentPrice) ? Number(editArtTraitementUrgentPrice) : null;
+        const finalRepassageUrgent = (editArtRepassageHasExpress && editArtRepassageUrgentPrice) ? Number(editArtRepassageUrgentPrice) : null;
+
         // Traitement
         if (editArtTraitementActive) {
           if (editingItem.traitement) {
@@ -1488,7 +1546,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
               article: editArtName.trim(),
               service: 'lavage_simple',
               prix: Number(editArtTraitementPrice),
-              prix_urgent: Number(editArtTraitementUrgentPrice),
+              prix_urgent: finalTraitementUrgent,
               description: '',
               store_id: editArtStoreId
             });
@@ -1499,7 +1557,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
               Number(editArtTraitementPrice),
               'individuel',
               '',
-              Number(editArtTraitementUrgentPrice),
+              finalTraitementUrgent,
               null, false, null, false, false,
               editArtStoreId
             );
@@ -1517,7 +1575,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
               article: editArtName.trim(),
               service: 'repassage',
               prix: Number(editArtRepassagePrice),
-              prix_urgent: Number(editArtRepassageUrgentPrice),
+              prix_urgent: finalRepassageUrgent,
               description: '',
               store_id: editArtStoreId
             });
@@ -1528,7 +1586,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
               Number(editArtRepassagePrice),
               'individuel',
               '',
-              Number(editArtRepassageUrgentPrice),
+              finalRepassageUrgent,
               null, false, null, false, false,
               editArtStoreId
             );
@@ -1629,17 +1687,31 @@ export default function AdminView({ activeTab, onManageStaff }) {
     e.preventDefault();
     if (!newArtName) return;
 
+    if (!newArtStoreId || newArtStoreId === 'all' || newArtStoreId === 'GLOBAL') {
+      alert("Veuillez sélectionner un point de laverie valide. La sélection d'un point non global est obligatoire pour créer un article.");
+      return;
+    }
+    const targetStoreId = newArtStoreId;
+
     if (newArtCategory === 'individuel') {
       if (!newArtTraitementActive && !newArtRepassageActive) {
         alert("Veuillez sélectionner au moins un service (Traitement ou Repassage) pour cet article.");
         return;
       }
-      if (newArtTraitementActive && (!newArtTraitementPrice || !newArtTraitementUrgentPrice)) {
-        alert("Veuillez saisir les tarifs de traitement.");
+      if (newArtTraitementActive && !newArtTraitementPrice) {
+        alert("Veuillez saisir le tarif de base du traitement.");
         return;
       }
-      if (newArtRepassageActive && (!newArtRepassagePrice || !newArtRepassageUrgentPrice)) {
-        alert("Veuillez saisir les tarifs de repassage.");
+      if (newArtTraitementActive && newArtTraitementHasExpress && !newArtTraitementUrgentPrice) {
+        alert("Veuillez saisir le tarif express du traitement ou désactiver l'option express.");
+        return;
+      }
+      if (newArtRepassageActive && !newArtRepassagePrice) {
+        alert("Veuillez saisir le tarif de base du repassage.");
+        return;
+      }
+      if (newArtRepassageActive && newArtRepassageHasExpress && !newArtRepassageUrgentPrice) {
+        alert("Veuillez saisir le tarif express du repassage ou désactiver l'option express.");
         return;
       }
     } else {
@@ -1647,10 +1719,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
     }
 
     // Check unique name constraint within the same store
-    const targetStoreId = newArtStoreId || (selectedStoreId !== 'all' ? selectedStoreId : null);
     const nameExists = catalog.some(
       item => item && item.article && item.article.trim().toLowerCase() === newArtName.trim().toLowerCase() &&
-      ((!item.store_id || item.store_id === 'all') && (!targetStoreId || targetStoreId === 'all') || item.store_id === targetStoreId)
+      item.store_id === targetStoreId
     );
     if (nameExists) {
       setNewArtNameError(`Le produit "${newArtName}" existe déjà pour ce point de laverie. Chaque nom de produit doit être unique par point.`);
@@ -1659,6 +1730,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
     try {
       if (newArtCategory === 'individuel') {
+        const finalTraitementUrgent = (newArtTraitementHasExpress && newArtTraitementUrgentPrice) ? Number(newArtTraitementUrgentPrice) : null;
+        const finalRepassageUrgent = (newArtRepassageHasExpress && newArtRepassageUrgentPrice) ? Number(newArtRepassageUrgentPrice) : null;
+
         if (newArtTraitementActive) {
           await db.addCatalogItem(
             newArtName.trim(),
@@ -1666,7 +1740,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
             Number(newArtTraitementPrice),
             'individuel',
             '',
-            Number(newArtTraitementUrgentPrice),
+            finalTraitementUrgent,
             null, false, null, false, false,
             targetStoreId
           );
@@ -1678,7 +1752,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
             Number(newArtRepassagePrice),
             'individuel',
             '',
-            Number(newArtRepassageUrgentPrice),
+            finalRepassageUrgent,
             null, false, null, false, false,
             targetStoreId
           );
@@ -1713,6 +1787,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setNewArtAdvantages(['']);
       setNewArtNombreVetements('');
       setNewArtDureeJours('30');
+      setNewArtTraitementHasExpress(false);
+      setNewArtRepassageHasExpress(false);
+      setNewArtTraitementUrgentPrice('');
+      setNewArtRepassageUrgentPrice('');
       setNewArtRamassage(false);
       setNewArtNombreRamassages('');
       setNewArtRamassageGratuit(false);
@@ -1870,6 +1948,17 @@ export default function AdminView({ activeTab, onManageStaff }) {
     e.preventDefault();
     if (!newCustNom || !newCustPrenom || !newCustTel || !newCustAdresse) return;
 
+    let finalStoreId = newCustStoreId;
+    if (!finalStoreId || finalStoreId === 'all' || finalStoreId === 'GLOBAL') {
+      const validStores = (stores || []).filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL');
+      if (validStores.length > 0) {
+        finalStoreId = validStores[0].id;
+      } else {
+        alert("Veuillez sélectionner un point de laverie valide. La sélection d'un point non global est obligatoire pour créer un profil client.");
+        return;
+      }
+    }
+
     const normalizedPhone = normalizePhoneNumber(newCustTel, newCustIndicatif);
 
     if (!validatePhoneNumber(normalizedPhone, newCustIndicatif)) {
@@ -1896,7 +1985,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
         latitude: lat,
         longitude: lng,
         coordonnees_livraison: coords,
-        store_id: newCustStoreId || null
+        store_id: finalStoreId
       });
 
       if (newCustomer && newCustSubPlanId) {
@@ -1917,7 +2006,11 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setNewCustLatitude('');
       setNewCustLongitude('');
       setNewCustSubPlanId('');
-      setNewCustStoreId(currentUser?.store_id && currentUser.store_id !== 'all' ? currentUser.store_id : '');
+      const validStores = (stores || []).filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL');
+      const resetStore = (currentUser?.store_id && currentUser.store_id !== 'all' && currentUser.store_id !== 'GLOBAL')
+        ? currentUser.store_id
+        : ((selectedStoreId && selectedStoreId !== 'all' && selectedStoreId !== 'GLOBAL') ? selectedStoreId : (validStores.length === 1 ? validStores[0].id : ''));
+      setNewCustStoreId(resetStore);
       alert(`Client ${newCustomer.prenom} ${newCustomer.nom} créé avec succès dans la base de données !`);
     } catch (err) {
       alert("Erreur de création du client : " + err.message);
@@ -2289,7 +2382,11 @@ export default function AdminView({ activeTab, onManageStaff }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-      {activeTab === 'dashboard' && (
+      {isPageShimmering ? (
+        <PageShimmer tab={activeTab} />
+      ) : (
+        <div className="page-tab-content">
+          {activeTab === 'dashboard' && (
         <DashboardTab
           earnedRevenue={earnedRevenue}
           completedOrdersCount={completedOrdersCount}
@@ -2357,7 +2454,18 @@ export default function AdminView({ activeTab, onManageStaff }) {
           setSelectedCrmCustomer={setSelectedCrmCustomer}
           crmSearch={crmSearch}
           setCrmSearch={setCrmSearch}
-          setShowNewCustomerModal={setShowNewCustomerModal}
+          setShowNewCustomerModal={(show) => {
+            if (show) {
+              const validStores = (stores || []).filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL');
+              const defaultStore = (currentUser?.store_id && currentUser.store_id !== 'all' && currentUser.store_id !== 'GLOBAL')
+                ? currentUser.store_id
+                : ((selectedStoreId && selectedStoreId !== 'all' && selectedStoreId !== 'GLOBAL')
+                    ? selectedStoreId
+                    : (validStores.length > 0 ? validStores[0].id : ''));
+              setNewCustStoreId(defaultStore);
+            }
+            setShowNewCustomerModal(show);
+          }}
           setShowDebtPaymentModal={setShowDebtPaymentModal}
           setDebtPaymentAmount={setDebtPaymentAmount}
           handleUnsubscribeCrm={handleUnsubscribeCrm}
@@ -2399,7 +2507,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
           handleToggleCatalogItemActive={handleToggleCatalogItemActive}
           setShowAddCatalogModal={(show) => {
             if (show) {
-              setNewArtStoreId(selectedStoreId !== 'all' ? selectedStoreId : 'all');
+              const defaultStore = (selectedStoreId && selectedStoreId !== 'all' && selectedStoreId !== 'GLOBAL')
+                ? selectedStoreId
+                : '';
+              setNewArtStoreId(defaultStore);
             }
             setShowAddCatalogModal(show);
           }}
@@ -2492,6 +2603,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
          ======================================================== */}
       {activeTab === 'help' && (
         <HelpTab />
+      )}
+        </div>
       )}
 
       {/* ========================================================
@@ -2588,7 +2701,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Ajouter</button>
+                  <StatefulButton type="submit" variant="primary" style={{ flex: 1 }} loadingText="Ajout...">Ajouter</StatefulButton>
                   <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowNewStaffModal(false)}>Annuler</button>
                 </div>
               </form>
@@ -2655,14 +2768,15 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label>Point de Laverie</label>
+                  <label>Point de Laverie *</label>
                   <CustomSelect
                     className="input-control"
                     value={newArtStoreId}
                     onChange={(e) => setNewArtStoreId(e.target.value)}
+                    required
                   >
-                    <option value="all">Tous les points (Global)</option>
-                    {stores && stores.map(st => (
+                    <option value="" disabled>-- Sélectionner obligatoirement un point de laverie --</option>
+                    {stores && stores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
                       <option key={st.id} value={st.id}>{st.nom} ({st.code})</option>
                     ))}
                   </CustomSelect>
@@ -2700,9 +2814,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       Activer le service Traitement
                     </label>
                     {newArtTraitementActive && (
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem' }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Tarif de base (FCFA) *</label>
                           <input
                             type="number"
                             className="input-control"
@@ -2710,26 +2824,62 @@ export default function AdminView({ activeTab, onManageStaff }) {
                             required
                             placeholder="Ex: 1000"
                             value={newArtTraitementPrice}
-                            onChange={(e) => {
-                              setNewArtTraitementPrice(e.target.value);
-                              const val = Number(e.target.value);
-                              if (!isNaN(val)) {
-                                setNewArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
-                              }
-                            }}
+                            onChange={(e) => setNewArtTraitementPrice(e.target.value)}
                           />
                         </div>
-                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
-                          <input
-                            type="number"
-                            className="input-control"
-                            style={{ height: '32px', fontSize: '0.8rem' }}
-                            required
-                            placeholder="Ex: 1500"
-                            value={newArtTraitementUrgentPrice}
-                            onChange={(e) => setNewArtTraitementUrgentPrice(e.target.value)}
-                          />
+
+                        <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                            <input
+                              type="checkbox"
+                              checked={newArtTraitementHasExpress}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setNewArtTraitementHasExpress(checked);
+                                if (checked && !newArtTraitementUrgentPrice && newArtTraitementPrice) {
+                                  const val = Number(newArtTraitementPrice);
+                                  if (!isNaN(val) && val > 0) {
+                                    setNewArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
+                                  }
+                                }
+                              }}
+                            />
+                            <span>⚡ Définir un tarif pour le lavage express</span>
+                          </label>
+
+                          {newArtTraitementHasExpress && (
+                            <div className="form-group" style={{ marginTop: '0.4rem', margin: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Lavage Express (FCFA) ⚡</label>
+                                {newArtTraitementPrice && (
+                                  <button
+                                    type="button"
+                                    style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                                    onClick={() => {
+                                      const val = Number(newArtTraitementPrice);
+                                      if (!isNaN(val) && val > 0) setNewArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
+                                    }}
+                                  >
+                                    Calculer (+50%)
+                                  </button>
+                                )}
+                              </div>
+                              <input
+                                type="number"
+                                className="input-control"
+                                style={{ height: '32px', fontSize: '0.8rem' }}
+                                required={newArtTraitementHasExpress}
+                                placeholder="Ex: 1500"
+                                value={newArtTraitementUrgentPrice}
+                                onChange={(e) => setNewArtTraitementUrgentPrice(e.target.value)}
+                              />
+                            </div>
+                          )}
+                          {!newArtTraitementHasExpress && (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.2rem' }}>
+                              Aucun tarif express défini (le lavage express ne sera pas proposé pour cet article).
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -2746,9 +2896,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       Activer le service Repassage
                     </label>
                     {newArtRepassageActive && (
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem' }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Tarif de base (FCFA) *</label>
                           <input
                             type="number"
                             className="input-control"
@@ -2756,26 +2906,62 @@ export default function AdminView({ activeTab, onManageStaff }) {
                             required
                             placeholder="Ex: 500"
                             value={newArtRepassagePrice}
-                            onChange={(e) => {
-                              setNewArtRepassagePrice(e.target.value);
-                              const val = Number(e.target.value);
-                              if (!isNaN(val)) {
-                                setNewArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
-                              }
-                            }}
+                            onChange={(e) => setNewArtRepassagePrice(e.target.value)}
                           />
                         </div>
-                        <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
-                          <input
-                            type="number"
-                            className="input-control"
-                            style={{ height: '32px', fontSize: '0.8rem' }}
-                            required
-                            placeholder="Ex: 750"
-                            value={newArtRepassageUrgentPrice}
-                            onChange={(e) => setNewArtRepassageUrgentPrice(e.target.value)}
-                          />
+
+                        <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                            <input
+                              type="checkbox"
+                              checked={newArtRepassageHasExpress}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setNewArtRepassageHasExpress(checked);
+                                if (checked && !newArtRepassageUrgentPrice && newArtRepassagePrice) {
+                                  const val = Number(newArtRepassagePrice);
+                                  if (!isNaN(val) && val > 0) {
+                                    setNewArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
+                                  }
+                                }
+                              }}
+                            />
+                            <span>⚡ Définir un tarif pour le repassage express</span>
+                          </label>
+
+                          {newArtRepassageHasExpress && (
+                            <div className="form-group" style={{ marginTop: '0.4rem', margin: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Repassage Express (FCFA) ⚡</label>
+                                {newArtRepassagePrice && (
+                                  <button
+                                    type="button"
+                                    style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                                    onClick={() => {
+                                      const val = Number(newArtRepassagePrice);
+                                      if (!isNaN(val) && val > 0) setNewArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
+                                    }}
+                                  >
+                                    Calculer (+50%)
+                                  </button>
+                                )}
+                              </div>
+                              <input
+                                type="number"
+                                className="input-control"
+                                style={{ height: '32px', fontSize: '0.8rem' }}
+                                required={newArtRepassageHasExpress}
+                                placeholder="Ex: 750"
+                                value={newArtRepassageUrgentPrice}
+                                onChange={(e) => setNewArtRepassageUrgentPrice(e.target.value)}
+                              />
+                            </div>
+                          )}
+                          {!newArtRepassageHasExpress && (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.2rem' }}>
+                              Aucun tarif express défini (le repassage express ne sera pas proposé pour cet article).
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -3017,7 +3203,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </>
               )}
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Ajouter</button>
+                    <StatefulButton type="submit" variant="primary" style={{ flex: 1 }} loadingText="Ajout...">Ajouter</StatefulButton>
                     <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowAddCatalogModal(false)}>Annuler</button>
                   </div>
                 </form>
@@ -3077,14 +3263,15 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </div>
 
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label>Point de Laverie</label>
+                    <label>Point de Laverie *</label>
                     <CustomSelect
                       className="input-control"
                       value={editArtStoreId}
                       onChange={(e) => setEditArtStoreId(e.target.value)}
+                      required
                     >
-                      <option value="all">Tous les points (Global)</option>
-                      {stores && stores.map(st => (
+                      <option value="" disabled>-- Sélectionner obligatoirement un point de laverie --</option>
+                      {stores && stores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
                         <option key={st.id} value={st.id}>{st.nom} ({st.code})</option>
                       ))}
                     </CustomSelect>
@@ -3121,9 +3308,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                         Activer le service Traitement
                       </label>
                       {editArtTraitementActive && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                          <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem' }}>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Tarif de base (FCFA) *</label>
                             <input
                               type="number"
                               className="input-control"
@@ -3131,26 +3318,62 @@ export default function AdminView({ activeTab, onManageStaff }) {
                               required
                               placeholder="Ex: 1000"
                               value={editArtTraitementPrice}
-                              onChange={(e) => {
-                                setEditArtTraitementPrice(e.target.value);
-                                const val = Number(e.target.value);
-                                if (!isNaN(val)) {
-                                  setEditArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
-                                }
-                              }}
+                              onChange={(e) => setEditArtTraitementPrice(e.target.value)}
                             />
                           </div>
-                          <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
-                            <input
-                              type="number"
-                              className="input-control"
-                              style={{ height: '32px', fontSize: '0.8rem' }}
-                              required
-                              placeholder="Ex: 1500"
-                              value={editArtTraitementUrgentPrice}
-                              onChange={(e) => setEditArtTraitementUrgentPrice(e.target.value)}
-                            />
+
+                          <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                              <input
+                                type="checkbox"
+                                checked={editArtTraitementHasExpress}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setEditArtTraitementHasExpress(checked);
+                                  if (checked && !editArtTraitementUrgentPrice && editArtTraitementPrice) {
+                                    const val = Number(editArtTraitementPrice);
+                                    if (!isNaN(val) && val > 0) {
+                                      setEditArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
+                                    }
+                                  }
+                                }}
+                              />
+                              <span>⚡ Définir un tarif pour le lavage express</span>
+                            </label>
+
+                            {editArtTraitementHasExpress && (
+                              <div className="form-group" style={{ marginTop: '0.4rem', margin: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Lavage Express (FCFA) ⚡</label>
+                                  {editArtTraitementPrice && (
+                                    <button
+                                      type="button"
+                                      style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                                      onClick={() => {
+                                        const val = Number(editArtTraitementPrice);
+                                        if (!isNaN(val) && val > 0) setEditArtTraitementUrgentPrice(Math.round(val * 1.5).toString());
+                                      }}
+                                    >
+                                      Calculer (+50%)
+                                    </button>
+                                  )}
+                                </div>
+                                <input
+                                  type="number"
+                                  className="input-control"
+                                  style={{ height: '32px', fontSize: '0.8rem' }}
+                                  required={editArtTraitementHasExpress}
+                                  placeholder="Ex: 1500"
+                                  value={editArtTraitementUrgentPrice}
+                                  onChange={(e) => setEditArtTraitementUrgentPrice(e.target.value)}
+                                />
+                              </div>
+                            )}
+                            {!editArtTraitementHasExpress && (
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.2rem' }}>
+                                Aucun tarif express défini (le lavage express ne sera pas proposé pour cet article).
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -3167,9 +3390,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                         Activer le service Repassage
                       </label>
                       {editArtRepassageActive && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                          <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Base (FCFA)</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem' }}>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Tarif de base (FCFA) *</label>
                             <input
                               type="number"
                               className="input-control"
@@ -3177,26 +3400,62 @@ export default function AdminView({ activeTab, onManageStaff }) {
                               required
                               placeholder="Ex: 500"
                               value={editArtRepassagePrice}
-                              onChange={(e) => {
-                                setEditArtRepassagePrice(e.target.value);
-                                const val = Number(e.target.value);
-                                if (!isNaN(val)) {
-                                  setEditArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
-                                }
-                              }}
+                              onChange={(e) => setEditArtRepassagePrice(e.target.value)}
                             />
                           </div>
-                          <div className="form-group" style={{ flex: 1, margin: 0 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Urgent (FCFA) ⚡</label>
-                            <input
-                              type="number"
-                              className="input-control"
-                              style={{ height: '32px', fontSize: '0.8rem' }}
-                              required
-                              placeholder="Ex: 750"
-                              value={editArtRepassageUrgentPrice}
-                              onChange={(e) => setEditArtRepassageUrgentPrice(e.target.value)}
-                            />
+
+                          <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                              <input
+                                type="checkbox"
+                                checked={editArtRepassageHasExpress}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setEditArtRepassageHasExpress(checked);
+                                  if (checked && !editArtRepassageUrgentPrice && editArtRepassagePrice) {
+                                    const val = Number(editArtRepassagePrice);
+                                    if (!isNaN(val) && val > 0) {
+                                      setEditArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
+                                    }
+                                  }
+                                }}
+                              />
+                              <span>⚡ Définir un tarif pour le repassage express</span>
+                            </label>
+
+                            {editArtRepassageHasExpress && (
+                              <div className="form-group" style={{ marginTop: '0.4rem', margin: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Repassage Express (FCFA) ⚡</label>
+                                  {editArtRepassagePrice && (
+                                    <button
+                                      type="button"
+                                      style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                                      onClick={() => {
+                                        const val = Number(editArtRepassagePrice);
+                                        if (!isNaN(val) && val > 0) setEditArtRepassageUrgentPrice(Math.round(val * 1.5).toString());
+                                      }}
+                                    >
+                                      Calculer (+50%)
+                                    </button>
+                                  )}
+                                </div>
+                                <input
+                                  type="number"
+                                  className="input-control"
+                                  style={{ height: '32px', fontSize: '0.8rem' }}
+                                  required={editArtRepassageHasExpress}
+                                  placeholder="Ex: 750"
+                                  value={editArtRepassageUrgentPrice}
+                                  onChange={(e) => setEditArtRepassageUrgentPrice(e.target.value)}
+                                />
+                              </div>
+                            )}
+                            {!editArtRepassageHasExpress && (
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.2rem' }}>
+                                Aucun tarif express défini (le repassage express ne sera pas proposé pour cet article).
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -3438,7 +3697,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </>
                 )}
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Enregistrer</button>
+                  <StatefulButton type="submit" variant="primary" style={{ flex: 1 }} loadingText="Enregistrement...">Enregistrer</StatefulButton>
                   <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowEditCatalogModal(false)}>Annuler</button>
                 </div>
               </form>
@@ -3568,15 +3827,16 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </div>
 
                 <div className="form-group">
-                  <label>Point de laverie rattaché</label>
+                  <label>Point de laverie rattaché *</label>
                   <CustomSelect
                     className="input-control"
                     value={newCustStoreId}
                     onChange={(e) => setNewCustStoreId(e.target.value)}
-                    disabled={currentUser?.store_id && currentUser.store_id !== 'all'}
+                    disabled={currentUser?.store_id && currentUser.store_id !== 'all' && currentUser.store_id !== 'GLOBAL'}
+                    required
                   >
-                    <option value="">-- Aucun point de laverie spécifique --</option>
-                    {stores.map(st => (
+                    <option value="" disabled>-- Sélectionner obligatoirement un point de laverie --</option>
+                    {stores && stores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
                       <option key={st.id} value={st.id}>{st.nom} ({st.ville || 'Cotonou'})</option>
                     ))}
                   </CustomSelect>
@@ -3633,7 +3893,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Créer</button>
+                  <StatefulButton type="submit" variant="primary" style={{ flex: 1 }} loadingText="Création...">Créer</StatefulButton>
                   <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowNewCustomerModal(false)}>Annuler</button>
                 </div>
               </form>
@@ -3717,7 +3977,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Confirmer</button>
+                  <StatefulButton type="submit" variant="primary" style={{ flex: 1 }} loadingText="Validation...">Confirmer</StatefulButton>
                   <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowDebtPaymentModal(false)}>Annuler</button>
                 </div>
               </form>

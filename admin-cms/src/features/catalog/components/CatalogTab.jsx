@@ -265,9 +265,15 @@ export default function CatalogTab({
                                 <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                                   {item.traitement.prix.toLocaleString()} F
                                 </span>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700 }}>
-                                  ⚡ {item.traitement.prix_urgent.toLocaleString()} F
-                                </span>
+                                {item.traitement.prix_urgent != null && Number(item.traitement.prix_urgent) > 0 ? (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700 }}>
+                                    ⚡ {Number(item.traitement.prix_urgent).toLocaleString()} F
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                    ⚡ Non défini
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>-</span>
@@ -281,9 +287,15 @@ export default function CatalogTab({
                                 <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                                   {item.repassage.prix.toLocaleString()} F
                                 </span>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700 }}>
-                                  ⚡ {item.repassage.prix_urgent.toLocaleString()} F
-                                </span>
+                                {item.repassage.prix_urgent != null && Number(item.repassage.prix_urgent) > 0 ? (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700 }}>
+                                    ⚡ {Number(item.repassage.prix_urgent).toLocaleString()} F
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                    ⚡ Non défini
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>-</span>

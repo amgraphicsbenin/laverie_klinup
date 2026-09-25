@@ -1,5 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Détection de la branche Git lors du build Vercel ou local
 const gitBranch = (process.env.VERCEL_GIT_COMMIT_REF || process.env.GITHUB_REF_NAME || process.env.VITE_APP_ENV || '').trim().toLowerCase();
@@ -10,6 +14,11 @@ const buildEnv = (gitBranch === 'test' || gitBranch === 'staging' || gitBranch =
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   define: {
     'import.meta.env.VITE_APP_ENV': JSON.stringify(buildEnv),
     'import.meta.env.VERCEL_GIT_COMMIT_REF': JSON.stringify(process.env.VERCEL_GIT_COMMIT_REF || ''),

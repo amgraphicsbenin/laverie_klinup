@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../../services/db';
+import StatefulButton from '../../../components/ui/StatefulButton';
 
 export default function StoresTab({ onShowSuccess }) {
   useEffect(() => {
@@ -97,7 +98,6 @@ export default function StoresTab({ onShowSuccess }) {
 
     setIsSubmitting(true);
     try {
-      setShowModal(false);
       if (editingStore) {
         await db.updateStore(editingStore.id, storePayload);
         if (onShowSuccess) onShowSuccess(`Point de laverie "${formNom}" mis à jour avec succès dans la base de données.`);
@@ -107,6 +107,7 @@ export default function StoresTab({ onShowSuccess }) {
         if (onShowSuccess) onShowSuccess(`Point de laverie "${formNom}" créé avec succès dans la base de données.`);
         else alert(`Point de laverie "${formNom}" créé avec succès dans la base de données.`);
       }
+      setShowModal(false);
     } catch (err) {
       alert("Erreur lors de l'enregistrement du point de laverie : " + err.message);
     } finally {
@@ -587,9 +588,15 @@ export default function StoresTab({ onShowSuccess }) {
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Annuler</button>
-                <button type="submit" className="btn btn-primary" style={{ padding: '0.65rem 1.5rem', fontWeight: 700 }}>
+                <StatefulButton
+                  type="submit"
+                  variant="primary"
+                  state={isSubmitting ? 'loading' : 'idle'}
+                  loadingText="Enregistrement..."
+                  style={{ padding: '0.65rem 1.5rem', fontWeight: 700 }}
+                >
                   {editingStore ? "Enregistrer les modifications" : "Créer le point de laverie"}
-                </button>
+                </StatefulButton>
               </div>
             </form>
           </div>

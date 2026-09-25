@@ -33,7 +33,8 @@ const STRIP_BY_TABLE: Record<string, string[]> = {
            'motif_annulation', 'solde_paid_at',
            'reference_paiement', 'reference_momo', 'acompte_paid_at', 'is_subscription_order'],
   catalog: ['sku', 'prix_urgent', 'is_active'],
-  customers: ['coordonnees_livraison', 'rewards'],
+  customers: ['coordonnees_livraison', 'rewards', 'latitude', 'longitude', 'quartier', 'ville'],
+  activity_logs: ['store_id'],
 };
 
 // Cache mémoire des colonnes absentes du schéma Supabase distant

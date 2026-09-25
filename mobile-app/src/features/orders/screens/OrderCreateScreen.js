@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Alert, RefreshControl, Animated, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Alert, RefreshControl, Animated, Dimensions, KeyboardAvoidingView } from 'react-native';
 import { SmoothScrollView as ScrollView } from '../../../components/SmoothScroll';
 import { Plus, Check, ShoppingBag, User, Sparkles, AlertTriangle, UserPlus, Gift, MapPin, UserCheck } from 'lucide-react-native';
 import { CustomSelect } from '../../../components/CustomSelect';
@@ -575,19 +575,30 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
 
       {/* CONTENEUR À GLISSEMENT LATÉRAL SYNCHRONISÉ (NOUVELLE COMMANDE ⇄ NOUVEAU CLIENT) */}
       <View
-        style={styles.slidingContentOuter}
+        style={[
+          styles.slidingContentOuter,
+          Platform.OS === 'web' && { overflowX: 'hidden' }
+        ]}
         onLayout={(e) => {
           const w = e.nativeEvent.layout.width;
           if (w > 0 && Math.abs(w - pagerWidth) > 1) {
             setPagerWidth(w);
           }
         }}
+        onScroll={(e) => {
+          if (Platform.OS === 'web' && e?.target) {
+            e.target.scrollLeft = 0;
+          }
+        }}
       >
+        {/* PANE 1: NOUVELLE COMMANDE */}
         <Animated.View
           style={[
-            styles.slidingContentTrack,
+            StyleSheet.absoluteFill,
             {
-              width: pagerWidth * 2,
+              width: '100%',
+              height: '100%',
+              overflow: 'hidden',
               transform: [
                 {
                   translateX: slideAnim.interpolate({
@@ -598,14 +609,23 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
               ],
             },
           ]}
+          pointerEvents={activeMode === 'commande' ? 'auto' : 'none'}
         >
-          {/* PANE 1: NOUVELLE COMMANDE */}
-          <View style={[styles.slidingPane, { width: pagerWidth }]}>
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+          <KeyboardAvoidingView
+            style={{ flex: 1, width: '100%' }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+          >
+              <ScrollView
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                horizontal={false}
+                showsHorizontalScrollIndicator={false}
+                alwaysBounceHorizontal={false}
+                directionalLockEnabled={true}
+                nestedScrollEnabled={true}
+              >
           {/* Step 1: Sélection du Client */}
           <View style={[styles.cardSection, { zIndex: 30, elevation: 0 }]}>
             <View style={styles.sectionHeader}>
@@ -1364,14 +1384,43 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
             </View>
           </View>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
+    </Animated.View>
 
-      {/* PANE 2: NOUVEAU CLIENT */}
-      <View style={[styles.slidingPane, { width: pagerWidth }]}>
+    {/* PANE 2: NOUVEAU CLIENT */}
+    <Animated.View
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          transform: [
+            {
+              translateX: slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [pagerWidth, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+      pointerEvents={activeMode === 'client' ? 'auto' : 'none'}
+    >
+      <KeyboardAvoidingView
+        style={{ flex: 1, width: '100%' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+      >
         <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          horizontal={false}
+          showsHorizontalScrollIndicator={false}
+          alwaysBounceHorizontal={false}
+          directionalLockEnabled={true}
+          nestedScrollEnabled={true}
         >
           <View style={styles.cardSection}>
             <View style={styles.sectionHeader}>
@@ -1654,7 +1703,7 @@ export default function OrderCreateScreen({ onNavigate, onShowSuccess, isActive 
             Enregistrer le Client
           </SlideActionButton>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Animated.View>
   </View>
 </View>
@@ -1716,6 +1765,7 @@ function getStyles(isDarkMode) {
       flex: 1,
       overflow: 'hidden',
       width: '100%',
+      position: 'relative',
     },
     slidingContentTrack: {
       flex: 1,
@@ -1723,6 +1773,7 @@ function getStyles(isDarkMode) {
     },
     slidingPane: {
       height: '100%',
+      overflow: 'hidden',
     },
     scrollContent: {
       padding: 20,
