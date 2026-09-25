@@ -7,7 +7,7 @@
 import { memoryDb, notifyListeners } from './memoryStore';
 
 /**
- * Normalise n'importe quelle variante de statut vers le cycle de vie standard KLIN UP.
+ * Normalise n'importe quelle variante de statut vers le cycle de vie standard Pressing Pro.
  * @param {String} rawStatus - Statut brut.
  * @returns {String} Statut canonique.
  */

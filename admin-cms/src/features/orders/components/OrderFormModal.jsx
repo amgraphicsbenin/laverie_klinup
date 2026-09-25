@@ -231,7 +231,10 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
       const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
       
-      const finalNetTotal = netTotal + deliveryFee + pickupFee;
+      const finalNetTotal = (isSubscriptionActive && !isImmediateSub)
+        ? (deliveryFee + pickupFee)
+        : (netTotal + deliveryFee + pickupFee);
+
       const newOrder = {
         customer_id: orderClient,
         store_id: selectedOrderStoreId,
@@ -263,7 +266,8 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         remise_pourcentage: discountPercent,
         remise_montant: discountAmount,
         created_by_id: currentUser ? currentUser.id : 'u1',
-        pay_with_subscription: payWithSubscription,
+        pay_with_subscription: !!payWithSubscription,
+        is_subscription_order: !!isSubscriptionActive,
         subscribe_plan_id: subscribePlanId,
         reference_paiement: finalModeReglement === 'Mobile Money' ? momoRefNumber.trim() : null,
         operateur_momo: finalModeReglement === 'Mobile Money' ? momoOperator : null
@@ -271,27 +275,28 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
       const created = await db.createOrder(newOrder);
 
-      // Notification WhatsApp automatique à la création de la commande
+      // Notification WhatsApp automatique à la création de la commande (sauf si initiée par un livreur)
+      const isLivreur = created?.cree_par_livreur || newOrder.cree_par_livreur;
       const targetCustomer = activeCustomer || (db.getCustomers ? db.getCustomers().find(c => c.id === orderClient) : null);
-      if (targetCustomer && targetCustomer.telephone) {
+      if (!isLivreur && targetCustomer && targetCustomer.telephone) {
         const targetOrder = created || newOrder;
         const formattedDueDate = targetOrder.due_date ? new Date(targetOrder.due_date).toLocaleDateString('fr-FR') : 'N/A';
         const totalVal = Number(targetOrder.prix_total !== undefined ? targetOrder.prix_total : (targetOrder.total || finalNetTotal || 0));
         const avanceVal = Number(targetOrder.avance_payee !== undefined ? targetOrder.avance_payee : (targetOrder.avance || finalAvance || 0));
         const remainingVal = Math.max(0, totalVal - avanceVal);
-        const orderCode = targetOrder.identifiant_unique_marquage || targetOrder.id || 'KLIN-0';
+        const orderCode = targetOrder.identifiant_unique_marquage || targetOrder.id || 'PRO-0';
         const typeArticlesStr = targetOrder.type_article || (selectedArticles.map(a => `${a.quantity}x ${a.article}`).join(', ')) || 'Articles divers';
 
         let text = '';
         if (targetOrder.is_subscription_order && targetOrder.subscription_details) {
           const det = targetOrder.subscription_details;
           if (det.immediate_subscription) {
-            text = `Bonjour ${targetCustomer.prenom} ${targetCustomer.nom}, votre commande ${orderCode} (${typeArticlesStr}) a bien été enregistrée chez KLIN UP avec souscription immédiate au forfait ${det.immediate_subscription.name} (${Number(det.immediate_subscription.prix || 0).toLocaleString()} FCFA).\nArticles déposés: ${det.clothes_deducted} vêtements\nNouveau solde restant: ${det.new_balance} vêt.\nAcompte payé: ${avanceVal.toLocaleString()} FCFA\nReste à payer sur l'abonnement: ${remainingVal.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+            text = `Bonjour ${targetCustomer.prenom} ${targetCustomer.nom}, votre commande ${orderCode} (${typeArticlesStr}) a bien été enregistrée chez Pressing Pro avec souscription immédiate au forfait ${det.immediate_subscription.name} (${Number(det.immediate_subscription.prix || 0).toLocaleString()} FCFA).\nArticles déposés: ${det.clothes_deducted} vêtements\nNouveau solde restant: ${det.new_balance} vêt.\nAcompte payé: ${avanceVal.toLocaleString()} FCFA\nReste à payer sur l'abonnement: ${remainingVal.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
           } else {
-            text = `Bonjour ${targetCustomer.prenom} ${targetCustomer.nom}, votre commande ${orderCode} (${typeArticlesStr}) a bien été enregistrée chez KLIN UP via votre forfait ${det.name}.\nArticles déposés: ${det.clothes_deducted} vêtements\nSolde précédent: ${det.previous_balance} vêt.\nNouveau solde restant: ${det.new_balance} vêt.\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+            text = `Bonjour ${targetCustomer.prenom} ${targetCustomer.nom}, votre commande ${orderCode} (${typeArticlesStr}) a bien été enregistrée chez Pressing Pro via votre forfait ${det.name}.\nArticles déposés: ${det.clothes_deducted} vêtements\nSolde précédent: ${det.previous_balance} vêt.\nNouveau solde restant: ${det.new_balance} vêt.\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
           }
         } else {
-          text = `Bonjour ${targetCustomer.prenom} ${targetCustomer.nom}, votre commande ${orderCode} (${typeArticlesStr}) a bien été enregistrée chez KLIN UP.\nTotal: ${totalVal.toLocaleString()} FCFA\nAcompte payé: ${avanceVal.toLocaleString()} FCFA\nReste à payer: ${remainingVal.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          text = `Bonjour ${targetCustomer.prenom} ${targetCustomer.nom}, votre commande ${orderCode} (${typeArticlesStr}) a bien été enregistrée chez Pressing Pro.\nTotal: ${totalVal.toLocaleString()} FCFA\nAcompte payé: ${avanceVal.toLocaleString()} FCFA\nReste à payer: ${remainingVal.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
         }
 
         const cleanIndicatif = String(targetCustomer.indicatif || '229').replace(/\D/g, '');

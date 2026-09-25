@@ -1,6 +1,6 @@
 /**
  * 🛡️ Utilitaires de Sécurité et d'Assainissement (Sanitization XSS & Crypto)
- * Application Admin CMS KLIN UP
+ * Application Admin CMS Pressing Pro
  */
 
 /**

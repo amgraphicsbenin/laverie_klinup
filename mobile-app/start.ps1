@@ -1,14 +1,19 @@
-﻿# ==============================================================================
-# KLIN UP - Lanceur du Serveur Mobile Expo
+# ==============================================================================
+# Pressing Pro - Lanceur du Serveur Mobile Expo
 # ==============================================================================
 
-$Host.UI.RawUI.WindowTitle = "KLIN UP - Serveur Expo"
+$Host.UI.RawUI.WindowTitle = "Pressing Pro - Serveur Expo"
 Clear-Host
 
 $env:EXPO_NO_TELEMETRY = "1"
 
+# Securite : L'environnement local utilise TOUJOURS la base de TEST (isolee de la production)
+$env:APP_ENV = "test"
+$env:EXPO_PUBLIC_APP_ENV = "test"
+
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "             KLIN UP MOBILE APP - SERVEUR EXPO            " -ForegroundColor Yellow
+Write-Host "          PRESSING PRO MOBILE APP - SERVEUR EXPO          " -ForegroundColor Yellow
+Write-Host "    [ENV] Mode TEST actif - Base de donnees isolee        " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host ""
 

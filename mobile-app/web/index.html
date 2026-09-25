@@ -4,10 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#0f0f13" />
-    <title>KLIN UP — Aperçu Mobile</title>
+    <title>Pressing Pro — Aperçu Mobile</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
       /* Modern and discreet custom scrollbars */
       ::-webkit-scrollbar {
@@ -44,19 +45,39 @@
       }
 
       @media print {
-        body {
+        @page {
+          size: auto;
+          margin: 4mm;
+        }
+        html, body {
           background: #ffffff !important;
           color: #000000 !important;
           padding: 0 !important;
           margin: 0 !important;
+          height: auto !important;
+          overflow: visible !important;
         }
         .preview-label, .phone-frame, .phone-notch, .home-bar, .side-btn,
-        .compactModalHeader, .compactModalTitle {
+        .compactModalHeader, .compactModalTitle,
+        .screen-glare, #sb-time, .status-bar {
           box-shadow: none !important;
           border: none !important;
           background: transparent !important;
         }
-        .no-print, button, [role="button"],
+        .phone-frame {
+          transform: none !important;
+          box-shadow: none !important;
+          border: none !important;
+          background: transparent !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          height: auto !important;
+          position: static !important;
+        }
+        .preview-label, .phone-notch, .home-bar, .side-btn, .screen-glare, #sb-time,
+        .no-print, .no-print *,
+        [data-print="no"], [data-print="no"] *,
+        button, [role="button"],
         .invoiceDownloadBtn, .invoicePrintBtn, .invoiceCloseBtn {
           display: none !important;
           visibility: hidden !important;
@@ -229,7 +250,7 @@
     </style>
   </head>
   <body>
-    <div class="preview-label">📱 KLIN UP — Aperçu Mobile</div>
+    <div class="preview-label">📱 Pressing Pro — Aperçu Mobile</div>
 
     <div class="phone-frame" id="phoneFrame">
       <!-- Boutons physiques -->

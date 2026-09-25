@@ -1,6 +1,7 @@
 export type Role = 'super_admin' | 'manager' | 'editeur_catalogue' | 'agent_accueil' | 'agent_lavage_repassage' | 'livreur';
 
 export type OrderStatus =
+  | 'en_attente_validation'
   | 'en_attente'
   | 'traitement'
   | 'en_cours_lavage'
@@ -77,6 +78,7 @@ export interface ActiveSubscription {
   name: string;
   total_clothes: number;
   remaining_clothes: number;
+  clothes_washed?: number;
   duree_jours?: number;
   subscribed_at: string;
   expires_at: string;
@@ -89,12 +91,17 @@ export interface Customer {
   prenom: string;
   telephone: string;
   adresse?: string;
-  coordonnees_livraison?: string;
+  quartier?: string;
+  ville?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  coordonnees_livraison?: string | null;
   indicatif?: string;
   preferences_pliage?: string;
   points_fidelite?: number;
   solde_dette?: number;
   active_subscription?: ActiveSubscription | null;
+  rewards?: any[];
   store_id?: string;
   created_by_id?: string;
   created_by_name?: string;
@@ -106,9 +113,19 @@ export interface OrderItem {
   service: string;
   quantite: number;
   prix: number;
+  price?: number;
+  quantity?: number;
 }
 
 export interface SubscriptionDetails {
+  name?: string;
+  total_clothes?: number;
+  remaining_clothes?: number;
+  previous_balance?: number;
+  new_balance?: number;
+  clothes_deducted?: number;
+  immediate_subscription?: any;
+  type_livraison?: string;
   remise_pourcentage?: number;
   remise_montant?: number;
   prix_base_avant_remise?: number;
@@ -124,6 +141,10 @@ export interface Order {
   mode_reglement: string;
   avance_payee: number;
   prix_total: number;
+  total?: number;
+  remise_pourcentage?: number;
+  remise_montant?: number;
+  prix_base_avant_remise?: number;
   frais_livraison?: number;
   frais_recuperation?: number;
   with_pickup?: boolean;
@@ -134,6 +155,18 @@ export interface Order {
   acompte_paid_at?: string | null;
   solde_paid_at?: string | null;
   items?: OrderItem[];
+  articles?: OrderItem[];
+  is_subscription_order?: boolean;
+  pay_with_subscription?: boolean;
+  subscribe_plan_id?: string;
+  subscription_details?: SubscriptionDetails;
+  store_id?: string | null;
+  motif_annulation?: string;
+  cree_par_livreur?: boolean;
+  validee_par_caisse?: boolean;
+  reference_paiement?: string | null;
+  reference_momo?: string | null;
+  operateur_momo?: string | null;
   created_by_id?: string | null;
   created_by_name?: string | null;
 }

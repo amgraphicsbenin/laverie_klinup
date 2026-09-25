@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /**
- * Premium Modern Splash Screen for KLIN UP
+ * Premium Modern Splash Screen for Pressing Pro
  * Features:
  * - Fluid entrance and breathing animations
  * - Ambient radial gradient glow (cross-platform Android, iOS & Web compatible)
@@ -265,8 +265,8 @@ export default function SplashScreen({
           ]}
         >
           <View style={styles.brandTitleRow}>
-            <Text style={[styles.brandTitle, { color: '#002cf7' }]}>KLIN</Text>
-            <Text style={[styles.brandTitle, { color: isDarkMode ? '#ffffff' : '#09090b', marginLeft: 6 }]}>UP</Text>
+            <Text style={[styles.brandTitle, { color: '#002cf7' }]}>PRESSING</Text>
+            <Text style={[styles.brandTitle, { color: isDarkMode ? '#ffffff' : '#09090b', marginLeft: 6 }]}>PRO</Text>
           </View>
 
           <Text style={[styles.brandSubtitle, { color: subtextColor }]}>
@@ -300,7 +300,7 @@ export default function SplashScreen({
         <View style={[styles.versionPill, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }]}>
           <View style={styles.statusDot} />
           <Text style={[styles.footerText, { color: isDarkMode ? '#52525b' : '#94a3b8' }]}>
-            KLIN UP OS • v1.0.0
+            PRESSING PRO OS • v1.0.0
           </Text>
         </View>
       </Animated.View>

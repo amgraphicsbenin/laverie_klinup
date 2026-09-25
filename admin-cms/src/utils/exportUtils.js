@@ -107,23 +107,30 @@ export function exportOrdersCSV(orders, customersList = []) {
     { label: 'Date Livraison Prévue', accessor: r => r.date_livraison_prevue || r.due_date || '' }
   ];
 
-  exportToCSV(`Commandes_KlinUp_${new Date().toISOString().slice(0, 10)}.csv`, headers, orders);
+  exportToCSV(`Commandes_PressingPro_${new Date().toISOString().slice(0, 10)}.csv`, headers, orders);
 }
 
-export function exportCustomersCSV(customers) {
+export function exportCustomersCSV(customers, storesList = []) {
   const headers = [
     { label: 'ID Client', accessor: 'id' },
     { label: 'Prénom', accessor: r => r.prenom || '' },
     { label: 'Nom', accessor: r => r.nom || '' },
-    { label: 'Téléphone', accessor: r => r.telephone || r.phone || '' },
+    { label: 'Téléphone', accessor: r => `+${r.indicatif || '229'} ${r.telephone || r.phone || ''}`.trim() },
     { label: 'Adresse', accessor: r => r.adresse || r.address || 'Non renseignée' },
+    { label: 'Quartier', accessor: r => r.quartier || 'Non renseigné' },
+    { label: 'Ville', accessor: r => r.ville || 'Cotonou' },
+    { label: 'Point de Laverie', accessor: r => {
+      const store = (storesList || []).find(s => s.id === r.store_id || s.code === r.store_id);
+      return store ? store.nom : (r.store_id || 'Tous les points');
+    }},
+    { label: 'Date Inscription', accessor: r => r.created_at ? new Date(r.created_at).toLocaleDateString('fr-FR') : 'N/A' },
     { label: 'Solde Dette (FCFA)', accessor: r => r.solde_dette || 0 },
     { label: 'Points Fidélité', accessor: r => r.points_fidelite || 0 },
     { label: 'Abonnement Actif', accessor: r => r.active_subscription ? r.active_subscription.name : (r.abonnement_actif || 'Aucun') },
     { label: 'Articles Restants Abn.', accessor: r => r.active_subscription ? r.active_subscription.remaining_clothes : (r.articles_restants || 0) }
   ];
 
-  exportToCSV(`Clients_KlinUp_${new Date().toISOString().slice(0, 10)}.csv`, headers, customers);
+  exportToCSV(`Clients_PressingPro_${new Date().toISOString().slice(0, 10)}.csv`, headers, customers);
 }
 
 export function exportLogsCSV(logs, staffList = [], storesList = []) {
@@ -188,5 +195,5 @@ export function exportLogsCSV(logs, staffList = [], storesList = []) {
     { label: 'Détails & Motif de l\'Opération', accessor: r => r.details || r.description || '' }
   ];
 
-  exportToCSV(`Audit_Logs_KlinUp_${new Date().toISOString().slice(0, 10)}.csv`, headers, logs);
+  exportToCSV(`Audit_Logs_PressingPro_${new Date().toISOString().slice(0, 10)}.csv`, headers, logs);
 }

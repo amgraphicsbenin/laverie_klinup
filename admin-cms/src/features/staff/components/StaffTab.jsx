@@ -764,7 +764,7 @@ export default function StaffTab({
                                   {prenom} {nom}
                                 </div>
                                 <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                                  {s.email || `${prenom.toLowerCase()}.${nom.toLowerCase()}@klinup.com`}
+                                  {s.email || `${prenom.toLowerCase()}.${nom.toLowerCase()}@pressingpro.com`}
                                 </div>
                               </div>
                             </div>

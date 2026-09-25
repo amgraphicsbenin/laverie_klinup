@@ -276,7 +276,9 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate, or
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
       const pickupFee = withPickup ? (pickupCalc.fee || 0) : 0;
 
-      const finalTotal = netTotal + deliveryFee + pickupFee;
+      const finalTotal = (isSubscriptionActive && !isImmediateSub)
+        ? (deliveryFee + pickupFee)
+        : (netTotal + deliveryFee + pickupFee);
 
       if (orderToEdit) {
         const updateData = {
@@ -307,7 +309,8 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate, or
           niveau_urgence: orderUrgency,
           remise_pourcentage: discountPercent,
           remise_montant: discountAmountFCFA,
-          pay_with_subscription: payWithSubscription,
+          pay_with_subscription: !!payWithSubscription,
+          is_subscription_order: !!isSubscriptionActive,
           subscribe_plan_id: subscribePlanId,
           reference_paiement: finalModeReglement === 'Mobile Money' ? momoRefNumber.trim() : null,
           reference_momo: finalModeReglement === 'Mobile Money' ? momoRefNumber.trim() : null,
@@ -337,20 +340,30 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate, or
           quantite: a.quantity,
           prix: a.price
         })),
+        items: selectedArticles.map(a => ({
+          article: a.article,
+          service: a.service,
+          quantite: a.quantity,
+          prix: a.price
+        })),
         total: finalTotal,
+        prix_total: finalTotal,
         prix_base_avant_remise: currentTotal,
         frais_livraison: deliveryFee,
         frais_recuperation: pickupFee,
         with_pickup: withPickup,
         distance_km: Math.max(deliveryCalc.distanceKm || 0, pickupCalc.distanceKm || 0),
         avance: finalAvance,
+        avance_payee: finalAvance,
         statut: 'attente',
         mode_paiement: finalModeReglement,
+        mode_reglement: finalModeReglement,
         niveau_urgence: orderUrgency,
         remise_pourcentage: discountPercent,
         remise_montant: discountAmountFCFA,
         created_by_id: currentUser ? currentUser.id : 'u1',
-        pay_with_subscription: payWithSubscription,
+        pay_with_subscription: !!payWithSubscription,
+        is_subscription_order: !!isSubscriptionActive,
         subscribe_plan_id: subscribePlanId,
         reference_paiement: finalModeReglement === 'Mobile Money' ? momoRefNumber.trim() : null,
         operateur_momo: finalModeReglement === 'Mobile Money' ? momoOperator : null
@@ -358,9 +371,15 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate, or
 
       const created = await db.createOrder(newOrder);
 
-      const targetCustomer = customers ? customers.find(c => c.id === orderClient) : (db.getCustomers ? db.getCustomers().find(c => c.id === orderClient) : null);
-      if (targetCustomer) {
-        sendOrderCreatedWhatsAppNotification(created || newOrder, targetCustomer);
+      // Notification WhatsApp automatique à la création de la commande
+      // RÈGLE MÉTIER : Si le livreur crée une commande, NE PAS envoyer le WhatsApp maintenant.
+      // Le premier message client sera envoyé uniquement après la validation par la caisse.
+      const isCreatedByLivreur = currentUser?.role === 'livreur' || created?.cree_par_livreur || newOrder.cree_par_livreur;
+      if (!isCreatedByLivreur) {
+        const targetCustomer = customers ? customers.find(c => c.id === orderClient) : (db.getCustomers ? db.getCustomers().find(c => c.id === orderClient) : null);
+        if (targetCustomer) {
+          sendOrderCreatedWhatsAppNotification(created || newOrder, targetCustomer);
+        }
       }
 
       // Délai de 2 secondes sur le spinner intégré du bouton

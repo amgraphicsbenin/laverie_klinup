@@ -1,5 +1,5 @@
 @echo off
-title KLIN UP - Serveur Expo
+title Pressing Pro - Serveur Expo
 color 0B
 
 :: ── Réparation automatique de l'index Git ─────────────────────────────────────

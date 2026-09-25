@@ -3,8 +3,7 @@ import { db } from './services/db';
 import AdminView from './components/AdminView';
 import CustomSelect from './components/CustomSelect';
 import { appEnv } from './services/supabaseClient';
-import logoDark from './assets/logo_dark.png';
-import logoGold from './assets/logo_gold.png';
+import logoBrand from './assets/logo_brand.png';
 // Composant utilitaire pour les icônes Google Material Symbols
 const MIcon = ({ name, size = 20, style = {}, className = '', filled = false }) => (
   <span
@@ -543,17 +542,45 @@ function App() {
         gap: '2rem',
         fontFamily: 'var(--font-body, Inter, sans-serif)',
       }}>
-        <img src={logoGold} alt="KLIN UP" style={{ width: '180px', opacity: 0.9 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+          <div style={{
+            width: '84px',
+            height: '84px',
+            borderRadius: '22px',
+            overflow: 'hidden',
+            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.45), 0 0 24px rgba(59, 130, 246, 0.3)',
+            border: '1.5px solid rgba(255, 255, 255, 0.18)',
+            background: '#0f172a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <img src={logoBrand} alt="Pressing Pro" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.85rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.5px', textTransform: 'uppercase' }}>
+                Pressing
+              </span>
+              <span style={{ fontSize: '1.85rem', fontWeight: 900, color: '#38bdf8', letterSpacing: '-0.5px', textTransform: 'uppercase' }}>
+                Pro
+              </span>
+            </div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.45)', letterSpacing: '2.5px', textTransform: 'uppercase', marginTop: '3px' }}>
+              Administration &amp; Caisse
+            </span>
+          </div>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
           <div style={{
-            width: '48px', height: '48px',
+            width: '44px', height: '44px',
             border: '3px solid rgba(255,255,255,0.1)',
-            borderTop: '3px solid #f59e0b',
+            borderTop: '3px solid #38bdf8',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
           }} />
           <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', margin: 0, letterSpacing: '0.05em' }}>
-            Connexion à Supabase en cours…
+            Connexion au serveur en cours…
           </p>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -575,7 +602,26 @@ function App() {
         padding: '2rem',
         fontFamily: 'var(--font-body, Inter, sans-serif)',
       }}>
-        <img src={logoGold} alt="KLIN UP" style={{ width: '160px', opacity: 0.8 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '72px',
+            height: '72px',
+            borderRadius: '18px',
+            overflow: 'hidden',
+            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.4)',
+            border: '1.5px solid rgba(255, 255, 255, 0.15)',
+            background: '#0f172a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <img src={logoBrand} alt="Pressing Pro" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.5px' }}>PRESSING</span>
+            <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#38bdf8', letterSpacing: '-0.5px' }}>PRO</span>
+          </div>
+        </div>
         <div style={{
           background: 'rgba(239, 68, 68, 0.08)',
           border: '1px solid rgba(239, 68, 68, 0.3)',
@@ -588,7 +634,7 @@ function App() {
         }}>
           <div style={{ color: '#ef4444', fontSize: '2rem' }}>⚠️</div>
           <h2 style={{ color: '#fca5a5', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
-            Connexion Supabase impossible
+            Connexion impossible
           </h2>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', margin: 0, lineHeight: 1.6 }}>
             {initError}
@@ -596,9 +642,9 @@ function App() {
           <button
             onClick={() => { setInitError(null); setIsInitializing(true); db.init().then(() => { setCurrentUser(db.getCurrentUser()); setStaffList(db.getStaff()); setDbIsRemote(db.isRemote()); setSelectedStoreIdState(db.getSelectedStoreId()); setIsInitializing(false); }).catch(err => { setInitError(err?.message || 'Erreur de connexion.'); setIsInitializing(false); }); }}
             style={{
-              background: 'rgba(245, 158, 11, 0.15)',
-              border: '1px solid rgba(245, 158, 11, 0.4)',
-              color: '#f59e0b',
+              background: 'rgba(56, 189, 248, 0.15)',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              color: '#38bdf8',
               padding: '0.75rem 1.5rem',
               borderRadius: '10px',
               cursor: 'pointer',
@@ -618,7 +664,7 @@ function App() {
       <div className="lockscreen-container">
         <div className="lockscreen-logo-area" style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
           <h1 style={{ color: '#ffffff', fontSize: '2.2rem', fontWeight: 800, margin: '0 0 0.25rem', letterSpacing: '-0.5px' }}>
-            Laverie - Admin
+            Pressing Pro - Admin
           </h1>
           {appEnv && (appEnv === 'test' || appEnv === 'staging' || appEnv === 'beta') && (
             <div style={{ marginBottom: '0.4rem' }}>
@@ -652,7 +698,7 @@ function App() {
             </div>
           )}
           <p className="lockscreen-subtitle" style={{ color: 'rgba(255, 255, 255, 0.6)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
-            Plateforme Laverie Admin CMS
+            Plateforme Pressing Pro Admin CMS
           </p>
         </div>
 
@@ -824,7 +870,7 @@ function App() {
                 <input
                   type="email"
                   required
-                  placeholder="votre.email@klinup.com"
+                  placeholder="votre.email@pressingpro.com"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
                   style={{
@@ -871,7 +917,7 @@ function App() {
           {/* ── Header: Title & Environment Pill ── */}
           <div className="sidebar-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '0.35rem' }}>
             <div className="sidebar-title-text" style={{ lineHeight: 1.2 }}>
-              Laverie - Admin
+              Pressing Pro - Admin
             </div>
             {appEnv && (appEnv === 'test' || appEnv === 'staging' || appEnv === 'beta') && (
               <span

@@ -30,8 +30,8 @@ export const memoryDb: MemoryStore = {
     express_hours: 6,
     express_markup: 50,
     normal_hours: 48,
-    receipt_header: "KLIN UP - Laverie & Pressing Premium",
-    receipt_footer: "Merci de votre confiance ! A bientot chez KLIN UP.",
+    receipt_header: "Pressing Pro - Laverie & Pressing Premium",
+    receipt_footer: "Merci de votre confiance ! À bientôt chez Pressing Pro.",
     ...(savedInitialSettings || {})
   },
   cash_closures: [],

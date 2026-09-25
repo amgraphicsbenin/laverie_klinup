@@ -99,9 +99,14 @@ export default function InvoiceModal({
           />
           
           <View style={styles.popupModalView}>
-            <View style={styles.compactModalHeader}>
+            <View className="no-print" dataSet={{ print: 'no' }} style={styles.compactModalHeader}>
               <Text style={styles.compactModalTitle}>Facture Client</Text>
-              <TouchableOpacity onPress={onClose}>
+              <TouchableOpacity
+                className="no-print"
+                dataSet={{ print: 'no' }}
+                accessibilityRole="button"
+                onPress={onClose}
+              >
                 <X size={20} color="#71717a" />
               </TouchableOpacity>
             </View>
@@ -109,7 +114,7 @@ export default function InvoiceModal({
             <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
               {/* Conteneur du reçu ticket thermique TPE */}
               <View style={styles.tpeReceiptContainer}>
-                <Text style={styles.tpeBrand}>KLIN UP</Text>
+                <Text style={styles.tpeBrand}>Pressing Pro</Text>
                 <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
                 <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
                 <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
@@ -235,8 +240,11 @@ export default function InvoiceModal({
               </View>
 
               {/* Contrôles de téléchargement et d'impression */}
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <View className="no-print" dataSet={{ print: 'no' }} style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
                 <TouchableOpacity
+                  className="no-print"
+                  dataSet={{ print: 'no' }}
+                  accessibilityRole="button"
                   onPress={() => onDownload(order)}
                   style={styles.invoiceDownloadBtn}
                   activeOpacity={0.8}
@@ -246,6 +254,9 @@ export default function InvoiceModal({
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  className="no-print"
+                  dataSet={{ print: 'no' }}
+                  accessibilityRole="button"
                   onPress={() => onPrint(order)}
                   style={styles.invoicePrintBtn}
                   activeOpacity={0.8}
@@ -256,6 +267,9 @@ export default function InvoiceModal({
               </View>
 
               <TouchableOpacity
+                className="no-print"
+                dataSet={{ print: 'no' }}
+                accessibilityRole="button"
                 onPress={onClose}
                 style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
               >

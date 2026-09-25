@@ -1,5 +1,5 @@
 /* ========================================================
-   DESIGN SYSTEM PREMIUM & AESTHETICS - KLIN UP BRAND STYLE
+   DESIGN SYSTEM PREMIUM & AESTHETICS - PRESSING PRO BRAND STYLE
    ======================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap');
@@ -9,8 +9,8 @@
   --font-sans: 'Noto Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-title: 'Noto Sans', sans-serif;
 
-  /* Palette de couleurs KLIN UP - Mode Clair (harmonie avec l'app mobile) */
-  --primary: #3b82f6;          /* Bleu principal KLIN UP */
+  /* Palette de couleurs Pressing Pro - Mode Clair (harmonie avec l'app mobile) */
+  --primary: #3b82f6;          /* Bleu principal Pressing Pro */
   --primary-hover: #2563eb;
   --primary-light: rgba(59, 130, 246, 0.08); /* Fond bleu ultra-léger */
   --primary-gradient: linear-gradient(135deg, #5da1fc 0%, #3b82f6 100%);
@@ -1160,7 +1160,7 @@ button, input, select, textarea {
   font-weight: 500;
 }
 
-/* Time Tracker Widget KLIN UP */
+/* Time Tracker Widget Pressing Pro */
 .time-tracker-card {
   background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);
   background-image: radial-gradient(circle at 100% 100%, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.03) 40%, transparent 40%),
@@ -2317,12 +2317,12 @@ tr:hover td {
 }
 
 /* ========================================================
-   SYSTEME DE MODE SOMBRE KLIN UP (#181818 Noir de Base)
+   SYSTEME DE MODE SOMBRE Pressing Pro (#181818 Noir de Base)
    ======================================================== */
 .dark-mode {
   color-scheme: dark;
 
-  /* Palette de couleurs KLIN UP - Mode Sombre (#181818 pour le noir de base) */
+  /* Palette de couleurs Pressing Pro - Mode Sombre (#181818 pour le noir de base) */
   --bg-app: #121212;           /* Fond d'application sombre et profond */
   --bg-card: #181818;          /* Noir de base exigé pour les cartes & conteneurs */
   --bg-sidebar: #181818;       /* Barre latérale en #181818 */
@@ -2333,7 +2333,7 @@ tr:hover td {
   --text-on-dark: #ffffff;
   --border-color: #27272a;     /* Bordures tamisées très douces */
 
-  /* Couleurs de marque KLIN UP tamisées pour le mode sombre */
+  /* Couleurs de marque Pressing Pro tamisées pour le mode sombre */
   --primary: #3b82f6;          /* Bleu principal adouci */
   --primary-hover: #60a5fa;
   --primary-light: rgba(59, 130, 246, 0.14);
@@ -2506,6 +2506,70 @@ tr:hover td {
 .dark-mode [style*="border: 1px solid #e2e8f0"] {
   border-color: #27272a !important;
 }
+
+/* ========================================================
+   RÈGLES D'IMPRESSION STRICTES (FACTURES & TICKETS TPE)
+   ======================================================== */
+@media print {
+  @page {
+    margin: 4mm;
+  }
+  
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+  }
+
+  /* Masquer tout le tableau de bord et les éléments du body */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Afficher uniquement la zone du reçu thermique */
+  #receipt-print-area-admin,
+  #receipt-print-area-admin * {
+    visibility: visible !important;
+  }
+
+  #receipt-print-area-admin {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Retirer les ombres, bordures et fonds des conteneurs de modale */
+  .modal-backdrop,
+  .modal-dialog-card {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: static !important;
+  }
+
+  /* Masquer expressément tous les boutons et contrôles d'action */
+  .no-print,
+  .no-print *,
+  [data-print="no"],
+  [data-print="no"] *,
+  button,
+  .btn {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
 
 
 

@@ -419,11 +419,11 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   };
 
   const getDisplayTicketId = (order) => {
-    if (!order) return 'KLIN-0';
+    if (!order) return 'PRO-0';
     if (order.identifiant_unique_marquage) return order.identifiant_unique_marquage;
     if (order.ticket_numero) return order.ticket_numero;
-    if (order.id && String(order.id).startsWith('KLIN-')) return order.id;
-    return order.id || 'KLIN-0';
+    if (order.id && (String(order.id).startsWith('KLIN-') || String(order.id).startsWith('PRO-'))) return order.id;
+    return order.id || 'PRO-0';
   };
 
   const kpiThemes = {

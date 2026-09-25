@@ -8,7 +8,7 @@ import {
 } from './db/syncEngine';
 
 /**
- * Interface unifiée d'accès aux services de données KLIN UP Admin.
+ * Interface unifiée d'accès aux services de données Pressing Pro Admin.
  * Toutes les mutations passent directement par Supabase (Supabase-first).
  * Appeler db.init() au démarrage de l'application pour charger les données.
  */

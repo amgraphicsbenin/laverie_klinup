@@ -141,7 +141,7 @@ export function AnimatedBadge({
   textStyle,
   ...rest
 }) {
-  // Déterminer la configuration du statut (soit statut beui brut, soit statut commande KLIN UP)
+  // Déterminer la configuration du statut (soit statut brut, soit statut commande Pressing Pro)
   const orderCfg = ORDER_STATUS_CONFIG[status];
   const resolvedThemeKey = orderCfg ? orderCfg.theme : (STATUS_THEMES[status] ? status : 'neutral');
   const resolvedLabel = children ?? (statusColor?.label || (orderCfg ? orderCfg.label : String(status)));

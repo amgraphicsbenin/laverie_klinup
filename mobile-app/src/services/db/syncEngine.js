@@ -121,6 +121,9 @@ function sanitizePayload(table, data) {
     delete sanitized.sku;
     delete sanitized.prix_urgent;
     delete sanitized.is_active;
+  } else if (table === 'customers') {
+    delete sanitized.coordonnees_livraison;
+    delete sanitized.rewards;
   }
 
   // Retrait proactif des colonnes identifiées comme non présentes dans le schéma Supabase

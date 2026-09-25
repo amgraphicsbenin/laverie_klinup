@@ -120,7 +120,7 @@ export default function DashboardTab({
             </span>
           </div>
           <h2 style={{ fontSize: '1.65rem', fontWeight: 800, fontFamily: 'var(--font-title)', margin: 0, letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>
-            {currentStore ? `Supervision - ${currentStore.nom}` : 'Supervision Globale KLIN UP'}
+            {currentStore ? `Supervision - ${currentStore.nom}` : 'Supervision Globale Pressing Pro'}
           </h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span>{totalArticlesInProcess} textile{totalArticlesInProcess > 1 ? 's' : ''} actuellement en traitement en atelier</span>

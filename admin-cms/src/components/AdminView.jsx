@@ -50,7 +50,7 @@ import {
   GripVertical
 } from 'lucide-react';
 import CustomSelect from './CustomSelect';
-import { validatePhoneNumber } from '../utils/phoneUtils';
+import { validatePhoneNumber, normalizePhoneNumber } from '../utils/phoneUtils';
 
 import DashboardTab from '../features/dashboard/components/DashboardTab';
 import OrdersTab from '../features/orders/components/OrdersTab';
@@ -235,31 +235,39 @@ export default function AdminView({ activeTab, onManageStaff }) {
     alert("Paramètres système enregistrés et synchronisés en temps réel !");
   };
 
-  const handleSubscribeCrm = (customerId, catalogItemId) => {
+  const handleSubscribeCrm = async (customerId, catalogItemId) => {
     if (!catalogItemId) {
       alert("Veuillez sélectionner un forfait d'abonnement.");
       return;
     }
-    const updated = db.subscribeCustomer(customerId, catalogItemId);
-    if (updated) {
-      refreshAdminData();
-      const updatedCustomers = db.getCustomers();
-      const updatedCust = updatedCustomers.find(c => c.id === customerId);
-      setSelectedCrmCustomer(updatedCust);
-      setSelectedCrmSubId('');
-      alert(`Abonnement souscrit avec succès pour ${updatedCust.prenom} ${updatedCust.nom} !`);
-    }
-  };
-
-  const handleUnsubscribeCrm = async (customerId) => {
-    if (await confirm("Êtes-vous sûr de vouloir résilier cet abonnement ?")) {
-      const updated = db.unsubscribeCustomer(customerId);
+    try {
+      const updated = await db.subscribeCustomer(customerId, catalogItemId);
       if (updated) {
         refreshAdminData();
         const updatedCustomers = db.getCustomers();
         const updatedCust = updatedCustomers.find(c => c.id === customerId);
         setSelectedCrmCustomer(updatedCust);
-        alert("Abonnement résilié avec succès !");
+        setSelectedCrmSubId('');
+        alert(`Abonnement souscrit avec succès pour ${updatedCust ? `${updatedCust.prenom} ${updatedCust.nom}` : 'le client'} !`);
+      }
+    } catch (err) {
+      alert("Erreur lors de la souscription à l'abonnement : " + (err.message || err));
+    }
+  };
+
+  const handleUnsubscribeCrm = async (customerId) => {
+    if (confirm("Êtes-vous sûr de vouloir résilier cet abonnement ?")) {
+      try {
+        const updated = await db.unsubscribeCustomer(customerId);
+        if (updated) {
+          refreshAdminData();
+          const updatedCustomers = db.getCustomers();
+          const updatedCust = updatedCustomers.find(c => c.id === customerId);
+          setSelectedCrmCustomer(updatedCust);
+          alert("Abonnement résilié avec succès !");
+        }
+      } catch (err) {
+        alert("Erreur lors de la résiliation de l'abonnement : " + (err.message || err));
       }
     }
   };
@@ -430,7 +438,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setEditStaffNom(selectedMember.nom || '');
       setEditStaffPrenom(selectedMember.prenom || '');
       setEditStaffRole(selectedMember.role || 'agent_accueil');
-      setEditStaffEmail(selectedMember.email || `${selectedMember.prenom.toLowerCase()}.${selectedMember.nom.toLowerCase()}@klinup.com`);
+      setEditStaffEmail(selectedMember.email || `${selectedMember.prenom.toLowerCase()}.${selectedMember.nom.toLowerCase()}@pressingpro.com`);
       setEditStaffTel(selectedMember.telephone || '');
       setEditStaffStatut(selectedMember.statut || 'actif');
       setEditStaffStoreId(selectedMember.store_id || selectedMember.laverie_id || selectedMember.laverie || (selectedMember.role === 'super_admin' ? 'all' : ''));
@@ -492,7 +500,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       return;
     }
 
-    const emailToUse = (newStaffEmail ? newStaffEmail.trim() : `${newStaffPrenom.toLowerCase().trim()}.${newStaffNom.toLowerCase().trim()}@klinup.com`).toLowerCase();
+    const emailToUse = (newStaffEmail ? newStaffEmail.trim() : `${newStaffPrenom.toLowerCase().trim()}.${newStaffNom.toLowerCase().trim()}@pressingpro.com`).toLowerCase();
     
     // Check email uniqueness to prevent collisions
     const emailExists = (staff || []).some(s => s.email && s.email.toLowerCase() === emailToUse);
@@ -614,6 +622,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const pendingOrdersCount = orders.filter(o => o.statut === 'en_attente').length;
 
   const statusDisplayLabels = {
+    en_attente_validation: 'À valider (Livreur)',
     en_attente: 'En attente',
     traitement: 'Traitement',
     en_cours_lavage: 'Lavage',
@@ -1754,7 +1763,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     (item.service || 'SRV').trim() === 'repassage' ? 'REP' :
                     (item.service || 'SRV').trim() === 'nettoyage_a_sec' ? 'SEC' : 'GEN';
     const idSuffix = item.id ? item.id.substring(item.id.indexOf('_') + 1).toUpperCase().substring(0, 4) : '0000';
-    return `KLIN-${artCode}-${srvCode}-${idSuffix}`;
+    return `PRO-${artCode}-${srvCode}-${idSuffix}`;
   };
 
   const formatDateOnly = (dateStr) => {
@@ -1861,7 +1870,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
     e.preventDefault();
     if (!newCustNom || !newCustPrenom || !newCustTel || !newCustAdresse) return;
 
-    if (!validatePhoneNumber(newCustTel, newCustIndicatif)) {
+    const normalizedPhone = normalizePhoneNumber(newCustTel, newCustIndicatif);
+
+    if (!validatePhoneNumber(normalizedPhone, newCustIndicatif)) {
       alert("Le format du numéro de téléphone n'est pas valide pour l'indicatif choisi.");
       return;
     }
@@ -1874,14 +1885,14 @@ export default function AdminView({ activeTab, onManageStaff }) {
         : null;
 
       const newCustomer = await db.addCustomer({
-        nom: newCustNom,
-        prenom: newCustPrenom,
-        telephone: newCustTel,
+        nom: newCustNom.trim(),
+        prenom: newCustPrenom.trim(),
+        telephone: normalizedPhone,
         indicatif: newCustIndicatif,
         preferences_pliage: newCustPref,
-        adresse: newCustAdresse,
-        quartier: newCustQuartier,
-        ville: newCustVille,
+        adresse: newCustAdresse.trim(),
+        quartier: newCustQuartier.trim(),
+        ville: newCustVille.trim(),
         latitude: lat,
         longitude: lng,
         coordonnees_livraison: coords,
@@ -1894,6 +1905,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
       refreshAdminData();
       setSelectedCustomerId(newCustomer.id);
+      setSelectedCrmCustomer(newCustomer);
       setShowNewCustomerModal(false);
       setNewCustNom('');
       setNewCustPrenom('');
@@ -1952,6 +1964,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
       }
     }
 
+    const isSubActive = (!!payWithSubscription || !!subscribePlanId) && activeCustomerObj && (!!activeCustomerObj.active_subscription || !!subscribePlanId);
+
     const orderData = {
       customer_id: selectedCustomerId,
       type_article: typeArticleSummary,
@@ -1959,9 +1973,11 @@ export default function AdminView({ activeTab, onManageStaff }) {
       niveau_urgence: niveauUrgence,
       mode_reglement: payWithSubscription ? (subscribePlanId ? modeReglement : 'abonnement') : modeReglement,
       avance_payee: (payWithSubscription && !subscribePlanId) ? 0 : Number(avancePayee || 0),
-      pay_with_subscription: payWithSubscription,
+      pay_with_subscription: !!payWithSubscription,
+      is_subscription_order: !!isSubActive,
       subscribe_plan_id: subscribePlanId,
       items: selectedItems,
+      articles: selectedItems,
       remise_pourcentage: Number(remisePourcentage || 0)
     };
 
@@ -1985,13 +2001,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
           const det = newOrder.subscription_details;
           if (det.immediate_subscription) {
             const remaining = newOrder.prix_total - newOrder.avance_payee;
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP avec souscription immédiate au forfait ${det.immediate_subscription.name} (${det.immediate_subscription.prix.toLocaleString()} FCFA).\nArticles déposés: ${det.clothes_deducted} vêtements\nNouveau solde restant: ${det.new_balance} vêt.\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer sur l'abonnement: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez Pressing Pro avec souscription immédiate au forfait ${det.immediate_subscription.name} (${det.immediate_subscription.prix.toLocaleString()} FCFA).\nArticles déposés: ${det.clothes_deducted} vêtements\nNouveau solde restant: ${det.new_balance} vêt.\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer sur l'abonnement: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
           } else {
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP via votre forfait ${det.name}.\nArticles déposés: ${det.clothes_deducted} vêtements\nSolde précédent: ${det.previous_balance} vêt.\nNouveau solde restant: ${det.new_balance} vêt.\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez Pressing Pro via votre forfait ${det.name}.\nArticles déposés: ${det.clothes_deducted} vêtements\nSolde précédent: ${det.previous_balance} vêt.\nNouveau solde restant: ${det.new_balance} vêt.\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
           }
         } else {
           const remaining = newOrder.prix_total - newOrder.avance_payee;
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez KLIN UP.\nTotal: ${newOrder.prix_total.toLocaleString()} FCFA\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${newOrder.identifiant_unique_marquage} (${newOrder.type_article}) a bien été enregistrée chez Pressing Pro.\nTotal: ${newOrder.prix_total.toLocaleString()} FCFA\nAcompte payé: ${newOrder.avance_payee.toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
         }
         sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
       }
@@ -2021,9 +2037,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
             if (finalStatus === 'restitue') {
               const isDelivery = order.subscription_details?.type_livraison === 'livraison' || order.mode_reglement === 'livraison';
               const actionLabel = isDelivery ? 'livrée' : 'récupérée';
-              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${actionLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} a été ${actionLabel} avec succès. Merci pour votre confiance et à bientôt chez Pressing Pro !`;
             } else if (finalStatus === 'pret') {
-              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
+              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête chez Pressing Pro ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
             }
             if (text) sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
           }
@@ -2074,9 +2090,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
         if (delivFinalStatus === 'restitue') {
           const isDelivery = delivOrder.subscription_details?.type_livraison === 'livraison' || delivOrder.mode_reglement === 'livraison';
           const actionLabel = isDelivery ? 'livrée' : 'récupérée';
-          text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA. Votre commande ${delivOrder.identifiant_unique_marquage} vous a été ${actionLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+          text = `Bonjour ${customer.prenom} ${customer.nom}, nous confirmons le règlement du solde de ${Number(delivAmountPaid).toLocaleString()} FCFA. Votre commande ${delivOrder.identifiant_unique_marquage} vous a été ${actionLabel} avec succès. Merci pour votre confiance et à bientôt chez Pressing Pro !`;
         } else if (delivFinalStatus === 'pret') {
-          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${delivOrder.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${delivOrder.identifiant_unique_marquage} est prête chez Pressing Pro ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
         }
         if (text) sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
       }
@@ -2108,7 +2124,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
       // Notification WhatsApp règlement dette
       if (updatedCustomer) {
-        const text = `Bonjour ${updatedCustomer.prenom} ${updatedCustomer.nom}, nous confirmons le paiement de ${Number(debtPaymentAmount).toLocaleString()} FCFA pour le règlement de votre dette chez KLIN UP.\nVotre nouveau solde débiteur est de ${updatedCustomer.solde_dette.toLocaleString()} FCFA.\nMerci et à bientôt !`;
+        const text = `Bonjour ${updatedCustomer.prenom} ${updatedCustomer.nom}, nous confirmons le paiement de ${Number(debtPaymentAmount).toLocaleString()} FCFA pour le règlement de votre dette chez Pressing Pro.\nVotre nouveau solde débiteur est de ${updatedCustomer.solde_dette.toLocaleString()} FCFA.\nMerci et à bientôt chez Pressing Pro !`;
         sendWhatsAppMessage(updatedCustomer.telephone, text, updatedCustomer.indicatif);
       }
 
@@ -2145,11 +2161,25 @@ export default function AdminView({ activeTab, onManageStaff }) {
         if (customer) {
           let text = '';
           if (nextStatus === 'pret') {
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête chez Pressing Pro ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
           } else if (nextStatus === 'restitue') {
             const isDelivery = order.subscription_details?.type_livraison === 'livraison' || order.mode_reglement === 'livraison';
             const actionLabel = isDelivery ? 'livrée' : 'récupérée';
-            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été ${actionLabel} avec succès. Merci pour votre confiance et à bientôt chez KLIN UP !`;
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} vous a été ${actionLabel} avec succès. Merci pour votre confiance et à bientôt chez Pressing Pro !`;
+          } else if ((order.statut === 'en_attente_validation' || (order.cree_par_livreur && !order.validee_par_caisse)) && nextStatus === 'en_attente') {
+            // Validation caisse depuis le changement de statut
+            const formattedDueDate = formatDateOnly(order.due_date);
+            const remaining = Number(order.prix_total || order.total || 0) - Number(order.avance_payee || order.avance || 0);
+            if (order.is_subscription_order && order.subscription_details) {
+              const det = order.subscription_details;
+              if (det.immediate_subscription) {
+                text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} (${order.type_article}) a bien été enregistrée chez Pressing Pro avec souscription immédiate au forfait ${det.immediate_subscription.name} (${det.immediate_subscription.prix.toLocaleString()} FCFA).\nArticles déposés: ${det.clothes_deducted} vêtements\nNouveau solde restant: ${det.new_balance} vêt.\nAcompte payé: ${Number(order.avance_payee || order.avance || 0).toLocaleString()} FCFA\nReste à payer sur l'abonnement: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+              } else {
+                text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} (${order.type_article}) a bien été enregistrée chez Pressing Pro via votre forfait ${det.name}.\nArticles déposés: ${det.clothes_deducted} vêtements\nSolde précédent: ${det.previous_balance} vêt.\nNouveau solde restant: ${det.new_balance} vêt.\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+              }
+            } else {
+              text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} (${order.type_article}) a bien été enregistrée chez Pressing Pro.\nTotal: ${Number(order.prix_total || order.total || 0).toLocaleString()} FCFA\nAcompte payé: ${Number(order.avance_payee || order.avance || 0).toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+            }
           }
           if (text) {
             sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
@@ -2158,6 +2188,41 @@ export default function AdminView({ activeTab, onManageStaff }) {
       }
     } catch (err) {
       alert("Erreur lors du changement de statut : " + err.message);
+    }
+  };
+
+  const handleValidateLivreurOrder = async (order) => {
+    if (!order) return;
+    try {
+      if (typeof db.validateOrderByCashier === 'function') {
+        await db.validateOrderByCashier(order.id);
+      } else {
+        await db.updateOrderStatus(order.id, 'en_attente');
+      }
+      refreshAdminData();
+
+      // Notification WhatsApp : premier message client généré après validation caisse
+      const customer = customers.find(c => c.id === order.customer_id);
+      if (customer && customer.telephone) {
+        let text = '';
+        const formattedDueDate = formatDateOnly(order.due_date);
+        const remaining = Number(order.prix_total || order.total || 0) - Number(order.avance_payee || order.avance || 0);
+
+        if (order.is_subscription_order && order.subscription_details) {
+          const det = order.subscription_details;
+          if (det.immediate_subscription) {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} (${order.type_article}) a bien été enregistrée chez Pressing Pro avec souscription immédiate au forfait ${det.immediate_subscription.name} (${det.immediate_subscription.prix.toLocaleString()} FCFA).\nArticles déposés: ${det.clothes_deducted} vêtements\nNouveau solde restant: ${det.new_balance} vêt.\nAcompte payé: ${Number(order.avance_payee || order.avance || 0).toLocaleString()} FCFA\nReste à payer sur l'abonnement: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          } else {
+            text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} (${order.type_article}) a bien été enregistrée chez Pressing Pro via votre forfait ${det.name}.\nArticles déposés: ${det.clothes_deducted} vêtements\nSolde précédent: ${det.previous_balance} vêt.\nNouveau solde restant: ${det.new_balance} vêt.\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+          }
+        } else {
+          text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} (${order.type_article}) a bien été enregistrée chez Pressing Pro.\nTotal: ${Number(order.prix_total || order.total || 0).toLocaleString()} FCFA\nAcompte payé: ${Number(order.avance_payee || order.avance || 0).toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\nDate de livraison prévue: ${formattedDueDate}\nMerci pour votre confiance !`;
+        }
+        sendWhatsAppMessage(customer.telephone, text, customer.indicatif);
+      }
+      alert(`Commande ${order.identifiant_unique_marquage} validée avec succès par la caisse !`);
+    } catch (err) {
+      alert("Erreur lors de la validation par la caisse : " + err.message);
     }
   };
 
@@ -2265,6 +2330,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           isOrderLate={isOrderLate}
           serviceLabels={serviceLabels}
           handleStatusChange={handleStatusChange}
+          handleValidateLivreurOrder={handleValidateLivreurOrder}
           handleStartDelivery={handleStartDelivery}
           copyToClipboard={copyToClipboard}
           formatDateTime={formatDateTime}
@@ -2285,6 +2351,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {activeTab === 'crm_management' && (
         <CustomersTab
           customers={customers}
+          stores={stores}
+          currentUser={currentUser}
           selectedCrmCustomer={selectedCrmCustomer}
           setSelectedCrmCustomer={setSelectedCrmCustomer}
           crmSearch={crmSearch}
@@ -2468,7 +2536,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   <input
                     type="email"
                     className="input-control"
-                    placeholder="nom.prenom@klinup.com"
+                    placeholder="nom.prenom@pressingpro.com"
                     required
                     value={newStaffEmail}
                     onChange={(e) => setNewStaffEmail(e.target.value)}
@@ -3866,7 +3934,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   {/* ---- EN-TÊTE DYNAMIQUE ---- */}
                   <div style={{ textAlign: 'center', paddingBottom: '16px', marginBottom: '16px', borderBottom: '2px dashed #cccccc' }}>
                     <h1 style={{ margin: 0, fontSize: effW >= 140 ? '22px' : '18px', fontWeight: '900', color: '#000000', letterSpacing: '1px', whiteSpace: 'pre-line' }}>
-                      {sysSettings.receipt_header || 'KLIN UP - Laverie & Pressing Premium'}
+                      {sysSettings.receipt_header || 'Pressing Pro - Laverie & Pressing Premium'}
                     </h1>
                     <p style={{ margin: '4px 0 12px', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
                       Ticket de Dépôt Client ({pFormat.toUpperCase()} • {pWidth}mm × {pHeight > 0 ? `${pHeight}mm` : 'Auto'})
@@ -4060,23 +4128,78 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
                   {/* ---- PIED DE PAGE DYNAMIQUE ---- */}
                   <div style={{ textAlign: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed #cccccc', fontSize: '11px', color: '#666666', whiteSpace: 'pre-line' }}>
-                    {sysSettings.receipt_footer || 'Merci de votre confiance ! À bientôt chez KLIN UP.'}
+                    {sysSettings.receipt_footer || 'Merci de votre confiance ! À bientôt chez Pressing Pro.'}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <div className="no-print" data-print="no" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
+                  <div className="no-print" data-print="no" style={{ display: 'flex', gap: '0.4rem' }}>
                     <button
                       type="button"
-                      className="btn btn-outline"
+                      className="btn btn-outline no-print"
+                      data-print="no"
                       style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
-                      onClick={() => window.print ? window.print() : alert("Impression du reçu en cours !")}
+                      onClick={() => {
+                        const element = document.getElementById('receipt-print-area-admin');
+                        if (element) {
+                          const iframe = document.createElement('iframe');
+                          iframe.style.position = 'fixed';
+                          iframe.style.right = '0';
+                          iframe.style.bottom = '0';
+                          iframe.style.width = '0';
+                          iframe.style.height = '0';
+                          iframe.style.border = '0';
+                          document.body.appendChild(iframe);
+                          const doc = iframe.contentWindow.document;
+                          doc.open();
+                          doc.write(`
+                            <!DOCTYPE html>
+                            <html>
+                              <head>
+                                <title>Facture_${createdOrder.identifiant_unique_marquage}</title>
+                                <style>
+                                  @page {
+                                    size: ${pFormat === 'A4' ? 'A4 portrait' : pFormat === 'A5' ? 'A5 portrait' : `${pWidth}mm auto`};
+                                    margin: ${pMargin || 3}mm;
+                                  }
+                                  body {
+                                    margin: 0;
+                                    padding: 0;
+                                    font-family: Arial, sans-serif;
+                                    background: #ffffff;
+                                    color: #000000;
+                                  }
+                                  * {
+                                    box-sizing: border-box;
+                                  }
+                                </style>
+                              </head>
+                              <body>
+                                ${element.outerHTML}
+                              </body>
+                            </html>
+                          `);
+                          doc.close();
+                          setTimeout(() => {
+                            iframe.contentWindow.focus();
+                            iframe.contentWindow.print();
+                            setTimeout(() => {
+                              document.body.removeChild(iframe);
+                            }, 1500);
+                          }, 250);
+                        } else if (window.print) {
+                          window.print();
+                        } else {
+                          alert("Impression du reçu en cours !");
+                        }
+                      }}
                     >
                       <Printer size={12} /> Imprimer ({pFormat.toUpperCase()})
                     </button>
                     <button
                       type="button"
-                      className="btn btn-outline"
+                      className="btn btn-outline no-print"
+                      data-print="no"
                       style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: '#000', borderColor: '#000', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
                       onClick={() => {
                         const element = document.getElementById('receipt-print-area-admin');
@@ -4101,7 +4224,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
                   <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-primary no-print"
+                  data-print="no"
                   style={{ width: '100%', background: '#000', color: '#fff', border: 'none', padding: '0.45rem', fontSize: '0.75rem', borderRadius: '8px' }}
                   onClick={() => setCreatedOrder(null)}
                 >

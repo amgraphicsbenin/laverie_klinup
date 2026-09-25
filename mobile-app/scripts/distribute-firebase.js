@@ -19,17 +19,17 @@ const FIREBASE_CONFIG = {
   apps: {
     production: {
       appId: '1:735467305399:android:43c1e315d66b4c56069032',
-      displayName: 'KLIN UP (Production)',
+      displayName: 'Pressing Pro (Production)',
       packageName: 'com.klinup.laverie',
     },
     test: {
       appId: '1:735467305399:android:170a40fff0cb9af8069032',
-      displayName: 'KLIN UP Test',
+      displayName: 'Pressing Pro Test',
       packageName: 'com.klinup.laverie.test',
     },
     staging: {
       appId: '1:735467305399:android:43c1e315d66b4c56069032',
-      displayName: 'KLIN UP Bêta',
+      displayName: 'Pressing Pro Bêta',
       packageName: 'com.klinup.laverie.beta',
     },
   },

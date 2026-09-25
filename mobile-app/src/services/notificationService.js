@@ -68,7 +68,7 @@ export async function initSystemNotifications() {
       if (typeof Notifications.setNotificationChannelAsync === 'function') {
         // Canal principal pour les commandes (priorité MAX = sonnerie + heads-up banner garantis sur Pixel)
         await Notifications.setNotificationChannelAsync('orders', {
-          name: 'Commandes KLIN UP',
+          name: 'Commandes Pressing Pro',
           description: 'Notifications de suivi des commandes',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 300, 150, 400],
@@ -261,7 +261,7 @@ export async function sendSystemNotification(title, body, data = {}) {
     if (Platform.OS === 'android' || Platform.OS === 'ios') {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: title || 'KLIN UP',
+          title: title || 'Pressing Pro',
           body: body || 'Nouvelle notification',
           sound: 'default',
           badge: 1,
@@ -277,14 +277,14 @@ export async function sendSystemNotification(title, body, data = {}) {
     } else if (typeof window !== 'undefined' && 'Notification' in window) {
       // Web fallback
       if (window.Notification.permission === 'granted') {
-        new window.Notification(title || 'KLIN UP', {
+        new window.Notification(title || 'Pressing Pro', {
           body: body || 'Nouvelle notification',
           icon: '/assets/notification_icon.png',
         });
       } else if (window.Notification.permission === 'default') {
         const perm = await window.Notification.requestPermission();
         if (perm === 'granted') {
-          new window.Notification(title || 'KLIN UP', { body: body || 'Nouvelle notification', icon: '/assets/notification_icon.png' });
+          new window.Notification(title || 'Pressing Pro', { body: body || 'Nouvelle notification', icon: '/assets/notification_icon.png' });
         }
       }
     }
@@ -383,7 +383,7 @@ export async function testSendPushNotification(userId, storeId = 'store_central'
             identifiant_unique_marquage: 'CMD-TEST-001',
             statut: 'en_attente',
             store_id: storeId,
-            titre: '🧪 Test Push KLIN UP',
+            titre: '🧪 Test Push Pressing Pro',
             message: 'Ceci est une notification push de test reçue en temps réel !'
           }
         }

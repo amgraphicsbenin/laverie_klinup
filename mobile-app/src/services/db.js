@@ -1,6 +1,6 @@
 /**
  * @file db.js
- * @description Point d'entrée rétro-compatible de la base de données KLIN UP.
+ * @description Point d'entrée rétro-compatible de la base de données Pressing Pro.
  * Ré-exporte les composants modulaires (seeds, dbEngine, syncEngine) pour maintenir la compatibilité avec le reste du projet.
  */
 

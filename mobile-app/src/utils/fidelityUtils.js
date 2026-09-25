@@ -1,5 +1,5 @@
 /**
- * Utilitaires pour le système de Fidélité & Récompenses (Reward System) Klin UP
+ * Utilitaires pour le système de Fidélité & Récompenses (Reward System) Pressing Pro
  * Design épuré, icônes solides vectorielles et intégration thème natif
  */
 

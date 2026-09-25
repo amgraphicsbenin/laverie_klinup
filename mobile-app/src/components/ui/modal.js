@@ -229,7 +229,7 @@ export function ModalDialog({ children, style }) {
 }
 
 // ── Modal.CloseTrigger ───────────────────────────────────────────────────────
-export function ModalCloseTrigger({ onPress, style }) {
+export function ModalCloseTrigger({ onPress, style, dataSet, className }) {
   const { onClose, isDarkMode } = useModalContext();
   const handlePress = onPress || onClose;
 
@@ -238,6 +238,9 @@ export function ModalCloseTrigger({ onPress, style }) {
       activeOpacity={0.7}
       onPress={handlePress}
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      className={`no-print ${className || ''}`.trim()}
+      dataSet={{ print: 'no', ...(dataSet || {}) }}
+      accessibilityRole="button"
       style={[
         styles.closeTrigger,
         {
@@ -253,9 +256,11 @@ export function ModalCloseTrigger({ onPress, style }) {
 }
 
 // ── Modal.Header ─────────────────────────────────────────────────────────────
-export function ModalHeader({ children, style, layout = 'row' }) {
+export function ModalHeader({ children, style, layout = 'row', dataSet, className }) {
   return (
     <View
+      className={className}
+      dataSet={dataSet}
       style={[
         styles.header,
         layout === 'column' ? styles.headerColumn : styles.headerRow,

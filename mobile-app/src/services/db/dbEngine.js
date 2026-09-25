@@ -130,7 +130,7 @@ export const db = {
   },
 
   getRewardCatalog: () => {
-    if (memoryDb.rewards && Array.isArray(memoryDb.rewards)) {
+    if (memoryDb.rewards && Array.isArray(memoryDb.rewards) && memoryDb.rewards.length > 0) {
       return memoryDb.rewards.map(r => ({
         id: r.id,
         title: r.title || r.article,
@@ -153,7 +153,13 @@ export const db = {
         is_active: c.is_active !== false
       }));
     }
-    return [];
+    return [
+      { id: 'remise_1000', title: 'Remise de 1 000 FCFA', cost: 30, discountAmount: 1000, iconName: 'Tag', description: 'Réduction de 1 000 FCFA sur la prochaine commande.', is_active: true },
+      { id: 'lavage_offert', title: 'Lavage 1 Vêtement Offert', cost: 50, discountAmount: 2000, iconName: 'Shirt', description: 'Un lavage gratuit pour une pièce au choix.', is_active: true },
+      { id: 'livraison_offerte', title: 'Livraison Offerte', cost: 60, discountAmount: 1500, iconName: 'Truck', description: 'Frais de livraison 100% offerts.', is_active: true },
+      { id: 'repassage_offert', title: 'Repassage Offert', cost: 100, discountAmount: 4000, iconName: 'Sparkles', description: 'Repassage complet offert sur vos vêtements.', is_active: true },
+      { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: 'Réduction de 5 000 FCFA lors du renouvellement d\'abonnement.', is_active: true }
+    ];
   },
 
   updateRewardCatalog: async (catalog) => {
@@ -236,7 +242,7 @@ export const db = {
 
     return (memoryDb.customers || []).filter(c => {
       if (!c) return false;
-      if (c.store_id === 'all') return true;
+      if (!c.store_id || c.store_id === 'all' || c.store_id === '') return true;
       if (c.store_id === targetStoreId || (targetStoreCode && c.store_id === targetStoreCode)) return true;
       if (c.created_by_id && storeStaffIds.has(c.created_by_id)) return true;
       return false;
@@ -787,13 +793,14 @@ export const db = {
   /**
    * Supprime définitivement un client.
    */
-  deleteCustomer: async (id) => {
+  deleteCustomer: async (id, reason) => {
     const idx = memoryDb.customers.findIndex(c => c.id === id);
     if (idx !== -1) {
       const customer = memoryDb.customers[idx];
       await performMutation('delete', 'customers', id);
       memoryDb.customers.splice(idx, 1);
-      db.logAction('SUPPRESSION_CLIENT', `Client ${customer.prenom} ${customer.nom} supprimé`);
+      const reasonText = reason ? ` (Motif : ${reason})` : '';
+      db.logAction('SUPPRESSION_CLIENT', `Client ${customer.prenom} ${customer.nom} supprimé${reasonText}`);
       db.notify();
       return true;
     }
@@ -943,11 +950,12 @@ export const db = {
     }
 
     if (isSubscriptionOrder) {
-      const remaining = customer.active_subscription.remaining_clothes;
+      const remaining = Number(customer.active_subscription.remaining_clothes || 0);
       if (remaining < totalClothes) {
         throw new Error(`Solde d'abonnement insuffisant. Requis: ${totalClothes}, Disponible: ${remaining}`);
       }
-      customer.active_subscription.remaining_clothes -= totalClothes;
+      customer.active_subscription.remaining_clothes = Math.max(0, remaining - totalClothes);
+      customer.active_subscription.clothes_washed = (Number(customer.active_subscription.clothes_washed) || 0) + totalClothes;
       totalPrice = subscribedPlan ? subscribedPlan.prix : 0;
     } else {
       if (inputItems.length > 0) {
@@ -996,15 +1004,18 @@ export const db = {
     const pickupFee = Number(orderData.frais_recuperation || orderData.pickup_fee || 0);
 
     const passedTotal = Number(orderData.prix_total || orderData.total || 0);
-    if (passedTotal > 0) {
+    if (isSubscriptionOrder && !subscribedPlan) {
+      // Pour une commande couverte par un forfait existant, seuls les frais de livraison/récupération s'appliquent
+      totalPrice = deliveryFee + pickupFee;
+    } else if (passedTotal > 0) {
       totalPrice = passedTotal;
     } else {
       totalPrice = Math.max(0, totalPrice) + deliveryFee + pickupFee;
     }
 
     const avanceInput = orderData.avance_payee !== undefined ? orderData.avance_payee : (orderData.avance !== undefined ? orderData.avance : 0);
-    const advancePaid = (isSubscriptionOrder && !subscribedPlan) ? 0 : Number(avanceInput);
-    const unpaidBalance = totalPrice - advancePaid;
+    const advancePaid = (isSubscriptionOrder && !subscribedPlan && (deliveryFee + pickupFee === 0)) ? 0 : Number(avanceInput);
+    const unpaidBalance = Math.max(0, totalPrice - advancePaid);
 
     if (customer && unpaidBalance > 0) {
       customer.solde_dette = Math.max(0, Number(customer.solde_dette) + unpaidBalance);
@@ -1020,7 +1031,7 @@ export const db = {
       }
     }
 
-    const codeMarquage = orderData.identifiant_unique_marquage || ('KLIN-' + (memoryDb.orders ? memoryDb.orders.length : 0));
+    const codeMarquage = orderData.identifiant_unique_marquage || ('PRO-' + (memoryDb.orders ? memoryDb.orders.length : 0));
 
     const expressHoursItem = memoryDb.catalog.find(c => c.id === 'setting_express_hours');
     const expressHours = expressHoursItem ? Number(expressHoursItem.prix) : 6;
@@ -1085,6 +1096,8 @@ export const db = {
       distance_km: Number(orderData.distance_km || 0),
       operateur_momo: orderData.operateur_momo || null,
       items: inputItems,
+      articles: inputItems,
+      pay_with_subscription: !!orderData.pay_with_subscription || (isSubscriptionOrder && !subscribedPlan),
       created_by_id: currentUser ? currentUser.id : null,
       created_by_name: currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : null,
       validated_by_id: isCreatedByLivreur ? null : (currentUser ? currentUser.id : null),
@@ -1096,6 +1109,7 @@ export const db = {
       newOrder.is_subscription_order = true;
       newOrder.subscription_details = {
         name: customer.active_subscription.name,
+        total_clothes: customer.active_subscription.total_clothes,
         previous_balance: customer.active_subscription.remaining_clothes + totalClothes,
         new_balance: customer.active_subscription.remaining_clothes,
         clothes_deducted: totalClothes
@@ -1581,6 +1595,8 @@ export const db = {
     const oldStatus = order.statut;
     const oldMotifAnnulation = order.motif_annulation;
     const oldCustomerDette = customer ? Number(customer.solde_dette) : null;
+    const oldRemainingClothes = customer?.active_subscription ? Number(customer.active_subscription.remaining_clothes) : null;
+    const oldClothesWashed = customer?.active_subscription ? Number(customer.active_subscription.clothes_washed || 0) : null;
 
     // ── Marquer la commande comme "en cours de mutation" ──
     addPendingOrderUpdate(orderId);
@@ -1591,7 +1607,29 @@ export const db = {
     const unpaid = order.prix_total - order.avance_payee;
     if (unpaid > 0 && customer) {
       customer.solde_dette = Math.max(0, Number(customer.solde_dette) - unpaid);
-      await performMutation('update', 'customers', customer.id, { solde_dette: customer.solde_dette }).catch(e => console.warn('[DB] Customer update error:', e));
+    }
+
+    // Réconciliation abonnement : restituer le quota de vêtements si payé par abonnement
+    const isSubOrder = order.is_subscription_order || order.pay_with_subscription || (order.subscription_details && order.subscription_details.clothes_deducted);
+    if (isSubOrder && customer?.active_subscription) {
+      const clothesToRestore = order.subscription_details?.clothes_deducted ||
+        (order.items || order.articles || []).reduce((sum, it) => sum + Number(it.quantite || it.quantity || 1), 0);
+      customer.active_subscription.remaining_clothes = Math.min(
+        Number(customer.active_subscription.total_clothes || 0),
+        Number(customer.active_subscription.remaining_clothes || 0) + Number(clothesToRestore)
+      );
+      customer.active_subscription.clothes_washed = Math.max(
+        0,
+        Number(customer.active_subscription.clothes_washed || 0) - Number(clothesToRestore)
+      );
+    }
+
+    if (customer && (unpaid > 0 || isSubOrder)) {
+      const updateData = { solde_dette: customer.solde_dette };
+      if (customer.active_subscription) {
+        updateData.active_subscription = customer.active_subscription;
+      }
+      await performMutation('update', 'customers', customer.id, updateData).catch(e => console.warn('[DB] Customer update error:', e));
     }
 
     db.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage} annulée. Motif : ${reason}`);
@@ -1604,6 +1642,14 @@ export const db = {
       order.motif_annulation = oldMotifAnnulation;
       if (customer && oldCustomerDette !== null) {
         customer.solde_dette = oldCustomerDette;
+      }
+      if (customer && customer.active_subscription) {
+        if (oldRemainingClothes !== null) {
+          customer.active_subscription.remaining_clothes = oldRemainingClothes;
+        }
+        if (oldClothesWashed !== null) {
+          customer.active_subscription.clothes_washed = oldClothesWashed;
+        }
       }
       db.notify();
       throw e;
@@ -1632,7 +1678,7 @@ export const db = {
       nom: member.nom,
       prenom: member.prenom,
       role: member.role || 'agent_accueil',
-      email: member.email ? member.email.trim().toLowerCase() : `${member.prenom.toLowerCase()}.${member.nom.toLowerCase()}@klinup.com`,
+      email: member.email ? member.email.trim().toLowerCase() : `${member.prenom.toLowerCase()}.${member.nom.toLowerCase()}@pressingpro.com`,
       telephone: member.telephone || '',
       code_pin: defaultPin,
       statut: member.statut || 'actif',

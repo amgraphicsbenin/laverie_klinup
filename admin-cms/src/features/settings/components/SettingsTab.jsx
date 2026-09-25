@@ -156,7 +156,7 @@ function LeafletZoneMap({ lat, lng, storeName, zones }) {
 
     L.marker([parsedLat, parsedLng], { icon: storeIcon })
       .addTo(map)
-      .bindPopup(`<b>${storeName || 'Laverie KLIN UP'}</b><br/>📍 GPS: ${parsedLat.toFixed(6)}, ${parsedLng.toFixed(6)}`)
+      .bindPopup(`<b>${storeName || 'Pressing Pro'}</b><br/>📍 GPS: ${parsedLat.toFixed(6)}, ${parsedLng.toFixed(6)}`)
       .openPopup();
 
     return () => {
@@ -210,8 +210,8 @@ export default function SettingsTab({
     }
   }, [activeSubTabProp]);
   const [isSavedToast, setIsSavedToast] = useState(false);
-  const [receiptHeader, setReceiptHeader] = useState(() => (db.getSettings ? (db.getSettings().receipt_header || '') : 'KLIN UP - Laverie & Pressing Premium'));
-  const [receiptFooter, setReceiptFooter] = useState(() => (db.getSettings ? (db.getSettings().receipt_footer || '') : 'Merci de votre confiance ! À bientôt chez KLIN UP.'));
+  const [receiptHeader, setReceiptHeader] = useState(() => (db.getSettings ? (db.getSettings().receipt_header || '') : 'Pressing Pro - Laverie & Pressing Premium'));
+  const [receiptFooter, setReceiptFooter] = useState(() => (db.getSettings ? (db.getSettings().receipt_footer || '') : 'Merci de votre confiance ! À bientôt chez Pressing Pro.'));
 
   // Fidelity / Reward Settings State
   const [fidelityActive, setFidelityActive] = useState(() => (db.getSettings ? (db.getSettings().fidelity_active ?? true) : true));
@@ -238,7 +238,7 @@ export default function SettingsTab({
   // Delivery Zones & GPS Map State
   const stores = db.getStores ? db.getStores() : [];
   const [selectedStoreIdForZone, setSelectedStoreIdForZone] = useState(() => (stores[0]?.id || 'store_central'));
-  const currentStoreObj = stores.find(s => s.id === selectedStoreIdForZone) || stores[0] || { id: 'store_central', nom: 'KLIN UP Cotonou', latitude: 6.3703, longitude: 2.3912 };
+  const currentStoreObj = stores.find(s => s.id === selectedStoreIdForZone) || stores[0] || { id: 'store_central', nom: 'Pressing Pro Cotonou', latitude: 6.3703, longitude: 2.3912 };
   
   const [storeLatInput, setStoreLatInput] = useState(() => String(currentStoreObj.latitude || 6.3703));
   const [storeLngInput, setStoreLngInput] = useState(() => String(currentStoreObj.longitude || 2.3912));
@@ -270,8 +270,8 @@ export default function SettingsTab({
     }
     setTrelloTestStatus('Envoi de la carte de test...');
     try {
-      const cardTitle = `[HAUTE] [Test System] TICK-TEST - Test Intégration Trello KLIN UP`;
-      const cardDesc = `### 🐞 Test Intégration Trello KLIN UP Admin\nFélicitations ! Votre intégration Trello fonctionne correctement.`;
+      const cardTitle = `[HAUTE] [Test System] TICK-TEST - Test Intégration Trello Pressing Pro`;
+      const cardDesc = `### 🐞 Test Intégration Trello Pressing Pro Admin\nFélicitations ! Votre intégration Trello fonctionne correctement.`;
       const url = `https://api.trello.com/1/cards?idList=${encodeURIComponent(trelloListId.trim())}&key=${encodeURIComponent(trelloApiKey.trim())}&token=${encodeURIComponent(trelloApiToken.trim())}&name=${encodeURIComponent(cardTitle)}&desc=${encodeURIComponent(cardDesc)}`;
       await fetch(url, { method: 'POST' });
       setTrelloTestStatus('✅ Carte de test envoyée avec succès sur votre tableau Trello !');
@@ -1122,7 +1122,7 @@ export default function SettingsTab({
                       fontSize: '0.82rem',
                       lineHeight: 1.4
                     }}
-                    placeholder={`Ex: KLIN UP - Laverie & Pressing Premium\nAkpakpa, Cotonou - Tél: +229 90 00 00 00\nNIF: 3201928374615 • IFU: 1234567890`}
+                    placeholder={`Ex: Pressing Pro - Laverie & Pressing Premium\nAkpakpa, Cotonou - Tél: +229 90 00 00 00\nNIF: 3201928374615 • IFU: 1234567890`}
                     value={receiptHeader}
                     onChange={(e) => setReceiptHeader(e.target.value)}
                   />
@@ -1337,7 +1337,7 @@ export default function SettingsTab({
                       }}>
                         {/* EN-TÊTE D'IMPRESSION */}
                         <div style={{ textAlign: 'center', fontWeight: 800, fontSize: effW >= 140 ? '1.05rem' : '0.88rem', marginBottom: '0.3rem', color: effW >= 140 ? 'var(--primary)' : 'inherit', whiteSpace: 'pre-line' }}>
-                          {receiptHeader || 'KLIN UP - Laverie & Pressing Premium'}
+                          {receiptHeader || 'Pressing Pro - Laverie & Pressing Premium'}
                         </div>
                         <div style={{ textAlign: 'center', fontSize: '0.68rem', color: '#64748b', marginBottom: '0.75rem' }}>
                           Point de Laverie: Akpakpa (KLP-739) • Tél: +229 90 00 00 00
@@ -1373,7 +1373,7 @@ export default function SettingsTab({
 
                         {/* FOOTER */}
                         <div style={{ textAlign: 'center', marginTop: '1rem', paddingTop: '0.6rem', borderTop: '1px dashed #94a3b8', fontSize: '0.72rem', color: '#475569', whiteSpace: 'pre-line' }}>
-                          {receiptFooter || 'Merci de votre confiance ! À bientôt chez KLIN UP.'}
+                          {receiptFooter || 'Merci de votre confiance ! À bientôt chez Pressing Pro.'}
                         </div>
                       </div>
                     </div>

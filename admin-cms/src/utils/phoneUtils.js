@@ -14,7 +14,25 @@ export const SUPPORTED_COUNTRIES = [
 ];
 
 /**
+ * Normalise un numéro de téléphone selon l'indicatif.
+ * Au Bénin (+229), convertit automatiquement les anciens numéros à 8 chiffres en 10 chiffres (préfixe '01').
+ * @param {string} phone Le numéro saisi
+ * @param {string} indicatif L'indicatif du pays
+ * @returns {string} Le numéro normalisé
+ */
+export const normalizePhoneNumber = (phone, indicatif = '229') => {
+  if (!phone) return '';
+  let cleanPhone = String(phone).replace(/\D/g, '');
+  const cleanCode = String(indicatif || '229').replace(/\D/g, '');
+  if (cleanCode === '229' && cleanPhone.length === 8) {
+    cleanPhone = '01' + cleanPhone;
+  }
+  return cleanPhone;
+};
+
+/**
  * Valide un numéro de téléphone selon l'indicatif en utilisant libphonenumber-js.
+ * Supporte automatiquement la saisie béninoise à 8 ou 10 chiffres.
  * @param {string} phone Le numéro de téléphone saisi
  * @param {string} indicatif L'indicatif du pays (ex: '229' ou '+229')
  * @returns {boolean} true si valide, false sinon
@@ -29,10 +47,13 @@ export const validatePhoneNumber = (phone, indicatif) => {
       cleanCode = '+' + cleanCode;
     }
     
-    // Nettoyage du numéro de téléphone (enlever les espaces ou caractères bizarres, garder que les chiffres)
-    const cleanPhone = phone.replace(/\\D/g, '');
+    // Nettoyage et normalisation du numéro de téléphone
+    let cleanPhone = phone.replace(/\D/g, '');
+    if ((cleanCode === '+229' || cleanCode === '229') && cleanPhone.length === 8) {
+      cleanPhone = '01' + cleanPhone;
+    }
     
-    // On construit le format E.164 (ex: +22997000000)
+    // On construit le format E.164 (ex: +2290197000000)
     const fullNumber = `${cleanCode}${cleanPhone}`;
     
     return isValidPhoneNumber(fullNumber);

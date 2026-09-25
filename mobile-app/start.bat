@@ -1,5 +1,5 @@
 @echo off
-title KLIN UP - Serveur Expo
+title Pressing Pro - Serveur Expo
 color 0B
 
 cd /d "%~dp0"
@@ -7,8 +7,13 @@ cd /d "%~dp0"
 :: Eviter toute demande d'authentification Expo ou de telemetrie en dev local
 set EXPO_NO_TELEMETRY=1
 
+:: Securite : L'environnement local utilise TOUJOURS la base de TEST (isolee de la production)
+set APP_ENV=test
+set EXPO_PUBLIC_APP_ENV=test
+
 echo ==========================================================
-echo              KLIN UP MOBILE APP - SERVEUR EXPO            
+echo           PRESSING PRO MOBILE APP - SERVEUR EXPO          
+echo     [ENV] Mode TEST actif - Base de donnees isolee        
 echo ==========================================================
 echo.
 echo Choisissez le mode de demarrage :

@@ -1,7 +1,10 @@
 @echo off
-title KLIN UP - Admin CMS Server (Port 5174)
+title Pressing Pro - Admin CMS Server (Port 5174)
 
-echo Demarrage du serveur Admin CMS KLIN UP sur le port 5174...
+echo Demarrage du serveur Admin CMS Pressing Pro sur le port 5174...
+echo [ENV] Environnement local TEST actif - Base de donnees isolee (Aucun impact sur la PROD)
+
+set VITE_APP_ENV=test
 
 cd /d "%~dp0admin-cms"
 

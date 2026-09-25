@@ -1,6 +1,6 @@
 /**
  * @file i18n.js
- * @description Service d'internationalisation KLIN UP.
+ * @description Service d'internationalisation Pressing Pro.
  * Gère les traductions français, anglais et la sélection de langue.
  */
 
@@ -21,14 +21,14 @@ export const LANGUAGES = [
 ];
 
 /**
- * Traductions complètes de l'application KLIN UP.
+ * Traductions complètes de l'application Pressing Pro.
  * Organisées par module fonctionnel.
  */
 const translations = {
   fr: {
     // ── App Globale ──
     app: {
-      loading: 'Chargement de KLIN UP...',
+      loading: 'Chargement de Pressing Pro...',
       error_detected: 'Erreur détectée',
       no_stack_trace: 'Pas de trace d\'empilement disponible',
       success: 'Succès',
@@ -50,7 +50,7 @@ const translations = {
     },
     // ── Connexion ──
     auth: {
-      login_title: 'Connexion KLIN UP',
+      login_title: 'Connexion Pressing Pro',
       login_subtitle: 'Connectez-vous pour accéder à la plateforme de caisse & atelier.',
       pin_title: 'Vérifiez votre identité',
       pin_subtitle: 'Entrez votre code PIN à 6 chiffres pour accéder à l\'espace de travail.',
@@ -217,7 +217,7 @@ const translations = {
       support_title: 'Support Technique',
       support_message: 'Besoin d\'assistance avec l\'application ou la caisse ?\n\nEmail : andre.koutomi98@gmail.com\nContact : +229 01 67 98 77 97 (Tél / WhatsApp)',
       support_button: 'Support Technique Administrateur',
-      version: 'KLIN UP Mobile v1.5.0 — Caisse & Gestion',
+      version: 'Pressing Pro Mobile v1.5.0 — Caisse & Gestion',
       back: 'Retour',
       email_non_config: 'non configuré',
     },
@@ -339,7 +339,7 @@ const translations = {
   // ════════════════════════════════════════════════
   en: {
     app: {
-      loading: 'Loading KLIN UP...',
+      loading: 'Loading Pressing Pro...',
       error_detected: 'Error Detected',
       no_stack_trace: 'No stack trace available',
       success: 'Success',
@@ -359,7 +359,7 @@ const translations = {
       profil: 'Profile',
     },
     auth: {
-      login_title: 'KLIN UP Login',
+      login_title: 'Pressing Pro Login',
       login_subtitle: 'Log in to access the cash register & workshop platform.',
       pin_title: 'Verify Your Identity',
       pin_subtitle: 'Enter your 6-digit PIN code to access the workspace.',
@@ -503,7 +503,7 @@ const translations = {
       support_title: 'Technical Support',
       support_message: 'Need help with the app or cash register?\n\nEmail: andre.koutomi98@gmail.com\nContact: +229 01 67 98 77 97 (Phone / WhatsApp)',
       support_button: 'Administrator Tech Support',
-      version: 'KLIN UP Mobile v1.5.0 — Cash Register & Management',
+      version: 'Pressing Pro Mobile v1.5.0 — Cash Register & Management',
       back: 'Back',
       email_non_config: 'not configured',
     },
@@ -617,7 +617,7 @@ const translations = {
   // ════════════════════════════════════════════════
   es: {
     app: {
-      loading: 'Cargando KLIN UP...',
+      loading: 'Cargando Pressing Pro...',
       error_detected: 'Error Detectado',
       no_stack_trace: 'No hay traza de pila disponible',
       success: 'Éxito',
@@ -637,7 +637,7 @@ const translations = {
       profil: 'Perfil',
     },
     auth: {
-      login_title: 'Inicio de Sesión KLIN UP',
+      login_title: 'Inicio de Sesión Pressing Pro',
       login_subtitle: 'Inicie sesión para acceder a la plataforma de caja y taller.',
       pin_title: 'Verifique su Identidad',
       pin_subtitle: 'Ingrese su código PIN de 6 dígitos para acceder al espacio de trabajo.',
@@ -780,7 +780,7 @@ const translations = {
       support_title: 'Soporte Técnico',
       support_message: '¿Necesita ayuda con la aplicación o la caja?\n\nCorreo: andre.koutomi98@gmail.com\nContacto: +229 01 67 98 77 97 (Tel / WhatsApp)',
       support_button: 'Soporte Técnico Administrador',
-      version: 'KLIN UP Mobile v1.5.0 — Caja y Gestión',
+      version: 'Pressing Pro Mobile v1.5.0 — Caja y Gestión',
       back: 'Volver',
       email_non_config: 'no configurado',
     },
@@ -879,7 +879,7 @@ const translations = {
   // ════════════════════════════════════════════════
   pt: {
     app: {
-      loading: 'Carregando KLIN UP...',
+      loading: 'Carregando Pressing Pro...',
       error_detected: 'Erro Detectado',
       no_stack_trace: 'Nenhum stack trace disponível',
       success: 'Sucesso',
@@ -899,7 +899,7 @@ const translations = {
       profil: 'Perfil',
     },
     auth: {
-      login_title: 'Login KLIN UP',
+      login_title: 'Login Pressing Pro',
       login_subtitle: 'Faça login para acessar a plataforma de caixa e oficina.',
       pin_title: 'Verifique sua Identidade',
       pin_subtitle: 'Digite seu código PIN de 6 dígitos para acessar o espaço de trabalho.',
@@ -1042,7 +1042,7 @@ const translations = {
       support_title: 'Suporte Técnico',
       support_message: 'Precisa de ajuda com o aplicativo ou caixa?\n\nE-mail: andre.koutomi98@gmail.com\nContato: +229 01 67 98 77 97 (Tel / WhatsApp)',
       support_button: 'Suporte Técnico Administrador',
-      version: 'KLIN UP Mobile v1.5.0 — Caixa e Gestão',
+      version: 'Pressing Pro Mobile v1.5.0 — Caixa e Gestão',
       back: 'Voltar',
       email_non_config: 'não configurado',
     },

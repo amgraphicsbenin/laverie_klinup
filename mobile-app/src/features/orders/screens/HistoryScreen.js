@@ -150,11 +150,11 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   };
 
   const getDisplayTicketId = (order) => {
-    if (!order) return 'KLIN-0';
+    if (!order) return 'PRO-0';
     if (order.identifiant_unique_marquage) return order.identifiant_unique_marquage;
     if (order.ticket_numero) return order.ticket_numero;
-    if (order.id && String(order.id).startsWith('KLIN-')) return order.id;
-    return order.id || 'KLIN-0';
+    if (order.id && (String(order.id).startsWith('KLIN-') || String(order.id).startsWith('PRO-'))) return order.id;
+    return order.id || 'PRO-0';
   };
 
   const getStatusColor = (statut) => {
@@ -454,7 +454,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
         </head>
         <body>
           <div class="container">
-            <div class="brand">KLIN UP</div>
+            <div class="brand">Pressing Pro</div>
             <div class="brand-sub">LAVERIE & PRESSING PREMIUM</div>
             <div class="text-muted">Tél: +229 XX XX XX XX</div>
             <div class="text-muted">Cotonou, Bénin</div>
@@ -529,7 +529,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             
             <div class="barcode">* ${order.identifiant_unique_marquage || order.id} *</div>
             
-            <div class="text-muted" style="text-align: center;">Rejoignez KLIN UP pour un service premium</div>
+            <div class="text-muted" style="text-align: center;">Rejoignez Pressing Pro pour un service premium</div>
           </div>
         </body>
       </html>
@@ -540,6 +540,28 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
     if (!order) return;
     try {
       const html = generateInvoiceHtml(order);
+      if (Platform.OS === 'web') {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        setTimeout(() => {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1500);
+        }, 250);
+        return;
+      }
       await Print.printAsync({ html });
     } catch (error) {
       Alert.alert("Erreur", "Impossible d'imprimer la facture.");
@@ -551,23 +573,63 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
     if (!order) return;
     try {
       const html = generateInvoiceHtml(order);
-      const { uri } = await Print.printToFileAsync({ html });
-      
+
       if (Platform.OS === 'web') {
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `facture_${order.identifiant_unique_marquage || order.id || 'KLIN'}.pdf`;
-        link.click();
-      } else {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Télécharger la facture',
-          UTI: 'com.adobe.pdf'
-        });
+        const ticketFileName = `facture_${order.identifiant_unique_marquage || order.id || 'PRO'}.pdf`;
+        if (typeof window !== 'undefined' && window.html2pdf) {
+          const container = document.createElement('div');
+          container.style.position = 'fixed';
+          container.style.left = '-9999px';
+          container.style.top = '0';
+          container.style.width = '380px';
+          container.innerHTML = html;
+          document.body.appendChild(container);
+
+          const opt = {
+            margin: [4, 4, 4, 4],
+            filename: ticketFileName,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
+            jsPDF: { unit: 'mm', format: [80, 220], orientation: 'portrait' }
+          };
+
+          try {
+            await window.html2pdf().set(opt).from(container).save();
+          } finally {
+            document.body.removeChild(container);
+          }
+          return;
+        }
+
+        // Fallback web: impression via iframe isolée sans les boutons
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        setTimeout(() => {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1500);
+        }, 250);
+        return;
       }
+
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Télécharger la facture',
+        UTI: 'com.adobe.pdf'
+      });
     } catch (error) {
       Alert.alert("Erreur", "Impossible de télécharger la facture.");
       console.error(error);
@@ -1038,7 +1100,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
 
                 return (
                   <>
-                    <Modal.Header layout="row">
+                    <Modal.Header layout="row" className="no-print" dataSet={{ print: 'no' }}>
                       <Modal.Icon variant="primary">
                         <Receipt size={20} color="#002cf7" />
                       </Modal.Icon>
@@ -1055,7 +1117,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                         {/* TPE Thermal Receipt Wrapper */}
                         <View style={styles.tpeReceiptContainer}>
                           {/* Receipt Header */}
-                          <Text style={styles.tpeBrand}>KLIN UP</Text>
+                          <Text style={styles.tpeBrand}>Pressing Pro</Text>
                           <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
                           <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
                           <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
@@ -1161,6 +1223,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                           <TouchableOpacity
                             className="no-print"
                             dataSet={{ print: 'no' }}
+                            accessibilityRole="button"
                             onPress={() => handleSharePdf(invoiceOrder)}
                             style={styles.invoiceDownloadBtn}
                             activeOpacity={0.8}
@@ -1172,6 +1235,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                           <TouchableOpacity
                             className="no-print"
                             dataSet={{ print: 'no' }}
+                            accessibilityRole="button"
                             onPress={() => handlePrintInvoice(invoiceOrder)}
                             style={styles.invoicePrintBtn}
                             activeOpacity={0.8}
@@ -1184,6 +1248,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                         <TouchableOpacity
                           className="no-print"
                           dataSet={{ print: 'no' }}
+                          accessibilityRole="button"
                           onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
                           style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
                         >

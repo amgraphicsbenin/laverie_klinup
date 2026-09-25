@@ -1,5 +1,5 @@
 # ==============================================================================
-# KLIN UP - Lanceur Principal (Racine)
+# Pressing Pro - Lanceur Principal (Racine)
 # ==============================================================================
 
 $mobileStart = Join-Path $PSScriptRoot "mobile-app\start.ps1"

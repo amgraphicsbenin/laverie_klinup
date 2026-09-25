@@ -494,7 +494,7 @@ export default function ProfileScreen({ onModalStateChange, closeAllModalsTrigge
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 18, fontWeight: '700', color: isDarkMode ? '#ffffff' : '#09090b' }}>
-                      {currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Agent KLIN UP'}
+                      {currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Agent Pressing Pro'}
                     </Text>
                     <Text style={{ fontSize: 13, color: isDarkMode ? '#38bdf8' : '#002cf7', fontWeight: '600', marginTop: 2 }}>
                       {currentUser ? getRoleLabel(currentUser.role) : ''}

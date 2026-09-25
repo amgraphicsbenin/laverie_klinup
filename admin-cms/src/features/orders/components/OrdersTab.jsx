@@ -34,6 +34,7 @@ export default function OrdersTab({
   isOrderLate,
   serviceLabels,
   handleStatusChange,
+  handleValidateLivreurOrder,
   handleStartDelivery,
   copyToClipboard,
   formatDateTime,
@@ -60,6 +61,7 @@ export default function OrdersTab({
   };
 
   const statusLabels = {
+    en_attente_validation: 'À valider (Livreur)',
     en_attente: 'En attente',
     traitement: 'Traitement',
     en_cours_lavage: 'Lavage',
@@ -73,6 +75,7 @@ export default function OrdersTab({
   };
 
   const statusBadgesConfig = {
+    en_attente_validation: { bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: 'rgba(217, 119, 6, 0.25)', label: 'À valider (Livreur)' },
     en_attente: { bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706', border: 'rgba(245, 158, 11, 0.25)', label: 'En attente' },
     traitement: { bg: 'rgba(124, 58, 237, 0.12)', color: '#7c3aed', border: 'rgba(124, 58, 237, 0.25)', label: 'Traitement' },
     en_cours_lavage: { bg: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', border: 'rgba(37, 99, 235, 0.25)', label: 'Lavage' },
@@ -616,6 +619,16 @@ export default function OrdersTab({
 
                     {/* Action Step Buttons Workflow */}
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                      {(order.statut === 'en_attente_validation' || (order.cree_par_livreur && !order.validee_par_caisse)) && (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', background: '#059669', border: 'none', color: '#fff' }}
+                          onClick={() => handleValidateLivreurOrder ? handleValidateLivreurOrder(order) : handleStatusChange(order.id, 'en_attente')}
+                        >
+                          <CheckCircle2 size={15} /> Valider la commande (Caisse)
+                        </button>
+                      )}
                       {(order.statut === 'en_attente' || order.statut === 'attente' || order.statut === 'retard' || order.statut === 'en_retard') && (
                         <button
                           type="button"

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, Modal as RNModal, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, Modal as RNModal, Platform, TextInput, ActivityIndicator } from 'react-native';
 import { SmoothScrollView as ScrollView } from './SmoothScroll';
-import { User, Phone, MapPin, Edit3, Trash2, ArrowLeft, Award, CreditCard, Calendar, CheckCircle2 } from 'lucide-react-native';
+import { User, Phone, MapPin, Edit3, Trash2, ArrowLeft, Award, CreditCard, Calendar, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react-native';
 import SafeBlurView from './SafeBlurView';
 const BlurView = SafeBlurView;
 import { MotiView } from './SafeView';
@@ -11,7 +11,7 @@ import { CustomSelect } from './CustomSelect';
 import { t } from '../services/i18n';
 import RewardFidelityCard from './RewardFidelityCard';
 import AnimatedBadge from './AnimatedBadge';
-import { ConfirmationModal } from './ui/modal';
+import { ConfirmationModal, Modal, ModalBackdrop, ModalContainer, ModalDialog, ModalHeader, ModalIcon, ModalHeading, ModalDescription, ModalBody, ModalFooter, ModalButton, ModalCloseTrigger } from './ui/modal';
 
 export default function ClientDetailModal({
   visible,
@@ -23,19 +23,34 @@ export default function ClientDetailModal({
   const { customers, orders, catalog, currentUser, isDarkMode } = useDbState();
   const [selectedCrmSubId, setSelectedCrmSubId] = useState('');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteReasonError, setDeleteReasonError] = useState('');
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [unsubscribeModalVisible, setUnsubscribeModalVisible] = useState(false);
   const styles = getStyles(isDarkMode);
+
+  const reasonPresets = [
+    "Demande expresse du client",
+    "Compte client en doublon",
+    "Client inactif / Parti",
+    "Erreur de saisie"
+  ];
 
   if (!visible || !client) return null;
 
   const activeClient = (customers || []).find(c => c && c.id === client.id) || client;
+  const clientActiveOrders = (orders || []).filter(
+    o => o && o.customer_id === activeClient?.id && !['livre', 'restitue', 'annule'].includes(o.statut)
+  );
+  const hasActiveOrders = clientActiveOrders.length > 0;
+  const hasDebt = (Number(activeClient?.solde_dette) || 0) > 0;
 
   const getDisplayTicketId = (order) => {
-    if (!order) return 'KLIN-0';
+    if (!order) return 'PRO-0';
     if (order.identifiant_unique_marquage) return order.identifiant_unique_marquage;
     if (order.ticket_numero) return order.ticket_numero;
-    if (order.id && String(order.id).startsWith('KLIN-')) return order.id;
-    return order.id || 'KLIN-0';
+    if (order.id && (String(order.id).startsWith('KLIN-') || String(order.id).startsWith('PRO-'))) return order.id;
+    return order.id || 'PRO-0';
   };
 
   const getStatusColor = (statut) => {
@@ -82,14 +97,39 @@ export default function ClientDetailModal({
   };
 
   const handleDeleteCustomer = () => {
+    setDeleteReason('');
+    setDeleteReasonError('');
     setDeleteModalVisible(true);
   };
 
-  const handleConfirmDeleteCustomer = () => {
-    setDeleteModalVisible(false);
-    db.deleteCustomer(activeClient.id);
-    if (onShowSuccess) onShowSuccess("Client supprimé avec succès.");
-    onClose();
+  const handleConfirmDeleteCustomer = async () => {
+    const trimmedReason = (deleteReason || '').trim();
+    if (!trimmedReason || trimmedReason.length < 3) {
+      setDeleteReasonError("Veuillez indiquer un motif d'au moins 3 caractères pour la suppression.");
+      return;
+    }
+
+    if (hasActiveOrders) {
+      setDeleteReasonError(`Impossible de supprimer : ce client a ${clientActiveOrders.length} commande(s) en cours.`);
+      return;
+    }
+
+    setIsDeletingCustomer(true);
+    setDeleteReasonError('');
+    try {
+      const success = await db.deleteCustomer(activeClient.id, trimmedReason);
+      if (success) {
+        setDeleteModalVisible(false);
+        if (onShowSuccess) onShowSuccess("Profil client supprimé avec succès.");
+        onClose();
+      } else {
+        setDeleteReasonError("Erreur lors de la suppression du client.");
+      }
+    } catch (err) {
+      setDeleteReasonError(err.message || "Erreur lors de la suppression.");
+    } finally {
+      setIsDeletingCustomer(false);
+    }
   };
 
   return (
@@ -320,18 +360,178 @@ export default function ClientDetailModal({
           })()}
           </ScrollView>
 
-          {/* CONFIRMATION MODAL : SUPPRESSION DU CLIENT */}
-          <ConfirmationModal
-            visible={deleteModalVisible}
-            onClose={() => setDeleteModalVisible(false)}
-            onConfirm={handleConfirmDeleteCustomer}
-            title="Supprimer le client"
-            description={`Voulez-vous vraiment supprimer ${activeClient.prenom || ''} ${activeClient.nom || ''} ? Cette action est irréversible.`}
-            variant="danger"
-            confirmText="Supprimer"
-            cancelText="Annuler"
+          {/* MODAL SUPPRESSION DU PROFIL CLIENT AVEC MOTIF OBLIGATOIRE */}
+          <Modal
+            isOpen={deleteModalVisible}
+            onClose={() => {
+              if (!isDeletingCustomer) {
+                setDeleteModalVisible(false);
+                setDeleteReasonError('');
+              }
+            }}
+            size="md"
             isDarkMode={isDarkMode}
-          />
+          >
+            <ModalBackdrop>
+              <ModalContainer size="md">
+                <ModalDialog>
+                  <ModalCloseTrigger
+                    onPress={() => {
+                      if (!isDeletingCustomer) {
+                        setDeleteModalVisible(false);
+                        setDeleteReasonError('');
+                      }
+                    }}
+                  />
+                  <ModalHeader layout="row" style={{ alignItems: 'center', gap: 10 }}>
+                    <ModalIcon variant="danger">
+                      <Trash2 size={20} color="#ef4444" />
+                    </ModalIcon>
+                    <View style={{ flex: 1 }}>
+                      <ModalHeading style={{ fontSize: 16 }}>Supprimer le client</ModalHeading>
+                      <ModalDescription style={{ fontSize: 12 }}>
+                        Confirmation et motif obligatoire
+                      </ModalDescription>
+                    </View>
+                  </ModalHeader>
+
+                  <ModalBody style={{ marginTop: 12 }}>
+                    {/* Carte récapitulative du client */}
+                    <View style={styles.deleteClientCard}>
+                      <View style={styles.deleteClientAvatar}>
+                        <Text style={styles.deleteClientAvatarText}>
+                          {(activeClient.prenom?.[0] || "") + (activeClient.nom?.[0] || "")}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.deleteClientName}>
+                          {activeClient.prenom} {activeClient.nom}
+                        </Text>
+                        <Text style={styles.deleteClientPhone}>
+                          +{activeClient.indicatif || '229'} {activeClient.telephone}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Blocage commandes actives en cours */}
+                    {hasActiveOrders && (
+                      <View style={styles.deleteWarningBox}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <AlertTriangle size={15} color="#dc2626" />
+                          <Text style={styles.deleteWarningTitle}>Suppression impossible</Text>
+                        </View>
+                        <Text style={styles.deleteWarningText}>
+                          Ce client possède <Text style={{ fontWeight: '800' }}>{clientActiveOrders.length} commande(s) en cours de traitement</Text>. Vous devez d'abord finaliser ou annuler ces commandes avant de pouvoir supprimer ce compte.
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Avertissement solde débiteur */}
+                    {!hasActiveOrders && hasDebt && (
+                      <View style={styles.deleteDebtBox}>
+                        <AlertCircle size={15} color="#d97706" style={{ flexShrink: 0 }} />
+                        <Text style={styles.deleteDebtText}>
+                          Attention : ce client a une dette restante de <Text style={{ fontWeight: '800' }}>{formatPrice(activeClient.solde_dette)}</Text>.
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Saisie obligatoire du motif */}
+                    {!hasActiveOrders && (
+                      <View style={{ marginTop: 2 }}>
+                        <Text style={styles.deleteReasonLabel}>
+                          Motif de la suppression <Text style={{ color: '#ef4444' }}>*</Text>
+                        </Text>
+
+                        {/* Presets rapides */}
+                        <View style={styles.presetsRow}>
+                          {reasonPresets.map((preset, idx) => {
+                            const isSelected = deleteReason === preset;
+                            return (
+                              <TouchableOpacity
+                                key={idx}
+                                style={[
+                                  styles.presetChip,
+                                  isSelected && styles.presetChipActive
+                                ]}
+                                onPress={() => {
+                                  setDeleteReason(preset);
+                                  if (deleteReasonError) setDeleteReasonError('');
+                                }}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[
+                                  styles.presetChipText,
+                                  isSelected && styles.presetChipTextActive
+                                ]}>
+                                  {preset}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+
+                        <TextInput
+                          style={[
+                            styles.deleteReasonInput,
+                            !!deleteReasonError && styles.deleteReasonInputError
+                          ]}
+                          placeholder="Précisez le motif (ex: demande client, doublon)..."
+                          placeholderTextColor={isDarkMode ? '#71717a' : '#94a3b8'}
+                          value={deleteReason}
+                          onChangeText={(text) => {
+                            setDeleteReason(text);
+                            if (deleteReasonError) setDeleteReasonError('');
+                          }}
+                          multiline
+                          numberOfLines={3}
+                          editable={!isDeletingCustomer}
+                        />
+
+                        {!!deleteReasonError && (
+                          <Text style={styles.deleteErrorText}>
+                            {deleteReasonError}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </ModalBody>
+
+                  <ModalFooter style={{ marginTop: 14, gap: 10, flexDirection: 'row' }}>
+                    <ModalButton
+                      variant="secondary"
+                      disabled={isDeletingCustomer}
+                      onPress={() => {
+                        setDeleteModalVisible(false);
+                        setDeleteReasonError('');
+                      }}
+                      style={{ flex: 1 }}
+                    >
+                      {hasActiveOrders ? 'Compris, fermer' : 'Annuler'}
+                    </ModalButton>
+
+                    {!hasActiveOrders && (
+                      <ModalButton
+                        variant="danger"
+                        disabled={isDeletingCustomer}
+                        onPress={handleConfirmDeleteCustomer}
+                        style={{ flex: 1.2 }}
+                      >
+                        {isDeletingCustomer ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <ActivityIndicator size="small" color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>Suppression...</Text>
+                          </View>
+                        ) : (
+                          'Supprimer'
+                        )}
+                      </ModalButton>
+                    )}
+                  </ModalFooter>
+                </ModalDialog>
+              </ModalContainer>
+            </ModalBackdrop>
+          </Modal>
 
           {/* CONFIRMATION MODAL : RÉSILIATION ABONNEMENT */}
           <ConfirmationModal
@@ -660,6 +860,128 @@ function getStyles(isDarkMode) {
       fontStyle: 'italic',
       textAlign: 'center',
       paddingVertical: 10,
+    },
+    deleteClientCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 12,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? '#1e1e24' : '#f8fafc',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#2e2e38' : '#e2e8f0',
+      marginBottom: 12,
+    },
+    deleteClientAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDarkMode ? '#3b82f6' : '#2563eb',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deleteClientAvatarText: {
+      color: '#ffffff',
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    deleteClientName: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
+    },
+    deleteClientPhone: {
+      fontSize: 12,
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      marginTop: 2,
+    },
+    deleteWarningBox: {
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca',
+      marginBottom: 12,
+    },
+    deleteWarningTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#dc2626',
+    },
+    deleteWarningText: {
+      fontSize: 12,
+      color: isDarkMode ? '#fca5a5' : '#b91c1c',
+      lineHeight: 17,
+    },
+    deleteDebtBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 10,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fde68a',
+      marginBottom: 12,
+    },
+    deleteDebtText: {
+      flex: 1,
+      fontSize: 12,
+      color: isDarkMode ? '#fcd34d' : '#b45309',
+      lineHeight: 16,
+    },
+    deleteReasonLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#334155',
+      marginBottom: 8,
+    },
+    presetsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginBottom: 10,
+    },
+    presetChip: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+      backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+    },
+    presetChipActive: {
+      borderColor: '#002cf7',
+      backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.25)' : '#eff6ff',
+    },
+    presetChipText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDarkMode ? '#94a3b8' : '#475569',
+    },
+    presetChipTextActive: {
+      color: isDarkMode ? '#60a5fa' : '#002cf7',
+      fontWeight: '700',
+    },
+    deleteReasonInput: {
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+      borderRadius: 12,
+      padding: 10,
+      fontSize: 13,
+      color: isDarkMode ? '#ffffff' : '#0f172a',
+      backgroundColor: isDarkMode ? '#18181b' : '#ffffff',
+      minHeight: 70,
+      textAlignVertical: 'top',
+    },
+    deleteReasonInputError: {
+      borderColor: '#ef4444',
+    },
+    deleteErrorText: {
+      fontSize: 11.5,
+      fontWeight: '600',
+      color: '#ef4444',
+      marginTop: 4,
     },
   };
 }

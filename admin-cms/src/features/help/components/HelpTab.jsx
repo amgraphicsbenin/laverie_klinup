@@ -86,7 +86,7 @@ export default function HelpTab() {
     if (!apiKey || !apiToken || !idList) return;
 
     const cardTitle = `[${payload.priority.toUpperCase()}] [${payload.module_name}] ${payload.id} - ${payload.subject}`;
-    const cardDesc = `### 🐞 Signalement KLIN UP Admin
+    const cardDesc = `### 🐞 Signalement Pressing Pro Admin
 - **Référence**: ${payload.id}
 - **Type**: ${payload.ticket_type === 'bug' ? 'Signalement de Bug' : payload.ticket_type === 'help' ? "Demande d'Aide" : "Suggestion"}
 - **Module**: ${payload.module_name}
@@ -541,7 +541,7 @@ ${payload.steps_to_reproduce ? `#### 🔄 Étapes pour reproduire :\n${payload.s
                   className="input-control"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="votre.email@klinup.com"
+                  placeholder="votre.email@pressingpro.com"
                   style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.82rem', borderRadius: '8px' }}
                 />
               </div>

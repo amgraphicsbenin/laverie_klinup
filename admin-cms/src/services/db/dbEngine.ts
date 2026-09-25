@@ -10,6 +10,7 @@ export { memoryDb, listeners, notifyListeners };
 export function normalizeOrderStatus(rawStatus: any): OrderStatus {
   if (!rawStatus) return 'en_attente';
   const s = String(rawStatus).trim().toLowerCase();
+  if (s === 'en_attente_validation' || s === 'attente_validation' || s === 'pending_validation' || s === 'a_valider') return 'en_attente_validation';
   if (s === 'pending' || s === 'attente' || s === 'en_attente') return 'en_attente';
   if (s === 'processing' || s === 'traitement') return 'traitement';
   if (s === 'washing' || s === 'lavage_cours' || s === 'en_cours_lavage') return 'en_cours_lavage';
@@ -406,6 +407,7 @@ export const dbEngine = {
     );
 
     return memoryDb.customers.filter((c: any) => {
+      if (!c.store_id || c.store_id === 'all' || c.store_id === '') return true;
       if (c.store_id === sid) return true;
       if (c.store_id === storeId) return true;
       if (storeCode && c.store_id === storeCode) return true;
@@ -580,8 +582,8 @@ export const dbEngine = {
       express_hours: 6,
       express_markup: 50,
       normal_hours: 48,
-      receipt_header: 'KLIN UP - Laverie & Pressing Premium',
-      receipt_footer: 'Merci de votre confiance ! À bientôt chez KLIN UP.',
+      receipt_header: 'Pressing Pro - Laverie & Pressing Premium',
+      receipt_footer: 'Merci de votre confiance ! À bientôt chez Pressing Pro.',
       fidelity_active: true,
       fidelity_spend_per_point: 1000,
       fidelity_tier_bronze_max_pts: 49,
@@ -707,7 +709,7 @@ export const dbEngine = {
   },
   getRewardCatalog: () => {
     // Priority 1: read from memoryDb.rewards (dedicated table `public.rewards` synced from Supabase)
-    if (memoryDb.rewards && Array.isArray(memoryDb.rewards)) {
+    if (memoryDb.rewards && Array.isArray(memoryDb.rewards) && memoryDb.rewards.length > 0) {
       return memoryDb.rewards.map((r: any) => ({
         id: r.id,
         title: r.title || r.article,
@@ -733,7 +735,14 @@ export const dbEngine = {
       }));
     }
 
-    return [];
+    // Priority 3: Standard default reward catalog
+    return [
+      { id: 'remise_1000', title: 'Remise de 1 000 FCFA', cost: 30, discountAmount: 1000, iconName: 'Tag', description: 'Réduction de 1 000 FCFA sur la prochaine commande.', is_active: true },
+      { id: 'lavage_offert', title: 'Lavage 1 Vêtement Offert', cost: 50, discountAmount: 2000, iconName: 'Shirt', description: 'Un lavage gratuit pour une pièce au choix.', is_active: true },
+      { id: 'livraison_offerte', title: 'Livraison Offerte', cost: 60, discountAmount: 1500, iconName: 'Truck', description: 'Frais de livraison 100% offerts.', is_active: true },
+      { id: 'repassage_offert', title: 'Repassage Offert', cost: 100, discountAmount: 4000, iconName: 'Sparkles', description: 'Repassage complet offert sur vos vêtements.', is_active: true },
+      { id: 'remise_5000', title: 'Remise 5 000 FCFA Abonnement', cost: 150, discountAmount: 5000, iconName: 'Gift', description: 'Réduction de 5 000 FCFA lors du renouvellement d\'abonnement.', is_active: true }
+    ];
   },
   updateRewardCatalog: async (catalog: any[]) => {
     if (!memoryDb.settings) {
@@ -1024,6 +1033,11 @@ export const dbEngine = {
       prenom: customerData.prenom || '',
       telephone: customerData.telephone ? customerData.telephone.trim() : '',
       adresse: customerData.adresse || '',
+      quartier: customerData.quartier ? customerData.quartier.trim() : '',
+      ville: customerData.ville ? customerData.ville.trim() : 'Cotonou',
+      latitude: customerData.latitude != null ? customerData.latitude : null,
+      longitude: customerData.longitude != null ? customerData.longitude : null,
+      coordonnees_livraison: customerData.coordonnees_livraison || null,
       indicatif: customerData.indicatif || '229',
       preferences_pliage: customerData.preferences_pliage || 'Plié',
       points_fidelite: 0,
@@ -1041,6 +1055,32 @@ export const dbEngine = {
     return newCustomer;
   },
 
+  updateCustomerDebt: async (customerId: string, amount: number): Promise<Customer | null> => {
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer) return null;
+
+    const originalDebt = Number(customer.solde_dette || 0);
+    const newDebt = Math.max(0, originalDebt + Number(amount));
+    customer.solde_dette = newDebt;
+
+    dbEngine.logAction(
+      'MAJ_SOLDE_FINANCIER',
+      `Solde dette de ${customer.prenom} ${customer.nom} modifié de ${amount} FCFA (Nouveau solde: ${newDebt} FCFA)`
+    );
+    notifyListeners();
+
+    try {
+      await performMutation('update', 'customers', customerId, { solde_dette: newDebt });
+    } catch (e) {
+      customer.solde_dette = originalDebt;
+      notifyListeners();
+      console.warn('[DB] performMutation error on updateCustomerDebt:', e);
+      throw e;
+    }
+
+    return customer;
+  },
+
   updateCustomer: async (customerId: string, updatedFields: Partial<Customer>): Promise<Customer | undefined> => {
     const customer = memoryDb.customers.find(c => c.id === customerId);
     if (!customer) return;
@@ -1055,13 +1095,14 @@ export const dbEngine = {
     return customer;
   },
 
-  deleteCustomer: async (customerId: string): Promise<boolean> => {
+  deleteCustomer: async (customerId: string, reason?: string): Promise<boolean> => {
     const idx = memoryDb.customers.findIndex(c => c.id === customerId);
     if (idx === -1) return false;
     const customer = memoryDb.customers[idx];
     await performMutation('delete', 'customers', customerId);
     memoryDb.customers.splice(idx, 1);
-    dbEngine.logAction('SUPPRESSION_CLIENT', `Client supprimé : ${customer.prenom} ${customer.nom}`);
+    const reasonText = reason ? ` (Motif : ${reason})` : '';
+    dbEngine.logAction('SUPPRESSION_CLIENT', `Client supprimé : ${customer.prenom} ${customer.nom}${reasonText}`);
     notifyListeners();
     return true;
   },
@@ -1171,18 +1212,89 @@ export const dbEngine = {
 
     const deliveryFee = Number(orderData.frais_livraison || (orderData as any).delivery_fee || 0);
     const pickupFee = Number(orderData.frais_recuperation || (orderData as any).pickup_fee || 0);
-    const passedTotal = Number(orderData.prix_total || orderData.total || 0);
-    const calculatedTotal = passedTotal > 0 ? passedTotal : Math.max(0, basePriceBeforeRemise - discountAmount) + deliveryFee + pickupFee;
+    const itemsList = orderData.items || (orderData as any).articles || [];
+    const totalClothes = itemsList.reduce((sum: number, it: any) => sum + Number(it.quantite || it.quantity || 1), 0);
+
+    const customer = memoryDb.customers.find(c => c.id === orderData.customer_id);
+    const isImmediateSub = !!(orderData as any).subscribe_plan_id;
+    const isSubOrder = !!(orderData as any).pay_with_subscription ||
+                       orderData.mode_reglement === 'abonnement' ||
+                       !!(orderData as any).is_subscription_order ||
+                       isImmediateSub;
+
+    let calculatedTotal = 0;
+    let subDetails: any = {
+      ...(orderData.subscription_details || {}),
+      remise_pourcentage: discountPercent,
+      remise_montant: discountAmount,
+      prix_base_avant_remise: basePriceBeforeRemise
+    };
+
+    if (isSubOrder && !isImmediateSub && (customer as any)?.active_subscription) {
+      // Commande couverte par un forfait existant : les vêtements sont déjà réglés
+      const sub = (customer as any).active_subscription;
+      const prevRemaining = Number(sub.remaining_clothes || 0);
+      if (prevRemaining < totalClothes) {
+        throw new Error(`Solde d'abonnement insuffisant. Requis : ${totalClothes} vêtements, Disponible : ${prevRemaining} vêtements.`);
+      }
+      sub.remaining_clothes = Math.max(0, prevRemaining - totalClothes);
+      sub.clothes_washed = (Number(sub.clothes_washed || 0) + totalClothes);
+
+      // Seuls les frais de livraison / récupération sont dus en numéraire
+      calculatedTotal = deliveryFee + pickupFee;
+      subDetails = {
+        ...subDetails,
+        name: sub.name,
+        total_clothes: sub.total_clothes,
+        previous_balance: prevRemaining,
+        new_balance: sub.remaining_clothes,
+        clothes_deducted: totalClothes
+      };
+    } else if (isImmediateSub) {
+      // Nouvelle souscription immédiate
+      const subscribedPlan = memoryDb.catalog.find(c => c.id === (orderData as any).subscribe_plan_id);
+      const planTotalClothes = Number(subscribedPlan?.nombre_vetements || 25);
+      const newRemaining = Math.max(0, planTotalClothes - totalClothes);
+      const newSub = {
+        catalog_item_id: subscribedPlan?.id || 'sub_immediate',
+        name: subscribedPlan?.article || 'Abonnement',
+        total_clothes: planTotalClothes,
+        remaining_clothes: newRemaining,
+        clothes_washed: totalClothes,
+        subscribed_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + (Number(subscribedPlan?.duree_jours) || 30) * 86400000).toISOString()
+      };
+      if (customer) {
+        (customer as any).active_subscription = newSub;
+      }
+      calculatedTotal = (subscribedPlan ? Number(subscribedPlan.prix || 0) : 0) + deliveryFee + pickupFee;
+      subDetails = {
+        ...subDetails,
+        name: newSub.name,
+        total_clothes: newSub.total_clothes,
+        previous_balance: planTotalClothes,
+        new_balance: newRemaining,
+        clothes_deducted: totalClothes,
+        immediate_subscription: {
+          id: subscribedPlan?.id,
+          name: subscribedPlan?.article,
+          prix: subscribedPlan?.prix
+        }
+      };
+    } else {
+      const passedTotal = Number(orderData.prix_total || orderData.total || 0);
+      calculatedTotal = passedTotal > 0 ? passedTotal : Math.max(0, basePriceBeforeRemise - discountAmount) + deliveryFee + pickupFee;
+    }
 
     const newOrder: Order = {
       id: 'o_' + Math.random().toString(36).substr(2, 9),
       customer_id: orderData.customer_id || '',
       statut: orderData.statut || 'en_attente',
-      type_article: orderData.type_article || 'Divers',
-      type_service: orderData.type_service || 'lavage_simple',
+      type_article: orderData.type_article || (itemsList[0] ? itemsList[0].article : 'Divers'),
+      type_service: orderData.type_service || (itemsList[0] ? itemsList[0].service : 'lavage_simple'),
       niveau_urgence: orderData.niveau_urgence || 'Normal',
-      mode_reglement: orderData.mode_reglement || 'especes',
-      avance_payee: Number(orderData.avance_payee || orderData.avance || 0),
+      mode_reglement: isSubOrder ? (isImmediateSub ? (orderData.mode_reglement || 'especes') : 'abonnement') : (orderData.mode_reglement || 'especes'),
+      avance_payee: isSubOrder && !isImmediateSub && (deliveryFee + pickupFee === 0) ? 0 : Number(orderData.avance_payee || orderData.avance || 0),
       prix_total: calculatedTotal,
       total: calculatedTotal,
       remise_pourcentage: discountPercent,
@@ -1190,28 +1302,29 @@ export const dbEngine = {
       frais_livraison: deliveryFee,
       frais_recuperation: pickupFee,
       prix_base_avant_remise: basePriceBeforeRemise,
-      reference_paiement: orderData.reference_paiement || orderData.momo_ref || null,
+      reference_paiement: orderData.reference_paiement || (orderData as any).momo_ref || null,
+      reference_momo: (orderData as any).reference_momo || orderData.reference_paiement || (orderData as any).momo_ref || null,
       operateur_momo: orderData.operateur_momo || null,
       distance_km: Number(orderData.distance_km || 0),
       with_pickup: !!orderData.with_pickup,
-      identifiant_unique_marquage: orderData.identifiant_unique_marquage || ('KLIN-' + (memoryDb.orders ? memoryDb.orders.length : 0)),
+      identifiant_unique_marquage: orderData.identifiant_unique_marquage || ('PRO-' + (memoryDb.orders ? memoryDb.orders.length : 0)),
       created_at: new Date().toISOString(),
       due_date: orderData.due_date || new Date(Date.now() + 48 * 3600000).toISOString(),
-      items: orderData.items || [],
+      acompte_paid_at: (orderData.avance_payee || orderData.avance) ? new Date().toISOString() : null,
+      solde_paid_at: calculatedTotal <= Number(orderData.avance_payee || orderData.avance || 0) ? new Date().toISOString() : null,
+      items: itemsList,
+      articles: itemsList,
+      is_subscription_order: isSubOrder,
+      pay_with_subscription: !!(orderData as any).pay_with_subscription || (isSubOrder && !isImmediateSub),
+      subscribe_plan_id: (orderData as any).subscribe_plan_id || null,
       created_by_id: currentUser ? currentUser.id : null,
       created_by_name: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : null,
       store_id: currentStoreId,
-      subscription_details: {
-        ...(orderData.subscription_details || {}),
-        remise_pourcentage: discountPercent,
-        remise_montant: discountAmount,
-        prix_base_avant_remise: basePriceBeforeRemise
-      }
+      subscription_details: subDetails
     };
 
-    const customer = memoryDb.customers.find(c => c.id === newOrder.customer_id);
     if (customer) {
-      const unpaidBalance = newOrder.prix_total - newOrder.avance_payee;
+      const unpaidBalance = Math.max(0, newOrder.prix_total - newOrder.avance_payee);
       if (unpaidBalance > 0) {
         customer.solde_dette = Math.max(0, Number(customer.solde_dette || 0) + unpaidBalance);
       }
@@ -1226,10 +1339,16 @@ export const dbEngine = {
         }
       }
 
-      await performMutation('update', 'customers', customer.id, {
+      const customerUpdatePayload: any = {
         solde_dette: customer.solde_dette,
         points_fidelite: customer.points_fidelite
-      }).catch(e => console.warn('[DB] Customer update error on createOrder:', e));
+      };
+      if ((customer as any).active_subscription) {
+        customerUpdatePayload.active_subscription = (customer as any).active_subscription;
+      }
+
+      await performMutation('update', 'customers', customer.id, customerUpdatePayload)
+        .catch(e => console.warn('[DB] Customer update error on createOrder:', e));
     }
 
     // Mise à jour optimiste de l'UI
@@ -1334,6 +1453,42 @@ export const dbEngine = {
     return order;
   },
 
+  validateOrderByCashier: async (orderId: string): Promise<Order | undefined> => {
+    const order = memoryDb.orders.find(o => o.id === orderId);
+    if (!order) throw new Error('Commande non trouvée');
+
+    const currentUser = dbEngine.getCurrentUser();
+    const nowStr = new Date().toISOString();
+    const oldStatus = order.statut;
+    const oldValidee = (order as any).validee_par_caisse;
+
+    order.statut = 'en_attente';
+    (order as any).validee_par_caisse = true;
+    (order as any).validated_by_id = currentUser ? currentUser.id : null;
+    (order as any).validated_by_name = currentUser ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim() : 'Admin Caisse';
+    (order as any).validated_at = nowStr;
+
+    notifyListeners();
+
+    try {
+      await performMutation('update', 'orders', orderId, {
+        statut: 'en_attente',
+        validee_par_caisse: true,
+        validated_by_id: (order as any).validated_by_id,
+        validated_by_name: (order as any).validated_by_name,
+        validated_at: (order as any).validated_at
+      });
+      dbEngine.logAction('VALIDATION_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} validée par la caisse (${(order as any).validated_by_name})`);
+    } catch (e) {
+      order.statut = oldStatus;
+      (order as any).validee_par_caisse = oldValidee;
+      notifyListeners();
+      console.warn('[DB] performMutation error on validateOrderByCashier:', e);
+      throw e;
+    }
+    return order;
+  },
+
   cancelOrder: async (orderId: string, reason: string = ''): Promise<Order | undefined> => {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) return;
@@ -1343,16 +1498,60 @@ export const dbEngine = {
 
     order.statut = 'annule';
     order.motif_annulation = reason.trim();
+
+    const customer = memoryDb.customers.find(c => c.id === order.customer_id);
+    const oldCustomerDebt = customer ? Number(customer.solde_dette || 0) : null;
+    const oldRemainingClothes = (customer as any)?.active_subscription ? Number((customer as any).active_subscription.remaining_clothes) : null;
+    const oldClothesWashed = (customer as any)?.active_subscription ? Number((customer as any).active_subscription.clothes_washed || 0) : null;
+
+    // Réconciliation financière : déduire le reliquat impayé de la commande annulée
+    const unpaid = Math.max(0, Number(order.prix_total || 0) - Number(order.avance_payee || 0));
+    if (unpaid > 0 && customer) {
+      customer.solde_dette = Math.max(0, Number(customer.solde_dette || 0) - unpaid);
+    }
+
+    // Réconciliation abonnement : restituer le quota de vêtements si payé par abonnement
+    const isSubOrder = (order as any).pay_with_subscription ||
+                       order.mode_reglement === 'abonnement' ||
+                       (order as any).is_subscription_order;
+    if (isSubOrder && (customer as any)?.active_subscription) {
+      const clothesCount = Number(order.subscription_details?.clothes_deducted) ||
+                           (order.articles || order.items || []).reduce((sum: number, it: any) => sum + Number(it.quantite || it.quantity || 1), 0);
+      const sub = (customer as any).active_subscription;
+      sub.remaining_clothes = Math.min(Number(sub.total_clothes || 0), Number(sub.remaining_clothes || 0) + clothesCount);
+      sub.clothes_washed = Math.max(0, Number(sub.clothes_washed || 0) - clothesCount);
+    }
+
     notifyListeners();
 
     try {
       await performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason.trim() });
+      if (customer && (unpaid > 0 || isSubOrder)) {
+        const custPayload: any = { solde_dette: customer.solde_dette };
+        if ((customer as any).active_subscription) {
+          custPayload.active_subscription = (customer as any).active_subscription;
+        }
+        await performMutation('update', 'customers', customer.id, custPayload)
+          .catch(e => console.warn('[DB] Customer reconciliation error on cancelOrder:', e));
+      }
       dbEngine.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} annulée. Motif : ${reason}`);
     } catch (e) {
       order.statut = oldStatus;
       order.motif_annulation = oldMotif;
+      if (customer && oldCustomerDebt !== null) {
+        customer.solde_dette = oldCustomerDebt;
+      }
+      if (customer && (customer as any)?.active_subscription) {
+        if (oldRemainingClothes !== null) {
+          (customer as any).active_subscription.remaining_clothes = oldRemainingClothes;
+        }
+        if (oldClothesWashed !== null) {
+          (customer as any).active_subscription.clothes_washed = oldClothesWashed;
+        }
+      }
       notifyListeners();
       console.warn('[DB] performMutation error on cancelOrder:', e);
+      throw e;
     }
     return order;
   },
