@@ -32,7 +32,7 @@ const STRIP_BY_TABLE: Record<string, string[]> = {
   orders: ['remise_pourcentage', 'remise_montant', 'prix_base_avant_remise',
            'motif_annulation', 'solde_paid_at',
            'reference_paiement', 'reference_momo', 'acompte_paid_at', 'is_subscription_order'],
-  catalog: ['sku', 'prix_urgent', 'is_active'],
+  catalog: ['sku', 'prix_urgent', 'is_active', 'statut'],
   customers: ['coordonnees_livraison', 'rewards', 'latitude', 'longitude', 'quartier', 'ville'],
   activity_logs: ['store_id'],
 };
@@ -370,6 +370,25 @@ export async function refreshStores(): Promise<void> {
     }
   } catch (e: any) {
     console.error('[KLIN UP DB] Erreur réseau refresh stores :', e.message);
+  }
+}
+
+export async function refreshCatalog(): Promise<void> {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('catalog').select('*').order('id', { ascending: true });
+    if (!error && data) {
+      memoryDb.catalog = (data || []).map((item: any) => {
+        const isActive = item.is_active === false || item.statut === 'inactif' ? false : true;
+        return { ...item, is_active: isActive, statut: isActive ? 'actif' : 'inactif' };
+      });
+      sanitizeCatalogIds();
+      notifyListeners();
+    } else if (error) {
+      console.error('[KLIN UP DB] Erreur refresh catalog :', error.message);
+    }
+  } catch (e: any) {
+    console.error('[KLIN UP DB] Erreur réseau refresh catalog :', e.message);
   }
 }
 

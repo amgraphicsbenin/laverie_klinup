@@ -64,10 +64,10 @@ import HelpTab from '../features/help/components/HelpTab';
 import StatefulButton from './ui/StatefulButton';
 import PageShimmer from './ui/PageShimmer';
 
-export default function AdminView({ activeTab, onManageStaff }) {
+export default function AdminView({ activeTab, onManageStaff, stores: propStores, selectedStoreId: propSelectedStoreId }) {
   const currentUser = db.getCurrentUser();
-  const stores = db.getStores ? db.getStores() : [];
-  const selectedStoreId = db.getSelectedStoreId ? db.getSelectedStoreId() : 'all';
+  const stores = propStores || (db.getStores ? db.getStores() : []);
+  const selectedStoreId = propSelectedStoreId || (db.getSelectedStoreId ? db.getSelectedStoreId() : 'all');
   const [catalog, setCatalog] = useState([]);
   const [orders, setOrders] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -624,7 +624,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
 
   const refreshAdminData = () => {
-    setCatalog(db.getCatalog());
+    setCatalog([...db.getCatalog().map(item => ({ ...item }))]);
     setOrders(db.getOrders());
     setLogs(db.getLogs());
     setStaff(db.getAllStaff ? db.getAllStaff() : db.getStaff());

@@ -75,6 +75,11 @@ export default function ImportCatalogModal({
       const parsed = parseInt(catMatch[1], 10);
       return !isNaN(parsed) && parsed > 0 ? parsed : fallbackNum;
     }
+    const repMatch = str.match(/^(\d+)_rep$/i);
+    if (repMatch) {
+      const parsed = parseInt(repMatch[1], 10);
+      return !isNaN(parsed) && parsed > 0 ? parsed : fallbackNum;
+    }
     return fallbackNum;
   };
 
@@ -167,11 +172,14 @@ export default function ImportCatalogModal({
       if (item.service === 'repassage') {
         groups[key].tarifRepassage = Number(item.prix) || 0;
         groups[key].tarifRepassageExpress = Number(item.prix_urgent) || 0;
+        if (!groups[key].repassageId) groups[key].repassageId = item.id;
       } else if (item.service === 'abonnement' || item.categorie === 'abonnement') {
         groups[key].tarifTraitement = Number(item.prix) || 0;
+        groups[key].treatmentId = item.id;
       } else {
         groups[key].tarifTraitement = Number(item.prix) || 0;
         groups[key].tarifTraitementExpress = Number(item.prix_urgent) || 0;
+        groups[key].treatmentId = item.id;
       }
     });
 
@@ -181,7 +189,8 @@ export default function ImportCatalogModal({
 
     // Passe 1 : Réserver les IDs des articles qui possèdent déjà un identifiant purement numérique unique réaliste
     groupList.forEach(g => {
-      const num = extractNumericId(g.rawId, null);
+      const preferredId = g.treatmentId || g.rawId;
+      const num = extractNumericId(preferredId, null);
       if (num !== null && num > 0 && num <= groupList.length + 50 && !usedNumericIds.has(num)) {
         g.numericId = String(num);
         usedNumericIds.add(num);
@@ -312,12 +321,15 @@ export default function ImportCatalogModal({
       return { rows: [], stats: { total: 0, valid: 0, duplicates: 0, invalid: 0 } };
     }
 
-    // Détection du délimiteur
+    // Détection robuste du délimiteur
     const firstLine = rawLines[0];
+    const countSemi = (firstLine.match(/;/g) || []).length;
+    const countComma = (firstLine.match(/,/g) || []).length;
+    const countTab = (firstLine.match(/\t/g) || []).length;
     let delimiter = ';';
-    if (firstLine.includes('\t')) delimiter = '\t';
-    else if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';';
-    else if (firstLine.includes(',')) delimiter = ',';
+    if (countTab > countSemi && countTab > countComma) delimiter = '\t';
+    else if (countComma > countSemi) delimiter = ',';
+    else delimiter = ';';
 
     const headerTokens = parseCSVLine(firstLine, delimiter).map(h => 
       h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\s_-]+/g, '')
@@ -631,8 +643,15 @@ export default function ImportCatalogModal({
         const targetId = row.assignedNumericId || row.idProduit;
 
         if (row.categorie === 'abonnement') {
+          const existingSubItem = (existingCatalog || []).find(c =>
+            c &&
+            (c.store_id === storeId || (!c.store_id && storeId === targetStoreId)) &&
+            (c.service === 'abonnement' || c.categorie === 'abonnement') &&
+            c.article?.trim().toLowerCase() === row.article.trim().toLowerCase()
+          );
+
           itemsToPersist.push({
-            id: targetId,
+            id: existingSubItem ? existingSubItem.id : targetId,
             article: row.article,
             service: 'abonnement',
             categorie: 'abonnement',
@@ -645,9 +664,16 @@ export default function ImportCatalogModal({
           });
         } else {
           // Traitement
+          const existingTraitementItem = (existingCatalog || []).find(c => 
+            c &&
+            (c.store_id === storeId || (!c.store_id && storeId === targetStoreId)) &&
+            c.service === 'lavage_simple' &&
+            c.article?.trim().toLowerCase() === row.article.trim().toLowerCase()
+          );
+
           if (row.prixTraitement > 0 || row.prixRepassage === 0) {
             itemsToPersist.push({
-              id: targetId,
+              id: existingTraitementItem ? existingTraitementItem.id : targetId,
               article: row.article,
               service: 'lavage_simple',
               categorie: 'individuel',
@@ -659,6 +685,7 @@ export default function ImportCatalogModal({
               statut: row.isActive ? 'actif' : 'inactif'
             });
           }
+
           // Repassage
           if (row.prixRepassage > 0) {
             // Rechercher si un article de repassage correspondant existe déjà dans le catalogue
@@ -669,8 +696,13 @@ export default function ImportCatalogModal({
               c.article?.trim().toLowerCase() === row.article.trim().toLowerCase()
             );
 
+            const baseId = existingTraitementItem ? existingTraitementItem.id : targetId;
+            const repId = existingRepassageItem
+              ? existingRepassageItem.id
+              : (baseId ? (baseId.endsWith('_rep') ? baseId : `${baseId}_rep`) : undefined);
+
             itemsToPersist.push({
-              id: existingRepassageItem ? existingRepassageItem.id : (targetId ? `${targetId}_rep` : undefined),
+              id: repId,
               article: row.article,
               service: 'repassage',
               categorie: 'individuel',
@@ -689,6 +721,10 @@ export default function ImportCatalogModal({
         updateExisting: updateExisting,
         storeId: targetStoreId
       });
+
+      if (db.refreshCatalog) {
+        await db.refreshCatalog();
+      }
 
       if (onImportSuccess) {
         onImportSuccess();
