@@ -86,7 +86,7 @@ export default function DashboardTab({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem', width: '100%' }}>
       
-      {/* 🚀 BANNIÈRE D'ACCUEIL & EN-TÊTE STATUTAIRE */}
+      {/* BANNIÈRE D'ACCUEIL & EN-TÊTE STATUTAIRE */}
       <div 
         style={{ 
           background: 'var(--bg-card)',
@@ -176,7 +176,7 @@ export default function DashboardTab({
         </div>
       </div>
 
-      {/* 📊 4 CARTES KPI HÉROÏQUES PREMIUM */}
+      {/* 4 CARTES KPI HÉROÏQUES PREMIUM */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1.25rem' }}>
         
         {/* KPI 1: CHIFFRE D'AFFAIRES ENCAISSÉ */}
@@ -319,7 +319,7 @@ export default function DashboardTab({
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem' }}>
             <span style={{ color: pendingOrdersCount > 0 ? '#d97706' : 'var(--text-muted)', fontWeight: 700 }}>
-              {pendingOrdersCount > 0 ? '⚠️ Traitement prioritaire' : 'Aucune attente'}
+              {pendingOrdersCount > 0 ? 'Traitement prioritaire' : 'Aucune attente'}
             </span>
             <ChevronRight size={14} color="var(--text-muted)" />
           </div>
@@ -327,7 +327,7 @@ export default function DashboardTab({
 
       </div>
 
-      {/* 🔄 TRACKER DE PIPELINE D'ATELIER EN DIRECT (SUIVI DE FLUX EN TEMPS RÉEL) */}
+      {/* TRACKER DE PIPELINE D'ATELIER EN DIRECT (SUIVI DE FLUX EN TEMPS RÉEL) */}
       <div className="card" style={{ padding: '1.5rem', borderRadius: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
           <div>
@@ -404,7 +404,7 @@ export default function DashboardTab({
         </div>
       </div>
 
-      {/* 📊 GRAPHIQUE METIER : VOLUME DE LINGE TRAITÉ */}
+      {/* GRAPHIQUE METIER : VOLUME DE LINGE TRAITÉ */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem', borderRadius: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -607,7 +607,7 @@ export default function DashboardTab({
 
       </div>
 
-      {/* 📦 ACTIVITÉS & COMMANDES RÉCENTES */}
+      {/* ACTIVITÉS & COMMANDES RÉCENTES */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem', borderRadius: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
           <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -659,7 +659,7 @@ export default function DashboardTab({
                         {order.type_article} ({serviceName}) — <span style={{ color: 'var(--primary)' }}>{clientName}</span>
                       </div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-                        Code Marquage : <strong>{order.identifiant_unique_marquage}</strong> | Créé le {new Date(order.created_at).toLocaleDateString('fr-FR')}
+                        ID Commande : <strong>{order.id || order.identifiant_unique_marquage}</strong> | Créé le {new Date(order.created_at).toLocaleDateString('fr-FR')}
                       </div>
                     </div>
                   </div>
@@ -667,7 +667,7 @@ export default function DashboardTab({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     {isExpress && (
                       <span style={{ fontSize: '0.65rem', background: 'rgba(239, 68, 68, 0.12)', color: 'var(--danger)', fontWeight: 800, padding: '0.2rem 0.55rem', borderRadius: '6px' }}>
-                        ⚡ Express
+                        Express
                       </span>
                     )}
                     <span className={`badge badge-${order.statut}`} style={{ fontSize: '0.72rem', fontWeight: 700 }}>
@@ -683,10 +683,10 @@ export default function DashboardTab({
 
       {showCashClosureModal && createPortal(
         <div className="modal-backdrop" onClick={() => setShowCashClosureModal(false)}>
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', borderRadius: '24px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', background: 'var(--bg-card, #ffffff)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', margin: 'auto' }}>
+          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '560px', borderRadius: '24px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', background: 'var(--bg-card, #ffffff)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', margin: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>
-                🔒 Clôture de Caisse Journalière (Z)
+                Clôture de Caisse Journalière (Z)
               </h3>
               <button type="button" onClick={() => setShowCashClosureModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}>✕</button>
             </div>

@@ -91,7 +91,7 @@ export const sendOrderCreatedWhatsAppNotification = (order, customer) => {
   const totalVal = Number(order.prix_total !== undefined ? order.prix_total : (order.total || 0));
   const avanceVal = Number(order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0));
   const remainingVal = Math.max(0, totalVal - avanceVal);
-  const orderCode = order.identifiant_unique_marquage || order.id || 'PRO-0';
+  const orderCode = order.id || order.identifiant_unique_marquage || '1';
   const itemsList = order.items || order.articles || [];
   const typeArticlesStr = order.type_article || (itemsList.map(a => `${a.quantite || a.quantity || 1}x ${a.article}`).join(', ')) || 'Articles divers';
 
@@ -114,7 +114,7 @@ export const sendOrderStatusWhatsAppNotification = (order, customer, nextStatus)
   if (!customer || !customer.telephone) return;
 
   const normalizedStatus = (nextStatus || order.statut || '').toLowerCase();
-  const orderCode = order.identifiant_unique_marquage || order.id || 'PRO-0';
+  const orderCode = order.id || order.identifiant_unique_marquage || '1';
   let text = '';
 
   if (normalizedStatus === 'pret') {

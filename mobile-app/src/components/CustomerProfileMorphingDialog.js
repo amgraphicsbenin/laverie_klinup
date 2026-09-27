@@ -159,7 +159,7 @@ function DialogInnerBody({
               colors={['#F59E0B', '#FBBF24']}
               style={styles.medalCircle}
             >
-              <Text style={styles.medalText}>#{rank}</Text>
+              <Text style={styles.medalText}>{rank}</Text>
             </LinearGradient>
           </View>
 

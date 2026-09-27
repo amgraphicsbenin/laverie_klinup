@@ -133,7 +133,7 @@ export default function CancelModal({
                 textAlign: 'center', 
                 paddingHorizontal: 10 
               }}>
-                Veuillez spécifier le motif d'annulation de la commande #{order ? (order.ticket_numero || order.id) : ''}.
+                Veuillez spécifier le motif d'annulation de la commande {order ? (order.id || order.identifiant_unique_marquage || order.ticket_numero) : ''}.
               </Text>
             </View>
 

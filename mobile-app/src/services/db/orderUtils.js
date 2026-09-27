@@ -34,6 +34,14 @@ export function hydrateOrder(order) {
   if (!order || typeof order !== 'object') return order;
   const hydrated = { ...order };
 
+  if (order.id !== undefined && order.id !== null) {
+    hydrated.id = String(order.id);
+  }
+  // Standard ID numérique : si l'identifiant unique de marquage est manquant ou contient l'ancien format PRO- / KLIN-, l'aligner sur l'ID
+  if (!hydrated.identifiant_unique_marquage || String(hydrated.identifiant_unique_marquage).startsWith('PRO-') || String(hydrated.identifiant_unique_marquage).startsWith('KLIN-')) {
+    hydrated.identifiant_unique_marquage = String(hydrated.id);
+  }
+
   if (order.client_nom && !order.client_name) {
     hydrated.client_name = order.client_nom;
   }

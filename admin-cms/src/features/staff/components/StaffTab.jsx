@@ -48,7 +48,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_view_dashboard',
     category: 'admin',
-    categoryLabel: '🖥️ Habilitations Admin CMS',
+    categoryLabel: 'Habilitations Admin CMS',
     title: 'Tableau de Bord & KPIs',
     description: 'Visionner les métriques de vente, chiffre d\'affaires et statistiques',
     icon: LayoutDashboard,
@@ -57,7 +57,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_manage_orders',
     category: 'admin',
-    categoryLabel: '🖥️ Habilitations Admin CMS',
+    categoryLabel: 'Habilitations Admin CMS',
     title: 'Gestion Caisse & Commandes CMS',
     description: 'Enregistrer, modifier, valider et encaisser les commandes de pressing',
     icon: ShoppingBag,
@@ -66,7 +66,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_manage_crm',
     category: 'admin',
-    categoryLabel: '🖥️ Habilitations Admin CMS',
+    categoryLabel: 'Habilitations Admin CMS',
     title: 'Répertoire & CRM Clients',
     description: 'Accéder aux fiches clients, solder les dettes et gérer les abonnements',
     icon: Users,
@@ -75,7 +75,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_edit_catalog',
     category: 'admin',
-    categoryLabel: '🖥️ Habilitations Admin CMS',
+    categoryLabel: 'Habilitations Admin CMS',
     title: 'Catalogue & Tarifications',
     description: 'Ajuster les prix des prestations et créer des forfaits d\'abonnement',
     icon: Tag,
@@ -84,7 +84,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_manage_stores',
     category: 'admin',
-    categoryLabel: '🖥️ Habilitations Admin CMS',
+    categoryLabel: 'Habilitations Admin CMS',
     title: 'Points de Laverie (Multi-Boutiques)',
     description: 'Créer, gérer et basculer entre les différents points de laverie',
     icon: Shield,
@@ -93,7 +93,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_view_logs',
     category: 'admin',
-    categoryLabel: '🖥️ Habilitations Admin CMS',
+    categoryLabel: 'Habilitations Admin CMS',
     title: 'Journal d\'Audit & Traçabilité',
     description: 'Traçabilité complète des actions effectuées sur le système (Super Admin)',
     icon: ShieldAlert,
@@ -103,7 +103,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_manage_staff',
     category: 'admin',
-    categoryLabel: '🖥️ Habilitations Admin CMS',
+    categoryLabel: 'Habilitations Admin CMS',
     title: 'Gestion du Personnel & Droits',
     description: 'Créer des profils, configurer les accès et réinitialiser les codes PIN',
     icon: UserCheck,
@@ -115,7 +115,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_access_mobile',
     category: 'mobile',
-    categoryLabel: '📱 Habilitations Application Mobile Terrain',
+    categoryLabel: 'Habilitations Application Mobile Terrain',
     title: 'Connexion & Accès App Mobile',
     description: 'Autoriser l\'authentification sur l\'application mobile terrain',
     icon: Key,
@@ -124,7 +124,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_create_orders_mobile',
     category: 'mobile',
-    categoryLabel: '📱 Habilitations Application Mobile Terrain',
+    categoryLabel: 'Habilitations Application Mobile Terrain',
     title: 'Enregistrement Caisse Mobile',
     description: 'Créer des commandes et imprimer des tickets sur l\'app mobile',
     icon: ShoppingBag,
@@ -133,7 +133,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_manage_delivery_mobile',
     category: 'mobile',
-    categoryLabel: '📱 Habilitations Application Mobile Terrain',
+    categoryLabel: 'Habilitations Application Mobile Terrain',
     title: 'Tournées Livreur & Collecte',
     description: 'Accès au module de livraison, ramassage et encaissement à domicile',
     icon: User,
@@ -142,7 +142,7 @@ const PERMISSIONS_CONFIG = [
   {
     key: 'can_manage_workshop_mobile',
     category: 'mobile',
-    categoryLabel: '📱 Habilitations Application Mobile Terrain',
+    categoryLabel: 'Habilitations Application Mobile Terrain',
     title: 'Traitement Atelier (Lavage/Repassage)',
     description: 'Mise à jour des étapes de traitement textile en atelier',
     icon: Sliders,
@@ -215,6 +215,11 @@ export default function StaffTab({
   // États pour "Configuration des Rôles"
   const [rolesList, setRolesList] = useState(() => db.getRoles ? db.getRoles() : []);
   const [selectedRoleId, setSelectedRoleId] = useState('');
+  const [viewingRoleId, setViewingRoleId] = useState(null);
+  const [showViewRoleModal, setShowViewRoleModal] = useState(false);
+  const [showEditRoleModal, setShowEditRoleModal] = useState(false);
+  const [roleSearch, setRoleSearch] = useState('');
+  const [roleTypeFilter, setRoleTypeFilter] = useState('all');
   const [editRoleLabel, setEditRoleLabel] = useState('');
   const [editRoleShortLabel, setEditRoleShortLabel] = useState('');
   const [editRoleColor, setEditRoleColor] = useState('#2563eb');
@@ -319,6 +324,26 @@ export default function StaffTab({
     staffCurrentPage * staffPerPage
   );
 
+  // Rôle actuellement consulté en modale de visualisation
+  const viewingRole = rolesList.find(r => r.id === viewingRoleId || r.key === viewingRoleId) || null;
+
+  // Filtrage intelligent des rôles (recherche textuelle + type natif/sur-mesure)
+  const filteredRoles = rolesList.filter(role => {
+    const query = roleSearch.trim().toLowerCase();
+    const label = (role.label || '').toLowerCase();
+    const shortLabel = (role.shortLabel || '').toLowerCase();
+    const desc = (role.description || '').toLowerCase();
+    const key = (role.key || '').toLowerCase();
+
+    const matchesSearch = !query || label.includes(query) || shortLabel.includes(query) || desc.includes(query) || key.includes(query);
+    const matchesType =
+      roleTypeFilter === 'all' ||
+      (roleTypeFilter === 'system' && role.isSystem) ||
+      (roleTypeFilter === 'custom' && !role.isSystem);
+
+    return matchesSearch && matchesType;
+  });
+
   // Rôle sélectionné dans l'éditeur de rôles
   const selectedRoleObj = rolesList.find(r => r.id === selectedRoleId || r.key === selectedRoleId) || rolesList[0];
 
@@ -399,6 +424,27 @@ export default function StaffTab({
     }
   };
 
+  const openViewRole = (role) => {
+    setViewingRoleId(role.id || role.key);
+    setShowViewRoleModal(true);
+  };
+
+  const openEditRole = (role) => {
+    const roleId = role.id || role.key;
+    setSelectedRoleId(roleId);
+    setEditRoleLabel(role.label || '');
+    setEditRoleShortLabel(role.shortLabel || role.label || '');
+    setEditRoleColor(role.color || '#2563eb');
+    setEditRoleDesc(role.description || '');
+    setEditRolePermissions(role.permissions || {});
+    setShowEditRoleModal(true);
+  };
+
+  const handleSwitchToEdit = (role) => {
+    setShowViewRoleModal(false);
+    openEditRole(role);
+  };
+
   const handleRoleSaveSubmit = (e) => {
     e.preventDefault();
     if (!selectedRoleObj) return;
@@ -416,7 +462,10 @@ export default function StaffTab({
 
     refreshRoles();
     setRoleSaveSuccess(true);
-    setTimeout(() => setRoleSaveSuccess(false), 2500);
+    setTimeout(() => {
+      setRoleSaveSuccess(false);
+      setShowEditRoleModal(false);
+    }, 1000);
   };
 
   const handleCreateNewRoleSubmit = (e) => {
@@ -437,18 +486,43 @@ export default function StaffTab({
 
     const updatedRoles = db.getRoles ? db.getRoles() : [];
     setRolesList(updatedRoles);
-    setSelectedRoleId(newRole.id);
     setShowNewRoleModal(false);
     setNewRoleLabel('');
     setNewRoleShortLabel('');
     setNewRoleColor('#2563eb');
     setNewRoleDesc('');
+
+    if (newRole) {
+      openEditRole(newRole);
+    }
   };
 
   const handleDeleteRole = (roleId) => {
+    const roleToDelete = rolesList.find(r => r.id === roleId || r.key === roleId);
+    if (!roleToDelete) return;
+
+    if (roleToDelete.isSystem) {
+      alert("Ce rôle système natif est indispensable et ne peut pas être supprimé car il structure les accès fondamentaux.");
+      return;
+    }
+
+    const assignedCount = staffList.filter(s => s.role === roleToDelete.key || s.role === roleToDelete.id).length;
+    let confirmMsg = `Êtes-vous sûr de vouloir supprimer le rôle "${roleToDelete.label}" ?`;
+    if (assignedCount > 0) {
+      confirmMsg += `\n\nAttention : ${assignedCount} utilisateur(s) du personnel sont actuellement rattaché(s) à ce rôle.`;
+    }
+    if (!window.confirm(confirmMsg)) return;
+
     if (db.deleteRole(roleId)) {
       refreshRoles();
-      setSelectedRoleId('');
+      if (selectedRoleId === roleId) {
+        setSelectedRoleId('');
+        setShowEditRoleModal(false);
+      }
+      if (viewingRoleId === roleId) {
+        setViewingRoleId(null);
+        setShowViewRoleModal(false);
+      }
     }
   };
 
@@ -821,7 +895,7 @@ export default function StaffTab({
                               }
                               return (
                                 <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  📍 {storeLabel}
+                                  {storeLabel}
                                 </span>
                               );
                             })()}
@@ -863,7 +937,7 @@ export default function StaffTab({
 
                               {hasPinRequest && (
                                 <span style={{ fontSize: '0.62rem', background: 'var(--warning-light)', color: 'var(--warning)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
-                                  Demande PIN ⚡
+                                  Demande PIN
                                 </span>
                               )}
                             </div>
@@ -1013,39 +1087,7 @@ export default function StaffTab({
       {activeSubTab === 'roles' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
-          {/* EN-TÊTE DE LA SECTION RÔLES */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '16px',
-              padding: '1rem 1.25rem',
-              boxShadow: 'var(--shadow-xs)'
-            }}
-          >
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.15rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-                <ShieldCheck size={20} color="var(--primary)" />
-                Configuration des Rôles & Habilitations
-              </h3>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                Définissez les rôles et associez la matrice des autorisations rattachées par défaut.
-              </span>
-            </div>
 
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setShowNewRoleModal(true)}
-              style={{ padding: '0.55rem 1.15rem', fontSize: '0.82rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
-            >
-              <Plus size={16} /> Créer un Rôle
-            </button>
-          </div>
-          
           {/* BANNIÈRE KPI RÔLES */}
           <div
             style={{
@@ -1095,509 +1137,390 @@ export default function StaffTab({
             </div>
           </div>
 
-          {/* DISPOSITION DEUX COLONNES : CATALOGUE DES RÔLES À GAUCHE - ÉDITEUR À DROITE */}
-          <div className="grid-2" style={{ gridTemplateColumns: '0.85fr 1.15fr', gap: '1.5rem', alignItems: 'start' }}>
-            
-            {/* COLONNE GAUCHE : LISTE DES RÔLES */}
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
-                <div>
-                  <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <ShieldCheck size={18} color="var(--primary)" />
-                    Catalogue des Rôles
-                  </h3>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                    {rolesList.length} rôle{rolesList.length > 1 ? 's' : ''} répertorié{rolesList.length > 1 ? 's' : ''}
-                  </span>
-                </div>
+          {/* CARTE TABLEAU PRINCIPALE DES RÔLES */}
+          <div
+            className="card"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem',
+              padding: '1.5rem',
+              borderRadius: '20px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow-sm)'
+            }}
+          >
+            {/* Header Tableau */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid var(--border-color)',
+                paddingBottom: '0.9rem',
+                flexWrap: 'wrap',
+                gap: '0.75rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <h3
+                  style={{
+                    fontFamily: 'var(--font-title)',
+                    fontSize: '1.2rem',
+                    fontWeight: 800,
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem'
+                  }}
+                >
+                  <ShieldCheck size={20} color="var(--primary)" />
+                  Catalogue des Rôles & Accès
+                </h3>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '12px',
+                    background: 'var(--primary-light)',
+                    color: 'var(--primary)'
+                  }}
+                >
+                  {filteredRoles.length} {filteredRoles.length > 1 ? 'rôles' : 'rôle'}
+                </span>
               </div>
 
-              {/* Liste défilante des rôles */}
-              <div style={{ overflowY: 'auto', maxHeight: '600px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {rolesList.length === 0 ? (
-                  <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <ShieldCheck size={36} style={{ margin: '0 auto 0.5rem', opacity: 0.35, color: 'var(--primary)' }} />
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Aucun rôle répertorié</div>
-                    <p style={{ fontSize: '0.75rem', margin: '0.35rem 0 0', color: 'var(--text-muted)' }}>
-                      Aucun rôle n'a été trouvé dans la base de données.
-                    </p>
-                  </div>
-                ) : (
-                  rolesList.map(role => {
-                  const isSelected = selectedRoleId === role.id || selectedRoleId === role.key;
-                  const assignedCount = staffList.filter(s => s.role === role.key || s.role === role.id).length;
-                  const roleColor = role.color || '#2563eb';
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setShowNewRoleModal(true)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  background: 'var(--primary)',
+                  color: '#fff',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)'
+                }}
+              >
+                <Plus size={16} /> Nouveau Rôle
+              </button>
+            </div>
 
-                  return (
-                    <div
-                      key={role.id || role.key}
-                      onClick={() => setSelectedRoleId(role.id)}
-                      style={{
-                        padding: '1rem',
-                        borderRadius: '14px',
-                        border: isSelected ? `2px solid ${roleColor}` : '1px solid var(--border-color)',
-                        background: isSelected ? `${roleColor}12` : 'var(--bg-app)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        boxShadow: isSelected ? 'var(--shadow-sm)' : 'none'
-                      }}
-                    >
-                      {isSelected && (
-                        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: roleColor }} />
-                      )}
+            {/* Barre de Recherche & Filtres par type */}
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="search-control-container" style={{ flex: 1, minWidth: '260px' }}>
+                <Search size={15} className="search-control-icon" />
+                <input
+                  type="text"
+                  className="search-control-input"
+                  placeholder="Rechercher par nom de rôle, tag, description..."
+                  value={roleSearch}
+                  onChange={(e) => setRoleSearch(e.target.value)}
+                />
+                {roleSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setRoleSearch('')}
+                    className="search-control-clear"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
 
-                      <div style={{ display: 'flex', alignItems: 'start', justifyBetween: 'space-between', gap: '0.75rem' }}>
-                        <div
-                          style={{
-                            width: '42px',
-                            height: '42px',
-                            borderRadius: '12px',
-                            background: roleColor,
-                            color: '#ffffff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1rem',
-                            fontWeight: 800,
-                            flexShrink: 0
-                          }}
-                        >
-                          <ShieldCheck size={20} />
-                        </div>
-
-                        <div style={{ flexGrow: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <strong style={{ fontSize: '0.92rem', color: isSelected ? roleColor : 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
-                              {role.label}
-                            </strong>
-
-                            <span
-                              style={{
-                                fontSize: '0.62rem',
-                                padding: '0.15rem 0.45rem',
-                                borderRadius: '6px',
-                                background: role.isSystem ? 'rgba(37, 99, 235, 0.1)' : 'rgba(139, 92, 246, 0.1)',
-                                color: role.isSystem ? '#2563eb' : '#8b5cf6',
-                                fontWeight: 700
-                              }}
-                            >
-                              {role.isSystem ? 'Système' : 'Sur-mesure'}
-                            </span>
-                          </div>
-
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0.5rem', lineHeight: '1.3' }}>
-                            {role.description || 'Aucune description renseignée.'}
-                          </p>
-
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <Users size={13} color="var(--primary)" />
-                              <strong>{assignedCount}</strong> utilisateur{assignedCount > 1 ? 's' : ''} rattaché{assignedCount > 1 ? 's' : ''}
-                            </span>
-
-                            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: roleColor }}>
-                              Tag: {role.shortLabel || role.key}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }))}
+              {/* Pilules de filtrage type de rôle */}
+              <div className="filter-pills-group" style={{ flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${roleTypeFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setRoleTypeFilter('all')}
+                  style={{ minWidth: '90px', justifyContent: 'center' }}
+                >
+                  Tous ({rolesList.length})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${roleTypeFilter === 'system' ? 'active' : ''}`}
+                  onClick={() => setRoleTypeFilter('system')}
+                  style={{ minWidth: '100px', justifyContent: 'center', gap: '0.3rem' }}
+                >
+                  <Shield size={13} /> Système ({systemRolesCount})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${roleTypeFilter === 'custom' ? 'active' : ''}`}
+                  onClick={() => setRoleTypeFilter('custom')}
+                  style={{ minWidth: '110px', justifyContent: 'center', gap: '0.3rem' }}
+                >
+                  <Sparkles size={13} /> Sur-mesure ({customRolesCount})
+                </button>
               </div>
             </div>
 
-            {/* COLONNE DROITE : ÉDITEUR DU RÔLE SELECTIONNE ET HABILITATIONS */}
-            <div className="card" style={{ minHeight: '600px', display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
-              {selectedRoleObj ? (
-                <form onSubmit={handleRoleSaveSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.35rem' }}>
-                  
-                  {/* EN-TÊTE RÔLE */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '1rem',
-                      background: `${editRoleColor}15`,
-                      padding: '1rem 1.25rem',
-                      borderRadius: '16px',
-                      border: `1px solid ${editRoleColor}30`
-                    }}
-                  >
-                    <div
-                      style={{
-                        background: editRoleColor,
-                        color: '#ffffff',
-                        width: '54px',
-                        height: '54px',
-                        borderRadius: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
-                      }}
-                    >
-                      <ShieldCheck size={28} />
-                    </div>
+            {/* Structure Tableau Responsive */}
+            <div className="table-container" style={{ width: '100%', overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+              <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-app)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                    <th style={{ padding: '0.85rem 1rem' }}>Rôle & Intitulé</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Type</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Libellé Court</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Habilitations (CMS / Mobile)</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Utilisateurs Rattachés</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRoles.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-secondary)' }}>
+                        <ShieldCheck size={36} style={{ margin: '0 auto 0.6rem', color: 'var(--text-muted)', opacity: 0.6 }} />
+                        <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>Aucun rôle trouvé</p>
+                        <p style={{ margin: '0.25rem 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                          Modifiez vos critères de recherche ou créez un nouveau rôle personnalisé.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRoles.map(role => {
+                      const roleColor = role.color || '#2563eb';
+                      const assignedUsers = staffList.filter(s => s.role === role.key || s.role === role.id);
+                      const assignedCount = assignedUsers.length;
+                      
+                      const adminPerms = PERMISSIONS_CONFIG.filter(p => p.category === 'admin');
+                      const mobilePerms = PERMISSIONS_CONFIG.filter(p => p.category === 'mobile');
+                      const rolePerms = role.permissions || {};
+                      const adminCount = adminPerms.filter(p => !!rolePerms[p.key]).length;
+                      const mobileCount = mobilePerms.filter(p => !!rolePerms[p.key]).length;
 
-                    <div style={{ flexGrow: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <h4 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
-                          {editRoleLabel || 'Édition du Rôle'}
-                        </h4>
-                        <span
+                      return (
+                        <tr
+                          key={role.id || role.key}
                           style={{
-                            fontSize: '0.68rem',
-                            padding: '0.2rem 0.55rem',
-                            borderRadius: '6px',
-                            background: selectedRoleObj.isSystem ? '#2563eb' : '#8b5cf6',
-                            color: '#fff',
-                            fontWeight: 700
+                            borderBottom: '1px solid var(--border-color)',
+                            transition: 'background 0.15s ease'
                           }}
                         >
-                          {selectedRoleObj.isSystem ? 'Rôle Système Natif' : 'Rôle Personnalisé'}
-                        </span>
-                      </div>
-                      
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>
-                        {selectedRoleObj.isSystem 
-                          ? "Ce rôle système natif définit les autorisations standards pour les utilisateurs rattachés."
-                          : "Ce rôle personnalisé adapte précisément les accès selon les besoins de votre organisation."}
-                      </p>
-                    </div>
-
-                    {!selectedRoleObj.isSystem && (
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        style={{ padding: '0.55rem', color: 'var(--danger)', borderColor: 'rgba(220, 38, 38, 0.25)', background: '#fff' }}
-                        onClick={() => {
-                          if (window.confirm(`Êtes-vous sûr de vouloir supprimer le rôle "${selectedRoleObj.label}" ?`)) {
-                            handleDeleteRole(selectedRoleObj.id);
-                          }
-                        }}
-                        title="Supprimer ce rôle"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* SECTION 1 : PROPRIÉTÉS DU RÔLE */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                    <h5 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      1. Propriétés du Rôle
-                    </h5>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '0.85rem' }}>
-                      <div className="form-group">
-                        <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Nom du Rôle</label>
-                        <input
-                          type="text"
-                          className="input-control"
-                          required
-                          value={editRoleLabel}
-                          onChange={(e) => setEditRoleLabel(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Libellé Court (Badge)</label>
-                        <input
-                          type="text"
-                          className="input-control"
-                          required
-                          value={editRoleShortLabel}
-                          onChange={(e) => setEditRoleShortLabel(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Description Fonctionnelle</label>
-                      <input
-                        type="text"
-                        className="input-control"
-                        placeholder="Ex: Responsable des inventaires textiles et contrôle qualité..."
-                        value={editRoleDesc}
-                        onChange={(e) => setEditRoleDesc(e.target.value)}
-                      />
-                    </div>
-
-                    {/* Sélection Couleur d'accentuation */}
-                    <div className="form-group">
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Couleur Thème du Rôle</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        {PRESET_COLORS.map(c => (
-                          <div
-                            key={c}
-                            onClick={() => setEditRoleColor(c)}
-                            style={{
-                              width: '26px',
-                              height: '26px',
-                              borderRadius: '50%',
-                              background: c,
-                              cursor: 'pointer',
-                              border: editRoleColor === c ? '2px solid var(--text-primary)' : '2px solid transparent',
-                              transform: editRoleColor === c ? 'scale(1.15)' : 'scale(1)',
-                              transition: 'all 0.15s ease',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
-                            }}
-                          />
-                        ))}
-                        <input
-                          type="color"
-                          value={editRoleColor}
-                          onChange={(e) => setEditRoleColor(e.target.value)}
-                          style={{ width: '32px', height: '32px', border: 'none', background: 'none', cursor: 'pointer' }}
-                          title="Couleur personnalisée"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SECTION 2 : MATRICE DES HABILITATIONS RATTACHÉES */}
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <h5 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Sliders size={15} color="var(--primary)" />
-                        2. Accès & Habilitations Rattachés à ce Rôle
-                      </h5>
-
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={() => selectAllPermissionsCategory('admin')}
-                          style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', borderRadius: '6px' }}
-                        >
-                          ⚡ Tout Admin
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={() => selectAllPermissionsCategory('mobile')}
-                          style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', borderRadius: '6px' }}
-                        >
-                          📱 Tout Mobile
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={clearAllRolePermissions}
-                          style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', borderRadius: '6px', color: 'var(--danger)' }}
-                        >
-                          🧹 Décocher Tout
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Admin CMS */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--primary)', background: 'rgba(0, 44, 247, 0.06)', padding: '0.35rem 0.75rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                        🖥️ Habilitations Admin CMS (Web)
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        {PERMISSIONS_CONFIG.filter(p => p.category === 'admin').map(perm => {
-                          const isChecked = !!editRolePermissions[perm.key];
-                          const IconComp = perm.icon;
-
-                          return (
-                            <label
-                              key={perm.key}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'start',
-                                gap: '0.75rem',
-                                padding: '0.85rem',
-                                borderRadius: '12px',
-                                border: isChecked ? `1px solid ${editRoleColor}` : '1px solid var(--border-color)',
-                                background: isChecked ? `${editRoleColor}0d` : 'var(--bg-app)',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => setEditRolePermissions(prev => ({ ...prev, [perm.key]: e.target.checked }))}
-                                style={{ marginTop: '0.2rem', accentColor: editRoleColor, width: '16px', height: '16px', cursor: 'pointer' }}
-                              />
-
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                  <IconComp size={15} color={perm.color} />
-                                  {perm.title}
-                                </div>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
-                                  {perm.description}
-                                </p>
-                              </div>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* App Mobile */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.08)', padding: '0.35rem 0.75rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                        📱 Habilitations Application Mobile Terrain
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        {PERMISSIONS_CONFIG.filter(p => p.category === 'mobile').map(perm => {
-                          const isChecked = !!editRolePermissions[perm.key];
-                          const IconComp = perm.icon;
-
-                          return (
-                            <label
-                              key={perm.key}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'start',
-                                gap: '0.75rem',
-                                padding: '0.85rem',
-                                borderRadius: '12px',
-                                border: isChecked ? `1px solid ${editRoleColor}` : '1px solid var(--border-color)',
-                                background: isChecked ? `${editRoleColor}0d` : 'var(--bg-app)',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => setEditRolePermissions(prev => ({ ...prev, [perm.key]: e.target.checked }))}
-                                style={{ marginTop: '0.2rem', accentColor: editRoleColor, width: '16px', height: '16px', cursor: 'pointer' }}
-                              />
-
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                  <IconComp size={15} color={perm.color} />
-                                  {perm.title}
-                                </div>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.3' }}>
-                                  {perm.description}
-                                </p>
-                              </div>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SECTION 3 : MEMBRES RATTACHÉS À CE RÔLE */}
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                    <h5 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Users size={15} color="var(--primary)" />
-                      3. Utilisateurs rattachés à ce Rôle
-                    </h5>
-
-                    {(() => {
-                      const attachedUsers = staffList.filter(s => s.role === selectedRoleObj.key || s.role === selectedRoleObj.id);
-                      if (attachedUsers.length === 0) {
-                        return (
-                          <div style={{ padding: '0.85rem', background: 'var(--bg-app)', borderRadius: '10px', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                            Aucun membre n'est actuellement rattaché à ce rôle.
-                          </div>
-                        );
-                      }
-                      return (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          {attachedUsers.map(u => (
-                            <div
-                              key={u.id}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                padding: '0.35rem 0.65rem',
-                                borderRadius: '20px',
-                                background: `${editRoleColor}15`,
-                                border: `1px solid ${editRoleColor}30`,
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                color: 'var(--text-primary)'
-                              }}
-                            >
+                          {/* 1. Rôle & Intitulé */}
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                               <div
                                 style={{
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '50%',
-                                  background: editRoleColor,
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '10px',
+                                  background: roleColor,
                                   color: '#fff',
-                                  fontSize: '0.65rem',
-                                  fontWeight: 800,
                                   display: 'flex',
                                   alignItems: 'center',
-                                  justifyContent: 'center'
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
                                 }}
                               >
-                                {(u.prenom || 'U')[0]}
+                                <ShieldCheck size={18} />
                               </div>
-                              <span>{u.prenom} {u.nom}</span>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
+                                  {role.label}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    color: 'var(--text-muted)',
+                                    maxWidth: '280px',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    marginTop: '2px'
+                                  }}
+                                  title={role.description}
+                                >
+                                  {role.description || 'Rôle standard sans description spécifique'}
+                                </div>
+                              </div>
                             </div>
-                          ))}
-                        </div>
+                          </td>
+
+                          {/* 2. Type */}
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                padding: '0.2rem 0.55rem',
+                                borderRadius: '8px',
+                                background: role.isSystem ? 'rgba(37, 99, 235, 0.08)' : 'rgba(139, 92, 246, 0.08)',
+                                color: role.isSystem ? '#2563eb' : '#8b5cf6',
+                                border: role.isSystem ? '1px solid rgba(37, 99, 235, 0.25)' : '1px solid rgba(139, 92, 246, 0.25)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem'
+                              }}
+                            >
+                              {role.isSystem ? <Shield size={11} /> : <Sparkles size={11} />}
+                              {role.isSystem ? 'Système' : 'Sur-mesure'}
+                            </span>
+                          </td>
+
+                          {/* 3. Libellé Court / Badge */}
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                padding: '0.2rem 0.55rem',
+                                borderRadius: '8px',
+                                background: `${roleColor}14`,
+                                color: roleColor,
+                                border: `1px solid ${roleColor}35`,
+                                display: 'inline-block'
+                              }}
+                            >
+                              {role.shortLabel || role.key}
+                            </span>
+                          </td>
+
+                          {/* 4. Habilitations (CMS / Mobile) */}
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  padding: '0.18rem 0.5rem',
+                                  borderRadius: '6px',
+                                  background: 'rgba(59, 130, 246, 0.08)',
+                                  color: 'var(--primary)',
+                                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}
+                                title={`${adminCount} autorisations CMS actives sur ${adminPerms.length}`}
+                              >
+                                {adminCount}/{adminPerms.length} admin
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  padding: '0.18rem 0.5rem',
+                                  borderRadius: '6px',
+                                  background: 'rgba(16, 185, 129, 0.08)',
+                                  color: '#10b981',
+                                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}
+                                title={`${mobileCount} autorisations Mobile actives sur ${mobilePerms.length}`}
+                              >
+                                {mobileCount}/{mobilePerms.length} mobile
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* 5. Utilisateurs Rattachés */}
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              {assignedCount > 0 ? (
+                                <>
+                                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    {assignedUsers.slice(0, 3).map((u, i) => (
+                                      <div
+                                        key={u.id || i}
+                                        style={{
+                                          width: '24px',
+                                          height: '24px',
+                                          borderRadius: '50%',
+                                          background: roleColor,
+                                          color: '#fff',
+                                          fontSize: '0.62rem',
+                                          fontWeight: 800,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          marginLeft: i > 0 ? '-6px' : 0,
+                                          border: '2px solid var(--bg-card)',
+                                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                        }}
+                                        title={`${u.prenom} ${u.nom}`}
+                                      >
+                                        {(u.prenom || 'U')[0]}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <span style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                    <strong style={{ color: 'var(--text-primary)' }}>{assignedCount}</strong> {assignedCount > 1 ? 'membres' : 'membre'}
+                                  </span>
+                                </>
+                              ) : (
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                  0 membre
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 6. Actions */}
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() => openViewRole(role)}
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                title="Consulter les détails et habilitations"
+                              >
+                                <Eye size={13} /> Voir
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() => openEditRole(role)}
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                title="Modifier ce rôle et ses habilitations"
+                              >
+                                <Edit3 size={13} /> Modifier
+                              </button>
+                              {!role.isSystem ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  onClick={() => handleDeleteRole(role.id)}
+                                  style={{ padding: '0.35rem 0.55rem', fontSize: '0.72rem', color: 'var(--danger)', borderColor: 'rgba(220, 38, 38, 0.25)', borderRadius: '8px' }}
+                                  title="Supprimer ce rôle"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  disabled
+                                  style={{ padding: '0.35rem 0.55rem', fontSize: '0.72rem', opacity: 0.35, cursor: 'not-allowed', borderRadius: '8px' }}
+                                  title="Rôle système natif protégé"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       );
-                    })()}
-                  </div>
-
-                  {/* BOUTON ENREGISTRER LE RÔLE */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      style={{
-                        padding: '0.65rem 1.75rem',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        borderRadius: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        boxShadow: 'var(--shadow-sm)'
-                      }}
-                    >
-                      <CheckCircle2 size={16} /> Enregistrer le Rôle & les Habilitations Rattachées
-                    </button>
-
-                    {roleSaveSuccess && (
-                      <span style={{ fontSize: '0.78rem', color: 'var(--success)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <Check size={16} /> Rôle sauvegardé avec succès !
-                      </span>
-                    )}
-                  </div>
-
-                </form>
-              ) : (
-                <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '0.75rem', padding: '3rem' }}>
-                  <div style={{ background: 'var(--primary-light)', padding: '1.25rem', borderRadius: '50%', color: 'var(--primary)' }}>
-                    <ShieldCheck size={48} />
-                  </div>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 600, textAlign: 'center' }}>
-                    {rolesList.length === 0
-                      ? "Aucun rôle n'est configuré en base de données. Créez un premier rôle pour commencer."
-                      : "Sélectionnez un rôle dans la liste pour consulter ses propriétés et définir ses habilitations rattachées."}
-                  </span>
-                  {rolesList.length === 0 && (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => setShowNewRoleModal(true)}
-                      style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', borderRadius: '12px', padding: '0.6rem 1.25rem', fontWeight: 700 }}
-                    >
-                      <Plus size={16} /> Créer un Rôle
-                    </button>
+                    })
                   )}
-                </div>
-              )}
+                </tbody>
+              </table>
             </div>
 
           </div>
@@ -1613,7 +1536,8 @@ export default function StaffTab({
             className="card modal-dialog-card"
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: '720px',
+              width: '100%',
+              maxWidth: '840px',
               maxHeight: '88vh',
               padding: '1.75rem',
               display: 'flex',
@@ -1803,7 +1727,7 @@ export default function StaffTab({
 
                 {/* Admin CMS */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)' }}>🖥️ Habilitations Admin CMS</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)' }}>Habilitations Admin CMS</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                     {PERMISSIONS_CONFIG.filter(p => p.category === 'admin').map(perm => {
                       const isChecked = !!editStaffPermissions[perm.key];
@@ -1847,7 +1771,7 @@ export default function StaffTab({
 
                 {/* App Mobile */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981' }}>📱 Habilitations Application Mobile</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981' }}>Habilitations Application Mobile</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                     {PERMISSIONS_CONFIG.filter(p => p.category === 'mobile').map(perm => {
                       const isChecked = !!editStaffPermissions[perm.key];
@@ -1915,7 +1839,7 @@ export default function StaffTab({
          ========================================================================= */}
       {showNewRoleModal && createPortal(
         <div className="modal-backdrop" onClick={() => setShowNewRoleModal(false)}>
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '480px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px' }}>
+          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '600px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1994,6 +1918,746 @@ export default function StaffTab({
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn btn-outline" onClick={() => setShowNewRoleModal(false)}>Annuler</button>
                 <StatefulButton type="submit" variant="primary" style={{ padding: '0.6rem 1.25rem', fontWeight: 700 }} loadingText="Création...">Créer le Rôle</StatefulButton>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* =========================================================================
+         MODALE : CONSULTATION DÉTAILLÉE D'UN RÔLE (VIEW MODAL)
+         ========================================================================= */}
+      {showViewRoleModal && viewingRole && createPortal(
+        <div
+          onClick={() => setShowViewRoleModal(false)}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: '16px', boxSizing: 'border-box'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '880px', maxWidth: '100%', maxHeight: '92vh',
+              background: 'var(--bg-card)',
+              borderRadius: '24px',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 25px 60px -12px rgba(15,23,42,0.3)',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden'
+            }}
+          >
+            {/* ── HEADER (style admin standard) ── */}
+            {(() => {
+              const rc = viewingRole.color || '#2563eb';
+              const adminPerms = PERMISSIONS_CONFIG.filter(p => p.category === 'admin');
+              const mobilePerms = PERMISSIONS_CONFIG.filter(p => p.category === 'mobile');
+              const rolePerms = viewingRole.permissions || {};
+              const adminCount = adminPerms.filter(p => !!rolePerms[p.key]).length;
+              const mobileCount = mobilePerms.filter(p => !!rolePerms[p.key]).length;
+              const assignedCount = staffList.filter(s => s.role === viewingRole.key || s.role === viewingRole.id).length;
+              return (
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '1.1rem 1.5rem',
+                  borderBottom: '1px solid var(--border-color)',
+                  background: 'var(--bg-app)',
+                  flexShrink: 0
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    {/* Color dot + icon */}
+                    <div style={{
+                      width: '44px', height: '44px', borderRadius: '13px', flexShrink: 0,
+                      background: `${rc}18`,
+                      border: `1.5px solid ${rc}35`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <ShieldCheck size={22} color={rc} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
+                          {viewingRole.label}
+                        </h4>
+                        <span style={{
+                          fontSize: '0.67rem', fontWeight: 700, padding: '0.18rem 0.55rem', borderRadius: '20px',
+                          background: viewingRole.isSystem ? 'rgba(37,99,235,0.1)' : 'rgba(139,92,246,0.1)',
+                          color: viewingRole.isSystem ? '#2563eb' : '#8b5cf6',
+                          border: viewingRole.isSystem ? '1px solid rgba(37,99,235,0.22)' : '1px solid rgba(139,92,246,0.22)'
+                        }}>
+                          {viewingRole.isSystem ? 'Système Natif' : 'Sur-mesure'}
+                        </span>
+                        <span style={{
+                          fontSize: '0.67rem', fontWeight: 700, padding: '0.18rem 0.55rem', borderRadius: '20px',
+                          background: `${rc}12`, color: rc,
+                          border: `1px solid ${rc}30`, fontFamily: 'monospace'
+                        }}>
+                          {viewingRole.shortLabel || viewingRole.key}
+                        </span>
+                      </div>
+                      {/* Stats inline */}
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <ShieldCheck size={11} color="var(--primary)" /> {adminCount}/{adminPerms.length} admin
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <Users size={11} color="#10b981" /> {mobileCount}/{mobilePerms.length} mobile
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <Users size={11} color="var(--text-muted)" /> {assignedCount} membre(s)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchToEdit(viewingRole)}
+                      style={{
+                        padding: '0.45rem 0.9rem', fontSize: '0.76rem', fontWeight: 700,
+                        borderRadius: '10px', border: '1.5px solid var(--primary)',
+                        background: 'var(--primary)', color: '#fff',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem'
+                      }}
+                    >
+                      <Edit3 size={13} /> Modifier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowViewRoleModal(false)}
+                      style={{
+                        width: '34px', height: '34px', borderRadius: '10px',
+                        border: '1.5px solid var(--border-color)',
+                        background: 'transparent', color: 'var(--text-muted)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── SCROLLABLE BODY ── */}
+            <div style={{ overflowY:'auto', flex:1, padding:'1.5rem', display:'flex', flexDirection:'column', gap:'1.5rem' }}>
+
+              {/* Permissions — Admin CMS */}
+              {(() => {
+                const rc = viewingRole.color || '#2563eb';
+                const rolePerms = viewingRole.permissions || {};
+                const adminPerms = PERMISSIONS_CONFIG.filter(p => p.category === 'admin');
+                const mobilePerms = PERMISSIONS_CONFIG.filter(p => p.category === 'mobile');
+
+                const PermSection = ({ perms, accent, label }) => (
+                  <div>
+                    <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'0.85rem' }}>
+                      <span style={{ fontSize:'0.68rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.8px', color: accent }}>{label}</span>
+                      <div style={{ flex:1, height:'1px', background:`linear-gradient(to right, ${accent}40, transparent)` }} />
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.55rem' }}>
+                      {perms.map(p => {
+                        const isActive = !!rolePerms[p.key];
+                        const IconC = p.icon;
+                        return (
+                          <div key={p.key} style={{
+                            display:'flex', alignItems:'center', gap:'0.65rem',
+                            padding:'0.75rem 1rem',
+                            borderRadius:'14px',
+                            border: isActive ? `1.5px solid ${p.color}35` : '1.5px solid var(--border-color)',
+                            background: isActive ? `${p.color}09` : 'var(--bg-app)',
+                            transition:'all 0.2s ease',
+                            position:'relative', overflow:'hidden'
+                          }}>
+                            
+                            <div style={{
+                              width:'32px', height:'32px', borderRadius:'10px', flexShrink:0,
+                              background: isActive ? `${p.color}18` : 'var(--border-color)',
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                              color: isActive ? p.color : 'var(--text-muted)'
+                            }}>
+                              <IconC size={16} />
+                            </div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:'0.78rem', fontWeight:700, color: isActive ? 'var(--text-primary)' : 'var(--text-muted)', marginBottom:'1px' }}>
+                                {p.title}
+                              </div>
+                              <div style={{ fontSize:'0.66rem', color:'var(--text-muted)', lineHeight:1.3 }}>{p.description}</div>
+                            </div>
+                            <div style={{
+                              width:'20px', height:'20px', borderRadius:'50%', flexShrink:0,
+                              background: isActive ? '#16a34a' : 'var(--border-color)',
+                              display:'flex', alignItems:'center', justifyContent:'center'
+                            }}>
+                              {isActive && <Check size={11} color="#fff" strokeWidth={3} />}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+
+                return (
+                  <>
+                    <PermSection perms={adminPerms} accent={rc} label="Habilitations Admin CMS" />
+                    <PermSection perms={mobilePerms} accent="#10b981" label="Habilitations App Mobile Terrain" />
+                  </>
+                );
+              })()}
+
+              {/* Membres rattachés */}
+              {(() => {
+                const rc = viewingRole.color || '#2563eb';
+                const assignedUsers = staffList.filter(s => s.role === viewingRole.key || s.role === viewingRole.id);
+                const allStores = db.getStores ? db.getStores() : [];
+
+                return (
+                  <div>
+                    <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'0.85rem' }}>
+                      <span style={{ fontSize:'0.68rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.8px', color:'var(--text-secondary)' }}>
+                        Membres Rattachés ({assignedUsers.length})
+                      </span>
+                      <div style={{ flex:1, height:'1px', background:'linear-gradient(to right, var(--border-color), transparent)' }} />
+                    </div>
+
+                    {assignedUsers.length === 0 ? (
+                      <div style={{
+                        padding:'1.5rem', borderRadius:'16px', textAlign:'center',
+                        background:'var(--bg-app)', border:'1.5px dashed var(--border-color)',
+                        color:'var(--text-muted)', fontSize:'0.8rem'
+                      }}>
+                        Aucun membre du personnel n'est encore rattaché à ce rôle.
+                      </div>
+                    ) : (
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:'0.5rem' }}>
+                        {assignedUsers.map(u => {
+                          const storeObj = allStores.find(st => st.id === u.store_id);
+                          return (
+                            <div key={u.id} style={{
+                              display:'flex', alignItems:'center', gap:'0.5rem',
+                              padding:'0.4rem 0.85rem 0.4rem 0.4rem',
+                              borderRadius:'24px',
+                              background: `${rc}10`,
+                              border: `1.5px solid ${rc}28`,
+                              fontSize:'0.76rem', fontWeight:600, color:'var(--text-primary)'
+                            }}>
+                              <div style={{
+                                width:'26px', height:'26px', borderRadius:'50%',
+                                background: rc, color:'#fff',
+                                fontSize:'0.62rem', fontWeight:900,
+                                display:'flex', alignItems:'center', justifyContent:'center',
+                                boxShadow:`0 0 0 2px ${rc}30`
+                              }}>
+                                {(u.prenom||'U')[0]}
+                              </div>
+                              <div>
+                                <div style={{ lineHeight:1.2 }}>{u.prenom} {u.nom}</div>
+                                {storeObj && <div style={{ fontSize:'0.64rem', color:'var(--text-muted)', fontWeight:500 }}>{storeObj.nom}</div>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* ── FOOTER ── */}
+            <div style={{
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              padding:'1rem 1.75rem',
+              borderTop:'1px solid var(--border-color)',
+              background:'var(--bg-app)', flexShrink:0
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowViewRoleModal(false)}
+                style={{
+                  padding:'0.55rem 1.25rem', fontSize:'0.8rem', fontWeight:600,
+                  borderRadius:'12px', border:'1.5px solid var(--border-color)',
+                  background:'transparent', color:'var(--text-secondary)', cursor:'pointer'
+                }}
+              >
+                Fermer
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchToEdit(viewingRole)}
+                style={{
+                  padding:'0.6rem 1.5rem', fontSize:'0.84rem', fontWeight:700,
+                  borderRadius:'12px', border:'none',
+                  background: viewingRole.color || 'var(--primary)',
+                  color:'#fff', cursor:'pointer',
+                  display:'flex', alignItems:'center', gap:'0.45rem',
+                  boxShadow:`0 4px 16px ${viewingRole.color || '#2563eb'}40`
+                }}
+              >
+                <Edit3 size={15} /> Modifier ce Rôle
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+
+      {/* =========================================================================
+         MODALE : MODIFICATION D'UN RÔLE & HABILITATIONS (EDIT MODAL)
+         ========================================================================= */}
+      {showEditRoleModal && selectedRoleObj && createPortal(
+        <div
+          onClick={() => { if (!roleSaveSuccess) setShowEditRoleModal(false); }}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: '16px', boxSizing: 'border-box'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '940px', maxWidth: '100%', maxHeight: '92vh',
+              background: 'var(--bg-card)',
+              borderRadius: '24px',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 25px 60px -12px rgba(15,23,42,0.3)',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden'
+            }}
+          >
+            {/* ── HEADER (style admin standard) ── */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '1.1rem 1.5rem',
+              borderBottom: '1px solid var(--border-color)',
+              background: 'var(--bg-app)',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                <div style={{
+                  width: '44px', height: '44px', borderRadius: '13px', flexShrink: 0,
+                  background: `${editRoleColor}18`,
+                  border: `1.5px solid ${editRoleColor}35`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <ShieldCheck size={22} color={editRoleColor} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                    <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
+                      {editRoleLabel || selectedRoleObj.label}
+                    </h4>
+                    <span style={{
+                      fontSize: '0.67rem', fontWeight: 700, padding: '0.18rem 0.55rem', borderRadius: '20px',
+                      background: selectedRoleObj.isSystem ? 'rgba(37,99,235,0.1)' : 'rgba(139,92,246,0.1)',
+                      color: selectedRoleObj.isSystem ? '#2563eb' : '#8b5cf6',
+                      border: selectedRoleObj.isSystem ? '1px solid rgba(37,99,235,0.22)' : '1px solid rgba(139,92,246,0.22)'
+                    }}>
+                      {selectedRoleObj.isSystem ? 'Système Natif' : 'Sur-mesure'}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>
+                    Modifier les propriétés & autorisations du rôle
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowEditRoleModal(false)}
+                style={{
+                  width: '34px', height: '34px', borderRadius: '10px',
+                  border: '1.5px solid var(--border-color)',
+                  background: 'transparent', color: 'var(--text-muted)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* ── FORM ── */}
+            <form onSubmit={handleRoleSaveSubmit} style={{ display:'flex', flexDirection:'column', flex:1, minHeight:0 }}>
+              <div style={{ overflowY:'auto', flex:1, padding:'1.5rem', display:'flex', flexDirection:'column', gap:'1.5rem' }}>
+
+                {/* ── SECTION 1 : Propriétés ── */}
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1rem' }}>
+                    <span style={{ fontSize:'0.68rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.8px', color:'var(--text-secondary)' }}>
+                      1. Propriétés du Rôle
+                    </span>
+                    <div style={{ flex:1, height:'1px', background:'linear-gradient(to right, var(--border-color), transparent)' }} />
+                  </div>
+
+                  <div style={{ display:'grid', gridTemplateColumns:'1.2fr 0.8fr', gap:'1rem', marginBottom:'1rem' }}>
+                    <div className="form-group" style={{ margin:0 }}>
+                      <label style={{ fontSize:'0.75rem', fontWeight:700, color:'var(--text-secondary)', marginBottom:'0.4rem', display:'block' }}>Nom du Rôle</label>
+                      <input
+                        type="text"
+                        className="input-control"
+                        required
+                        value={editRoleLabel}
+                        onChange={(e) => setEditRoleLabel(e.target.value)}
+                        style={{ borderRadius:'12px' }}
+                      />
+                    </div>
+                    <div className="form-group" style={{ margin:0 }}>
+                      <label style={{ fontSize:'0.75rem', fontWeight:700, color:'var(--text-secondary)', marginBottom:'0.4rem', display:'block' }}>Libellé Court (Badge)</label>
+                      <input
+                        type="text"
+                        className="input-control"
+                        required
+                        value={editRoleShortLabel}
+                        onChange={(e) => setEditRoleShortLabel(e.target.value)}
+                        style={{ borderRadius:'12px' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ margin:0 }}>
+                    <label style={{ fontSize:'0.75rem', fontWeight:700, color:'var(--text-secondary)', marginBottom:'0.4rem', display:'block' }}>Description Fonctionnelle</label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      placeholder="Ex: Responsable des inventaires textiles et contrôle qualité..."
+                      value={editRoleDesc}
+                      onChange={(e) => setEditRoleDesc(e.target.value)}
+                      style={{ borderRadius:'12px' }}
+                    />
+                  </div>
+
+                  {/* Color picker — premium swatch strip */}
+                  <div style={{ marginTop:'1rem' }}>
+                    <label style={{ fontSize:'0.75rem', fontWeight:700, color:'var(--text-secondary)', marginBottom:'0.75rem', display:'block' }}>
+                      Couleur d'Identité du Rôle
+                    </label>
+                    <div style={{ display:'flex', alignItems:'center', gap:'0.65rem', flexWrap:'wrap' }}>
+                      {PRESET_COLORS.map(c => (
+                        <div
+                          key={c}
+                          onClick={() => setEditRoleColor(c)}
+                          style={{
+                            width:'30px', height:'30px', borderRadius:'50%',
+                            background: c, cursor:'pointer',
+                            outline: editRoleColor === c ? `3px solid ${c}` : '3px solid transparent',
+                            outlineOffset: editRoleColor === c ? '2px' : '0',
+                            transform: editRoleColor === c ? 'scale(1.2)' : 'scale(1)',
+                            transition:'all 0.18s ease',
+                            boxShadow: editRoleColor === c ? `0 4px 14px ${c}60` : '0 2px 6px rgba(0,0,0,0.12)'
+                          }}
+                        />
+                      ))}
+                      <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
+                        <input
+                          type="color"
+                          value={editRoleColor}
+                          onChange={(e) => setEditRoleColor(e.target.value)}
+                          style={{ width:'30px', height:'30px', borderRadius:'50%', border:'none', cursor:'pointer', padding:0, background:'none' }}
+                          title="Couleur personnalisée"
+                        />
+                      </div>
+                      {/* Live preview chip */}
+                      <div style={{
+                        display:'flex', alignItems:'center', gap:'0.4rem',
+                        padding:'0.3rem 0.85rem', borderRadius:'20px',
+                        background:`${editRoleColor}18`,
+                        border:`1.5px solid ${editRoleColor}40`,
+                        fontSize:'0.75rem', fontWeight:700,
+                        color: editRoleColor,
+                        marginLeft:'auto'
+                      }}>
+                        <span style={{ width:'10px', height:'10px', borderRadius:'50%', background: editRoleColor, display:'inline-block', boxShadow:`0 0 0 2px ${editRoleColor}30` }} />
+                        {editRoleShortLabel || '—'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── SECTION 2 : Habilitations ── */}
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'1rem', flexWrap:'wrap', gap:'0.5rem' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
+                      <span style={{ fontSize:'0.68rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.8px', color:'var(--text-secondary)' }}>
+                        2. Accès & Habilitations
+                      </span>
+                      <div style={{ height:'1px', width:'60px', background:'var(--border-color)' }} />
+                    </div>
+                    <div style={{ display:'flex', gap:'0.4rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => selectAllPermissionsCategory('admin')}
+                        style={{
+                          padding:'0.3rem 0.65rem', fontSize:'0.7rem', fontWeight:700, borderRadius:'8px',
+                          border:`1px solid ${editRoleColor}35`, background:`${editRoleColor}10`,
+                          color: editRoleColor, cursor:'pointer'
+                        }}
+                      >Admin</button>
+                      <button
+                        type="button"
+                        onClick={() => selectAllPermissionsCategory('mobile')}
+                        style={{
+                          padding:'0.3rem 0.65rem', fontSize:'0.7rem', fontWeight:700, borderRadius:'8px',
+                          border:'1px solid rgba(16,185,129,0.3)', background:'rgba(16,185,129,0.07)',
+                          color:'#10b981', cursor:'pointer'
+                        }}
+                      >Mobile</button>
+                      <button
+                        type="button"
+                        onClick={clearAllRolePermissions}
+                        style={{
+                          padding:'0.3rem 0.65rem', fontSize:'0.7rem', fontWeight:700, borderRadius:'8px',
+                          border:'1px solid rgba(220,38,38,0.25)', background:'rgba(220,38,38,0.05)',
+                          color:'var(--danger)', cursor:'pointer'
+                        }}
+                      >Vider</button>
+                    </div>
+                  </div>
+
+                  {/* Admin CMS permissions */}
+                  <div style={{ marginBottom:'1rem' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'0.45rem', marginBottom:'0.6rem' }}>
+                      <span style={{ fontSize:'0.68rem', fontWeight:700, color:'var(--primary)', background:'rgba(59,130,246,0.08)', padding:'0.25rem 0.6rem', borderRadius:'6px' }}>
+                        Admin CMS (Web)
+                      </span>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.5rem' }}>
+                      {PERMISSIONS_CONFIG.filter(p => p.category === 'admin').map(perm => {
+                        const isChecked = !!editRolePermissions[perm.key];
+                        const IconComp = perm.icon;
+                        return (
+                          <label
+                            key={perm.key}
+                            style={{
+                              display:'flex', alignItems:'center', gap:'0.7rem',
+                              padding:'0.75rem 1rem',
+                              borderRadius:'14px',
+                              border: isChecked ? `1.5px solid ${editRoleColor}50` : '1.5px solid var(--border-color)',
+                              background: isChecked ? `${editRoleColor}09` : 'var(--bg-app)',
+                              cursor:'pointer', transition:'all 0.18s ease',
+                              position:'relative', overflow:'hidden'
+                            }}
+                          >
+                            
+                            {/* Custom toggle */}
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => setEditRolePermissions(prev => ({ ...prev, [perm.key]: e.target.checked }))}
+                              style={{ display:'none' }}
+                            />
+                            <div style={{
+                              width:'36px', height:'20px', borderRadius:'10px', flexShrink:0,
+                              background: isChecked ? editRoleColor : 'var(--border-color)',
+                              position:'relative', transition:'background 0.2s ease',
+                              cursor:'pointer'
+                            }}>
+                              <div style={{
+                                position:'absolute', top:'2px',
+                                left: isChecked ? '18px' : '2px',
+                                width:'16px', height:'16px', borderRadius:'50%',
+                                background:'#fff',
+                                boxShadow:'0 1px 4px rgba(0,0,0,0.25)',
+                                transition:'left 0.2s ease'
+                              }} />
+                            </div>
+                            <div style={{
+                              width:'28px', height:'28px', borderRadius:'9px', flexShrink:0,
+                              background: isChecked ? `${perm.color}1a` : 'var(--border-color)',
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                              color: isChecked ? perm.color : 'var(--text-muted)',
+                              transition:'all 0.18s ease'
+                            }}>
+                              <IconComp size={14} />
+                            </div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:'0.78rem', fontWeight:700, color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)', lineHeight:1.2 }}>
+                                {perm.title}
+                              </div>
+                              <div style={{ fontSize:'0.66rem', color:'var(--text-muted)', lineHeight:1.3, marginTop:'1px' }}>
+                                {perm.description}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Mobile permissions */}
+                  <div>
+                    <div style={{ display:'flex', alignItems:'center', gap:'0.45rem', marginBottom:'0.6rem' }}>
+                      <span style={{ fontSize:'0.68rem', fontWeight:700, color:'#10b981', background:'rgba(16,185,129,0.08)', padding:'0.25rem 0.6rem', borderRadius:'6px' }}>
+                        Application Mobile Terrain
+                      </span>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.5rem' }}>
+                      {PERMISSIONS_CONFIG.filter(p => p.category === 'mobile').map(perm => {
+                        const isChecked = !!editRolePermissions[perm.key];
+                        const IconComp = perm.icon;
+                        return (
+                          <label
+                            key={perm.key}
+                            style={{
+                              display:'flex', alignItems:'center', gap:'0.7rem',
+                              padding:'0.75rem 1rem',
+                              borderRadius:'14px',
+                              border: isChecked ? '1.5px solid rgba(16,185,129,0.4)' : '1.5px solid var(--border-color)',
+                              background: isChecked ? 'rgba(16,185,129,0.07)' : 'var(--bg-app)',
+                              cursor:'pointer', transition:'all 0.18s ease',
+                              position:'relative', overflow:'hidden'
+                            }}
+                          >
+                            
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => setEditRolePermissions(prev => ({ ...prev, [perm.key]: e.target.checked }))}
+                              style={{ display:'none' }}
+                            />
+                            <div style={{
+                              width:'36px', height:'20px', borderRadius:'10px', flexShrink:0,
+                              background: isChecked ? '#10b981' : 'var(--border-color)',
+                              position:'relative', transition:'background 0.2s ease',
+                              cursor:'pointer'
+                            }}>
+                              <div style={{
+                                position:'absolute', top:'2px',
+                                left: isChecked ? '18px' : '2px',
+                                width:'16px', height:'16px', borderRadius:'50%',
+                                background:'#fff',
+                                boxShadow:'0 1px 4px rgba(0,0,0,0.25)',
+                                transition:'left 0.2s ease'
+                              }} />
+                            </div>
+                            <div style={{
+                              width:'28px', height:'28px', borderRadius:'9px', flexShrink:0,
+                              background: isChecked ? `${perm.color}1a` : 'var(--border-color)',
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                              color: isChecked ? perm.color : 'var(--text-muted)',
+                              transition:'all 0.18s ease'
+                            }}>
+                              <IconComp size={14} />
+                            </div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:'0.78rem', fontWeight:700, color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)', lineHeight:1.2 }}>
+                                {perm.title}
+                              </div>
+                              <div style={{ fontSize:'0.66rem', color:'var(--text-muted)', lineHeight:1.3, marginTop:'1px' }}>
+                                {perm.description}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── SECTION 3 : Membres ── */}
+                {(() => {
+                  const attachedUsers = staffList.filter(s => s.role === selectedRoleObj.key || s.role === selectedRoleObj.id);
+                  if (attachedUsers.length === 0) return null;
+                  return (
+                    <div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'0.75rem' }}>
+                        <span style={{ fontSize:'0.68rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.8px', color:'var(--text-secondary)' }}>
+                          3. Membres Rattachés ({attachedUsers.length})
+                        </span>
+                        <div style={{ flex:1, height:'1px', background:'linear-gradient(to right, var(--border-color), transparent)' }} />
+                      </div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:'0.45rem' }}>
+                        {attachedUsers.map(u => (
+                          <div
+                            key={u.id}
+                            style={{
+                              display:'flex', alignItems:'center', gap:'0.4rem',
+                              padding:'0.3rem 0.65rem 0.3rem 0.3rem',
+                              borderRadius:'24px',
+                              background:`${editRoleColor}12`,
+                              border:`1.5px solid ${editRoleColor}28`,
+                              fontSize:'0.74rem', fontWeight:600, color:'var(--text-primary)'
+                            }}
+                          >
+                            <div style={{
+                              width:'22px', height:'22px', borderRadius:'50%',
+                              background: editRoleColor, color:'#fff',
+                              fontSize:'0.62rem', fontWeight:800,
+                              display:'flex', alignItems:'center', justifyContent:'center'
+                            }}>
+                              {(u.prenom||'U')[0]}
+                            </div>
+                            {u.prenom} {u.nom}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* ── FOOTER ── */}
+              <div style={{
+                display:'flex', justifyContent:'space-between', alignItems:'center',
+                padding:'1rem 1.75rem',
+                borderTop:'1px solid var(--border-color)',
+                background:'var(--bg-app)', flexShrink:0
+              }}>
+                <div>
+                  {!selectedRoleObj.isSystem && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRole(selectedRoleObj.id)}
+                      style={{
+                        padding:'0.55rem 1rem', fontSize:'0.78rem', fontWeight:700, borderRadius:'12px',
+                        border:'1.5px solid rgba(220,38,38,0.28)', background:'rgba(220,38,38,0.05)',
+                        color:'var(--danger)', cursor:'pointer',
+                        display:'flex', alignItems:'center', gap:'0.4rem'
+                      }}
+                    >
+                      <Trash2 size={14} /> Supprimer
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
+                  {roleSaveSuccess && (
+                    <span style={{ fontSize:'0.78rem', color:'var(--success)', fontWeight:700, display:'flex', alignItems:'center', gap:'0.3rem' }}>
+                      <Check size={15} /> Enregistré !
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowEditRoleModal(false)}
+                    style={{
+                      padding:'0.55rem 1.2rem', fontSize:'0.8rem', fontWeight:600, borderRadius:'12px',
+                      border:'1.5px solid var(--border-color)', background:'transparent',
+                      color:'var(--text-secondary)', cursor:'pointer'
+                    }}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding:'0.6rem 1.5rem', fontSize:'0.84rem', fontWeight:700, borderRadius:'12px',
+                      border:'none',
+                      background: editRoleColor,
+                      color:'#fff', cursor:'pointer',
+                      display:'flex', alignItems:'center', gap:'0.45rem',
+                      boxShadow:`0 4px 16px ${editRoleColor}40`
+                    }}
+                  >
+                    <CheckCircle2 size={15} /> Enregistrer
+                  </button>
+                </div>
               </div>
             </form>
           </div>

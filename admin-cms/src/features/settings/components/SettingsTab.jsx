@@ -156,7 +156,7 @@ function LeafletZoneMap({ lat, lng, storeName, zones }) {
 
     L.marker([parsedLat, parsedLng], { icon: storeIcon })
       .addTo(map)
-      .bindPopup(`<b>${storeName || 'Pressing Pro'}</b><br/>📍 GPS: ${parsedLat.toFixed(6)}, ${parsedLng.toFixed(6)}`)
+      .bindPopup(`<b>${storeName || 'Pressing Pro'}</b><br/>GPS: ${parsedLat.toFixed(6)}, ${parsedLng.toFixed(6)}`)
       .openPopup();
 
     return () => {
@@ -260,7 +260,7 @@ export default function SettingsTab({
     localStorage.setItem('klinup_trello_api_key', trelloApiKey.trim());
     localStorage.setItem('klinup_trello_api_token', trelloApiToken.trim());
     localStorage.setItem('klinup_trello_list_id', trelloListId.trim());
-    alert("✅ Configuration Trello sauvegardée avec succès !");
+    alert("Configuration Trello sauvegardée avec succès !");
   };
 
   const handleTestTrello = async () => {
@@ -271,13 +271,14 @@ export default function SettingsTab({
     setTrelloTestStatus('Envoi de la carte de test...');
     try {
       const cardTitle = `[HAUTE] [Test System] TICK-TEST - Test Intégration Trello Pressing Pro`;
-      const cardDesc = `### 🐞 Test Intégration Trello Pressing Pro Admin\nFélicitations ! Votre intégration Trello fonctionne correctement.`;
+      const cardDesc = `### Test Intégration Trello Pressing Pro Admin\nFélicitations ! Votre intégration Trello fonctionne correctement.`;
       const url = `https://api.trello.com/1/cards?idList=${encodeURIComponent(trelloListId.trim())}&key=${encodeURIComponent(trelloApiKey.trim())}&token=${encodeURIComponent(trelloApiToken.trim())}&name=${encodeURIComponent(cardTitle)}&desc=${encodeURIComponent(cardDesc)}`;
       await fetch(url, { method: 'POST' });
-      setTrelloTestStatus('✅ Carte de test envoyée avec succès sur votre tableau Trello !');
+      setTrelloTestStatus('Carte de test envoyée avec succès sur votre tableau Trello !');
       setTimeout(() => setTrelloTestStatus(''), 4000);
     } catch (e) {
-      setTrelloTestStatus('❌ Échec de l envoi. Vérifiez la Clé API, Token et ID de liste.');
+      setTrelloTestStatus("Échec de l'envoi. Vérifiez la Clé API, Token et ID de liste.");
+
     }
   };
 
@@ -871,7 +872,7 @@ export default function SettingsTab({
                   {/* Bronze */}
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#d97706', marginBottom: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>🥉 Seuil / Intervalle Niveau Bronze (pts) :</span>
+                      <span>Bronze :</span>
                       <span style={{ fontSize: '0.7rem', color: '#d97706', fontWeight: 800, background: 'rgba(217, 119, 6, 0.12)', padding: '0.15rem 0.5rem', borderRadius: '6px' }}>
                         Intervalle : 0 à {tierBronzeMaxPts || 49} pts
                       </span>
@@ -901,7 +902,7 @@ export default function SettingsTab({
                   {/* Silver */}
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0284c7', marginBottom: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>🥈 Seuil Niveau Argent (pts) :</span>
+                      <span>Argent :</span>
                       <span style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 800, background: 'rgba(2, 132, 199, 0.12)', padding: '0.15rem 0.5rem', borderRadius: '6px' }}>
                         Intervalle : {tierSilverPts} à {(Number(tierGoldPts) || 150) - 1} pts
                       </span>
@@ -918,7 +919,7 @@ export default function SettingsTab({
                   {/* Gold */}
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ca8a04', marginBottom: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>🥇 Seuil Niveau Or (pts) :</span>
+                      <span>Or :</span>
                       <span style={{ fontSize: '0.7rem', color: '#ca8a04', fontWeight: 800, background: 'rgba(202, 138, 4, 0.12)', padding: '0.15rem 0.5rem', borderRadius: '6px' }}>
                         Intervalle : {tierGoldPts} à {(Number(tierPlatinumPts) || 300) - 1} pts
                       </span>
@@ -935,7 +936,7 @@ export default function SettingsTab({
                   {/* Platinum */}
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#7c3aed', marginBottom: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>💎 Seuil Niveau Platine VIP (pts) :</span>
+                      <span>Platine VIP :</span>
                       <span style={{ fontSize: '0.7rem', color: '#7c3aed', fontWeight: 800, background: 'rgba(124, 58, 237, 0.12)', padding: '0.15rem 0.5rem', borderRadius: '6px' }}>
                         Intervalle : {tierPlatinumPts}+ pts (VIP)
                       </span>
@@ -1264,8 +1265,8 @@ export default function SettingsTab({
                     </label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       {[
-                        { id: 'portrait', label: '📱 Portrait' },
-                        { id: 'landscape', label: '🖼️ Paysage' }
+                        { id: 'portrait', label: 'Portrait' },
+                        { id: 'landscape', label: 'Paysage' }
                       ].map((o) => (
                         <button
                           key={o.id}
@@ -1360,7 +1361,7 @@ export default function SettingsTab({
                             <strong>3 500 F</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#d97706' }}>
-                            <span>⚡ Supplément Urgence (+50%)</span>
+                            <span>Supplément Urgence (+50%)</span>
                             <strong>+2 750 F</strong>
                           </div>
                         </div>
@@ -1498,7 +1499,7 @@ export default function SettingsTab({
                         onClick={() => setIsDbUnlocked(false)}
                         style={{ padding: '0.5rem 0.8rem', fontSize: '0.78rem', borderRadius: '10px', fontWeight: 700, color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.3)' }}
                       >
-                        🔒 Verrouiller
+                        Verrouiller
                       </button>
                     </div>
                   </div>
@@ -1508,7 +1509,7 @@ export default function SettingsTab({
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                         <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(0, 121, 191, 0.12)', color: '#0079bf', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                          📋
+                          
                         </div>
                         <div>
                           <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Intégration Trello (Kanban Bugs)</h4>
@@ -1564,7 +1565,7 @@ export default function SettingsTab({
                       </div>
 
                       {trelloTestStatus && (
-                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: trelloTestStatus.includes('✅') ? '#10b981' : '#ef4444' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: trelloTestStatus.includes('✔') ? '#10b981' : '#ef4444' }}>
                           {trelloTestStatus}
                         </div>
                       )}
@@ -1577,7 +1578,7 @@ export default function SettingsTab({
                         onClick={handleTestTrello}
                         style={{ flex: 1, padding: '0.5rem', fontSize: '0.78rem', borderRadius: '10px', fontWeight: 700 }}
                       >
-                        🧪 Tester Trello
+                        Tester Trello
                       </button>
                       <button
                         type="button"
@@ -1585,7 +1586,7 @@ export default function SettingsTab({
                         onClick={handleSaveTrelloConfig}
                         style={{ padding: '0.5rem 1rem', fontSize: '0.78rem', borderRadius: '10px', fontWeight: 800 }}
                       >
-                        💾 Enregistrer
+                        Enregistrer
                       </button>
                     </div>
                   </div>
@@ -1977,7 +1978,7 @@ export default function SettingsTab({
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: '520px',
+                maxWidth: '640px',
                 background: 'var(--bg-card)',
                 borderRadius: '24px',
                 padding: '24px 28px',
@@ -2134,7 +2135,7 @@ export default function SettingsTab({
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: '480px',
+                maxWidth: '580px',
                 background: 'var(--bg-card)',
                 borderRadius: '24px',
                 padding: '24px 28px',
@@ -2258,7 +2259,7 @@ export default function SettingsTab({
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: '480px',
+                maxWidth: '580px',
                 background: 'var(--bg-card)',
                 borderRadius: '24px',
                 padding: '24px 28px',

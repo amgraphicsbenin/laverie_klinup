@@ -419,11 +419,8 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
   };
 
   const getDisplayTicketId = (order) => {
-    if (!order) return 'PRO-0';
-    if (order.identifiant_unique_marquage) return order.identifiant_unique_marquage;
-    if (order.ticket_numero) return order.ticket_numero;
-    if (order.id && (String(order.id).startsWith('KLIN-') || String(order.id).startsWith('PRO-'))) return order.id;
-    return order.id || 'PRO-0';
+    if (!order) return '-';
+    return String(order.id || order.identifiant_unique_marquage || order.ticket_numero || '-');
   };
 
   const kpiThemes = {
@@ -646,7 +643,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                         >
                           <View style={{ flex: 1 }}>
                             <Text style={styles.detailsClientName}>{getCustomerName(o.customer_id)}</Text>
-                            <Text style={styles.detailsTicketNo}>Ticket #{getDisplayTicketId(o)}</Text>
+                            <Text style={styles.detailsTicketNo}>Ticket {getDisplayTicketId(o)}</Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
                             <Text style={styles.detailsPrice}>{formatPrice(o.prix_total || o.total)}</Text>
@@ -1226,7 +1223,7 @@ export default function DashboardScreen({ onNavigate, setSelectedOrder, setGesti
                           <User size={12} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 4 }} />
                           <Text style={styles.clientPillBtnText}>{getCustomerName(item.customer_id)}</Text>
                         </TouchableOpacity>
-                        <Text style={styles.orderNumber}>Ticket #{getDisplayTicketId(item)}</Text>
+                        <Text style={styles.orderNumber}>Ticket {getDisplayTicketId(item)}</Text>
                       </View>
                     </View>
 

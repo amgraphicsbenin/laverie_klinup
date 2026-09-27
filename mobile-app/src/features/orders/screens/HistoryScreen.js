@@ -128,7 +128,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   const handleDeleteOrder = (order) => {
     Alert.alert(
       "Supprimer la commande",
-      `Voulez-vous vraiment supprimer d\u00e9finitivement la commande #${getDisplayTicketId(order)} ? Cette action est irr\u00e9versible.`,
+      `Voulez-vous vraiment supprimer définitivement la commande ${getDisplayTicketId(order)} ? Cette action est irréversible.`,
       [
         { text: "Non", style: "cancel" },
         {
@@ -150,11 +150,8 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
   };
 
   const getDisplayTicketId = (order) => {
-    if (!order) return 'PRO-0';
-    if (order.identifiant_unique_marquage) return order.identifiant_unique_marquage;
-    if (order.ticket_numero) return order.ticket_numero;
-    if (order.id && (String(order.id).startsWith('KLIN-') || String(order.id).startsWith('PRO-'))) return order.id;
-    return order.id || 'PRO-0';
+    if (!order) return '-';
+    return String(order.id || order.identifiant_unique_marquage || order.ticket_numero || '-');
   };
 
   const getStatusColor = (statut) => {
@@ -463,7 +460,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
             
             <div class="meta-row">
               <span class="meta-label">Ticket N° :</span>
-              <span class="meta-value">#${displayTicketId}</span>
+              <span class="meta-value">${displayTicketId}</span>
             </div>
             <div class="meta-row">
               <span class="meta-label">Code :</span>
@@ -785,7 +782,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
               <View style={styles.ticketSummaryRow}>
                 <View style={styles.ticketBadge}>
                   <Tag size={11} color={isDarkMode ? '#38bdf8' : '#002cf7'} style={{ marginRight: 4 }} />
-                  <Text style={styles.ticketNoText}>Ticket #{getDisplayTicketId(item)}</Text>
+                  <Text style={styles.ticketNoText}>Ticket {getDisplayTicketId(item)}</Text>
                 </View>
               </View>
 
@@ -855,7 +852,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
               </TouchableOpacity>
 
               <Text style={styles.fullPageTitle} numberOfLines={1}>
-                {selectedOrder ? `Commande #${getDisplayTicketId(selectedOrder)}` : ''}
+                {selectedOrder ? `Commande ${getDisplayTicketId(selectedOrder)}` : ''}
               </Text>
               <View style={{ width: 40 }} />
             </View>
@@ -1107,7 +1104,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                       <View style={{ flex: 1 }}>
                         <Modal.Heading>Facture Client</Modal.Heading>
                         <Modal.Description>
-                          Ticket #{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}
+                          Ticket {invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}
                         </Modal.Description>
                       </View>
                     </Modal.Header>
@@ -1127,7 +1124,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                           {/* Receipt Metadata */}
                           <View style={styles.tpeMetaRow}>
                             <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
-                            <Text style={styles.tpeMetaVal}>#{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
+                            <Text style={styles.tpeMetaVal}>{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
                           </View>
                           <View style={styles.tpeMetaRow}>
                             <Text style={styles.tpeMetaLabel}>Date :</Text>
@@ -1282,7 +1279,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                 <View style={{ flex: 1 }}>
                   <Modal.Heading>Annuler la commande</Modal.Heading>
                   <Modal.Description numberOfLines={1}>
-                    {orderToCancel ? `Ticket #${getDisplayTicketId(orderToCancel)}` : 'Commande'}
+                    {orderToCancel ? `Ticket ${getDisplayTicketId(orderToCancel)}` : 'Commande'}
                   </Modal.Description>
                 </View>
               </Modal.Header>
@@ -1324,7 +1321,7 @@ export default function HistoryScreen({ onModalStateChange, closeAllModalsTrigge
                           marginTop: 2,
                         }}
                       >
-                        Ticket #{getDisplayTicketId(orderToCancel)}
+                        Ticket {getDisplayTicketId(orderToCancel)}
                       </Text>
                     </View>
                     <Text

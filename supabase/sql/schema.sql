@@ -63,8 +63,10 @@ CREATE TABLE IF NOT EXISTS public.customers (
 );
 
 -- 3. Table: orders
+CREATE SEQUENCE IF NOT EXISTS public.orders_id_seq START WITH 1 INCREMENT BY 1;
+
 CREATE TABLE IF NOT EXISTS public.orders (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT nextval('public.orders_id_seq')::text,
   customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
   statut TEXT NOT NULL,
   type_article TEXT NOT NULL,

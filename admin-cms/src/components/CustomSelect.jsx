@@ -95,7 +95,16 @@ export default function CustomSelect({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         style={triggerStyle}
       >
-        <span>{selectedOption ? selectedOption.label : ''}</span>
+        <span style={{ 
+          overflow: 'hidden', 
+          textOverflow: 'ellipsis', 
+          whiteSpace: 'nowrap', 
+          minWidth: 0, 
+          flex: 1, 
+          textAlign: 'left' 
+        }}>
+          {selectedOption ? selectedOption.label : ''}
+        </span>
         <ChevronDown 
           size={14} 
           style={{ 

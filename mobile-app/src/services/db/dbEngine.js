@@ -1031,7 +1031,27 @@ export const db = {
       }
     }
 
-    const codeMarquage = orderData.identifiant_unique_marquage || ('PRO-' + (memoryDb.orders ? memoryDb.orders.length : 0));
+    // Logique d'ID de commande strictement séquentielle et incrémentale (ID = N + 1)
+    let finalOrderId = '';
+    if (orderData.id && /^\d+$/.test(String(orderData.id).trim())) {
+      finalOrderId = String(orderData.id).trim();
+    } else {
+      let maxNum = 0;
+      // 1. Scanner memoryDb.orders pour trouver le plus grand ID numérique existant
+      (memoryDb.orders || []).forEach(o => {
+        if (!o || !o.id) return;
+        const strId = String(o.id).trim();
+        if (/^\d+$/.test(strId)) {
+          const n = parseInt(strId, 10);
+          if (!isNaN(n) && n > maxNum) maxNum = n;
+        }
+      });
+      // 2. ID incrémental suivant l'ordre de création (ID = N + 1)
+      finalOrderId = String(maxNum + 1);
+    }
+
+    // L'identifiant de marquage est strictement harmonisé sur l'ID numérique de commande
+    const finalMarquage = finalOrderId;
 
     const expressHoursItem = memoryDb.catalog.find(c => c.id === 'setting_express_hours');
     const expressHours = expressHoursItem ? Number(expressHoursItem.prix) : 6;
@@ -1065,7 +1085,7 @@ export const db = {
     }
 
     const newOrder = {
-      id: orderData.id || ('o_' + Math.random().toString(36).substr(2, 9)),
+      id: finalOrderId,
       customer_id: orderData.customer_id,
       store_id: currentStoreId,
       statut: initialStatus,
@@ -1085,7 +1105,7 @@ export const db = {
       applied_reward_title: orderData.applied_reward_title || null,
       applied_reward_discount: rewardDiscount,
       prix_base_avant_remise: basePriceBeforeRemise,
-      identifiant_unique_marquage: codeMarquage,
+      identifiant_unique_marquage: finalMarquage,
       created_at: nowStr,
       due_date: dueDate,
       acompte_paid_at: advancePaid > 0 ? nowStr : null,
@@ -1174,7 +1194,8 @@ export const db = {
    * Valide une commande créée par un livreur par l'agent de caisse / manager.
    */
   validateOrderByCashier: async (orderId) => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) throw new Error('Commande non trouvée');
 
     const currentUser = db.getCurrentUser();
@@ -1186,7 +1207,7 @@ export const db = {
     const oldStatus = order.statut;
     const oldValidee = order.validee_par_caisse;
 
-    addPendingOrderUpdate(orderId);
+    addPendingOrderUpdate(sOrderId);
 
     order.validee_par_caisse = true;
     order.statut = 'en_attente';
@@ -1197,7 +1218,7 @@ export const db = {
     db.notify();
 
     try {
-      await performMutation('update', 'orders', orderId, {
+      await performMutation('update', 'orders', sOrderId, {
         validee_par_caisse: true,
         statut: 'en_attente',
         validated_by_id: order.validated_by_id,
@@ -1220,7 +1241,8 @@ export const db = {
    * Modifie une commande existante (notamment par la caisse avant validation).
    */
   updateOrder: async (orderId, orderData) => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) throw new Error('Commande non trouvée');
 
     const currentUser = db.getCurrentUser();
@@ -1363,7 +1385,8 @@ export const db = {
    * Met à jour le statut d'une commande.
    */
   updateOrderStatus: async (orderId, newStatus) => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) return;
 
     let normalizedStatus = newStatus;
@@ -1384,7 +1407,7 @@ export const db = {
     const oldCustomerPoints = customer ? Number(customer.points_fidelite) : null;
 
     // ── Marquer la commande comme "en cours de mutation" pour empêcher le startPeriodicSync d'écraser la modif locale ──
-    addPendingOrderUpdate(orderId);
+    addPendingOrderUpdate(sOrderId);
 
     order.statut = normalizedStatus;
 
@@ -1447,11 +1470,11 @@ export const db = {
     }
 
     // ── Libérer la commande et notifier l'UI de façon optimiste ──
-    removePendingOrderUpdate(orderId);
+    removePendingOrderUpdate(sOrderId);
     db.notify();
 
     try {
-      await performMutation('update', 'orders', orderId, updateData);
+      await performMutation('update', 'orders', sOrderId, updateData);
       sendOrderNotification('UPDATE', order, oldStatus);
     } catch (e) {
       console.warn('[DB Sync] Erreur lors de la mise à jour distante du statut de la commande :', e);
@@ -1464,7 +1487,8 @@ export const db = {
    * Finalise une commande en validant le paiement final et en restituant les vêtements.
    */
   deliverOrderWithPayment: async (orderId, amountPaid, paymentMethod, finalStatus = 'restitue', referencePaiement = null, operateurMomo = null) => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) return;
 
     let normalizedFinalStatus = 'restitue';
@@ -1487,7 +1511,7 @@ export const db = {
     const oldCustomerPoints = customer ? Number(customer.points_fidelite) : null;
 
     // ── Marquer la commande comme "en cours de mutation" ──
-    addPendingOrderUpdate(orderId);
+    addPendingOrderUpdate(sOrderId);
 
     const totalVal = Number(order.prix_total || order.total || 0);
     const avanceVal = Number(order.avance_payee || order.avance || 0);
@@ -1559,7 +1583,7 @@ export const db = {
     };
 
     try {
-      await performMutation('update', 'orders', orderId, updateData);
+      await performMutation('update', 'orders', sOrderId, updateData);
     } catch (e) {
       // ── Rollback : restaurer l'état local antérieur en cas d'échec réseau ──
       order.statut = oldStatus;
@@ -1576,7 +1600,7 @@ export const db = {
       db.notify();
       throw e;
     } finally {
-      removePendingOrderUpdate(orderId);
+      removePendingOrderUpdate(sOrderId);
     }
     db.notify();
     return order;
@@ -1586,7 +1610,8 @@ export const db = {
    * Annule une commande et ajuste les soldes débiteurs en conséquence.
    */
   cancelOrder: async (orderId, reason = '') => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) return;
 
     const customer = memoryDb.customers.find(c => c.id === order.customer_id);
@@ -1599,7 +1624,7 @@ export const db = {
     const oldClothesWashed = customer?.active_subscription ? Number(customer.active_subscription.clothes_washed || 0) : null;
 
     // ── Marquer la commande comme "en cours de mutation" ──
-    addPendingOrderUpdate(orderId);
+    addPendingOrderUpdate(sOrderId);
 
     order.statut = 'annule';
     order.motif_annulation = reason;
@@ -1632,10 +1657,10 @@ export const db = {
       await performMutation('update', 'customers', customer.id, updateData).catch(e => console.warn('[DB] Customer update error:', e));
     }
 
-    db.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage} annulée. Motif : ${reason}`);
+    db.logAction('ANNULATION_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} annulée. Motif : ${reason}`);
 
     try {
-      await performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason });
+      await performMutation('update', 'orders', sOrderId, { statut: 'annule', motif_annulation: reason });
     } catch (e) {
       // ── Rollback : restaurer l'état local antérieur en cas d'échec réseau ──
       order.statut = oldStatus;
@@ -1654,16 +1679,17 @@ export const db = {
       db.notify();
       throw e;
     } finally {
-      removePendingOrderUpdate(orderId);
+      removePendingOrderUpdate(sOrderId);
     }
     db.notify();
     return order;
   },
 
   deleteOrder: async (id) => {
-    const idx = memoryDb.orders.findIndex(o => o.id === id);
+    const sOrderId = String(id);
+    const idx = memoryDb.orders.findIndex(o => String(o.id) === sOrderId);
     if (idx !== -1) {
-      await performMutation('delete', 'orders', id);
+      await performMutation('delete', 'orders', sOrderId);
       memoryDb.orders.splice(idx, 1);
       db.notify();
     }

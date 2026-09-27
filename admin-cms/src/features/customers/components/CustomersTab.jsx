@@ -665,7 +665,7 @@ export default function CustomersTab({
                       }}
                       title="Filtrer par point de laverie"
                     >
-                      <option value="all">🏢 Tous les points de laverie</option>
+                      <option value="all">Tous les points de laverie</option>
                       {availableStores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
                         <option key={st.id} value={st.id}>{st.nom}</option>
                       ))}
@@ -932,7 +932,7 @@ export default function CustomersTab({
                               {c.active_subscription ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                                   <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    ✨ {c.active_subscription.name}
+                                    {c.active_subscription.name}
                                   </span>
                                   <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
                                     {c.active_subscription.remaining_clothes}/{c.active_subscription.total_clothes} vêtements
@@ -1459,7 +1459,7 @@ export default function CustomersTab({
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                   {isExpired && (
                                     <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ef4444', background: 'rgba(239, 68, 68, 0.12)', padding: '0.1rem 0.4rem', borderRadius: '6px' }}>
-                                      ⚠️ Expiré
+                                      Expiré
                                     </span>
                                   )}
                                   <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
@@ -1612,7 +1612,7 @@ export default function CustomersTab({
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: '560px',
+                maxWidth: '680px',
                 minHeight: '580px',
                 maxHeight: '92vh',
                 background: 'var(--bg-card)',
@@ -1957,7 +1957,7 @@ export default function CustomersTab({
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: '440px',
+                maxWidth: '560px',
                 maxHeight: '90vh',
                 overflowY: 'auto',
                 background: 'var(--bg-card, #ffffff)',
@@ -2321,7 +2321,7 @@ export default function CustomersTab({
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   width: '100%',
-                  maxWidth: '520px',
+                  maxWidth: '600px',
                   background: 'var(--bg-card, #ffffff)',
                   borderRadius: '24px',
                   padding: '1.5rem',
@@ -2421,9 +2421,9 @@ export default function CustomersTab({
                       {customerToDelete.prenom} {customerToDelete.nom}
                     </strong>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      <span>📞 +{customerToDelete.indicatif || '229'} {customerToDelete.telephone}</span>
+                      <span>+{customerToDelete.indicatif || '229'} {customerToDelete.telephone}</span>
                       {assignedStore && (
-                        <span>📍 {assignedStore.nom}</span>
+                        <span>{assignedStore.nom}</span>
                       )}
                     </div>
                   </div>

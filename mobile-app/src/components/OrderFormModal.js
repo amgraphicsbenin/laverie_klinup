@@ -429,7 +429,7 @@ export function OrderFormModal({ visible, onClose, onShowSuccess, onNavigate, or
               <View style={{ flex: 1 }}>
                 <Modal.Heading>{orderToEdit ? "Modifier la Commande" : "Nouvelle Commande"}</Modal.Heading>
                 <Modal.Description>
-                  {orderToEdit ? `Ticket #${orderToEdit.identifiant_unique_marquage || orderToEdit.id} • En attente de validation` : "Créer un ticket pressing / laverie"}
+                  {orderToEdit ? `Ticket ${orderToEdit.id || orderToEdit.identifiant_unique_marquage} • En attente de validation` : "Créer un ticket pressing / laverie"}
                 </Modal.Description>
               </View>
             </Modal.Header>

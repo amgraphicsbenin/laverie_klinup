@@ -207,11 +207,8 @@ export default function GestionScreen({
   };
 
   const getDisplayTicketId = (order) => {
-    if (!order) return 'PRO-0';
-    if (order.identifiant_unique_marquage) return order.identifiant_unique_marquage;
-    if (order.ticket_numero) return order.ticket_numero;
-    if (order.id && (String(order.id).startsWith('KLIN-') || String(order.id).startsWith('PRO-'))) return order.id;
-    return order.id || 'PRO-0';
+    if (!order) return '-';
+    return String(order.id || order.identifiant_unique_marquage || order.ticket_numero || '-');
   };
 
   const getItemsSummary = (items) => {
@@ -747,7 +744,7 @@ export default function GestionScreen({
   const handleDeleteOrder = (order) => {
     Alert.alert(
       "Supprimer la commande",
-      `Voulez-vous vraiment supprimer définitivement la commande #${getDisplayTicketId(order)} ? Cette action est irréversible.`,
+      `Voulez-vous vraiment supprimer définitivement la commande ${getDisplayTicketId(order)} ? Cette action est irréversible.`,
       [
         { text: "Non", style: "cancel" },
         {
@@ -1163,7 +1160,7 @@ export default function GestionScreen({
             
             <div class="meta-row">
               <div class="meta-label">Ticket N° :</div>
-              <div class="meta-value">#${displayTicketId}</div>
+              <div class="meta-value">${displayTicketId}</div>
             </div>
             <div class="meta-row">
               <div class="meta-label">Code :</div>
@@ -1629,7 +1626,7 @@ export default function GestionScreen({
                           </Text>
                         </TouchableOpacity>
                         <Text style={styles.cardTicketNo}>
-                          Ticket #{getDisplayTicketId(item)}
+                          Ticket {getDisplayTicketId(item)}
                         </Text>
                       </View>
 
@@ -2068,7 +2065,7 @@ export default function GestionScreen({
               </TouchableOpacity>
 
               <Text style={styles.fullPageTitle} numberOfLines={1}>
-                {selectedOrder ? `Commande #${getDisplayTicketId(selectedOrder)}` : ''}
+                {selectedOrder ? `Commande ${getDisplayTicketId(selectedOrder)}` : ''}
               </Text>
               <View style={{ width: 40 }} />
             </View>
@@ -2698,7 +2695,7 @@ export default function GestionScreen({
                       <View style={{ flex: 1 }}>
                         <Modal.Heading>Facture Client</Modal.Heading>
                         <Modal.Description>
-                          Ticket #{getDisplayTicketId(invoiceOrder)}
+                          Ticket {getDisplayTicketId(invoiceOrder)}
                         </Modal.Description>
                       </View>
                     </Modal.Header>
@@ -2718,7 +2715,7 @@ export default function GestionScreen({
                           {/* Receipt Metadata */}
                           <View style={styles.tpeMetaRow}>
                             <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
-                            <Text style={styles.tpeMetaVal}>#{getDisplayTicketId(invoiceOrder)}</Text>
+                            <Text style={styles.tpeMetaVal}>{getDisplayTicketId(invoiceOrder)}</Text>
                           </View>
                           <View style={styles.tpeMetaRow}>
                             <Text style={styles.tpeMetaLabel}>Code :</Text>
@@ -2896,7 +2893,7 @@ export default function GestionScreen({
                 <View style={{ flex: 1 }}>
                   <Modal.Heading>Annuler la commande</Modal.Heading>
                   <Modal.Description numberOfLines={1}>
-                    {orderToCancel ? `Ticket #${getDisplayTicketId(orderToCancel)}` : 'Commande'}
+                    {orderToCancel ? `Ticket ${getDisplayTicketId(orderToCancel)}` : 'Commande'}
                   </Modal.Description>
                 </View>
               </Modal.Header>
@@ -2938,7 +2935,7 @@ export default function GestionScreen({
                           marginTop: 2,
                         }}
                       >
-                        Ticket #{getDisplayTicketId(orderToCancel)}
+                        Ticket {getDisplayTicketId(orderToCancel)}
                       </Text>
                     </View>
                     <Text
@@ -3028,7 +3025,7 @@ export default function GestionScreen({
                 <View style={{ flex: 1 }}>
                   <Modal.Heading>Confirmation du Règlement</Modal.Heading>
                   <Modal.Description numberOfLines={1}>
-                    {paymentOrder ? `Commande #${paymentOrder.ticket_numero || paymentOrder.id}` : 'Règlement solde'}
+                    {paymentOrder ? `Commande ${paymentOrder.ticket_numero || paymentOrder.id}` : 'Règlement solde'}
                   </Modal.Description>
                 </View>
               </Modal.Header>

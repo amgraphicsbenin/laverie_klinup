@@ -124,11 +124,11 @@ export default function InvoiceModal({
                 {/* Métadonnées de facture */}
                 <View style={styles.tpeMetaRow}>
                   <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
-                  <Text style={styles.tpeMetaVal}>#{getDisplayTicketId(order)}</Text>
+                  <Text style={styles.tpeMetaVal}>{getDisplayTicketId(order)}</Text>
                 </View>
                 <View style={styles.tpeMetaRow}>
                   <Text style={styles.tpeMetaLabel}>Code :</Text>
-                  <Text style={styles.tpeMetaVal}>{order.identifiant_unique_marquage || order.id}</Text>
+                  <Text style={styles.tpeMetaVal}>{order.id || order.identifiant_unique_marquage}</Text>
                 </View>
                 <View style={styles.tpeMetaRow}>
                   <Text style={styles.tpeMetaLabel}>Date :</Text>

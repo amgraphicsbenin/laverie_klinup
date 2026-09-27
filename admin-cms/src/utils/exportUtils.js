@@ -92,7 +92,7 @@ export function exportOrdersCSV(orders, customersList = []) {
   };
 
   const headers = [
-    { label: 'Code Commande', accessor: r => r.identifiant_unique_marquage || r.code_commande || r.id },
+    { label: 'ID Commande', accessor: r => r.id || r.identifiant_unique_marquage || r.code_commande },
     { label: 'Client', accessor: getClientName },
     { label: 'Téléphone Client', accessor: getClientPhone },
     { label: 'Article', accessor: r => r.type_article || 'Non renseigné' },

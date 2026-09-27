@@ -473,10 +473,10 @@ ${payload.steps_to_reproduce ? `#### 🔄 Étapes pour reproduire :\n${payload.s
                   onChange={(e) => setPriority(e.target.value)}
                   style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', borderRadius: '10px', fontWeight: 700 }}
                 >
-                  <option value="Basse">🟢 Basse (Question / Détail)</option>
-                  <option value="Moyenne">🟡 Moyenne (Gêne mineure)</option>
-                  <option value="Haute">🟠 Haute (Fonctionnalité bloquée)</option>
-                  <option value="Critique">🔴 Critique (Panne système)</option>
+                  <option value="Basse">Basse (Question / Détail)</option>
+                  <option value="Moyenne">Moyenne (Gêne mineure)</option>
+                  <option value="Haute">Haute (Fonctionnalité bloquée)</option>
+                  <option value="Critique">Critique (Panne système)</option>
                 </select>
               </div>
             </div>

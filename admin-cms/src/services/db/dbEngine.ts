@@ -28,6 +28,13 @@ export function normalizeOrderStatus(rawStatus: any): OrderStatus {
 export function hydrateOrder(order: any): Order {
   if (!order) return order;
   const hydrated: Order = { ...order };
+  if (order.id !== undefined && order.id !== null) {
+    hydrated.id = String(order.id);
+  }
+  // Standard ID numérique : si l'identifiant unique de marquage est manquant ou contient l'ancien format PRO-, l'aligner sur l'ID
+  if (!hydrated.identifiant_unique_marquage || String(hydrated.identifiant_unique_marquage).startsWith('PRO-') || String(hydrated.identifiant_unique_marquage).startsWith('KLIN-')) {
+    hydrated.identifiant_unique_marquage = String(hydrated.id);
+  }
   hydrated.statut = normalizeOrderStatus(order.statut || order.status);
 
   const isCompleted = hydrated.statut === 'restitue' || hydrated.statut === 'annule';
@@ -1298,8 +1305,30 @@ export const dbEngine = {
       calculatedTotal = passedTotal > 0 ? passedTotal : Math.max(0, basePriceBeforeRemise - discountAmount) + deliveryFee + pickupFee;
     }
 
+    // Logique d'ID de commande strictement séquentielle et incrémentale (ID = N + 1)
+    let finalOrderId = '';
+    if (orderData.id && /^\d+$/.test(String(orderData.id).trim())) {
+      finalOrderId = String(orderData.id).trim();
+    } else {
+      let maxNum = 0;
+      // 1. Scanner memoryDb.orders pour trouver le plus grand ID numérique existant
+      (memoryDb.orders || []).forEach(o => {
+        if (!o || !o.id) return;
+        const strId = String(o.id).trim();
+        if (/^\d+$/.test(strId)) {
+          const n = parseInt(strId, 10);
+          if (!isNaN(n) && n > maxNum) maxNum = n;
+        }
+      });
+      // 2. ID incrémental suivant l'ordre de création (ID = N + 1)
+      finalOrderId = String(maxNum + 1);
+    }
+
+    // L'identifiant de marquage est strictement harmonisé sur l'ID numérique de commande
+    const finalMarquage = finalOrderId;
+
     const newOrder: Order = {
-      id: 'o_' + Math.random().toString(36).substr(2, 9),
+      id: finalOrderId,
       customer_id: orderData.customer_id || '',
       statut: orderData.statut || 'en_attente',
       type_article: orderData.type_article || (itemsList[0] ? itemsList[0].article : 'Divers'),
@@ -1319,7 +1348,7 @@ export const dbEngine = {
       operateur_momo: orderData.operateur_momo || null,
       distance_km: Number(orderData.distance_km || 0),
       with_pickup: !!orderData.with_pickup,
-      identifiant_unique_marquage: orderData.identifiant_unique_marquage || ('PRO-' + (memoryDb.orders ? memoryDb.orders.length : 0)),
+      identifiant_unique_marquage: finalMarquage,
       created_at: new Date().toISOString(),
       due_date: orderData.due_date || new Date(Date.now() + 48 * 3600000).toISOString(),
       acompte_paid_at: (orderData.avance_payee || orderData.avance) ? new Date().toISOString() : null,
@@ -1389,7 +1418,8 @@ export const dbEngine = {
     referencePaiement: string | null = null,
     operateurMomo: string | null = null
   ): Promise<Order | undefined> => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) return;
 
     const normalizedFinalStatus = (finalStatus === 'livre' ? 'restitue' : finalStatus) as OrderStatus;
@@ -1445,7 +1475,8 @@ export const dbEngine = {
   },
 
   updateOrderStatus: async (orderId: string, newStatus: OrderStatus): Promise<Order | undefined> => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) return;
     const oldStatus = order.statut;
     const normalized = normalizeOrderStatus(newStatus);
@@ -1455,7 +1486,7 @@ export const dbEngine = {
     notifyListeners();
 
     try {
-      await performMutation('update', 'orders', orderId, { statut: normalized });
+      await performMutation('update', 'orders', sOrderId, { statut: normalized });
       dbEngine.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${normalized}'`);
     } catch (e) {
       order.statut = oldStatus;
@@ -1466,7 +1497,8 @@ export const dbEngine = {
   },
 
   validateOrderByCashier: async (orderId: string): Promise<Order | undefined> => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) throw new Error('Commande non trouvée');
 
     const currentUser = dbEngine.getCurrentUser();
@@ -1502,7 +1534,8 @@ export const dbEngine = {
   },
 
   cancelOrder: async (orderId: string, reason: string = ''): Promise<Order | undefined> => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) return;
 
     const oldStatus = order.statut;
@@ -1537,7 +1570,7 @@ export const dbEngine = {
     notifyListeners();
 
     try {
-      await performMutation('update', 'orders', orderId, { statut: 'annule', motif_annulation: reason.trim() });
+      await performMutation('update', 'orders', sOrderId, { statut: 'annule', motif_annulation: reason.trim() });
       if (customer && (unpaid > 0 || isSubOrder)) {
         const custPayload: any = { solde_dette: customer.solde_dette };
         if ((customer as any).active_subscription) {
@@ -1569,7 +1602,8 @@ export const dbEngine = {
   },
 
   updateOrderStore: async (orderId: string, newStoreId: string): Promise<Order | undefined> => {
-    const order = memoryDb.orders.find(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const order = memoryDb.orders.find(o => String(o.id) === sOrderId);
     if (!order) return;
     const oldStoreId = order.store_id;
 
@@ -1577,7 +1611,7 @@ export const dbEngine = {
     notifyListeners();
 
     try {
-      await performMutation('update', 'orders', orderId, { store_id: newStoreId });
+      await performMutation('update', 'orders', sOrderId, { store_id: newStoreId });
       const store = memoryDb.stores?.find(s => s.id === newStoreId || s.code === newStoreId);
       const storeName = store ? store.nom : newStoreId;
       dbEngine.logAction('RATTACHEMENT_COMMANDE', `Commande ${order.identifiant_unique_marquage || order.id} rattachée au point : ${storeName}`);
@@ -1590,14 +1624,15 @@ export const dbEngine = {
   },
 
   deleteOrder: async (orderId: string): Promise<boolean> => {
-    const idx = memoryDb.orders.findIndex(o => o.id === orderId);
+    const sOrderId = String(orderId);
+    const idx = memoryDb.orders.findIndex(o => String(o.id) === sOrderId);
     if (idx === -1) return false;
     const order = memoryDb.orders[idx];
     memoryDb.orders.splice(idx, 1);
     notifyListeners();
 
     try {
-      await performMutation('delete', 'orders', orderId);
+      await performMutation('delete', 'orders', sOrderId);
       dbEngine.logAction('SUPPRESSION_COMMANDE', `Commande supprimée : ${order.identifiant_unique_marquage || order.id}`);
     } catch (e) {
       memoryDb.orders.splice(idx, 0, order);
@@ -1657,8 +1692,49 @@ export const dbEngine = {
       ? Number(rawPrixUrgent)
       : null;
 
+    // Standard fonctionnel d'ID purement numérique
+    let finalId = '';
+    if (itemData.id && String(itemData.id).trim()) {
+      const isRep = String(itemData.id).includes('_rep');
+      const cleanDigits = String(itemData.id).replace(/\D/g, '');
+      const parsed = parseInt(cleanDigits, 10);
+      if (!isNaN(parsed) && parsed > 0 && parsed <= 500) {
+        finalId = isRep ? `${cleanDigits}_rep` : (cleanDigits ? cleanDigits : String(itemData.id).trim());
+      } else {
+        finalId = '';
+      }
+    }
+    if (!finalId) {
+      let maxNum = 0;
+      (memoryDb.catalog || []).forEach(c => {
+        if (!c || !c.id) return;
+        const cat = (c.categorie || (c.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
+        if (cat !== 'individuel' && cat !== 'abonnement') return;
+        if (c.service === 'system_setting' || c.service === 'reward_catalog') return;
+        if (/^\d+$/.test(String(c.id).trim())) {
+          const n = parseInt(String(c.id).trim(), 10);
+          if (!isNaN(n) && n <= 500 && n > maxNum) maxNum = n;
+        }
+      });
+      if (itemData.service === 'repassage') {
+        const sibling = (memoryDb.catalog || []).find(c =>
+          c.article?.trim().toLowerCase() === (itemData.article || '').trim().toLowerCase() &&
+          c.store_id === effectiveStoreId &&
+          c.service !== 'repassage'
+        );
+        if (sibling && sibling.id) {
+          const sibDigits = String(sibling.id).replace(/\D/g, '');
+          finalId = sibDigits ? `${sibDigits}_rep` : `${sibling.id}_rep`;
+        } else {
+          finalId = String(maxNum + 1);
+        }
+      } else {
+        finalId = String(maxNum + 1);
+      }
+    }
+
     const newItem: CatalogItem = {
-      id: 'cat_' + Math.random().toString(36).substr(2, 9),
+      id: finalId,
       article: itemData.article || 'Article',
       service: itemData.service || 'lavage_simple',
       prix: Number(itemData.prix || 0),
@@ -1678,9 +1754,130 @@ export const dbEngine = {
 
     await performMutation('insert', 'catalog', newItem.id, newItem);
     memoryDb.catalog.push(newItem);
-    dbEngine.logAction('AJOUT_CATALOGUE', `Article ajouté au catalogue : ${newItem.article} (${newItem.prix} FCFA)`);
+    dbEngine.logAction('AJOUT_CATALOGUE', `Article ajouté au catalogue : ${newItem.id} ${newItem.article} (${newItem.prix} FCFA)`);
     notifyListeners();
     return newItem;
+  },
+
+  addCatalogItemsBatch: async (
+    items: Array<Partial<CatalogItem>>,
+    options: { updateExisting?: boolean; storeId?: string } = {}
+  ): Promise<{ inserted: number; updated: number; errors: string[] }> => {
+    let inserted = 0;
+    let updated = 0;
+    const errors: string[] = [];
+
+    // Déterminer le standard fonctionnel incrémenté de départ (ID purement numérique)
+    let currentNextNum = 0;
+    const usedBatchNumbers = new Set<number>();
+    (memoryDb.catalog || []).forEach(c => {
+      if (!c || !c.id) return;
+      const cat = (c.categorie || (c.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
+      if (cat !== 'individuel' && cat !== 'abonnement') return;
+      if (c.service === 'system_setting' || c.service === 'reward_catalog') return;
+      if (/^\d+$/.test(String(c.id).trim())) {
+        const n = parseInt(String(c.id).trim(), 10);
+        if (!isNaN(n) && n <= 500) {
+          usedBatchNumbers.add(n);
+          if (n > currentNextNum) currentNextNum = n;
+        }
+      }
+    });
+
+    for (let i = 0; i < items.length; i++) {
+      const itemData = { ...items[i] };
+      if (options.storeId && !itemData.store_id) {
+        itemData.store_id = options.storeId;
+      }
+
+      // Règle montants : cellule vide = 0
+      itemData.prix = itemData.prix != null ? Number(itemData.prix) : 0;
+      if (itemData.prix_urgent != null) {
+        itemData.prix_urgent = Number(itemData.prix_urgent) || null;
+      }
+
+      try {
+        // 1. Recherche par ID direct pour mise à jour immédiate
+        if (itemData.id) {
+          const cleanId = String(itemData.id).replace(/\D/g, '') || String(itemData.id).trim();
+          const existingById = memoryDb.catalog.find(c => 
+            c.id === cleanId || 
+            String(c.id).replace(/\D/g, '') === cleanId
+          );
+          if (existingById) {
+            await dbEngine.updateCatalogItem(existingById.id, {
+              article: itemData.article || existingById.article,
+              service: itemData.service || existingById.service,
+              categorie: itemData.categorie || existingById.categorie,
+              prix: itemData.prix,
+              prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : existingById.prix_urgent,
+              description: itemData.description !== undefined ? itemData.description : existingById.description,
+              is_active: itemData.is_active !== undefined ? itemData.is_active : existingById.is_active,
+              statut: itemData.statut || (itemData.is_active !== undefined ? (itemData.is_active ? 'actif' : 'inactif') : existingById.statut),
+              store_id: itemData.store_id || existingById.store_id
+            });
+            updated++;
+            continue;
+          }
+        }
+
+        // 2. Recherche par correspondance (store_id, service, nom d'article)
+        if (options.updateExisting && itemData.article && itemData.service && itemData.store_id) {
+          const existing = memoryDb.catalog.find(c => 
+            c.store_id === itemData.store_id &&
+            c.service === itemData.service &&
+            c.article?.trim().toLowerCase() === itemData.article?.trim().toLowerCase()
+          );
+          if (existing) {
+            await dbEngine.updateCatalogItem(existing.id, {
+              prix: itemData.prix,
+              prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : existing.prix_urgent,
+              description: itemData.description || existing.description,
+              is_active: itemData.is_active !== undefined ? itemData.is_active : existing.is_active,
+              statut: itemData.statut || (itemData.is_active !== undefined ? (itemData.is_active ? 'actif' : 'inactif') : existing.statut),
+              categorie: itemData.categorie || existing.categorie
+            });
+            updated++;
+            continue;
+          }
+        }
+
+        // 3. Nouveau produit : attribuer un ID numérique incrémental si non fourni ou si aberrant (> 500)
+        let cleanId = '';
+        let isRep = false;
+        if (itemData.id) {
+          isRep = String(itemData.id).includes('_rep');
+          const digits = String(itemData.id).replace(/\D/g, '');
+          const parsed = parseInt(digits, 10);
+          if (!isNaN(parsed) && parsed > 0 && parsed <= 500) {
+            cleanId = digits;
+            usedBatchNumbers.add(parsed);
+            if (parsed > currentNextNum) currentNextNum = parsed;
+          }
+        }
+
+        if (!cleanId) {
+          do {
+            currentNextNum += 1;
+          } while (usedBatchNumbers.has(currentNextNum));
+          cleanId = String(currentNextNum);
+          usedBatchNumbers.add(currentNextNum);
+        }
+
+        itemData.id = isRep ? `${cleanId}_rep` : cleanId;
+
+        await dbEngine.addCatalogItem(itemData);
+        inserted++;
+      } catch (err: any) {
+        errors.push(`Ligne ${i + 1} (${itemData.article || 'Article'}) : ${err?.message || 'Erreur inconnue'}`);
+      }
+    }
+
+    if (inserted > 0 || updated > 0) {
+      dbEngine.logAction('IMPORT_CATALOGUE', `Import catalogue : ${inserted} article(s) ajouté(s), ${updated} mis à jour.`);
+    }
+
+    return { inserted, updated, errors };
   },
 
   updateCatalogItem: async (itemId: string, updatedFields: Partial<CatalogItem>): Promise<CatalogItem | undefined> => {
@@ -1696,6 +1893,12 @@ export const dbEngine = {
 
     if (updateData.prix_urgent !== undefined) {
       updateData.prix_urgent = (updateData.prix_urgent !== null && (updateData.prix_urgent as any) !== '' && !isNaN(Number(updateData.prix_urgent)) && Number(updateData.prix_urgent) > 0) ? Number(updateData.prix_urgent) : null;
+    }
+
+    if (updateData.is_active !== undefined) {
+      updateData.statut = updateData.is_active ? 'actif' : 'inactif';
+    } else if (updateData.statut !== undefined) {
+      updateData.is_active = updateData.statut === 'actif' || updateData.statut === '1' || (updateData.statut as any) === 1;
     }
 
     const finalCategory = updateData.categorie || item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel');

@@ -363,4 +363,9 @@ export const DEFAULT_CATALOG = [
   { id: 'setting_express_markup', article: 'Majoration Express (%)', service: 'system', prix: 50, categorie: 'system_setting', description: 'Configuration système', is_active: true, statut: 'actif' },
   { id: 'setting_fidelity_spend_per_point', article: 'Tranche Dépense par Point (FCFA)', service: 'system', prix: 1000, categorie: 'system_setting', description: 'Montant en FCFA requis pour gagner 1 point de fidélité', is_active: true, statut: 'actif' },
   { id: 'setting_fidelity_active', article: 'Programme Fidélité Actif', service: 'system', prix: 1, categorie: 'system_setting', description: '1 = activé, 0 = désactivé', is_active: true, statut: 'actif' }
-];
+].map(item => {
+  if (item.categorie === 'individuel' || item.categorie === 'abonnement') {
+    return { store_id: 'store_akpakpa', ...item };
+  }
+  return item;
+});

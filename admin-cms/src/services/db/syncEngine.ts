@@ -220,8 +220,39 @@ export async function initDb(): Promise<void> {
     if (!custRes.error) memoryDb.customers = custRes.data || [];
     else console.warn('[KLIN UP DB] ⚠️ Chargement customers partiel :', custRes.error.message);
 
-    if (!ordRes.error) memoryDb.orders = (ordRes.data || []).map(hydrateOrder);
-    else console.warn('[KLIN UP DB] ⚠️ Chargement orders partiel :', ordRes.error.message);
+    if (!ordRes.error) {
+      const loadedOrders = (ordRes.data || []).map(hydrateOrder);
+      // Tri chronologique rigoureux selon la date de création
+      loadedOrders.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+
+      // Vérifier si des commandes comportent encore des identifiants non strictement numériques
+      const hasLegacyOrderIds = loadedOrders.some(o => !/^\d+$/.test(String(o.id).trim()));
+      if (hasLegacyOrderIds) {
+        console.log('[KLIN UP DB] 🔄 Réalignement séquentiel strict des commandes (1..N selon ordre de création)...');
+        // Réalignement immédiat en mémoire selon l'ordre chronologique
+        for (let i = 0; i < loadedOrders.length; i++) {
+          const seqId = String(i + 1);
+          const oldId = String(loadedOrders[i].id);
+          loadedOrders[i].id = seqId;
+          loadedOrders[i].identifiant_unique_marquage = seqId;
+
+          if (oldId !== seqId) {
+            setTimeout(async () => {
+              try {
+                await supabase.from('order_notifications').update({ order_id: seqId }).eq('order_id', oldId);
+                await supabase.from('orders').update({ id: seqId, identifiant_unique_marquage: seqId }).eq('id', oldId);
+              } catch (e) {
+                console.warn(`[KLIN UP DB] Synchronisation distante ID commande ${oldId} -> ${seqId} :`, e);
+              }
+            }, i * 60);
+          }
+        }
+      }
+
+      memoryDb.orders = loadedOrders;
+    } else {
+      console.warn('[KLIN UP DB] ⚠️ Chargement orders partiel :', ordRes.error.message);
+    }
 
     if (!logRes.error) {
       const staffList = memoryDb.staff || [];
@@ -244,6 +275,7 @@ export async function initDb(): Promise<void> {
         const isActive = item.is_active === false || item.statut === 'inactif' ? false : true;
         return { ...item, is_active: isActive, statut: isActive ? 'actif' : 'inactif' };
       });
+      sanitizeCatalogIds();
     } else {
       console.warn('[KLIN UP DB] ⚠️ Chargement catalog partiel :', catRes.error.message);
     }
@@ -419,5 +451,54 @@ export async function testConnection(): Promise<{ success: boolean; message?: st
     return { success: false, error: e.message || 'Erreur de connexion réseau.' };
   }
 }
+
+export function sanitizeCatalogIds(): void {
+  if (!memoryDb.catalog || memoryDb.catalog.length === 0) return;
+
+  const realItems = memoryDb.catalog.filter(c => {
+    if (!c || !c.article) return false;
+    const cat = (c.categorie || (c.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
+    if (cat !== 'individuel' && cat !== 'abonnement') return false;
+    if (c.service === 'system_setting' || c.service === 'reward_catalog') return false;
+    return true;
+  });
+
+  const used = new Set<number>();
+  let maxValid = 0;
+
+  // 1. Recenser les IDs valides (entiers positifs <= 500)
+  realItems.forEach(c => {
+    const rawId = String(c.id || '').trim();
+    const isPure = /^\d+$/.test(rawId);
+    if (isPure) {
+      const n = parseInt(rawId, 10);
+      if (!isNaN(n) && n > 0 && n <= 500) {
+        used.add(n);
+        if (n > maxValid) maxValid = n;
+      }
+    }
+  });
+
+  // 2. Corriger toute anomalie (> 500)
+  let nextSeq = 1;
+  realItems.forEach(c => {
+    const rawId = String(c.id || '').trim();
+    const isPure = /^\d+$/.test(rawId);
+    const n = isPure ? parseInt(rawId, 10) : 0;
+
+    if (isPure && n > 500) {
+      while (used.has(nextSeq)) nextSeq++;
+      const oldId = c.id;
+      const newId = String(nextSeq);
+      c.id = newId;
+      used.add(nextSeq);
+      console.log(`[KLIN UP DB] 🔄 ID catalogue anormal corrigé : ${oldId} -> ${newId} (${c.article})`);
+      if (supabase && isUsingRemote) {
+        supabase.from('catalog').update({ id: newId }).eq('id', oldId).catch(() => {});
+      }
+    }
+  });
+}
+
 
 

@@ -350,9 +350,9 @@ export default function LogsTab({
               value={originFilter}
               onChange={(e) => { setOriginFilter(e.target.value); setCurrentPage(1); }}
             >
-              <option value="all">🌐 Toutes Origines</option>
-              <option value="admin">🖥️ Admin CMS</option>
-              <option value="mobile">📱 App Mobile</option>
+              <option value="all">Toutes Origines</option>
+              <option value="admin">Admin CMS</option>
+              <option value="mobile">App Mobile</option>
               <option value="system">🤖 Système</option>
             </CustomSelect>
           </div>
@@ -364,10 +364,10 @@ export default function LogsTab({
               value={categoryFilter}
               onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
             >
-              <option value="all">📂 Toutes Catégories</option>
-              <option value="security">🔒 Sécurité & Accès</option>
+              <option value="all">Toutes Catégories</option>
+              <option value="security">Sécurité & Accès</option>
               <option value="orders">🛍️ Commandes</option>
-              <option value="sales">💰 Ventes & Dette</option>
+              <option value="sales">Ventes & Dette</option>
               <option value="system">⚙️ Système & Laveries</option>
             </CustomSelect>
           </div>
@@ -379,7 +379,7 @@ export default function LogsTab({
               value={storeFilter}
               onChange={(e) => { setStoreFilter(e.target.value); setCurrentPage(1); }}
             >
-              <option value="all">📍 Tous les Points</option>
+              <option value="all">Tous les Points</option>
               {(stores || []).map(s => (
                 <option key={s.id} value={s.id}>{s.nom}</option>
               ))}
@@ -393,7 +393,7 @@ export default function LogsTab({
               value={dateFilter}
               onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
             >
-              <option value="all">📅 Toutes les Dates</option>
+              <option value="all">Toutes les Dates</option>
               <option value="today">Aujourd'hui</option>
               <option value="7days">7 Derniers Jours</option>
               <option value="30days">30 Derniers Jours</option>
@@ -476,7 +476,7 @@ export default function LogsTab({
                       <td style={{ verticalAlign: 'top' }}>
                         <div style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--text-primary)' }}>{userName}</div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{userRole}</div>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>📍 {logStore}</div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{logStore}</div>
                       </td>
 
                       {/* Action Exécutée */}
@@ -512,13 +512,13 @@ export default function LogsTab({
                               padding: '0.35rem 0.6rem',
                               borderRadius: '8px',
                               background: 'rgba(220, 38, 38, 0.08)',
-                              borderLeft: '3px solid #dc2626',
+                              
                               color: '#dc2626',
                               fontSize: '0.75rem',
                               fontWeight: 700
                             }}
                           >
-                            💡 Motif spécifié : {motifText}
+                            Motif : {motifText}
                           </div>
                         )}
                       </td>
@@ -547,19 +547,36 @@ export default function LogsTab({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span>Afficher par page :</span>
-            <select
-              value={logsPerPage}
-              onChange={(e) => {
-                setLogsPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              style={{ background: 'var(--bg-app)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '6px', padding: '0.15rem 0.4rem', fontSize: '0.76rem' }}
-            >
-              <option value={15}>15 lignes</option>
-              <option value={30}>30 lignes</option>
-              <option value={50}>50 lignes</option>
-              <option value={100}>100 lignes</option>
-            </select>
+            <div style={{ width: '135px', display: 'inline-block' }}>
+              <CustomSelect
+                value={logsPerPage}
+                onChange={(e) => {
+                  setLogsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{
+                  fontSize: '0.76rem',
+                  padding: '0.28rem 0.65rem',
+                  borderRadius: '8px',
+                  background: 'var(--bg-app)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontWeight: 600,
+                  height: '32px'
+                }}
+                dropdownStyle={{
+                  bottom: 'calc(100% + 6px)',
+                  top: 'auto',
+                  minWidth: '135px',
+                  boxShadow: '0 -10px 30px rgba(0,0,0,0.18)'
+                }}
+              >
+                <option value={15}>15 lignes</option>
+                <option value={30}>30 lignes</option>
+                <option value={50}>50 lignes</option>
+                <option value={100}>100 lignes</option>
+              </CustomSelect>
+            </div>
             <span>• Affichage {paginatedLogs.length > 0 ? (currentPage - 1) * logsPerPage + 1 : 0} - {Math.min(currentPage * logsPerPage, fullyFilteredLogs.length)} sur {fullyFilteredLogs.length} traces</span>
           </div>
 
@@ -617,7 +634,7 @@ export default function LogsTab({
               className="card modal-dialog-card"
               onClick={(e) => e.stopPropagation()}
               style={{
-                maxWidth: '620px',
+                maxWidth: '740px',
                 width: '100%',
                 maxHeight: '88vh',
                 overflowY: 'auto',
@@ -692,7 +709,7 @@ export default function LogsTab({
                 <div style={{ background: 'var(--bg-app)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>Point de Laverie</div>
                   <div style={{ fontWeight: 800, marginTop: '0.25rem', color: 'var(--text-primary)', fontSize: '0.88rem' }}>
-                    📍 {(stores.find(st => st.id === selectedLog.store_id || st.id === user?.store_id) || {}).nom || 'Point Central'}
+                    {(stores.find(st => st.id === selectedLog.store_id || st.id === user?.store_id) || {}).nom || 'Point Central'}
                   </div>
                 </div>
               </div>
@@ -709,9 +726,9 @@ export default function LogsTab({
 
               {/* Bloc Motif si disponible */}
               {motifText && (
-                <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(220, 38, 38, 0.1)', borderRadius: '12px', border: '1px solid rgba(220, 38, 38, 0.3)', borderLeft: '4px solid #dc2626' }}>
+                <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(220, 38, 38, 0.1)', borderRadius: '12px', border: '1px solid rgba(220, 38, 38, 0.3)',  }}>
                   <div style={{ fontSize: '0.74rem', color: '#f87171', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    💡 Motif Spécifié pour cette Opération
+                    Motif Spécifié pour cette Opération
                   </div>
                   <div style={{ fontSize: '0.92rem', color: '#fca5a5', fontWeight: 800, marginTop: '0.3rem', lineHeight: 1.4 }}>
                     {motifText}

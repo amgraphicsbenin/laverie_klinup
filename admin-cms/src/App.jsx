@@ -1478,6 +1478,8 @@ function App() {
           <AdminView
             activeTab={adminMenu}
             onManageStaff={() => setAdminMenu('staff_management')}
+            selectedStoreId={selectedStoreId}
+            stores={db.getStores()}
           />
         )}
 

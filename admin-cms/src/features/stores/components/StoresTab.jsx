@@ -412,13 +412,13 @@ export default function StoresTab({ onShowSuccess }) {
                     return (
                       <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.68rem', background: 'var(--bg-app)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 600, border: '1px solid var(--border-color)' }}>
-                          📦 {sOrders.length} Commande{sOrders.length > 1 ? 's' : ''}
+                          {sOrders.length} Commande{sOrders.length > 1 ? 's' : ''}
                         </span>
                         <span style={{ fontSize: '0.68rem', background: 'var(--bg-app)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 600, border: '1px solid var(--border-color)' }}>
-                          👥 {sCust.length} Client{sCust.length > 1 ? 's' : ''}
+                          {sCust.length} Client{sCust.length > 1 ? 's' : ''}
                         </span>
                         <span style={{ fontSize: '0.68rem', background: 'var(--bg-app)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: 600, border: '1px solid var(--border-color)' }}>
-                          👔 {sStaff.length} Agent{sStaff.length > 1 ? 's' : ''}
+                          {sStaff.length} Agent{sStaff.length > 1 ? 's' : ''}
                         </span>
                       </div>
                     );
@@ -476,7 +476,7 @@ export default function StoresTab({ onShowSuccess }) {
       {/* CREATE / EDIT MODAL (PORTAL) */}
       {showModal && createPortal(
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', borderRadius: '24px', margin: 'auto' }}>
+          <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '640px', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', borderRadius: '24px', margin: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span className="material-symbols-rounded">store</span>

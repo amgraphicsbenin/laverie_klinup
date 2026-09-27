@@ -1,0 +1,17 @@
+@supabase_url = https://ryjwrjzggfwglfmyovhk.supabase.co
+@anon_key = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5andyanpnZ2Z3Z2xmbXlvdmhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NDE4NDcsImV4cCI6MjEwNTExNzg0N30.SuL0HAWzX2EmISFgf01wt5huArlRw5Dcd4fayMpVt8c
+
+### 1. Test: Récupérer les rôles depuis Supabase (Si la table 'roles' est accessible publiquement)
+GET {{supabase_url}}/rest/v1/roles?select=*
+apikey: {{anon_key}}
+Authorization: Bearer {{anon_key}}
+
+### 2. Test: Appeler une Edge Function (Remplacez 'hello-world' par le nom de votre fonction)
+POST {{supabase_url}}/functions/v1/hello-world
+apikey: {{anon_key}}
+Authorization: Bearer {{anon_key}}
+Content-Type: application/json
+
+{
+    "name": "KLIN UP Test"
+}

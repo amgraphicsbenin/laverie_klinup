@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../../../services/db';
 import {
   ShoppingBag,
@@ -10,6 +10,8 @@ import {
   Ban,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Phone,
   MapPin,
@@ -21,103 +23,332 @@ import {
   User,
   Check,
   Zap,
-  Download
+  Download,
+  Printer,
+  CreditCard,
+  Building2,
+  SlidersHorizontal,
+  ArrowUpDown,
+  X
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import { exportOrdersCSV } from '../../../utils/exportUtils';
 
+// Helper component for rich Action Dropdown items
+function ActionMenuItem({ icon: Icon, iconColor, label, onClick, color, isBold = false, subtitle }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.6rem',
+        padding: '0.5rem 0.85rem',
+        background: hovered ? 'var(--bg-app)' : 'transparent',
+        border: 'none',
+        width: '100%',
+        textAlign: 'left',
+        fontSize: '0.76rem',
+        fontWeight: isBold ? 700 : 600,
+        color: color || 'var(--text-primary)',
+        cursor: 'pointer',
+        transition: 'background 0.15s ease'
+      }}
+    >
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '20px',
+        flexShrink: 0
+      }}>
+        <Icon size={14} color={iconColor || color || 'currentColor'} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+        <span>{label}</span>
+        {subtitle && (
+          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '1px' }}>
+            {subtitle}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
 export default function OrdersTab({
-  orders,
-  customers,
-  atelierFilter,
+  orders = [],
+  customers = [],
+  stores: propStores,
+  currentUser,
+  atelierFilter = 'all',
   setAtelierFilter,
-  isOrderLate,
-  serviceLabels,
+  isOrderLate = () => false,
+  serviceLabels = {},
   handleStatusChange,
   handleValidateLivreurOrder,
   handleStartDelivery,
   copyToClipboard,
-  formatDateTime,
+  formatDateTime = (d) => String(d || ''),
   handleCancelOrder,
   setShowOrderRegistrationModal,
-  historySearchQuery,
+  historySearchQuery = '',
   setHistorySearchQuery,
-  historyFilterStatus,
+  historyFilterStatus = 'all',
   setHistoryFilterStatus,
   getOrderStatusLabel,
   setCreatedOrder
 }) {
+  // Local state
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [activeActionDropdown, setActiveActionDropdown] = useState(null); // { order, coords: { top, bottom, right } }
+  const [searchQuery, setSearchQuery] = useState(historySearchQuery || '');
+  const [selectedStatus, setSelectedStatus] = useState(historyFilterStatus || 'all');
+  const [selectedStore, setSelectedStore] = useState('all');
+  const [quickFilter, setQuickFilter] = useState('all'); // 'all', 'express', 'retard', 'reste_a_payer', 'solde', 'actives'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' (défaut : plus récent au plus ancien), 'asc'
+
+  // Pagination states (Style Journaux d'Audit)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ordersPerPage, setOrdersPerPage] = useState(15);
+
+  // Ref for handling clicks outside the active dropdown
+  const dropdownRef = useRef(null);
+
+  // Available stores
+  const stores = propStores && propStores.length > 0 ? propStores : (db.getStores ? db.getStores() : []);
+
+  // Sync external search query if changed
+  useEffect(() => {
+    if (setHistorySearchQuery) {
+      setHistorySearchQuery(searchQuery);
+    }
+  }, [searchQuery, setHistorySearchQuery]);
+
+  useEffect(() => {
+    if (setHistoryFilterStatus) {
+      setHistoryFilterStatus(selectedStatus);
+    }
+  }, [selectedStatus, setHistoryFilterStatus]);
+
+  // Click outside and dynamic repositioning on scroll for the action dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        if (activeActionDropdown?.triggerEl && activeActionDropdown.triggerEl.contains(event.target)) {
+          return;
+        }
+        setActiveActionDropdown(null);
+      }
+    };
+
+    const handleScroll = (event) => {
+      // Si l'utilisateur scrolle dans le menu lui-même, ne pas fermer
+      if (dropdownRef.current && dropdownRef.current.contains(event.target)) {
+        return;
+      }
+
+      // Repositionner le menu pour suivre le bouton de la ligne lors du scroll au lieu de le fermer
+      if (activeActionDropdown?.triggerEl) {
+        const rect = activeActionDropdown.triggerEl.getBoundingClientRect();
+        // Fermer uniquement si le bouton sort très largement du viewport (scroll au-delà)
+        if (rect.bottom < -50 || rect.top > window.innerHeight + 50) {
+          setActiveActionDropdown(null);
+          return;
+        }
+        const menuEstimatedHeight = 350;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const openUpward = spaceBelow < menuEstimatedHeight && rect.top > menuEstimatedHeight;
+
+        setActiveActionDropdown(prev => prev ? ({
+          ...prev,
+          coords: {
+            top: openUpward ? undefined : rect.bottom + 6,
+            bottom: openUpward ? (window.innerHeight - rect.top + 6) : undefined,
+            right: Math.max(16, window.innerWidth - rect.right)
+          }
+        }) : null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [activeActionDropdown]);
 
   const toggleExpand = (orderId) => {
     setExpandedOrderId(prev => (prev === orderId ? null : orderId));
   };
 
   const handleCopy = (orderId, text) => {
-    copyToClipboard(text);
+    if (copyToClipboard) {
+      copyToClipboard(text);
+    } else {
+      navigator.clipboard.writeText(text);
+    }
     setCopiedId(orderId);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const statusLabels = {
-    en_attente_validation: 'À valider (Livreur)',
-    en_attente: 'En attente',
-    traitement: 'Traitement',
-    en_cours_lavage: 'Lavage',
-    en_cours_repassage: 'Repassage',
-    pret: 'Prêt',
-    a_livrer: 'À livrer',
-    a_recuperer: 'À récupérer',
-    en_cours_livraison: 'Livraison en cours',
-    restitue: 'Commande livrée / récupérée',
-    annule: 'Annulée'
+  const toggleActionDropdown = (e, order) => {
+    e.stopPropagation();
+    if (activeActionDropdown?.order?.id === order.id) {
+      setActiveActionDropdown(null);
+      return;
+    }
+    const triggerEl = e.currentTarget;
+    const rect = triggerEl.getBoundingClientRect();
+    const menuEstimatedHeight = 350;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < menuEstimatedHeight && rect.top > menuEstimatedHeight;
+
+    setActiveActionDropdown({
+      order,
+      triggerEl,
+      coords: {
+        top: openUpward ? undefined : rect.bottom + 6,
+        bottom: openUpward ? (window.innerHeight - rect.top + 6) : undefined,
+        right: Math.max(16, window.innerWidth - rect.right)
+      }
+    });
   };
 
+  // Badges configuration for statuses
   const statusBadgesConfig = {
-    en_attente_validation: { bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: 'rgba(217, 119, 6, 0.25)', label: 'À valider (Livreur)' },
-    en_attente: { bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706', border: 'rgba(245, 158, 11, 0.25)', label: 'En attente' },
-    traitement: { bg: 'rgba(124, 58, 237, 0.12)', color: '#7c3aed', border: 'rgba(124, 58, 237, 0.25)', label: 'Traitement' },
-    en_cours_lavage: { bg: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', border: 'rgba(37, 99, 235, 0.25)', label: 'Lavage' },
-    en_cours_repassage: { bg: 'rgba(13, 148, 136, 0.12)', color: '#0d9488', border: 'rgba(13, 148, 136, 0.25)', label: 'Repassage' },
-    pret: { bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.25)', label: 'Prêt' },
-    a_livrer: { bg: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.25)', label: 'À livrer' },
-    a_recuperer: { bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: 'rgba(217, 119, 6, 0.25)', label: 'À récupérer' },
-    en_cours_livraison: { bg: 'rgba(79, 70, 229, 0.10)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.22)', label: 'Livraison en cours' },
-    restitue: { bg: 'rgba(16, 185, 129, 0.08)', color: '#059669', border: 'rgba(16, 185, 129, 0.2)', label: 'Commande livrée / récupérée' },
-    annule: { bg: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.2)', label: 'Annulée' }
+    en_attente_validation: { bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: 'rgba(217, 119, 6, 0.28)', label: 'À valider (Livreur)' },
+    en_attente: { bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706', border: 'rgba(245, 158, 11, 0.28)', label: 'En attente' },
+    attente: { bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706', border: 'rgba(245, 158, 11, 0.28)', label: 'En attente' },
+    traitement: { bg: 'rgba(124, 58, 237, 0.12)', color: '#7c3aed', border: 'rgba(124, 58, 237, 0.28)', label: 'Traitement' },
+    en_cours_lavage: { bg: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', border: 'rgba(37, 99, 235, 0.28)', label: 'Lavage' },
+    lavage_cours: { bg: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', border: 'rgba(37, 99, 235, 0.28)', label: 'Lavage' },
+    en_cours_repassage: { bg: 'rgba(13, 148, 136, 0.12)', color: '#0d9488', border: 'rgba(13, 148, 136, 0.28)', label: 'Repassage' },
+    repassage_cours: { bg: 'rgba(13, 148, 136, 0.12)', color: '#0d9488', border: 'rgba(13, 148, 136, 0.28)', label: 'Repassage' },
+    pret: { bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.28)', label: 'Prêt' },
+    a_livrer: { bg: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.28)', label: 'À livrer' },
+    a_recuperer: { bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: 'rgba(217, 119, 6, 0.28)', label: 'À récupérer' },
+    en_cours_livraison: { bg: 'rgba(79, 70, 229, 0.12)', color: '#4f46e5', border: 'rgba(79, 70, 229, 0.25)', label: 'En livraison' },
+    restitue: { bg: 'rgba(16, 185, 129, 0.10)', color: '#059669', border: 'rgba(16, 185, 129, 0.25)', label: 'Livrée / Restituée' },
+    annule: { bg: 'rgba(239, 68, 68, 0.10)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.25)', label: 'Annulée' }
   };
 
-  // Metrics KPI calculation
+  const getStatusBadge = (order) => {
+    const fallbackLabel = getOrderStatusLabel ? getOrderStatusLabel(order) : order.statut;
+    const cfg = statusBadgesConfig[order.statut] || {
+      bg: 'rgba(100, 116, 139, 0.12)',
+      color: 'var(--text-secondary)',
+      border: 'rgba(100, 116, 139, 0.25)',
+      label: fallbackLabel
+    };
+    return cfg;
+  };
+
+  // High-level KPI calculations
   const activeOrders = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule');
   const expressOrdersCount = activeOrders.filter(o => o.niveau_urgence === 'Express').length;
   const readyOrdersCount = activeOrders.filter(o => ['pret', 'a_livrer', 'a_recuperer'].includes(o.statut)).length;
   const lateOrdersCount = activeOrders.filter(o => isOrderLate(o)).length;
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+  // Filter & Sort Logic: Default sorted from NEWEST to OLDEST (created_at / date_depot descending)
+  const filteredOrders = orders.filter(order => {
+    const customer = customers.find(c => c.id === order.customer_id);
+    const clientName = customer ? `${customer.prenom || ''} ${customer.nom || ''}`.toLowerCase() : (order.client_name || '').toLowerCase();
+    const orderIdStr = String(order.id || '').toLowerCase();
+    const code = String(order.identifiant_unique_marquage || '').toLowerCase();
+    const article = String(order.type_article || '').toLowerCase();
+    const service = String(serviceLabels[order.type_service] || order.type_service || '').toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
 
-      {/* BANNIÈRE DE STATISTIQUES EN TÊTE (KPI BAR) */}
+    // Text search matching
+    if (q) {
+      const matches = orderIdStr.includes(q) ||
+        code.includes(q) ||
+        clientName.includes(q) ||
+        clientPhone.includes(q) ||
+        article.includes(q) ||
+        service.includes(q);
+      if (!matches) return false;
+    }
+
+    // Status filter
+    if (selectedStatus !== 'all') {
+      if (order.statut !== selectedStatus) return false;
+    }
+
+    // Store filter
+    if (selectedStore !== 'all') {
+      const matchStore = String(order.store_id || '') === String(selectedStore) ||
+        stores.some(st => String(st.id) === String(selectedStore) && String(st.code) === String(order.store_id));
+      if (!matchStore) return false;
+    }
+
+    // Quick filters
+    const remaining = (order.prix_total || 0) - (order.avance_payee || 0);
+    if (quickFilter === 'express') {
+      if (order.niveau_urgence !== 'Express') return false;
+    } else if (quickFilter === 'retard') {
+      if (!isOrderLate(order)) return false;
+    } else if (quickFilter === 'reste_a_payer') {
+      if (remaining <= 0) return false;
+    } else if (quickFilter === 'solde') {
+      if (remaining > 0) return false;
+    } else if (quickFilter === 'actives') {
+      if (order.statut === 'restitue' || order.statut === 'annule') return false;
+    }
+
+    return true;
+  }).sort((a, b) => {
+    // Par défaut du plus récent au plus ancien
+    const dateA = new Date(a.created_at || a.date_depot || 0).getTime();
+    const dateB = new Date(b.created_at || b.date_depot || 0).getTime();
+    return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+  });
+
+  // Réinitialiser la page courante lors d'un changement de filtre
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedStatus, selectedStore, quickFilter, sortOrder]);
+
+  // Calculs de pagination (Même système que les journaux d'audit)
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage) || 1;
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * ordersPerPage;
+    return filteredOrders.slice(start, start + ordersPerPage);
+  }, [filteredOrders, currentPage, ordersPerPage]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+      {/* ========================================================
+          1. BANNIÈRE DE STATISTIQUES EN TÊTE (KPI SUMMARY CARDS)
+          ======================================================== */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-        gap: '1rem'
+        gap: '0.9rem'
       }}>
-        {/* KPI 1 : Commandes Actives en Atelier */}
+        {/* KPI 1 : Commandes Actives */}
         <div className="card" style={{
-          padding: '1.1rem 1.25rem',
+          padding: '1rem 1.15rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '1rem',
+          gap: '0.85rem',
           borderRadius: '16px',
           background: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
           boxShadow: 'var(--shadow-sm)'
         }}>
           <div style={{
-            width: '46px',
-            height: '46px',
-            borderRadius: '14px',
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
             background: 'var(--primary-light)',
             color: 'var(--primary)',
             display: 'flex',
@@ -125,33 +356,33 @@ export default function OrdersTab({
             justifyContent: 'center',
             flexShrink: 0
           }}>
-            <ShoppingBag size={24} />
+            <ShoppingBag size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               En Atelier (Actives)
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
-              {activeOrders.length} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>commandes</span>
+            <div style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
+              {activeOrders.length} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)' }}>dépôts</span>
             </div>
           </div>
         </div>
 
         {/* KPI 2 : Traitements Express */}
         <div className="card" style={{
-          padding: '1.1rem 1.25rem',
+          padding: '1rem 1.15rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '1rem',
+          gap: '0.85rem',
           borderRadius: '16px',
           background: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
           boxShadow: 'var(--shadow-sm)'
         }}>
           <div style={{
-            width: '46px',
-            height: '46px',
-            borderRadius: '14px',
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
             background: 'rgba(245, 158, 11, 0.12)',
             color: '#d97706',
             display: 'flex',
@@ -159,33 +390,33 @@ export default function OrdersTab({
             justifyContent: 'center',
             flexShrink: 0
           }}>
-            <Flame size={24} />
+            <Flame size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Traitements Express
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#d97706', lineHeight: 1.1, marginTop: '2px' }}>
-              {expressOrdersCount} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>urgentes</span>
+            <div style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#d97706', lineHeight: 1.1, marginTop: '2px' }}>
+              {expressOrdersCount} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)' }}>urgentes</span>
             </div>
           </div>
         </div>
 
-        {/* KPI 3 : Prêtes / À Distribuer */}
+        {/* KPI 3 : Prêtes / À Livrer */}
         <div className="card" style={{
-          padding: '1.1rem 1.25rem',
+          padding: '1rem 1.15rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '1rem',
+          gap: '0.85rem',
           borderRadius: '16px',
           background: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
           boxShadow: 'var(--shadow-sm)'
         }}>
           <div style={{
-            width: '46px',
-            height: '46px',
-            borderRadius: '14px',
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
             background: 'rgba(16, 185, 129, 0.12)',
             color: '#10b981',
             display: 'flex',
@@ -193,33 +424,33 @@ export default function OrdersTab({
             justifyContent: 'center',
             flexShrink: 0
           }}>
-            <CheckCircle2 size={24} />
+            <CheckCircle2 size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Prêtes / À Livrer
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#10b981', lineHeight: 1.1, marginTop: '2px' }}>
-              {readyOrdersCount} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>disponibles</span>
+            <div style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#10b981', lineHeight: 1.1, marginTop: '2px' }}>
+              {readyOrdersCount} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)' }}>disponibles</span>
             </div>
           </div>
         </div>
 
         {/* KPI 4 : Retards en Atelier */}
         <div className="card" style={{
-          padding: '1.1rem 1.25rem',
+          padding: '1rem 1.15rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '1rem',
+          gap: '0.85rem',
           borderRadius: '16px',
           background: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
           boxShadow: 'var(--shadow-sm)'
         }}>
           <div style={{
-            width: '46px',
-            height: '46px',
-            borderRadius: '14px',
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
             background: lateOrdersCount > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(100, 116, 139, 0.1)',
             color: lateOrdersCount > 0 ? '#ef4444' : 'var(--text-muted)',
             display: 'flex',
@@ -227,693 +458,1172 @@ export default function OrdersTab({
             justifyContent: 'center',
             flexShrink: 0
           }}>
-            <AlertTriangle size={24} />
+            <AlertTriangle size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Alertes Retard
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: lateOrdersCount > 0 ? '#ef4444' : 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
-              {lateOrdersCount} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>dépassements</span>
+            <div style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: lateOrdersCount > 0 ? '#ef4444' : 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
+              {lateOrdersCount} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)' }}>dépassements</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* DISPOSITION PRINCIPALE DU FLUX (ATELIER A GAUCHE, HISTORIQUE A DROITE) */}
-      <div className="grid-2" style={{ gridTemplateColumns: '1.25fr 0.75fr', gap: '1.5rem', alignItems: 'start' }}>
-
-        {/* COLONNE GAUCHE : SUIVI D'ATELIER & CAISSE TERRAIN */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem', borderRadius: '20px' }}>
-
-          {/* Header Suivi Atelier */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.9rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                Suivi d'Atelier & Caisse Terrain
-              </h3>
-              <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                Avancement des traitements et encaissements des dépôts actifs
-              </p>
+      {/* ========================================================
+          2. FILTRES RAPIDES ADMIN (COMPACT, ÉLÉGANT, AU-DESSUS DU TABLEAU)
+          ======================================================== */}
+      <div className="card" style={{
+        padding: '0.85rem 1.15rem',
+        borderRadius: '16px',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+        boxShadow: 'var(--shadow-sm)'
+      }}>
+        {/* Ligne 1 : Barre de Recherche + Sélecteurs de filtres + Boutons d'Action */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.65rem'
+        }}>
+          {/* Bloc Recherche & Sélecteurs */}
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.55rem', flex: 1, minWidth: '280px' }}>
+            {/* Input Recherche rapide */}
+            <div style={{ position: 'relative', width: '240px', minWidth: '180px' }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                placeholder="ID commande, client, tél, article..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.42rem 1.8rem 0.42rem 2rem',
+                  fontSize: '0.78rem',
+                  borderRadius: '9px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-app)',
+                  color: 'var(--text-primary)',
+                  outline: 'none'
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    padding: 0
+                  }}
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => exportOrdersCSV(orders, customers)}
-                style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                title="Exporter toutes les commandes en CSV"
+            {/* Sélecteur de Statut */}
+            <div style={{ width: '150px' }}>
+              <CustomSelect
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                style={{
+                  fontSize: '0.76rem',
+                  padding: '0.42rem 0.65rem',
+                  borderRadius: '9px',
+                  background: 'var(--bg-app)',
+                  border: '1px solid var(--border-color)'
+                }}
               >
-                <Download size={14} /> CSV
-              </button>
-              {/* Filter Pills */}
-              <div style={{ display: 'flex', background: 'var(--bg-app)', padding: '0.25rem', borderRadius: '10px', border: '1px solid var(--border-color)', gap: '0.25rem' }}>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setAtelierFilter('all')}
+                <option value="all">Tous statuts</option>
+                <option value="en_attente_validation">À valider (Livreur)</option>
+                <option value="en_attente">En attente</option>
+                <option value="traitement">Traitement</option>
+                <option value="en_cours_lavage">Lavage</option>
+                <option value="en_cours_repassage">Repassage</option>
+                <option value="pret">Prêt</option>
+                <option value="a_livrer">À livrer</option>
+                <option value="a_recuperer">À récupérer</option>
+                <option value="en_cours_livraison">En livraison</option>
+                <option value="restitue">Livré / Restitué</option>
+                <option value="annule">Annulé</option>
+              </CustomSelect>
+            </div>
+
+            {/* Sélecteur de Point de Laverie (Store) si plusieurs stores */}
+            {stores.length > 0 && (
+              <div style={{ width: '160px' }}>
+                <CustomSelect
+                  value={selectedStore}
+                  onChange={(e) => setSelectedStore(e.target.value)}
                   style={{
-                    padding: '0.35rem 0.75rem',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    borderRadius: '7px',
-                    border: 'none',
-                    background: atelierFilter === 'all' ? 'var(--primary)' : 'transparent',
-                    color: atelierFilter === 'all' ? '#fff' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
+                    fontSize: '0.76rem',
+                    padding: '0.42rem 0.65rem',
+                    borderRadius: '9px',
+                    background: 'var(--bg-app)',
+                    border: '1px solid var(--border-color)'
                   }}
                 >
-                  Toutes ({activeOrders.length})
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setAtelierFilter('urgent')}
-                  style={{
-                    padding: '0.35rem 0.75rem',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    borderRadius: '7px',
-                    border: 'none',
-                    background: atelierFilter === 'urgent' ? '#d97706' : 'transparent',
-                    color: atelierFilter === 'urgent' ? '#fff' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem'
-                  }}
-                >
-                  ⚡ Urgent ({expressOrdersCount})
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setAtelierFilter('retard')}
-                  style={{
-                    padding: '0.35rem 0.75rem',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    borderRadius: '7px',
-                    border: 'none',
-                    background: atelierFilter === 'retard' ? '#ef4444' : 'transparent',
-                    color: atelierFilter === 'retard' ? '#fff' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem'
-                  }}
-                >
-                  ⚠️ Retard ({lateOrdersCount})
-                </button>
+                  <option value="all">Tous les points</option>
+                  {stores.map(st => (
+                    <option key={st.id} value={st.id}>
+                      {st.nom} ({st.code})
+                    </option>
+                  ))}
+                </CustomSelect>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Liste des cartes Suivi d'Atelier */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '680px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-            {(() => {
-              const filteredAtelierOrders = orders.filter(o => {
-                if (o.statut === 'restitue' || o.statut === 'annule') return false;
-                if (atelierFilter === 'urgent') return o.niveau_urgence === 'Express';
-                if (atelierFilter === 'retard') return isOrderLate(o);
-                return true;
-              }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          {/* Boutons d'Action (Exporter & Nouvelle Commande) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => exportOrdersCSV(filteredOrders, customers)}
+              style={{
+                padding: '0.42rem 0.75rem',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                borderRadius: '9px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                background: 'var(--bg-card)'
+              }}
+              title="Exporter le tableau actuel en CSV"
+            >
+              <Download size={13} /> Exporter CSV
+            </button>
 
-              if (filteredAtelierOrders.length === 0) {
-                return (
-                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3.5rem 1.5rem', background: 'var(--bg-app)', borderRadius: '16px', border: '1px dashed var(--border-color)' }}>
-                    <CheckCircle2 size={36} style={{ margin: '0 auto 0.6rem', color: 'var(--primary)', opacity: 0.6 }} />
-                    <h4 style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Aucune commande active</h4>
-                    <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>Toutes les commandes correspondant à ce filtre ont été traitées ou livrées.</p>
-                  </div>
-                );
-              }
-
-              return filteredAtelierOrders.map(order => {
-                const customer = customers.find(c => c.id === order.customer_id);
-                const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
-                const clientPhone = customer ? customer.telephone : '-';
-                const isExpress = order.niveau_urgence === 'Express';
-                const isLate = isOrderLate(order);
-                const remainingToPay = order.prix_total - order.avance_payee;
-                const statusCfg = statusBadgesConfig[order.statut] || { bg: 'rgba(100,116,139,0.1)', color: 'var(--text-secondary)', border: 'rgba(100,116,139,0.2)', label: order.statut };
-
-                return (
-                  <div
-                    key={order.id}
-                    className="card"
-                    style={{
-                      padding: '1.25rem',
-                      borderRadius: '16px',
-                      border: isExpress ? '1.5px solid rgba(245, 158, 11, 0.5)' : (isLate ? '1.5px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--border-color)'),
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.9rem',
-                      background: 'var(--bg-card)',
-                      boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
-                      transition: 'all 0.2s ease',
-                      position: 'relative'
-                    }}
-                  >
-                    {/* Top Row: Order ID, Tags & Status Badge */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '1rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', letterSpacing: '0.2px' }}>
-                            {order.identifiant_unique_marquage}
-                          </span>
-                          {isExpress && (
-                            <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '20px', background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                              ⚡ Express
-                            </span>
-                          )}
-                          {isLate && (
-                            <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                              ⚠️ RETARD
-                            </span>
-                          )}
-                        </div>
-
-                        <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <Package size={15} color="var(--primary)" />
-                          <span>{order.type_article}</span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg-app)', padding: '0.1rem 0.4rem', borderRadius: '6px' }}>
-                            {serviceLabels[order.type_service] || order.type_service}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Status Badge Tag */}
-                      <button
-                        type="button"
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          padding: '0.3rem 0.75rem',
-                          borderRadius: '20px',
-                          background: statusCfg.bg,
-                          color: statusCfg.color,
-                          border: `1px solid ${statusCfg.border}`,
-                          cursor: (order.statut === 'a_livrer' || order.statut === 'a_recuperer' || order.statut === 'en_cours_livraison') ? 'pointer' : 'default',
-                          fontFamily: 'inherit',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
-                        }}
-                        disabled={!(order.statut === 'a_livrer' || order.statut === 'a_recuperer' || order.statut === 'en_cours_livraison')}
-                        onClick={(e) => {
-                          if (order.statut === 'a_livrer') {
-                            e.stopPropagation();
-                            handleStatusChange(order.id, 'en_cours_livraison');
-                          } else if (order.statut === 'a_recuperer' || order.statut === 'en_cours_livraison') {
-                            e.stopPropagation();
-                            handleStartDelivery(order, 'restitue');
-                          }
-                        }}
-                      >
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: statusCfg.color }}></span>
-                        {statusCfg.label}
-                      </button>
-                    </div>
-
-                    {/* Middle Row: Client info & Deposit Date */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-app)', padding: '0.5rem 0.75rem', borderRadius: '12px', fontSize: '0.76rem', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <User size={14} color="var(--primary)" />
-                        <span>Client : <strong style={{ color: 'var(--text-primary)' }}>{clientName}</strong> ({clientPhone})</span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>📍 Point :</span>
-                        <select
-                          value={(() => {
-                            const stores = db.getStores();
-                            const match = stores.find(s => s.id === order.store_id || s.code === order.store_id);
-                            return match ? match.id : (stores[0]?.id || order.store_id || '');
-                          })()}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={async (e) => {
-                            e.stopPropagation();
-                            const newSid = e.target.value;
-                            await db.updateOrderStore(order.id, newSid);
-                          }}
-                          style={{
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            color: 'var(--primary)',
-                            background: '#fff',
-                            border: '1px solid rgba(59, 130, 246, 0.3)',
-                            borderRadius: '6px',
-                            padding: '0.15rem 0.45rem',
-                            cursor: 'pointer',
-                            outline: 'none'
-                          }}
-                        >
-                          {db.getStores().map(st => (
-                            <option key={st.id} value={st.id}>
-                              {st.nom} ({st.code})
-                            </option>
-                          ))}
-                        </select>
-
-                        <button
-                          onClick={() => toggleExpand(order.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', fontWeight: 700, fontSize: '0.74rem', marginLeft: '0.25rem' }}
-                        >
-                          {expandedOrderId === order.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                          Détails
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Expanded Drawer: Address, Phone & Detailed Billing */}
-                    {expandedOrderId === order.id && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(59, 130, 246, 0.04)', padding: '0.85rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.15)', fontSize: '0.76rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)' }}>
-                          <MapPin size={14} color="var(--primary)" />
-                          <span>Adresse : <strong style={{ color: 'var(--text-primary)' }}>{customer?.adresse || 'Non renseignée'}</strong></span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)' }}>
-                          <Phone size={14} color="var(--primary)" />
-                          <span>Téléphone : <strong style={{ color: 'var(--text-primary)' }}>{customer ? `+${customer.indicatif || '229'} ${customer.telephone}` : 'Non renseigné'}</strong></span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)' }}>
-                          <Clock size={14} color="var(--primary)" />
-                          <span>Dépôt le : <strong style={{ color: 'var(--text-primary)' }}>{formatDateTime(order.created_at)}</strong></span>
-                        </div>
-
-                        {/* Detailed Billing breakdown */}
-                        {(() => {
-                          const isExpress = order.niveau_urgence === 'Express';
-                          const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
-                          const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
-
-                          const itemsList = order.items || order.articles || [];
-                          let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
-                          if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
-                            const catalogItem = db.getCatalog().find(c => c.article === order.type_article && c.service === order.type_service);
-                            itemsSum = catalogItem ? catalogItem.prix : 1500;
-                          }
-
-                          const netPrice = order.prix_total !== undefined ? order.prix_total : (order.total || 0);
-                          const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
-                          const displayBrut = order.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
-
-                          const discountPercent = order.remise_pourcentage || 0;
-                          const discountAmount = order.remise_montant || (discountPercent > 0 ? Math.round(displayBrut * (discountPercent / 100)) : 0);
-
-                          const rewardTitle = order.applied_reward_title;
-                          const rewardDiscount = Number(order.applied_reward_discount || order.reward_discount || 0);
-
-                          return (
-                            <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed rgba(59, 130, 246, 0.2)', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                              <div style={{ fontWeight: 800, color: 'var(--primary)', marginBottom: '0.2rem' }}>Détails de la Facturation :</div>
-
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Total Brut :</span>
-                                <strong>{displayBrut.toLocaleString()} FCFA</strong>
-                              </div>
-
-                              {isExpress && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#d97706' }}>
-                                  <span>Majoration Express (+{expressMarkup}%) :</span>
-                                  <strong>Inclus</strong>
-                                </div>
-                              )}
-
-                              {discountAmount > 0 && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
-                                  <span>Réduction :</span>
-                                  <strong>-{discountAmount.toLocaleString()} FCFA</strong>
-                                </div>
-                              )}
-
-                              {(rewardDiscount > 0 || rewardTitle) && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981' }}>
-                                  <span>Récompense ({rewardTitle || 'Fidélité'}) :</span>
-                                  <strong>-{rewardDiscount.toLocaleString()} FCFA</strong>
-                                </div>
-                              )}
-
-                              {Number(order.frais_livraison || 0) > 0 && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#3b82f6' }}>
-                                  <span>🚚 Frais de Livraison{order.distance_km ? ` (${order.distance_km} km)` : ''} :</span>
-                                  <strong>+{Number(order.frais_livraison).toLocaleString()} FCFA</strong>
-                                </div>
-                              )}
-
-                              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(0,0,0,0.1)', paddingTop: '0.2rem', fontWeight: 800 }}>
-                                <span>Net à payer :</span>
-                                <span style={{ color: 'var(--text-primary)' }}>{netPrice.toLocaleString()} FCFA</span>
-                              </div>
-
-                              {(order.operateur_momo || order.reference_momo || order.reference_paiement) && (
-                                <div style={{ marginTop: '0.25rem', padding: '0.35rem 0.5rem', background: 'rgba(0, 44, 247, 0.05)', borderRadius: '6px', fontSize: '0.72rem', color: '#002cf7' }}>
-                                  <strong>Règlement Mobile Money :</strong> {order.operateur_momo || 'MoMo'} {order.reference_momo || order.reference_paiement ? `(Réf: ${order.reference_momo || order.reference_paiement})` : ''}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.7rem', fontWeight: 700, borderRadius: '8px', width: 'fit-content', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const cName = customer ? `${customer.prenom} ${customer.nom}` : '';
-                            const cPhone = customer ? `+${customer.indicatif || '229'} ${customer.telephone}` : '';
-                            const cAddr = customer?.adresse || 'Non renseignée';
-                            handleCopy(order.id, `Client: ${cName}\nTél: ${cPhone}\nAdresse: ${cAddr}`);
-                          }}
-                        >
-                          {copiedId === order.id ? <Check size={13} /> : <Copy size={13} />}
-                          {copiedId === order.id ? 'Copié !' : 'Copier Coordonnées'}
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Financial Progress Bar (Total, Paid, Remaining) */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.65rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>Total: <strong style={{ color: 'var(--text-primary)' }}>{order.prix_total.toLocaleString()} F CFA</strong></span>
-                        <span style={{ color: 'var(--text-secondary)' }}>Acompte: <strong style={{ color: 'var(--primary)' }}>{order.avance_payee.toLocaleString()} F</strong></span>
-                        <div>
-                          {remainingToPay > 0 ? (
-                            <span style={{ color: '#d97706', fontWeight: 800, background: 'rgba(245, 158, 11, 0.1)', padding: '0.15rem 0.45rem', borderRadius: '6px' }}>
-                              Reste: {remainingToPay.toLocaleString()} F
-                            </span>
-                          ) : (
-                            <span style={{ color: '#10b981', fontWeight: 800, background: 'rgba(16, 185, 129, 0.1)', padding: '0.15rem 0.45rem', borderRadius: '6px' }}>
-                              Solde Payé
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Action Step Buttons Workflow */}
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
-                      {(order.statut === 'en_attente_validation' || (order.cree_par_livreur && !order.validee_par_caisse)) && (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', background: '#059669', border: 'none', color: '#fff' }}
-                          onClick={() => handleValidateLivreurOrder ? handleValidateLivreurOrder(order) : handleStatusChange(order.id, 'en_attente')}
-                        >
-                          <CheckCircle2 size={15} /> Valider la commande (Caisse)
-                        </button>
-                      )}
-                      {(order.statut === 'en_attente' || order.statut === 'attente' || order.statut === 'retard' || order.statut === 'en_retard') && (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', background: '#7c3aed', border: 'none', color: '#fff' }}
-                          onClick={() => handleStatusChange(order.id, 'traitement')}
-                        >
-                          <Zap size={15} /> Passer au traitement
-                        </button>
-                      )}
-                      {order.statut === 'traitement' && (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', background: '#2563eb', border: 'none', color: '#fff' }}
-                          onClick={() => handleStatusChange(order.id, 'en_cours_lavage')}
-                        >
-                          <Sparkles size={15} /> Lancer le lavage
-                        </button>
-                      )}
-                      {order.statut === 'en_cours_lavage' && (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', background: '#0d9488', border: 'none', color: '#fff' }}
-                          onClick={() => handleStatusChange(order.id, 'en_cours_repassage')}
-                        >
-                          <Flame size={15} /> Passer au repassage
-                        </button>
-                      )}
-                      {order.statut === 'en_cours_repassage' && (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', background: '#059669', border: 'none', color: '#fff' }}
-                          onClick={() => handleStatusChange(order.id, 'pret')}
-                        >
-                          <CheckCircle2 size={15} /> Marquer comme Prêt
-                        </button>
-                      )}
-                      {order.statut === 'pret' && (
-                        <>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            style={{ flex: 1, padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, borderRadius: '10px', background: '#4f46e5', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                            onClick={() => handleStatusChange(order.id, 'a_livrer')}
-                          >
-                            <Truck size={14} /> À livrer
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            style={{ flex: 1, padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, borderRadius: '10px', background: '#d97706', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                            onClick={() => handleStatusChange(order.id, 'a_recuperer')}
-                          >
-                            <Package size={14} /> À récupérer
-                          </button>
-                        </>
-                      )}
-                      {order.statut === 'a_livrer' && (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, borderRadius: '10px', background: '#4f46e5', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-                          onClick={() => handleStatusChange(order.id, 'en_cours_livraison')}
-                        >
-                          <Truck size={15} /> Démarrer la livraison
-                        </button>
-                      )}
-                      {order.statut === 'a_recuperer' && (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, borderRadius: '10px', background: '#d97706', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-                          onClick={() => handleStartDelivery(order, 'restitue')}
-                        >
-                          <CheckCircle2 size={15} /> Commande récupérée
-                        </button>
-                      )}
-                      {order.statut === 'en_cours_livraison' && (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, borderRadius: '10px', background: '#0f172a', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-                          onClick={() => handleStartDelivery(order, 'restitue')}
-                        >
-                          <CheckCircle2 size={15} /> Terminer la livraison
-                        </button>
-                      )}
-                      {!['en_attente', 'attente', 'traitement', 'en_cours_lavage', 'lavage_cours', 'en_cours_repassage', 'repassage_cours', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'restitue', 'annule', 'retard', 'en_retard'].includes(order.statut) && (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{ flex: 1, padding: '0.55rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', background: '#7c3aed', border: 'none', color: '#fff' }}
-                          onClick={() => handleStatusChange(order.id, 'traitement')}
-                        >
-                          <Zap size={15} /> Passer au traitement
-                        </button>
-                      )}
-
-                      {/* Cancel Order Button */}
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        style={{ padding: '0.55rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        title="Annuler la commande"
-                        onClick={() => handleCancelOrder(order.id)}
-                      >
-                        <Ban size={15} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        </div>
-
-        {/* COLONNE DROITE : HISTORIQUE DES COMMANDES */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem', borderRadius: '20px' }}>
-
-          {/* Header Historique & Bouton Nouvelle Commande */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.9rem' }}>
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                Historique Global
-              </h3>
-            </div>
             <button
               type="button"
               className="btn btn-primary"
               onClick={() => setShowOrderRegistrationModal(true)}
-              style={{ padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--primary)', color: '#fff', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)' }}
+              style={{
+                padding: '0.42rem 0.9rem',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                borderRadius: '9px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                background: 'var(--primary)',
+                color: '#fff',
+                boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)'
+              }}
             >
-              <Plus size={15} /> Nouvelle
+              <Plus size={14} /> Nouvelle Commande
             </button>
           </div>
+        </div>
 
-          {/* Search Bar & Filter Dropdown */}
-          <div style={{ display: 'flex', gap: '0.65rem' }}>
-            <div style={{ flexGrow: 1, position: 'relative' }}>
-              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                className="input-control"
-                style={{ paddingLeft: '2.4rem', width: '100%', borderRadius: '10px', fontSize: '0.8rem', padding: '0.5rem 0.5rem 0.5rem 2.4rem' }}
-                placeholder="Rechercher par Code/Client..."
-                value={historySearchQuery}
-                onChange={(e) => setHistorySearchQuery(e.target.value)}
-              />
-            </div>
-            <CustomSelect
-              className="input-control"
-              style={{ borderRadius: '10px', fontSize: '0.78rem', width: '125px', padding: '0.45rem 0.5rem' }}
-              value={historyFilterStatus}
-              onChange={(e) => setHistoryFilterStatus(e.target.value)}
-            >
-              <option value="all">Tous statuts</option>
-              <option value="en_attente">En attente</option>
-              <option value="en_cours_lavage">En cours</option>
-              <option value="pret">Prêt</option>
-              <option value="a_livrer">À livrer</option>
-              <option value="a_recuperer">À récupérer</option>
-              <option value="restitue">Livré</option>
-              <option value="annule">Annulé</option>
-            </CustomSelect>
+        {/* Ligne 2 : Pastilles de filtres rapides (Quick filter pills) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          borderTop: '1px dashed var(--border-color)',
+          paddingTop: '0.6rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', marginRight: '0.2rem' }}>
+              Filtres rapides :
+            </span>
+
+            {[
+              { id: 'all', label: `Toutes (${orders.length})` },
+              { id: 'actives', label: `Actives (${activeOrders.length})` },
+              { id: 'express', label: `🔥 Express (${expressOrdersCount})`, color: '#d97706' },
+              { id: 'retard', label: `⚠️ Retard (${lateOrdersCount})`, color: '#ef4444' },
+              { id: 'reste_a_payer', label: '💳 Reste à payer' },
+              { id: 'solde', label: '✅ Soldées' }
+            ].map(pill => {
+              const isActive = quickFilter === pill.id;
+              return (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => setQuickFilter(pill.id)}
+                  style={{
+                    padding: '0.22rem 0.55rem',
+                    fontSize: '0.71rem',
+                    fontWeight: 700,
+                    borderRadius: '7px',
+                    border: isActive ? '1px solid transparent' : '1px solid var(--border-color)',
+                    background: isActive ? (pill.color || 'var(--primary)') : 'var(--bg-app)',
+                    color: isActive ? '#fff' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {pill.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* List of History Items */}
-          <div style={{ overflowY: 'auto', maxHeight: '580px', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem' }}>
-            {(() => {
-              const query = historySearchQuery.toLowerCase();
-              const filteredHistory = orders.filter(o => {
-                const customer = customers.find(c => c.id === o.customer_id);
-                const clientName = customer ? `${customer.prenom || ''} ${customer.nom || ''}`.toLowerCase() : '';
-                const code = (o.identifiant_unique_marquage || o.id || '').toLowerCase();
+          {/* Tri & Compteur de résultats */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <button
+              type="button"
+              onClick={() => setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'))}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                fontSize: '0.71rem',
+                color: 'var(--text-secondary)',
+                fontWeight: 600
+              }}
+              title="Changer l'ordre de tri chronologique"
+            >
+              <ArrowUpDown size={12} />
+              <span>{sortOrder === 'desc' ? 'Plus récentes en premier' : 'Plus anciennes en premier'}</span>
+            </button>
 
-                const matchesSearch = clientName.includes(query) || code.includes(query);
-                const matchesStatus = historyFilterStatus === 'all' || o.statut === historyFilterStatus;
-
-                return matchesSearch && matchesStatus;
-              }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-              if (filteredHistory.length === 0) {
-                return (
-                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2.5rem 1rem', background: 'var(--bg-app)', borderRadius: '14px', border: '1px dashed var(--border-color)' }}>
-                    <Ticket size={28} style={{ margin: '0 auto 0.4rem', color: 'var(--text-muted)' }} />
-                    <p style={{ margin: 0, fontSize: '0.78rem' }}>Aucune commande dans l'historique.</p>
-                  </div>
-                );
-              }
-
-              return filteredHistory.map(order => {
-                const customer = customers.find(c => c.id === order.customer_id);
-                const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
-                const serviceName = serviceLabels[order.type_service] || order.type_service;
-                const statusCfg = statusBadgesConfig[order.statut] || { bg: 'rgba(100,116,139,0.1)', color: 'var(--text-secondary)', label: getOrderStatusLabel(order) };
-
-                return (
-                  <button
-                    type="button"
-                    key={order.id}
-                    className="card-clickable"
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      width: '100%',
-                      textAlign: 'left',
-                      fontFamily: 'inherit',
-                      color: 'inherit',
-                      padding: '0.85rem 1rem',
-                      borderRadius: '14px',
-                      border: '1px solid var(--border-color)',
-                      background: 'var(--bg-card)',
-                      gap: '0.45rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onClick={() => setCreatedOrder(order)}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
-                        {order.identifiant_unique_marquage}
-                      </span>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '12px', background: statusCfg.bg, color: statusCfg.color }}>
-                        {getOrderStatusLabel(order)}
-                      </span>
-                    </div>
-
-
-
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                      <span>Client : <strong style={{ color: 'var(--text-primary)' }}>{clientName}</strong></span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--primary)' }}>
-                        {order.prix_total.toLocaleString()} F
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', fontSize: '0.68rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.35rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>📍 Point :</span>
-                        <select
-                          value={(() => {
-                            const stores = db.getStores();
-                            const match = stores.find(s => s.id === order.store_id || s.code === order.store_id);
-                            return match ? match.id : (stores[0]?.id || order.store_id || '');
-                          })()}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={async (e) => {
-                            e.stopPropagation();
-                            const newSid = e.target.value;
-                            await db.updateOrderStore(order.id, newSid);
-                          }}
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            color: 'var(--primary)',
-                            background: 'rgba(59, 130, 246, 0.08)',
-                            border: '1px solid rgba(59, 130, 246, 0.25)',
-                            borderRadius: '6px',
-                            padding: '0.1rem 0.35rem',
-                            cursor: 'pointer',
-                            outline: 'none'
-                          }}
-                        >
-                          {db.getStores().map(st => (
-                            <option key={st.id} value={st.id}>
-                              {st.nom} ({st.code})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                        <Ticket size={12} /> Cliquer pour ticket
-                      </div>
-                    </div>
-                  </button>
-                );
-              });
-            })()}
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.15rem 0.55rem', borderRadius: '12px' }}>
+              {filteredOrders.length} {filteredOrders.length <= 1 ? 'commande' : 'commandes'}
+            </span>
           </div>
         </div>
       </div>
+
+      {/* ========================================================
+          3. TABLEAU DES COMMANDES (STYLE TABLEAU TRÈS AVANCÉ)
+          ======================================================== */}
+      <div className="card" style={{
+        padding: 0,
+        borderRadius: '18px',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--shadow-sm)',
+        minHeight: '380px'
+      }}>
+        {/* Conteneur défilable horizontalement avec Colonne Action Sticky à droite */}
+        <div style={{ overflowX: 'auto', width: '100%', position: 'relative' }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            textAlign: 'left',
+            fontSize: '0.78rem'
+          }}>
+            {/* Table Header */}
+            <thead>
+              <tr style={{
+                background: 'var(--bg-app)',
+                borderBottom: '1px solid var(--border-color)',
+                color: 'var(--text-secondary)'
+              }}>
+                <th style={{ padding: '0.75rem 0.85rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap', width: '40px' }}>
+                  #
+                </th>
+                <th style={{ padding: '0.75rem 0.85rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                  ID de Commande
+                </th>
+                <th style={{ padding: '0.75rem 0.85rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                  Date & Heure
+                </th>
+                <th style={{ padding: '0.75rem 0.85rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                  Client & Coordonnées
+                </th>
+                <th style={{ padding: '0.75rem 0.85rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                  Point de Laverie
+                </th>
+                <th style={{ padding: '0.75rem 0.85rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                  Articles & Prestations
+                </th>
+                <th style={{ padding: '0.75rem 0.85rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                  Statut
+                </th>
+                <th style={{ padding: '0.75rem 0.85rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                  Finances & Règlement
+                </th>
+                <th style={{ padding: '0.75rem 0.85rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                  Retrait / Mode
+                </th>
+                {/* COLONNE ACTION FIXE (STICKY NON DÉFILABLE HORIZONTALEMENT) */}
+                <th style={{
+                  padding: '0.75rem 1rem',
+                  fontWeight: 800,
+                  fontSize: '0.7rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  whiteSpace: 'nowrap',
+                  position: 'sticky',
+                  right: 0,
+                  background: 'var(--bg-app)',
+                  zIndex: 10,
+                  boxShadow: '-5px 0 12px rgba(0,0,0,0.06)',
+                  textAlign: 'center',
+                  minWidth: '115px'
+                }}>
+                  Action
+                </th>
+              </tr>
+            </thead>
+
+            {/* Table Body */}
+            <tbody>
+              {filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={10} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                      <Ticket size={36} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Aucune commande trouvée</div>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                        Modifiez vos critères de recherche ou réinitialisez les filtres.
+                      </div>
+                      {(searchQuery || selectedStatus !== 'all' || selectedStore !== 'all' || quickFilter !== 'all') && (
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setSelectedStatus('all');
+                            setSelectedStore('all');
+                            setQuickFilter('all');
+                          }}
+                          style={{ marginTop: '0.5rem', fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
+                        >
+                          Réinitialiser les filtres
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedOrders.map((order, idx) => {
+                  const customer = customers.find(c => c.id === order.customer_id);
+                  const clientName = customer ? `${customer.prenom} ${customer.nom}` : (order.client_name || 'Client B2B');
+                  const clientPhone = customer ? customer.telephone : (order.client_telephone || '-');
+                  const isExpress = order.niveau_urgence === 'Express';
+                  const isLate = isOrderLate(order);
+                  const remainingToPay = (order.prix_total || 0) - (order.avance_payee || 0);
+                  const statusCfg = getStatusBadge(order);
+                  const isExpanded = expandedOrderId === order.id;
+                  const isActionOpen = activeActionDropdown?.order?.id === order.id;
+
+                  // Store matching
+                  const currentStore = stores.find(s => s.id === order.store_id || s.code === order.store_id) || stores[0];
+
+                  return (
+                    <React.Fragment key={order.id || idx}>
+                      {/* Ligne principale de commande */}
+                      <tr
+                        style={{
+                          borderBottom: isExpanded ? 'none' : '1px solid var(--border-color)',
+                          background: isExpress ? 'rgba(245, 158, 11, 0.02)' : (idx % 2 === 0 ? 'var(--bg-card)' : 'rgba(0,0,0,0.01)'),
+                          transition: 'background 0.15s ease'
+                        }}
+                      >
+                        {/* 0. Bouton d'extension détail (+) */}
+                        <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(order.id)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: isExpanded ? 'var(--primary)' : 'var(--text-muted)',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'transform 0.15s ease'
+                            }}
+                            title={isExpanded ? "Replier les détails" : "Déplier les détails financiers et articles"}
+                          >
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                        </td>
+
+                        {/* 1. ID de Commande */}
+                        <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              {(() => {
+                                const displayId = String(order.id || order.identifiant_unique_marquage || '');
+                                return (
+                                  <>
+                                    <span style={{
+                                      fontFamily: 'var(--font-title)',
+                                      fontWeight: 800,
+                                      fontSize: '0.84rem',
+                                      color: 'var(--text-primary)',
+                                      letterSpacing: '0.2px'
+                                    }}>
+                                      {displayId}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopy(order.id, displayId)}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: copiedId === order.id ? '#10b981' : 'var(--text-muted)',
+                                        padding: 0,
+                                        display: 'inline-flex',
+                                        alignItems: 'center'
+                                      }}
+                                      title="Copier l'ID de commande"
+                                    >
+                                      {copiedId === order.id ? <Check size={12} /> : <Copy size={12} />}
+                                    </button>
+                                  </>
+                                );
+                              })()}
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+                              {isExpress && (
+                                <span style={{
+                                  fontSize: '0.62rem',
+                                  fontWeight: 800,
+                                  padding: '0.1rem 0.4rem',
+                                  borderRadius: '6px',
+                                  background: 'rgba(245, 158, 11, 0.15)',
+                                  color: '#d97706',
+                                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.2rem'
+                                }}>
+                                  <Flame size={10} /> Express
+                                </span>
+                              )}
+                              {isLate && (
+                                <span style={{
+                                  fontSize: '0.62rem',
+                                  fontWeight: 800,
+                                  padding: '0.1rem 0.4rem',
+                                  borderRadius: '6px',
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  color: '#ef4444',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.2rem'
+                                }}>
+                                  <AlertTriangle size={10} /> Retard
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 2. Date & Heure */}
+                        <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {formatDateTime(order.created_at || order.date_depot)}
+                            </span>
+                            {order.date_retrait_prevue && (
+                              <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <Clock size={10} /> Prévu : {formatDateTime(order.date_retrait_prevue)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 3. Client & Coordonnées */}
+                        <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', minWidth: '170px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <User size={13} color="var(--primary)" />
+                              <span>{clientName}</span>
+                            </div>
+                            <div style={{ fontSize: '0.71rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <Phone size={11} color="var(--text-muted)" />
+                              <span>{clientPhone}</span>
+                            </div>
+                            {customer?.adresse && (
+                              <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={customer.adresse}>
+                                <MapPin size={10} />
+                                <span>{customer.adresse}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 4. Point de Laverie (Store) */}
+                        <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                          <select
+                            value={(() => {
+                              const match = stores.find(s => s.id === order.store_id || s.code === order.store_id);
+                              return match ? match.id : (stores[0]?.id || order.store_id || '');
+                            })()}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={async (e) => {
+                              e.stopPropagation();
+                              const newSid = e.target.value;
+                              if (db.updateOrderStore) {
+                                await db.updateOrderStore(order.id, newSid);
+                              }
+                            }}
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              color: 'var(--primary)',
+                              background: 'rgba(59, 130, 246, 0.08)',
+                              border: '1px solid rgba(59, 130, 246, 0.25)',
+                              borderRadius: '7px',
+                              padding: '0.22rem 0.45rem',
+                              cursor: 'pointer',
+                              outline: 'none'
+                            }}
+                          >
+                            {stores.map(st => (
+                              <option key={st.id} value={st.id}>
+                                {st.nom} ({st.code})
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+
+                        {/* 5. Articles & Prestations */}
+                        <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', minWidth: '160px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <Package size={13} color="var(--primary)" />
+                              <span>{order.type_article || 'Articles textiles'}</span>
+                              {order.items && order.items.length > 1 && (
+                                <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '0.05rem 0.35rem', borderRadius: '10px', background: 'var(--primary-light)', color: 'var(--primary)' }}>
+                                  +{order.items.length}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.71rem', color: 'var(--text-secondary)' }}>
+                              <span style={{ background: 'var(--bg-app)', padding: '0.1rem 0.4rem', borderRadius: '5px', border: '1px solid var(--border-color)', fontWeight: 600 }}>
+                                {serviceLabels[order.type_service] || order.type_service || 'Lavage standard'}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 6. Statut */}
+                        <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                          <span style={{
+                            fontSize: '0.71rem',
+                            fontWeight: 700,
+                            padding: '0.24rem 0.65rem',
+                            borderRadius: '16px',
+                            background: statusCfg.bg,
+                            color: statusCfg.color,
+                            border: `1px solid ${statusCfg.border}`,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem'
+                          }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: statusCfg.color }}></span>
+                            {statusCfg.label}
+                          </span>
+                        </td>
+
+                        {/* 7. Finances & Règlement */}
+                        <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
+                              {(order.prix_total || 0).toLocaleString()} F CFA
+                            </div>
+                            <div style={{ fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Avance: {(order.avance_payee || 0).toLocaleString()} F</span>
+                              {remainingToPay > 0 ? (
+                                <span style={{ color: '#d97706', fontWeight: 800, background: 'rgba(245, 158, 11, 0.1)', padding: '0.05rem 0.35rem', borderRadius: '4px' }}>
+                                  Dû: {remainingToPay.toLocaleString()} F
+                                </span>
+                              ) : (
+                                <span style={{ color: '#10b981', fontWeight: 800, background: 'rgba(16, 185, 129, 0.1)', padding: '0.05rem 0.35rem', borderRadius: '4px' }}>
+                                  Soldé
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 8. Retrait / Mode */}
+                        <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            {order.type_depot === 'livreur' || order.type_retrait === 'livraison' || order.adresse_livraison ? (
+                              <span style={{ fontSize: '0.71rem', fontWeight: 600, color: '#4f46e5', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <Truck size={13} /> Livraison
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.71rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <Building2 size={13} /> Comptoir
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 9. COLONNE ACTION FIXE (STICKY NON DÉFILABLE HORIZONTALEMENT) */}
+                        <td style={{
+                          padding: '0.75rem 0.85rem',
+                          verticalAlign: 'middle',
+                          textAlign: 'center',
+                          position: 'sticky',
+                          right: 0,
+                          background: 'var(--bg-card)',
+                          zIndex: 10,
+                          boxShadow: '-5px 0 12px rgba(0,0,0,0.06)',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          <button
+                            type="button"
+                            onClick={(e) => toggleActionDropdown(e, order)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                              background: isActionOpen ? 'var(--primary)' : 'var(--bg-app)',
+                              color: isActionOpen ? '#fff' : 'var(--text-primary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <SlidersHorizontal size={12} />
+                            <span>Action</span>
+                            <ChevronDown size={12} style={{ transform: isActionOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* TIROIR D'EXTENSION / ACCORDÉON DE DÉTAIL D'UNE COMMANDE */}
+                      {isExpanded && (
+                        <tr style={{ background: 'rgba(59, 130, 246, 0.03)', borderBottom: '1px solid var(--border-color)' }}>
+                          <td colSpan={10} style={{ padding: '1rem 1.5rem' }}>
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                              gap: '1.25rem',
+                              background: 'var(--bg-card)',
+                              padding: '1.15rem',
+                              borderRadius: '14px',
+                              border: '1px solid rgba(59, 130, 246, 0.2)'
+                            }}>
+                              {/* Colonne A : Coordonnées Complètes & Logistique */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.76rem' }}>
+                                <div style={{ fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.2rem' }}>
+                                  <User size={14} /> Coordonnées & Prise en Charge
+                                </div>
+                                <div style={{ color: 'var(--text-secondary)' }}>
+                                  Client : <strong style={{ color: 'var(--text-primary)' }}>{clientName}</strong>
+                                </div>
+                                <div style={{ color: 'var(--text-secondary)' }}>
+                                  Téléphone : <strong style={{ color: 'var(--text-primary)' }}>{customer ? `+${customer.indicatif || '229'} ${customer.telephone}` : clientPhone}</strong>
+                                </div>
+                                <div style={{ color: 'var(--text-secondary)' }}>
+                                  Adresse : <strong style={{ color: 'var(--text-primary)' }}>{customer?.adresse || order.adresse_livraison || 'Comptoir / Non renseignée'}</strong>
+                                </div>
+                                <div style={{ color: 'var(--text-secondary)' }}>
+                                  Point de Traitement : <strong style={{ color: 'var(--text-primary)' }}>{currentStore?.nom || 'Agence Principale'} ({currentStore?.code || 'HQ'})</strong>
+                                </div>
+                                {order.cree_par_livreur && (
+                                  <div style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', background: 'rgba(79, 70, 229, 0.08)', color: '#4f46e5', fontWeight: 600, fontSize: '0.72rem' }}>
+                                    🚚 Commande collectée sur le terrain par le livreur
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Colonne B : Ventilation Financière Complète */}
+                              {(() => {
+                                const isExpressOrder = order.niveau_urgence === 'Express';
+                                const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
+                                const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
+
+                                const itemsList = order.items || order.articles || [];
+                                let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
+                                if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
+                                  const catalogItem = db.getCatalog().find(c => c.article === order.type_article && c.service === order.type_service);
+                                  itemsSum = catalogItem ? catalogItem.prix : 1500;
+                                }
+
+                                const netPrice = order.prix_total !== undefined ? order.prix_total : (order.total || 0);
+                                const calculatedBrut = isExpressOrder ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
+                                const displayBrut = order.prix_base_avant_remise || Math.max(calculatedBrut, netPrice);
+
+                                const discountPercent = order.remise_pourcentage || 0;
+                                const discountAmount = order.remise_montant || (discountPercent > 0 ? Math.round(displayBrut * (discountPercent / 100)) : 0);
+
+                                const rewardTitle = order.applied_reward_title;
+                                const rewardDiscount = Number(order.applied_reward_discount || order.reward_discount || 0);
+
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.76rem', borderLeft: '1px dashed var(--border-color)', paddingLeft: '1.25rem' }}>
+                                    <div style={{ fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.2rem' }}>
+                                      <CreditCard size={14} /> Ventilation Financière
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Total Brut :</span>
+                                      <strong>{displayBrut.toLocaleString()} FCFA</strong>
+                                    </div>
+
+                                    {isExpressOrder && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#d97706' }}>
+                                        <span style={{ whiteSpace: 'nowrap' }}>Majoration Express (+{expressMarkup}%) :</span>
+                                        <strong>Inclus</strong>
+                                      </div>
+                                    )}
+
+                                    {discountAmount > 0 && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
+                                        <span style={{ whiteSpace: 'nowrap' }}>Remise Commerciale :</span>
+                                        <strong>-{discountAmount.toLocaleString()} FCFA</strong>
+                                      </div>
+                                    )}
+
+                                    {(rewardDiscount > 0 || rewardTitle) && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981' }}>
+                                        <span style={{ whiteSpace: 'nowrap' }}>Récompense ({rewardTitle || 'Fidélité'}) :</span>
+                                        <strong>-{rewardDiscount.toLocaleString()} FCFA</strong>
+                                      </div>
+                                    )}
+
+                                    {Number(order.frais_livraison || 0) > 0 && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#3b82f6' }}>
+                                        <span style={{ whiteSpace: 'nowrap' }}>Frais de Livraison{order.distance_km ? ` (${order.distance_km} km)` : ''} :</span>
+                                        <strong>+{Number(order.frais_livraison).toLocaleString()} FCFA</strong>
+                                      </div>
+                                    )}
+
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.3rem', fontWeight: 800, fontSize: '0.82rem' }}>
+                                      <span style={{ whiteSpace: 'nowrap' }}>Net à Payer :</span>
+                                      <span style={{ color: 'var(--primary)' }}>{netPrice.toLocaleString()} FCFA</span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                                      <span style={{ whiteSpace: 'nowrap' }}>Acompte Versé :</span>
+                                      <span style={{ fontWeight: 700 }}>{(order.avance_payee || 0).toLocaleString()} FCFA</span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+                                      <span style={{ whiteSpace: 'nowrap' }}>Solde Restant :</span>
+                                      <span style={{ color: remainingToPay > 0 ? '#d97706' : '#10b981' }}>
+                                        {remainingToPay > 0 ? `${remainingToPay.toLocaleString()} FCFA (Dû)` : 'Soldé (0 FCFA)'}
+                                      </span>
+                                    </div>
+
+                                    {(order.operateur_momo || order.reference_momo || order.reference_paiement) && (
+                                      <div style={{ marginTop: '0.3rem', padding: '0.35rem 0.5rem', background: 'rgba(0, 44, 247, 0.05)', borderRadius: '6px', fontSize: '0.72rem', color: '#002cf7' }}>
+                                        <strong>Règlement Mobile Money :</strong> {order.operateur_momo || 'MoMo'} {order.reference_momo || order.reference_paiement ? `(Réf: ${order.reference_momo || order.reference_paiement})` : ''}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Colonne C : Liste des Articles Déposés (si multi-articles) */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.76rem', borderLeft: '1px dashed var(--border-color)', paddingLeft: '1.25rem' }}>
+                                <div style={{ fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.2rem' }}>
+                                  <Package size={14} /> Détail du Panier Déposé
+                                </div>
+
+                                {order.items && order.items.length > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', maxHeight: '140px', overflowY: 'auto' }}>
+                                    {order.items.map((it, itIdx) => (
+                                      <div key={itIdx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0.4rem', background: 'var(--bg-app)', borderRadius: '6px' }}>
+                                        <span><strong>{it.quantite || it.quantity || 1}x</strong> {it.article || it.nom || it.name || order.type_article}</span>
+                                        <span style={{ color: 'var(--text-secondary)' }}>{((it.prix || it.price || 0) * (it.quantite || it.quantity || 1)).toLocaleString()} F</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div style={{ color: 'var(--text-secondary)' }}>
+                                    Article unique : <strong>{order.type_article}</strong> ({serviceLabels[order.type_service] || order.type_service})
+                                  </div>
+                                )}
+
+                                {order.notes && (
+                                  <div style={{ marginTop: '0.3rem', padding: '0.35rem 0.5rem', background: 'rgba(245, 158, 11, 0.08)', borderRadius: '6px', fontSize: '0.72rem', color: '#d97706' }}>
+                                    <strong>Note / Consigne :</strong> {order.notes}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 4. BARRE DE PAGINATION (STYLE JOURNAUX D'AUDIT) */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '0.85rem 1.15rem',
+          borderTop: '1px solid var(--border-color)',
+          background: 'var(--bg-card)',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span>Afficher par page :</span>
+            <div style={{ width: '145px', display: 'inline-block' }}>
+              <CustomSelect
+                value={ordersPerPage}
+                onChange={(e) => {
+                  setOrdersPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{
+                  fontSize: '0.76rem',
+                  padding: '0.28rem 0.65rem',
+                  borderRadius: '8px',
+                  background: 'var(--bg-app)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontWeight: 600,
+                  height: '32px'
+                }}
+                dropdownStyle={{
+                  bottom: 'calc(100% + 6px)',
+                  top: 'auto',
+                  minWidth: '150px',
+                  boxShadow: '0 -10px 30px rgba(0,0,0,0.18)'
+                }}
+              >
+                <option value={10}>10 commandes</option>
+                <option value={15}>15 commandes</option>
+                <option value={25}>25 commandes</option>
+                <option value={50}>50 commandes</option>
+                <option value={100}>100 commandes</option>
+              </CustomSelect>
+            </div>
+            <span>• Affichage {paginatedOrders.length > 0 ? (currentPage - 1) * ordersPerPage + 1 : 0} - {Math.min(currentPage * ordersPerPage, filteredOrders.length)} sur {filteredOrders.length} {filteredOrders.length <= 1 ? 'commande' : 'commandes'}</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              style={{
+                padding: '0.3rem 0.65rem',
+                fontSize: '0.76rem',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                opacity: currentPage <= 1 ? 0.45 : 1,
+                cursor: currentPage <= 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <ChevronLeft size={14} /> Précédent
+            </button>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', padding: '0 0.4rem' }}>
+              Page {currentPage} sur {Math.max(1, totalPages)}
+            </span>
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={totalPages <= 1 || currentPage >= totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              style={{
+                padding: '0.3rem 0.65rem',
+                fontSize: '0.76rem',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                opacity: (totalPages <= 1 || currentPage >= totalPages) ? 0.45 : 1,
+                cursor: (totalPages <= 1 || currentPage >= totalPages) ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Suivant <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================
+          4. MENU DÉROULANT D'ACTIONS AVANCÉES FIXE (GLOBAL, NON ROGNÉ, HORS STACKING TABLE)
+          ======================================================== */}
+      {activeActionDropdown && (() => {
+        const order = activeActionDropdown.order;
+        const remainingToPay = (order.prix_total || 0) - (order.avance_payee || 0);
+        const statusCfg = getStatusBadge(order);
+        const customer = customers.find(c => c.id === order.customer_id);
+        const clientName = customer ? `${customer.prenom} ${customer.nom}` : (order.client_name || 'Client B2B');
+        const clientPhone = customer ? customer.telephone : (order.client_telephone || '-');
+
+        return (
+          <div
+            ref={dropdownRef}
+            style={{
+              position: 'fixed',
+              right: activeActionDropdown.coords.right,
+              top: activeActionDropdown.coords.top,
+              bottom: activeActionDropdown.coords.bottom,
+              width: '240px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              boxShadow: '0 16px 40px rgba(0,0,0,0.25)',
+              zIndex: 99999, // Au-dessus absolu de tout élément
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              textAlign: 'left',
+              padding: '0.4rem 0',
+              animation: 'scaleInCenter 0.15s ease'
+            }}
+          >
+            {/* Section 1 : Reçu & Impression */}
+            <div style={{ padding: '0.3rem 0.85rem', fontSize: '0.64rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Consultation & Ticket
+            </div>
+
+            <ActionMenuItem
+              icon={Ticket}
+              iconColor="var(--primary)"
+              label="Voir le Reçu de Caisse"
+              onClick={() => {
+                setActiveActionDropdown(null);
+                if (setCreatedOrder) setCreatedOrder(order);
+              }}
+            />
+
+            <ActionMenuItem
+              icon={Printer}
+              iconColor="#7c3aed"
+              label="Imprimer la Facture"
+              onClick={() => {
+                setActiveActionDropdown(null);
+                if (setCreatedOrder) setCreatedOrder(order);
+              }}
+            />
+
+            {/* Séparateur */}
+            <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.35rem 0' }} />
+
+            {/* Section 2 : Avancement de Statut contextualisé */}
+            <div style={{ padding: '0.3rem 0.85rem', fontSize: '0.64rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Avancement Traitement
+            </div>
+
+            {(order.statut === 'en_attente_validation' || (order.cree_par_livreur && !order.validee_par_caisse)) && (
+              <ActionMenuItem
+                icon={CheckCircle2}
+                iconColor="#059669"
+                color="#059669"
+                isBold
+                label="Valider Commande Caisse"
+                subtitle="Validation du dépôt livreur"
+                onClick={() => {
+                  setActiveActionDropdown(null);
+                  if (handleValidateLivreurOrder) handleValidateLivreurOrder(order);
+                  else if (handleStatusChange) handleStatusChange(order.id, 'en_attente');
+                }}
+              />
+            )}
+
+            {(order.statut === 'en_attente' || order.statut === 'attente' || order.statut === 'retard' || order.statut === 'en_retard') && (
+              <ActionMenuItem
+                icon={Zap}
+                iconColor="#7c3aed"
+                color="#7c3aed"
+                isBold
+                label="Passer au traitement"
+                subtitle="Prise en charge atelier"
+                onClick={() => {
+                  setActiveActionDropdown(null);
+                  if (handleStatusChange) handleStatusChange(order.id, 'traitement');
+                }}
+              />
+            )}
+
+            {order.statut === 'traitement' && (
+              <ActionMenuItem
+                icon={Sparkles}
+                iconColor="#2563eb"
+                color="#2563eb"
+                isBold
+                label="Lancer le lavage"
+                subtitle="Mise en machine"
+                onClick={() => {
+                  setActiveActionDropdown(null);
+                  if (handleStatusChange) handleStatusChange(order.id, 'en_cours_lavage');
+                }}
+              />
+            )}
+
+            {order.statut === 'en_cours_lavage' && (
+              <ActionMenuItem
+                icon={Flame}
+                iconColor="#0d9488"
+                color="#0d9488"
+                isBold
+                label="Passer au repassage"
+                subtitle="Finition pressing"
+                onClick={() => {
+                  setActiveActionDropdown(null);
+                  if (handleStatusChange) handleStatusChange(order.id, 'en_cours_repassage');
+                }}
+              />
+            )}
+
+            {order.statut === 'en_cours_repassage' && (
+              <ActionMenuItem
+                icon={CheckCircle2}
+                iconColor="#10b981"
+                color="#10b981"
+                isBold
+                label="Marquer comme Prêt"
+                subtitle="Articles prêts à emballer"
+                onClick={() => {
+                  setActiveActionDropdown(null);
+                  if (handleStatusChange) handleStatusChange(order.id, 'pret');
+                }}
+              />
+            )}
+
+            {order.statut === 'pret' && (
+              <>
+                <ActionMenuItem
+                  icon={Truck}
+                  iconColor="#4f46e5"
+                  color="#4f46e5"
+                  isBold
+                  label="Définir À livrer"
+                  subtitle="Prêt pour tournée livreur"
+                  onClick={() => {
+                    setActiveActionDropdown(null);
+                    if (handleStatusChange) handleStatusChange(order.id, 'a_livrer');
+                  }}
+                />
+                <ActionMenuItem
+                  icon={Package}
+                  iconColor="#d97706"
+                  color="#d97706"
+                  isBold
+                  label="Définir À récupérer"
+                  subtitle="Mise à disposition comptoir"
+                  onClick={() => {
+                    setActiveActionDropdown(null);
+                    if (handleStatusChange) handleStatusChange(order.id, 'a_recuperer');
+                  }}
+                />
+              </>
+            )}
+
+            {order.statut === 'a_livrer' && (
+              <ActionMenuItem
+                icon={Truck}
+                iconColor="#4f46e5"
+                color="#4f46e5"
+                isBold
+                label="Démarrer la livraison"
+                subtitle="En cours d'acheminement"
+                onClick={() => {
+                  setActiveActionDropdown(null);
+                  if (handleStatusChange) handleStatusChange(order.id, 'en_cours_livraison');
+                }}
+              />
+            )}
+
+            {(order.statut === 'a_recuperer' || order.statut === 'en_cours_livraison') && (
+              <ActionMenuItem
+                icon={CheckCircle2}
+                iconColor="#059669"
+                color="#059669"
+                isBold
+                label="Confirmer Restitution / Livré"
+                subtitle="Clôture et remise au client"
+                onClick={() => {
+                  setActiveActionDropdown(null);
+                  if (handleStartDelivery) handleStartDelivery(order, 'restitue');
+                  else if (handleStatusChange) handleStatusChange(order.id, 'restitue');
+                }}
+              />
+            )}
+
+            {/* Reste à payer / Encaissement rapide */}
+            {remainingToPay > 0 && order.statut !== 'annule' && (
+              <ActionMenuItem
+                icon={CreditCard}
+                iconColor="#d97706"
+                color="#d97706"
+                isBold
+                label={`Encaisser Solde (${remainingToPay.toLocaleString()} F)`}
+                subtitle="Règlement caisse terrain"
+                onClick={() => {
+                  setActiveActionDropdown(null);
+                  if (handleStartDelivery) {
+                    handleStartDelivery(order, order.statut);
+                  } else if (setCreatedOrder) {
+                    setCreatedOrder(order);
+                  }
+                }}
+              />
+            )}
+
+            {/* Séparateur */}
+            <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.35rem 0' }} />
+
+            {/* Section 3 : Outils & Coordonnées */}
+            <div style={{ padding: '0.3rem 0.85rem', fontSize: '0.64rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Gestion
+            </div>
+
+            <ActionMenuItem
+              icon={Copy}
+              label="Copier Fiche Complète"
+              onClick={() => {
+                setActiveActionDropdown(null);
+                const cName = customer ? `${customer.prenom} ${customer.nom}` : clientName;
+                const cPhone = customer ? `+${customer.indicatif || '229'} ${customer.telephone}` : clientPhone;
+                const cAddr = customer?.adresse || 'Non renseignée';
+                const text = `KLIN UP - Commande ${order.id || order.identifiant_unique_marquage}\nClient: ${cName}\nTél: ${cPhone}\nAdresse: ${cAddr}\nStatut: ${statusCfg.label}\nMontant: ${order.prix_total} FCFA (Reste: ${remainingToPay} FCFA)`;
+                handleCopy(order.id, text);
+              }}
+            />
+
+            {order.statut !== 'annule' && (
+              <ActionMenuItem
+                icon={Ban}
+                iconColor="#ef4444"
+                color="#ef4444"
+                label="Annuler la Commande"
+                onClick={() => {
+                  setActiveActionDropdown(null);
+                  if (handleCancelOrder) handleCancelOrder(order.id);
+                }}
+              />
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../services/db';
 import OrderFormModal from '../features/orders/components/OrderFormModal';
@@ -384,7 +384,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
   useEffect(() => {
     setCatalogCurrentPage(1);
-  }, [catalogSearchText, catalogServiceFilter, catalogPriceFilter, catalogSortOrder]);
+  }, [catalogSearchText, catalogServiceFilter, catalogPriceFilter, catalogSortOrder, selectedStoreId]);
 
   const [timerSeconds, setTimerSeconds] = useState(5048); // 01:24:08 by default
   const [isTimerRunning, setIsTimerRunning] = useState(true);
@@ -400,16 +400,16 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const [editSubPrice, setEditSubPrice] = useState('');
   const [editSubDescription, setEditSubDescription] = useState('');
   const [editArtStoreId, setEditArtStoreId] = useState('all');
-
+  const [editProductButtonState, setEditProductButtonState] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
   // Catalog add state
   const [showAddCatalogModal, setShowAddCatalogModal] = useState(false);
+  const [addProductButtonState, setAddProductButtonState] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
   const [newArtCategory, setNewArtCategory] = useState('individuel'); // 'individuel' or 'abonnement'
   const [newArtName, setNewArtName] = useState('');
-  const [newArtService, setNewArtService] = useState('lavage_simple');
   const [newArtPrice, setNewArtPrice] = useState('');
   const [newArtDescription, setNewArtDescription] = useState('');
-  const [newArtStoreId, setNewArtStoreId] = useState('all');
+  const [newArtStoreId, setNewArtStoreId] = useState('');
 
   // Logs filters
   const [logFilterAction, setLogFilterAction] = useState('all');
@@ -967,7 +967,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
                 return (
                   <tr key={o.id}>
-                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{o.identifiant_unique_marquage}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{o.id || o.identifiant_unique_marquage}</td>
                     <td>{clientName}</td>
                     <td>{o.type_article}</td>
                     <td>{serviceLabels[o.type_service] || o.type_service}</td>
@@ -1013,7 +1013,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 const badgeClass = `badge badge-${o.statut}`;
                 return (
                   <tr key={o.id}>
-                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{o.identifiant_unique_marquage}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{o.id || o.identifiant_unique_marquage}</td>
                     <td>{clientName}</td>
                     <td>{o.type_article}</td>
                     <td>
@@ -1069,7 +1069,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 const clientName = customer ? `${customer.prenom} ${customer.nom}` : 'Client B2B';
                 return (
                   <tr key={o.id}>
-                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{o.identifiant_unique_marquage}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{o.id || o.identifiant_unique_marquage}</td>
                     <td>{clientName}</td>
                     <td>{o.type_article}</td>
                     <td><span className="badge" style={{ background: o.niveau_urgence === 'Express' ? 'var(--status-late-light)' : 'var(--primary-light)', color: o.niveau_urgence === 'Express' ? 'var(--status-late)' : 'var(--primary)' }}>{o.niveau_urgence || 'Normal'}</span></td>
@@ -1228,12 +1228,17 @@ export default function AdminView({ activeTab, onManageStaff }) {
       const itemCat = item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel');
 
       if (itemCat === 'individuel') {
-        const articleKey = (selectedStoreId === 'all' && item.store_id)
-          ? `${item.article.trim().toLowerCase()}__${item.store_id}`
-          : item.article.trim().toLowerCase();
+        const rawId = String(item.id || '');
+        const baseNumeric = rawId.replace(/_rep$/, '');
+        const isNumericBase = /^\d+$/.test(baseNumeric);
+        const articleKey = isNumericBase
+          ? `id_${baseNumeric}__${item.store_id || 'default'}`
+          : ((selectedStoreId === 'all' && item.store_id)
+              ? `${item.article.trim().toLowerCase()}__${item.store_id}`
+              : item.article.trim().toLowerCase());
         if (!groups[articleKey]) {
           groups[articleKey] = {
-            id: item.id,
+            id: isNumericBase ? baseNumeric : item.id,
             article: item.article,
             categorie: 'individuel',
             traitement: null,
@@ -1261,6 +1266,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
           };
         }
       } else if (itemCat === 'abonnement' && catalogCategory === 'abonnement') {
+        // BUG FIX: also filter subscriptions by selected store (was missing)
+        if (selectedStoreId !== 'all' && item.store_id && item.store_id !== 'all' && item.store_id !== selectedStoreId) {
+          return;
+        }
         rawGroupedCatalog.push(item);
       }
     });
@@ -1323,7 +1332,11 @@ export default function AdminView({ activeTab, onManageStaff }) {
     });
   };
 
-  const filteredCatalog = getGroupedCatalog();
+  // BUG FIX: Memoize to avoid expensive recompute on every re-render
+  const filteredCatalog = useMemo(() => getGroupedCatalog(), [
+    catalog, selectedStoreId, catalogCategory, catalogSearchText,
+    catalogServiceFilter, catalogPriceFilter, catalogSortOrder
+  ]);
 
   // --- FILTRES LOGS ---
   const filteredLogs = logs.filter(log => {
@@ -1488,6 +1501,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       setEditArtRamassageGratuit(!!groupedItem.ramassage_gratuit);
       setEditArtLivraisonGratuite(!!groupedItem.livraison_gratuite);
     }
+    setEditProductButtonState('idle');
     setShowEditCatalogModal(true);
   };
 
@@ -1525,14 +1539,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
       if (!editArtPrice) return;
     }
 
-    // Check unique name constraint (excluding current item records)
-    const nameExists = catalog.some(
-      item => item && item.article && !editingItem.allIds?.includes(item.id) && item.id !== editingItem.id && item.article.trim().toLowerCase() === editArtName.trim().toLowerCase()
-    );
-    if (nameExists) {
-      setEditArtNameError(`Le produit "${editArtName}" existe déjà. Chaque nom de produit doit être unique.`);
-      return;
-    }
+    setEditArtNameError('');
+    setEditProductButtonState('loading');
 
     try {
       if (editArtCategory === 'individuel') {
@@ -1547,20 +1555,22 @@ export default function AdminView({ activeTab, onManageStaff }) {
               service: 'lavage_simple',
               prix: Number(editArtTraitementPrice),
               prix_urgent: finalTraitementUrgent,
-              description: '',
+              // BUG FIX 9: preserve existing description, don't wipe it
+              ...(editingItem.traitement.description !== undefined ? { description: editingItem.traitement.description } : {}),
               store_id: editArtStoreId
             });
           } else {
-            await db.addCatalogItem(
-              editArtName.trim(),
-              'lavage_simple',
-              Number(editArtTraitementPrice),
-              'individuel',
-              '',
-              finalTraitementUrgent,
-              null, false, null, false, false,
-              editArtStoreId
-            );
+            const baseDigits = editingItem.repassage?.id ? String(editingItem.repassage.id).replace(/\D/g, '') : (editingItem.id ? String(editingItem.id).replace(/\D/g, '') : '');
+            await db.addCatalogItem({
+              id: baseDigits || undefined,
+              article: editArtName.trim(),
+              service: 'lavage_simple',
+              prix: Number(editArtTraitementPrice),
+              prix_urgent: finalTraitementUrgent,
+              categorie: 'individuel',
+              description: '',
+              store_id: editArtStoreId
+            });
           }
         } else {
           if (editingItem.traitement) {
@@ -1576,20 +1586,22 @@ export default function AdminView({ activeTab, onManageStaff }) {
               service: 'repassage',
               prix: Number(editArtRepassagePrice),
               prix_urgent: finalRepassageUrgent,
-              description: '',
+              // BUG FIX 9: preserve existing description, don't wipe it
+              ...(editingItem.repassage.description !== undefined ? { description: editingItem.repassage.description } : {}),
               store_id: editArtStoreId
             });
           } else {
-            await db.addCatalogItem(
-              editArtName.trim(),
-              'repassage',
-              Number(editArtRepassagePrice),
-              'individuel',
-              '',
-              finalRepassageUrgent,
-              null, false, null, false, false,
-              editArtStoreId
-            );
+            const baseDigits = editingItem.traitement?.id ? String(editingItem.traitement.id).replace(/\D/g, '') : (editingItem.id ? String(editingItem.id).replace(/\D/g, '') : '');
+            await db.addCatalogItem({
+              id: baseDigits ? `${baseDigits}_rep` : undefined,
+              article: editArtName.trim(),
+              service: 'repassage',
+              prix: Number(editArtRepassagePrice),
+              prix_urgent: finalRepassageUrgent,
+              categorie: 'individuel',
+              description: '',
+              store_id: editArtStoreId
+            });
           }
         } else {
           if (editingItem.repassage) {
@@ -1614,29 +1626,53 @@ export default function AdminView({ activeTab, onManageStaff }) {
         });
       }
 
-      setEditingItem(null);
-      setShowEditCatalogModal(false);
-      setEditArtName('');
-      setEditArtPrice('');
-      setEditArtDescription('');
-      setEditArtAdvantages(['']);
-      setEditArtNombreVetements('');
-      setEditArtDureeJours('30');
-      setEditArtRamassage(false);
-      setEditArtNombreRamassages('');
-      setEditArtRamassageGratuit(false);
-      setEditArtLivraisonGratuite(false);
-      setEditArtNameError('');
-      refreshAdminData();
-      alert("Produit mis à jour avec succès dans la base de données !");
+      setEditProductButtonState('success');
+
+      setTimeout(() => {
+        setEditingItem(null);
+        setShowEditCatalogModal(false);
+        setEditArtName('');
+        setEditArtPrice('');
+        setEditArtDescription('');
+        setEditArtAdvantages(['']);
+        setEditArtNombreVetements('');
+        setEditArtDureeJours('30');
+        setEditArtRamassage(false);
+        setEditArtNombreRamassages('');
+        setEditArtRamassageGratuit(false);
+        setEditArtLivraisonGratuite(false);
+        setEditArtNameError('');
+        setEditProductButtonState('idle');
+
+        // Déclencher le rechargement via shimmer de la page comme sur la navigation
+        setIsPageShimmering(true);
+        refreshAdminData();
+        setTimeout(() => {
+          setIsPageShimmering(false);
+        }, 2000);
+      }, 500);
+
     } catch (err) {
+      setEditProductButtonState('error');
+      setTimeout(() => {
+        setEditProductButtonState('idle');
+      }, 2500);
       alert("Erreur lors de l'enregistrement du produit : " + err.message);
     }
   };
 
   const handleToggleCatalogItemActive = async (groupedItem) => {
+    const isActive = groupedItem.is_active !== false && groupedItem.statut !== 'inactif';
+    const action = isActive ? 'désactiver' : 'activer';
+    if (!await confirm(`Voulez-vous vraiment ${action} l'article "${groupedItem.article}" du catalogue mobile ?`)) return;
     try {
-      await db.toggleCatalogItemActive(groupedItem.article || groupedItem.id);
+      // Use allIds for multi-service grouped items to toggle all related DB rows safely by ID
+      const idsToToggle = groupedItem.allIds && groupedItem.allIds.length > 0
+        ? groupedItem.allIds
+        : [groupedItem.id];
+      for (const id of idsToToggle) {
+        await db.toggleCatalogItemActive(id);
+      }
       refreshAdminData();
     } catch (err) {
       alert("Erreur de modification du statut : " + err.message);
@@ -1718,44 +1754,38 @@ export default function AdminView({ activeTab, onManageStaff }) {
       if (!newArtPrice) return;
     }
 
-    // Check unique name constraint within the same store
-    const nameExists = catalog.some(
-      item => item && item.article && item.article.trim().toLowerCase() === newArtName.trim().toLowerCase() &&
-      item.store_id === targetStoreId
-    );
-    if (nameExists) {
-      setNewArtNameError(`Le produit "${newArtName}" existe déjà pour ce point de laverie. Chaque nom de produit doit être unique par point.`);
-      return;
-    }
+    setNewArtNameError('');
+    setAddProductButtonState('loading');
 
     try {
       if (newArtCategory === 'individuel') {
         const finalTraitementUrgent = (newArtTraitementHasExpress && newArtTraitementUrgentPrice) ? Number(newArtTraitementUrgentPrice) : null;
         const finalRepassageUrgent = (newArtRepassageHasExpress && newArtRepassageUrgentPrice) ? Number(newArtRepassageUrgentPrice) : null;
 
+        let treatmentItem = null;
         if (newArtTraitementActive) {
-          await db.addCatalogItem(
-            newArtName.trim(),
-            'lavage_simple',
-            Number(newArtTraitementPrice),
-            'individuel',
-            '',
-            finalTraitementUrgent,
-            null, false, null, false, false,
-            targetStoreId
-          );
+          treatmentItem = await db.addCatalogItem({
+            article: newArtName.trim(),
+            service: 'lavage_simple',
+            prix: Number(newArtTraitementPrice),
+            prix_urgent: finalTraitementUrgent,
+            categorie: 'individuel',
+            description: '',
+            store_id: targetStoreId
+          });
         }
         if (newArtRepassageActive) {
-          await db.addCatalogItem(
-            newArtName.trim(),
-            'repassage',
-            Number(newArtRepassagePrice),
-            'individuel',
-            '',
-            finalRepassageUrgent,
-            null, false, null, false, false,
-            targetStoreId
-          );
+          const repId = treatmentItem?.id ? `${String(treatmentItem.id).replace(/\D/g, '')}_rep` : undefined;
+          await db.addCatalogItem({
+            id: repId,
+            article: newArtName.trim(),
+            service: 'repassage',
+            prix: Number(newArtRepassagePrice),
+            prix_urgent: finalRepassageUrgent,
+            categorie: 'individuel',
+            description: '',
+            store_id: targetStoreId
+          });
         }
       } else {
         const finalDescription = newArtAdvantages.map(a => a.trim()).filter(Boolean).join(' | ');
@@ -1775,29 +1805,43 @@ export default function AdminView({ activeTab, onManageStaff }) {
         });
       }
 
-      setCatalogCategory(newArtCategory);
-      setCatalogSearchText('');
-      setCatalogServiceFilter('all');
-      setCatalogPriceFilter('all');
-      refreshAdminData();
-      setShowAddCatalogModal(false);
-      setNewArtName('');
-      setNewArtPrice('');
-      setNewArtDescription('');
-      setNewArtAdvantages(['']);
-      setNewArtNombreVetements('');
-      setNewArtDureeJours('30');
-      setNewArtTraitementHasExpress(false);
-      setNewArtRepassageHasExpress(false);
-      setNewArtTraitementUrgentPrice('');
-      setNewArtRepassageUrgentPrice('');
-      setNewArtRamassage(false);
-      setNewArtNombreRamassages('');
-      setNewArtRamassageGratuit(false);
-      setNewArtLivraisonGratuite(false);
-      setNewArtNameError('');
-      alert(`Produit "${newArtName.trim()}" créé avec succès dans la base de données !`);
+      setAddProductButtonState('success');
+
+      setTimeout(() => {
+        setCatalogCategory(newArtCategory);
+        setCatalogSearchText('');
+        setCatalogServiceFilter('all');
+        setCatalogPriceFilter('all');
+        setShowAddCatalogModal(false);
+        setNewArtName('');
+        setNewArtPrice('');
+        setNewArtDescription('');
+        setNewArtAdvantages(['']);
+        setNewArtNombreVetements('');
+        setNewArtDureeJours('30');
+        setNewArtTraitementHasExpress(false);
+        setNewArtRepassageHasExpress(false);
+        setNewArtTraitementUrgentPrice('');
+        setNewArtRepassageUrgentPrice('');
+        setNewArtRamassage(false);
+        setNewArtNombreRamassages('');
+        setNewArtRamassageGratuit(false);
+        setNewArtLivraisonGratuite(false);
+        setNewArtNameError('');
+        setAddProductButtonState('idle');
+
+        // Déclencher le rechargement via shimmer de la page comme sur la navigation
+        setIsPageShimmering(true);
+        refreshAdminData();
+        setTimeout(() => {
+          setIsPageShimmering(false);
+        }, 2000);
+      }, 500);
     } catch (err) {
+      setAddProductButtonState('error');
+      setTimeout(() => {
+        setAddProductButtonState('idle');
+      }, 2500);
       alert("Erreur lors de la création du produit : " + err.message);
     }
   };
@@ -2422,6 +2466,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
         <OrdersTab
           orders={orders}
           customers={customers}
+          stores={stores}
+          currentUser={currentUser}
           atelierFilter={atelierFilter}
           setAtelierFilter={setAtelierFilter}
           isOrderLate={isOrderLate}
@@ -2515,6 +2561,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
             setShowAddCatalogModal(show);
           }}
           stores={stores}
+          selectedStoreId={selectedStoreId}
+          refreshAdminData={refreshAdminData}
+          catalog={catalog}
         />
       )}
 
@@ -2613,14 +2662,24 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {showNewStaffModal && (
         <ModalPortal>
           <div className="modal-backdrop">
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'default' }}>
-              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                Ajouter un Employé
-              </h3>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '560px', background: 'var(--bg-card)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Ajouter un Employé
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowNewStaffModal(false)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  title="Fermer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
-              <form onSubmit={handleCreateStaff} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <div className="form-group">
+              <form onSubmit={handleCreateStaff} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
                     <label>Prénom</label>
                     <input
                       type="text"
@@ -2631,7 +2690,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       onChange={(e) => setNewStaffPrenom(e.target.value)}
                     />
                   </div>
-                  <div className="form-group">
+                  <div className="form-group" style={{ margin: 0 }}>
                     <label>Nom</label>
                     <input
                       type="text"
@@ -2644,30 +2703,32 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Email Professionnel</label>
-                  <input
-                    type="email"
-                    className="input-control"
-                    placeholder="nom.prenom@pressingpro.com"
-                    required
-                    value={newStaffEmail}
-                    onChange={(e) => setNewStaffEmail(e.target.value)}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '0.85rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Email Professionnel</label>
+                    <input
+                      type="email"
+                      className="input-control"
+                      placeholder="nom.prenom@pressingpro.com"
+                      required
+                      value={newStaffEmail}
+                      onChange={(e) => setNewStaffEmail(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Téléphone</label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      placeholder="Ex: +229 97979797"
+                      value={newStaffTel}
+                      onChange={(e) => setNewStaffTel(e.target.value)}
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Téléphone</label>
-                  <input
-                    type="text"
-                    className="input-control"
-                    placeholder="Ex: +229 97979797"
-                    value={newStaffTel}
-                    onChange={(e) => setNewStaffTel(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
+                <div className="form-group" style={{ margin: 0 }}>
                   <label>Rôle Principal</label>
                   <CustomSelect
                     className="input-control"
@@ -2682,7 +2743,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </CustomSelect>
                 </div>
 
-                <div className="form-group">
+                <div className="form-group" style={{ margin: 0 }}>
                   <label>Point de Laverie d'affectation <span style={{ color: '#ef4444' }}>*</span></label>
                   <CustomSelect
                     className="input-control"
@@ -2690,7 +2751,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     onChange={(e) => setNewStaffStoreId(e.target.value)}
                     required
                   >
-                    <option value="">-- Sélectionner un point de laverie * --</option>
+                    <option value="">-- Sélectionner un point de laverie --</option>
                     <option value="all">Tous les points (Accès Global Super Admin)</option>
                     {db.getStores().map(s => (
                       <option key={s.id} value={s.id}>
@@ -2700,7 +2761,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </CustomSelect>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                   <StatefulButton type="submit" variant="primary" style={{ flex: 1 }} loadingText="Ajout...">Ajouter</StatefulButton>
                   <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowNewStaffModal(false)}>Annuler</button>
                 </div>
@@ -2717,17 +2778,22 @@ export default function AdminView({ activeTab, onManageStaff }) {
          ======================================================== */}
       {showAddCatalogModal && (
         <ModalPortal>
-          <div className="modal-backdrop" onClick={() => setShowAddCatalogModal(false)}>
+          <div className="modal-backdrop" onClick={() => {
+            const hasData = newArtName || newArtTraitementPrice || newArtRepassagePrice || newArtPrice || (newArtAdvantages && newArtAdvantages.some(a => a.trim()));
+            if (!hasData || window.confirm('Des données ont été saisies. Voulez-vous vraiment fermer sans sauvegarder ?')) {
+              setShowAddCatalogModal(false);
+            }
+          }}>
             <div 
               className="card modal-dialog-card" 
               onClick={(e) => e.stopPropagation()} 
               style={{ 
                 width: '100%', 
-                maxWidth: '650px', 
+                maxWidth: '850px', 
                 maxHeight: '90vh', 
                 overflowY: 'auto', 
                 background: 'var(--bg-card)', 
-                padding: '24px 28px', 
+                padding: '28px 32px', 
                 display: 'flex', 
                 flexDirection: 'column', 
                 gap: '1.25rem', 
@@ -2739,12 +2805,17 @@ export default function AdminView({ activeTab, onManageStaff }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
                   Ajouter au Catalogue
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setShowAddCatalogModal(false)}
+                  onClick={() => {
+                    const hasData = newArtName || newArtTraitementPrice || newArtRepassagePrice || newArtPrice || (newArtAdvantages && newArtAdvantages.some(a => a.trim()));
+                    if (!hasData || window.confirm('Des données ont été saisies. Voulez-vous vraiment fermer sans sauvegarder ?')) {
+                      setShowAddCatalogModal(false);
+                    }
+                  }}
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
                   title="Fermer"
                 >
@@ -2752,9 +2823,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </button>
               </div>
 
-            <form onSubmit={handleAddCatalogItem} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <form onSubmit={handleAddCatalogItem} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               {/* Category choice, Point de laverie & Name */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1.4fr', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr 1.35fr', gap: '1rem', alignItems: 'flex-start' }}>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label>Catégorie de tarif</label>
                   <CustomSelect
@@ -2775,7 +2846,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     onChange={(e) => setNewArtStoreId(e.target.value)}
                     required
                   >
-                    <option value="" disabled>-- Sélectionner obligatoirement un point de laverie --</option>
+                    <option value="" disabled>-- Sélectionner un point de laverie --</option>
                     {stores && stores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
                       <option key={st.id} value={st.id}>{st.nom} ({st.code})</option>
                     ))}
@@ -2790,7 +2861,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     placeholder={newArtCategory === 'individuel' ? "Ex: Chemise, Pull, Jeans" : "Ex: Offre Spéciale, Abonnement Prestige"}
                     required
                     value={newArtName}
-                    onChange={(e) => setNewArtName(e.target.value)}
+                    onChange={(e) => {
+                      setNewArtName(e.target.value);
+                      if (newArtNameError) setNewArtNameError('');
+                    }}
                   />
                   {newArtNameError && (
                     <div style={{ color: 'var(--danger)', fontSize: '0.72rem', marginTop: '0.25rem', fontWeight: 600 }}>
@@ -2844,13 +2918,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
                                 }
                               }}
                             />
-                            <span>⚡ Définir un tarif pour le lavage express</span>
+                            <span>Définir un tarif pour le lavage express</span>
                           </label>
 
                           {newArtTraitementHasExpress && (
                             <div className="form-group" style={{ marginTop: '0.4rem', margin: 0 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Lavage Express (FCFA) ⚡</label>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Lavage Express (FCFA)</label>
                                 {newArtTraitementPrice && (
                                   <button
                                     type="button"
@@ -2926,13 +3000,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
                                 }
                               }}
                             />
-                            <span>⚡ Définir un tarif pour le repassage express</span>
+                            <span>Définir un tarif pour le repassage express</span>
                           </label>
 
                           {newArtRepassageHasExpress && (
                             <div className="form-group" style={{ marginTop: '0.4rem', margin: 0 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Repassage Express (FCFA) ⚡</label>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Repassage Express (FCFA)</label>
                                 {newArtRepassagePrice && (
                                   <button
                                     type="button"
@@ -3015,7 +3089,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                           <input
-                            type="checkbox"
+                            type="radio"
+                            name="new_art_ramassage"
                             checked={newArtRamassage}
                             onChange={() => setNewArtRamassage(true)}
                             style={{ cursor: 'pointer' }}
@@ -3024,7 +3099,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                         </label>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                           <input
-                            type="checkbox"
+                            type="radio"
+                            name="new_art_ramassage"
                             checked={!newArtRamassage}
                             onChange={() => setNewArtRamassage(false)}
                             style={{ cursor: 'pointer' }}
@@ -3073,7 +3149,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                           <input
-                            type="checkbox"
+                            type="radio"
+                            name="new_art_livraison"
                             checked={newArtLivraisonGratuite}
                             onChange={() => setNewArtLivraisonGratuite(true)}
                             style={{ cursor: 'pointer' }}
@@ -3082,7 +3159,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                         </label>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                           <input
-                            type="checkbox"
+                            type="radio"
+                            name="new_art_livraison"
                             checked={!newArtLivraisonGratuite}
                             onChange={() => setNewArtLivraisonGratuite(false)}
                             style={{ cursor: 'pointer' }}
@@ -3096,7 +3174,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0 }}>
                       <span>Avantages & Conditions</span>
                       <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
-                        Glissez les poignées ☰ pour réordonner
+                        Glissez les poignées pour réordonner
                       </span>
                     </label>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
@@ -3203,8 +3281,26 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </>
               )}
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <StatefulButton type="submit" variant="primary" style={{ flex: 1 }} loadingText="Ajout...">Ajouter</StatefulButton>
-                    <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowAddCatalogModal(false)}>Annuler</button>
+                    <StatefulButton
+                      type="submit"
+                      variant="primary"
+                      state={addProductButtonState}
+                      loadingText="Ajout en cours..."
+                      successText="Ajouté !"
+                      errorText="Erreur"
+                      style={{ flex: 1 }}
+                    >
+                      Ajouter
+                    </StatefulButton>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      style={{ flex: 1 }}
+                      onClick={() => setShowAddCatalogModal(false)}
+                      disabled={addProductButtonState === 'loading'}
+                    >
+                      Annuler
+                    </button>
                   </div>
                 </form>
               </div>
@@ -3217,17 +3313,21 @@ export default function AdminView({ activeTab, onManageStaff }) {
          ======================================================== */}
       {showEditCatalogModal && (
         <ModalPortal>
-          <div className="modal-backdrop" onClick={() => setShowEditCatalogModal(false)}>
+          <div className="modal-backdrop" onClick={() => {
+            if (window.confirm('Des modifications sont en cours. Voulez-vous vraiment fermer sans sauvegarder ?')) {
+              setShowEditCatalogModal(false);
+            }
+          }}>
             <div 
               className="card modal-dialog-card" 
               onClick={(e) => e.stopPropagation()} 
               style={{ 
                 width: '100%', 
-                maxWidth: '650px', 
+                maxWidth: '850px', 
                 maxHeight: '90vh', 
                 overflowY: 'auto', 
                 background: 'var(--bg-card)', 
-                padding: '24px 28px', 
+                padding: '28px 32px', 
                 display: 'flex', 
                 flexDirection: 'column', 
                 gap: '1.25rem', 
@@ -3239,7 +3339,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
                   Options d'Édition Avancées
                 </h3>
                 <button
@@ -3252,9 +3352,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </button>
               </div>
 
-              <form onSubmit={handleSaveProductAdvanced} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <form onSubmit={handleSaveProductAdvanced} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
                 {/* Category info, Point de Laverie & Name */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1.4fr', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr 1.35fr', gap: '1rem', alignItems: 'flex-start' }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label>Catégorie de tarif</label>
                     <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-app)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
@@ -3270,7 +3370,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       onChange={(e) => setEditArtStoreId(e.target.value)}
                       required
                     >
-                      <option value="" disabled>-- Sélectionner obligatoirement un point de laverie --</option>
+                      <option value="" disabled>-- Sélectionner un point de laverie --</option>
                       {stores && stores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
                         <option key={st.id} value={st.id}>{st.nom} ({st.code})</option>
                       ))}
@@ -3284,7 +3384,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       className="input-control"
                       required
                       value={editArtName}
-                      onChange={(e) => setEditArtName(e.target.value)}
+                      onChange={(e) => {
+                        setEditArtName(e.target.value);
+                        if (editArtNameError) setEditArtNameError('');
+                      }}
                     />
                     {editArtNameError && (
                       <div style={{ color: 'var(--danger)', fontSize: '0.72rem', marginTop: '0.25rem', fontWeight: 600 }}>
@@ -3338,13 +3441,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
                                   }
                                 }}
                               />
-                              <span>⚡ Définir un tarif pour le lavage express</span>
+                              <span>Définir un tarif pour le lavage express</span>
                             </label>
 
                             {editArtTraitementHasExpress && (
                               <div className="form-group" style={{ marginTop: '0.4rem', margin: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Lavage Express (FCFA) ⚡</label>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Lavage Express (FCFA)</label>
                                   {editArtTraitementPrice && (
                                     <button
                                       type="button"
@@ -3420,13 +3523,13 @@ export default function AdminView({ activeTab, onManageStaff }) {
                                   }
                                 }}
                               />
-                              <span>⚡ Définir un tarif pour le repassage express</span>
+                              <span>Définir un tarif pour le repassage express</span>
                             </label>
 
                             {editArtRepassageHasExpress && (
                               <div className="form-group" style={{ marginTop: '0.4rem', margin: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Repassage Express (FCFA) ⚡</label>
+                                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)' }}>Tarif Repassage Express (FCFA)</label>
                                   {editArtRepassagePrice && (
                                     <button
                                       type="button"
@@ -3508,7 +3611,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                         <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                             <input
-                              type="checkbox"
+                              type="radio"
+                              name="edit_art_ramassage"
                               checked={editArtRamassage}
                               onChange={() => setEditArtRamassage(true)}
                               style={{ cursor: 'pointer' }}
@@ -3517,7 +3621,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                           </label>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                             <input
-                              type="checkbox"
+                              type="radio"
+                              name="edit_art_ramassage"
                               checked={!editArtRamassage}
                               onChange={() => setEditArtRamassage(false)}
                               style={{ cursor: 'pointer' }}
@@ -3566,7 +3671,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                         <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                             <input
-                              type="checkbox"
+                              type="radio"
+                              name="edit_art_livraison"
                               checked={editArtLivraisonGratuite}
                               onChange={() => setEditArtLivraisonGratuite(true)}
                               style={{ cursor: 'pointer' }}
@@ -3575,7 +3681,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                           </label>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                             <input
-                              type="checkbox"
+                              type="radio"
+                              name="edit_art_livraison"
                               checked={!editArtLivraisonGratuite}
                               onChange={() => setEditArtLivraisonGratuite(false)}
                               style={{ cursor: 'pointer' }}
@@ -3590,7 +3697,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0 }}>
                         <span>Avantages & Conditions</span>
                         <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
-                          Glissez les poignées ☰ pour réordonner
+                          Glissez les poignées pour réordonner
                         </span>
                       </label>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
@@ -3697,8 +3804,26 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </>
                 )}
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <StatefulButton type="submit" variant="primary" style={{ flex: 1 }} loadingText="Enregistrement...">Enregistrer</StatefulButton>
-                  <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowEditCatalogModal(false)}>Annuler</button>
+                  <StatefulButton
+                    type="submit"
+                    variant="primary"
+                    state={editProductButtonState}
+                    loadingText="Enregistrement..."
+                    successText="Enregistré !"
+                    errorText="Erreur"
+                    style={{ flex: 1 }}
+                  >
+                    Enregistrer
+                  </StatefulButton>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ flex: 1 }}
+                    onClick={() => setShowEditCatalogModal(false)}
+                    disabled={editProductButtonState === 'loading'}
+                  >
+                    Annuler
+                  </button>
                 </div>
               </form>
             </div>
@@ -3722,64 +3847,78 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {showNewCustomerModal && (
         <ModalPortal>
           <div className="modal-backdrop" onClick={() => setShowNewCustomerModal(false)}>
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
-              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                Nouveau Client
-              </h3>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Nouveau Client
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowNewCustomerModal(false)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  title="Fermer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
-              <form onSubmit={handleCreateCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div className="form-group">
-                  <label>Nom</label>
-                  <input
-                    type="text"
-                    className="input-control"
-                    placeholder="Nom de famille"
-                    required
-                    value={newCustNom}
-                    onChange={(e) => setNewCustNom(e.target.value)}
-                  />
+              <form onSubmit={handleCreateCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Nom</label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      placeholder="Nom de famille"
+                      required
+                      value={newCustNom}
+                      onChange={(e) => setNewCustNom(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Prénom</label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      placeholder="Prénom"
+                      required
+                      value={newCustPrenom}
+                      onChange={(e) => setNewCustPrenom(e.target.value)}
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Prénom</label>
-                  <input
-                    type="text"
-                    className="input-control"
-                    placeholder="Prénom"
-                    required
-                    value={newCustPrenom}
-                    onChange={(e) => setNewCustPrenom(e.target.value)}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.4fr', gap: '0.85rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Pays (Indicatif)</label>
+                    <CustomSelect
+                      className="input-control"
+                      value={newCustIndicatif}
+                      onChange={(e) => setNewCustIndicatif(e.target.value)}
+                    >
+                      {countries.map((c) => (
+                        <option key={`${c.code}-${c.name}`} value={c.code}>
+                          {c.flag} {c.name} (+{c.code})
+                        </option>
+                      ))}
+                    </CustomSelect>
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Téléphone</label>
+                    <input
+                      type="tel"
+                      className="input-control"
+                      placeholder="Ex: 0197979797"
+                      required
+                      value={newCustTel}
+                      onChange={(e) => setNewCustTel(e.target.value)}
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Pays (Indicatif)</label>
-                  <CustomSelect
-                    className="input-control"
-                    value={newCustIndicatif}
-                    onChange={(e) => setNewCustIndicatif(e.target.value)}
-                  >
-                    {countries.map((c) => (
-                      <option key={`${c.code}-${c.name}`} value={c.code}>
-                        {c.flag} {c.name} (+{c.code})
-                      </option>
-                    ))}
-                  </CustomSelect>
-                </div>
-
-                <div className="form-group">
-                  <label>Téléphone</label>
-                  <input
-                    type="tel"
-                    className="input-control"
-                    placeholder="Ex: 0197979797"
-                    required
-                    value={newCustTel}
-                    onChange={(e) => setNewCustTel(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
+                <div className="form-group" style={{ margin: 0 }}>
                   <label>Préférence pliage</label>
                   <CustomSelect
                     className="input-control"
@@ -3791,7 +3930,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </CustomSelect>
                 </div>
 
-                <div className="form-group">
+                <div className="form-group" style={{ margin: 0 }}>
                   <label>Adresse physique</label>
                   <input
                     type="text"
@@ -3803,8 +3942,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   />
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <div className="form-group" style={{ flex: 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
                     <label>Quartier</label>
                     <input
                       type="text"
@@ -3814,7 +3953,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       onChange={(e) => setNewCustQuartier(e.target.value)}
                     />
                   </div>
-                  <div className="form-group" style={{ flex: 1 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
                     <label>Ville</label>
                     <input
                       type="text"
@@ -3826,7 +3965,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   </div>
                 </div>
 
-                <div className="form-group">
+                <div className="form-group" style={{ margin: 0 }}>
                   <label>Point de laverie rattaché *</label>
                   <CustomSelect
                     className="input-control"
@@ -3835,7 +3974,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                     disabled={currentUser?.store_id && currentUser.store_id !== 'all' && currentUser.store_id !== 'GLOBAL'}
                     required
                   >
-                    <option value="" disabled>-- Sélectionner obligatoirement un point de laverie --</option>
+                    <option value="" disabled>-- Sélectionner un point de laverie --</option>
                     {stores && stores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
                       <option key={st.id} value={st.id}>{st.nom} ({st.ville || 'Cotonou'})</option>
                     ))}
@@ -3908,10 +4047,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {showDebtPaymentModal && selectedCrmCustomer && (
         <ModalPortal>
           <div className="modal-backdrop" onClick={() => setShowDebtPaymentModal(false)}>
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
-              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                Règlement Dette
-              </h3>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '520px', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Règlement Dette
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowDebtPaymentModal(false)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  title="Fermer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 Client: <strong>{selectedCrmCustomer.prenom} {selectedCrmCustomer.nom}</strong>
               </p>
@@ -3992,10 +4141,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {showDeliveryPaymentModal && delivOrder && (
         <ModalPortal>
           <div className="modal-backdrop" onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); setMomoOperator('MTN'); }}>
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
-              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                {delivFinalStatus === 'en_cours_lavage' ? 'Règlement Obligatoire Avant Lavage' : 'Règlement du Solde & Validation'}
-              </h3>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '520px', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  {delivFinalStatus === 'en_cours_lavage' ? 'Règlement Obligatoire Avant Lavage' : 'Règlement du Solde & Validation'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); setMomoOperator('MTN'); }}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  title="Fermer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '10px' }}>
                 <div>Code: <strong>{delivOrder.identifiant_unique_marquage}</strong></div>
@@ -4103,10 +4262,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {showCancelModal && orderToCancel && (
         <ModalPortal>
           <div className="modal-backdrop" onClick={() => { setShowCancelModal(false); setOrderToCancel(null); }}>
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '380px', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default' }}>
-              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', color: 'var(--danger)' }}>
-                Annuler la Commande
-              </h3>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '500px', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--danger)' }}>
+                  Annuler la Commande
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => { setShowCancelModal(false); setOrderToCancel(null); }}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  title="Fermer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 Voulez-vous vraiment annuler la commande <strong>{orderToCancel.identifiant_unique_marquage}</strong> ? Cette opération va recréditer la dette du client si elle n'est pas encore soldée.
@@ -4159,15 +4328,18 @@ export default function AdminView({ activeTab, onManageStaff }) {
         const effW = isLandscape && pHeight > 0 ? pHeight : pWidth;
         const effH = isLandscape && pHeight > 0 ? pWidth : pHeight;
 
-        const modalMaxWidthPx = `${Math.min(Math.max(effW * 3.4, 280), 560)}px`;
-        const modalPaddingPx = `${Math.min(Math.max(pMargin * 2.2, 10), 32)}px`;
+        const modalMaxWidthPx = `${Math.min(Math.max(effW * 4.8, 420), 620)}px`;
+        const modalPaddingPx = `${Math.min(Math.max(pMargin * 2.2, 12), 32)}px`;
 
         return (
           <ModalPortal>
-            <div className="modal-backdrop" onClick={() => setCreatedOrder(null)}>
+            <div className="modal-backdrop" onClick={() => setCreatedOrder(null)} style={{ alignItems: 'flex-start', overflowY: 'auto', padding: '2rem 1rem' }}>
               <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{
                 width: '100%',
                 maxWidth: modalMaxWidthPx,
+                maxHeight: 'calc(100vh - 4rem)',
+                overflowY: 'auto',
+                margin: 'auto',
                 background: '#fff',
                 color: '#000',
                 padding: '1.25rem',
@@ -4209,7 +4381,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       fontSize: '16px',
                       letterSpacing: '2px'
                     }}>
-                      {createdOrder.identifiant_unique_marquage}
+                      {createdOrder.id || createdOrder.identifiant_unique_marquage}
                     </div>
                   </div>
 
@@ -4350,34 +4522,39 @@ export default function AdminView({ activeTab, onManageStaff }) {
                           </div>
                         )}
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px dashed #e5e5e5' }}>
-                          <span style={{ color: '#1e293b', fontWeight: '800' }}>Net à payer :</span>
-                          <span style={{ fontWeight: '800', color: '#000000', fontSize: '14px' }}>
-                            {createdOrder.is_subscription_order
-                              ? (createdOrder.subscription_details?.immediate_subscription
-                                ? `${netPrice.toLocaleString()} FCFA`
-                                : '0 FCFA (Abonnement)')
-                              : `${netPrice.toLocaleString()} FCFA`}
-                          </span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: '6px', borderTop: '1px dashed #e5e5e5', gap: '10px' }}>
+                          <span style={{ color: '#1e293b', fontWeight: '800', whiteSpace: 'nowrap' }}>Net à payer :</span>
+                          <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontWeight: '800', color: '#000000', fontSize: '15px', whiteSpace: 'nowrap' }}>
+                              {createdOrder.is_subscription_order
+                                ? (createdOrder.subscription_details?.immediate_subscription
+                                  ? `${netPrice.toLocaleString()} FCFA`
+                                  : '0 FCFA')
+                                : `${netPrice.toLocaleString()} FCFA`}
+                            </span>
+                            {createdOrder.is_subscription_order && !createdOrder.subscription_details?.immediate_subscription && (
+                              <div style={{ fontSize: '11px', color: '#16a34a', fontWeight: '700', marginTop: '2px' }}>(Abonnement)</div>
+                            )}
+                          </div>
                         </div>
 
                         {(!createdOrder.is_subscription_order || !!createdOrder.subscription_details?.immediate_subscription) ? (
                           <>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ color: '#555555' }}>Acompte Payé :</span>
-                              <span style={{ fontWeight: '700', color: '#002cf7' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
+                              <span style={{ color: '#555555', whiteSpace: 'nowrap' }}>Acompte Payé :</span>
+                              <span style={{ fontWeight: '700', color: '#002cf7', whiteSpace: 'nowrap' }}>{(createdOrder.avance_payee || 0).toLocaleString()} FCFA</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid #e5e5e5' }}>
-                              <span style={{ color: '#555555', fontWeight: '700' }}>Reste à payer :</span>
-                              <span style={{ fontWeight: '800', fontSize: '14px', color: (netPrice - (createdOrder.avance_payee || 0)) > 0 ? '#d32f2f' : '#16a34a' }}>
+                              <span style={{ color: '#555555', fontWeight: '700', whiteSpace: 'nowrap' }}>Reste à payer :</span>
+                              <span style={{ fontWeight: '800', fontSize: '14px', color: (netPrice - (createdOrder.avance_payee || 0)) > 0 ? '#d32f2f' : '#16a34a', whiteSpace: 'nowrap' }}>
                                 {Math.max(0, netPrice - (createdOrder.avance_payee || 0)).toLocaleString()} FCFA
                               </span>
                             </div>
                           </>
                         ) : (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid #e5e5e5' }}>
-                            <span style={{ color: '#16a34a', fontWeight: '800' }}>Reste à payer :</span>
-                            <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a' }}>
+                            <span style={{ color: '#16a34a', fontWeight: '800', whiteSpace: 'nowrap' }}>Reste à payer :</span>
+                            <span style={{ fontWeight: '800', fontSize: '14px', color: '#16a34a', whiteSpace: 'nowrap' }}>
                               0 FCFA
                             </span>
                           </div>
@@ -4416,7 +4593,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                             <!DOCTYPE html>
                             <html>
                               <head>
-                                <title>Facture_${createdOrder.identifiant_unique_marquage}</title>
+                                <title>Facture_${createdOrder.id || createdOrder.identifiant_unique_marquage}</title>
                                 <style>
                                   @page {
                                     size: ${pFormat === 'A4' ? 'A4 portrait' : pFormat === 'A5' ? 'A5 portrait' : `${pWidth}mm auto`};
@@ -4467,7 +4644,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                           const jsPdfFormat = pFormat === 'A4' ? 'a4' : pFormat === 'A5' ? 'a5' : (pHeight > 0 ? [pWidth, pHeight] : [pWidth, 200]);
                           const opt = {
                             margin: (pMargin || 5) / 25.4,
-                            filename: `Facture_${createdOrder.identifiant_unique_marquage}.pdf`,
+                            filename: `Facture_${createdOrder.id || createdOrder.identifiant_unique_marquage}.pdf`,
                             image: { type: 'jpeg', quality: 0.98 },
                             html2canvas: { scale: 2, useCORS: true, logging: false },
                             jsPDF: { unit: 'mm', format: jsPdfFormat, orientation: pOrient || 'portrait' }
@@ -4501,7 +4678,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
       {activeDetailsCard && (
         <ModalPortal>
           <div className="modal-backdrop" onClick={() => setActiveDetailsCard(null)}>
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '780px', maxHeight: '88vh', overflow: 'hidden', background: 'var(--bg-card, #ffffff)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px', cursor: 'default', margin: 'auto' }}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '880px', maxHeight: '88vh', overflow: 'hidden', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default', margin: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                 <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   {activeDetailsCard === 'ca' && <TrendingUp size={20} className="text-primary" />}

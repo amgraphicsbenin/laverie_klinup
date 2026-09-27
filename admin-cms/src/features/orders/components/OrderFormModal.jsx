@@ -287,7 +287,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
         const totalVal = Number(targetOrder.prix_total !== undefined ? targetOrder.prix_total : (targetOrder.total || finalNetTotal || 0));
         const avanceVal = Number(targetOrder.avance_payee !== undefined ? targetOrder.avance_payee : (targetOrder.avance || finalAvance || 0));
         const remainingVal = Math.max(0, totalVal - avanceVal);
-        const orderCode = targetOrder.identifiant_unique_marquage || targetOrder.id || 'PRO-0';
+        const orderCode = targetOrder.id || targetOrder.identifiant_unique_marquage || '1';
         const typeArticlesStr = targetOrder.type_article || (selectedArticles.map(a => `${a.quantity}x ${a.article}`).join(', ')) || 'Articles divers';
 
         let text = '';
@@ -329,10 +329,10 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
           onClick={(e) => e.stopPropagation()} 
           style={{
             width: '100%',
-            maxWidth: '520px',
+            maxWidth: '700px',
             maxHeight: '90vh',
             background: 'var(--bg-card, #ffffff)',
-            padding: '20px 24px',
+            padding: '24px 28px',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -359,7 +359,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
           {/* Sélection du point de laverie */}
           <div style={{ zIndex: 35, position: 'relative' }}>
             <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              📍 Point de Laverie d'Enregistrement
+              Point de Laverie d'Enregistrement
             </label>
             <select
               style={{
@@ -472,7 +472,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                       fontSize: '11px',
                       fontWeight: 700
                     }}>
-                      ⚠ Solde insuffisant ({getTotalClothesCount()} requis)
+                      Solde insuffisant ({getTotalClothesCount()} requis)
                     </div>
                   )}
 
@@ -869,7 +869,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '14px', border: `1px solid ${withDelivery ? '#3b82f6' : 'var(--border-color)'}`, backgroundColor: withDelivery ? 'rgba(59, 130, 246, 0.07)' : 'var(--bg-app)', marginBottom: '14px' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '13px', fontWeight: 700, color: withDelivery ? '#3b82f6' : 'var(--text-primary)' }}>
-                🚚 Livraison à domicile
+                Livraison à domicile
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                 {withDelivery && activeCustomer?.coordonnees_livraison
@@ -890,7 +890,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '14px', border: `1px solid ${withPickup ? '#8b5cf6' : 'var(--border-color)'}`, backgroundColor: withPickup ? 'rgba(139, 92, 246, 0.07)' : 'var(--bg-app)', marginBottom: '14px' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '13px', fontWeight: 700, color: withPickup ? '#8b5cf6' : 'var(--text-primary)' }}>
-                🧺 Récupération à domicile
+                Récupération à domicile
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                 {withPickup && activeCustomer?.coordonnees_livraison
@@ -1169,26 +1169,26 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
                 {withDelivery && deliveryFeePreview > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 700 }}>🚚 Frais de Livraison ({deliveryCalcPreview.distanceKm} km)</span>
+                    <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 700 }}>Frais de Livraison ({deliveryCalcPreview.distanceKm} km)</span>
                     <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 700 }}>+{formatPrice(deliveryFeePreview)}</span>
                   </div>
                 )}
                 {withDelivery && deliveryFeePreview === 0 && activeCustomer && !activeCustomer.coordonnees_livraison && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>⚠️ Livraison</span>
+                    <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>Livraison</span>
                     <span style={{ fontSize: '11px', color: '#f59e0b' }}>GPS client non renseigné</span>
                   </div>
                 )}
 
                 {withPickup && pickupFeePreview > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>📦 Frais de Récupération ({pickupCalcPreview.distanceKm} km)</span>
+                    <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>Frais de Récupération ({pickupCalcPreview.distanceKm} km)</span>
                     <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>+{formatPrice(pickupFeePreview)}</span>
                   </div>
                 )}
                 {withPickup && pickupFeePreview === 0 && activeCustomer && !activeCustomer.coordonnees_livraison && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>⚠️ Récupération</span>
+                    <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>Récupération</span>
                     <span style={{ fontSize: '11px', color: '#f59e0b' }}>GPS client non renseigné</span>
                   </div>
                 )}

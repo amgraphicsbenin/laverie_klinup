@@ -46,11 +46,8 @@ export default function ClientDetailModal({
   const hasDebt = (Number(activeClient?.solde_dette) || 0) > 0;
 
   const getDisplayTicketId = (order) => {
-    if (!order) return 'PRO-0';
-    if (order.identifiant_unique_marquage) return order.identifiant_unique_marquage;
-    if (order.ticket_numero) return order.ticket_numero;
-    if (order.id && (String(order.id).startsWith('KLIN-') || String(order.id).startsWith('PRO-'))) return order.id;
-    return order.id || 'PRO-0';
+    if (!order) return '-';
+    return String(order.id || order.identifiant_unique_marquage || order.ticket_numero || '-');
   };
 
   const getStatusColor = (statut) => {
@@ -339,7 +336,7 @@ export default function ClientDetailModal({
                 return (
                   <View key={item.id} style={styles.orderHistoryItem}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.orderHistoryNo}>Ticket #{getDisplayTicketId(item)}</Text>
+                      <Text style={styles.orderHistoryNo}>Ticket {getDisplayTicketId(item)}</Text>
                       <Text style={styles.orderHistoryDate}>Enregistrée le {item.created_at ? item.created_at.split('T')[0] : 'N/A'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 4 }}>
