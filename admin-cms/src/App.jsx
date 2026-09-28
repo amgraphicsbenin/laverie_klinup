@@ -1198,55 +1198,6 @@ function App() {
 
           {hasAdminAccess && (
             <div className="topbar-actions">
-              {/* Sélecteur de Point de Laverie (Seul le Super Admin peut naviguer entre les laveries et voir la Vue Globale) */}
-              {isSuperAdmin ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.25rem 0.65rem', borderRadius: '12px', minWidth: '220px' }}>
-                  <MIcon name="storefront" size={18} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                  <CustomSelect
-                    value={selectedStoreId}
-                    onChange={(e) => {
-                      db.setSelectedStoreId(e.target.value);
-                      setSelectedStoreIdState(e.target.value);
-                    }}
-                    className=""
-                    style={{
-                      border: 'none',
-                      background: 'transparent',
-                      color: 'var(--text-primary)',
-                      fontWeight: 700,
-                      fontSize: '0.82rem',
-                      outline: 'none',
-                      padding: 0,
-                      height: 'auto',
-                      boxShadow: 'none'
-                    }}
-                    dropdownStyle={{
-                      minWidth: '230px',
-                      right: 0,
-                      left: 'auto',
-                      top: 'calc(100% + 8px)'
-                    }}
-                  >
-                    <option value="all">Tous les points (Vue Globale)</option>
-                    {db.getStores().map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.nom} ({s.code})
-                      </option>
-                    ))}
-                  </CustomSelect>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(79, 70, 229, 0.08)', border: '1px solid rgba(79, 70, 229, 0.2)', padding: '0.35rem 0.75rem', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary)' }}>
-                  <MIcon name="storefront" size={18} style={{ color: 'var(--primary)' }} />
-                  <span>
-                    {(() => {
-                      const userStoreId = currentUser?.store_id || currentUser?.laverie_id || 'store_central';
-                      const currentStore = db.getStores().find(s => s.id === userStoreId || s.code === userStoreId);
-                      return currentStore ? `${currentStore.nom} (${currentStore.code})` : 'Mon Point de Laverie';
-                    })()}
-                  </span>
-                </div>
-              )}
               {/* Raccourcis Icônes (Bouton Mode Sombre & Notifications) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {/* Bouton Mode Sombre */}
@@ -1478,8 +1429,6 @@ function App() {
           <AdminView
             activeTab={adminMenu}
             onManageStaff={() => setAdminMenu('staff_management')}
-            selectedStoreId={selectedStoreId}
-            stores={db.getStores()}
           />
         )}
 

@@ -310,8 +310,10 @@ export default function StaffTab({
     const query = searchTerm.toLowerCase();
 
     const matchesSearch = prenom.includes(query) || nom.includes(query) || email.includes(query) || tel.includes(query);
-    const matchesRole = roleFilter === 'all' || s.role === roleFilter;
-    const matchesStore = storeFilter === 'all' || s.store_id === storeFilter;
+    const sStoreId = s.store_id || s.laverie_id || s.store_code || s.laverie;
+    const matchesStore = storeFilter === 'all' ||
+      sStoreId === storeFilter ||
+      (db.getStores ? db.getStores() : []).some(st => (st.id === storeFilter && (st.code === sStoreId || st.id === sStoreId)) || (st.code === storeFilter && st.id === sStoreId));
     const matchesStatus = statusFilter === 'all' || (s.statut || 'actif') === statusFilter;
 
     return matchesSearch && matchesRole && matchesStore && matchesStatus;

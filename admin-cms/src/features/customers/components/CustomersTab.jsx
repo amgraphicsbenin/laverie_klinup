@@ -563,7 +563,11 @@ export default function CustomersTab({
             tel.includes(query);
 
           if (!matchesQuery) return false;
-          if (storeFilter !== 'all' && c.store_id !== storeFilter) return false;
+          if (storeFilter !== 'all') {
+            const matchStore = c.store_id === storeFilter ||
+              availableStores.some(s => (s.id === storeFilter && s.code === c.store_id) || (s.code === storeFilter && s.id === c.store_id));
+            if (!matchStore) return false;
+          }
           if (filterMode === 'abonne') return !!c.active_subscription;
           if (filterMode === 'dette') return (c.solde_dette || 0) > 0;
           if (filterMode === 'fidelite') {
@@ -667,7 +671,7 @@ export default function CustomersTab({
                     >
                       <option value="all">Tous les points de laverie</option>
                       {availableStores.filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL').map(st => (
-                        <option key={st.id} value={st.id}>{st.nom}</option>
+                        <option key={st.id} value={st.id}>{st.nom} ({st.code})</option>
                       ))}
                     </CustomSelect>
                   </div>

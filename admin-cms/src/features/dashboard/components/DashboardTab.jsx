@@ -49,7 +49,10 @@ export default function DashboardTab({
   getOrderStatusLabel,
   setActiveDetailsCard,
   setShowOrderRegistrationModal,
-  onManageStaff
+  onManageStaff,
+  stores: propStores,
+  dashboardStoreFilter = 'all',
+  setDashboardStoreFilter = () => {}
 }) {
   const [activeStageFilter, setActiveStageFilter] = useState('all');
   const [showCashClosureModal, setShowCashClosureModal] = useState(false);
@@ -57,9 +60,8 @@ export default function DashboardTab({
   const [actualMomo, setActualMomo] = useState('');
   const [closureNotes, setClosureNotes] = useState('');
 
-  const selectedStoreId = db.getSelectedStoreId ? db.getSelectedStoreId() : 'all';
-  const stores = db.getStores ? db.getStores() : [];
-  const currentStore = stores.find(s => s.id === selectedStoreId);
+  const stores = propStores && propStores.length > 0 ? propStores : (db.getStores ? db.getStores() : []);
+  const currentStore = stores.find(s => s.id === dashboardStoreFilter || s.code === dashboardStoreFilter);
   const storeName = currentStore ? currentStore.nom : 'Tous les points (Vue Globale)';
 
   // Calculate today's theoretical cash totals
@@ -127,8 +129,43 @@ export default function DashboardTab({
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ zIndex: 1, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Action Buttons & Quick Store Filter */}
+        <div style={{ zIndex: 1, display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+
+          {/* Sélecteur Rapide Point de Laverie */}
+          {stores && stores.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', padding: '0.35rem 0.75rem', borderRadius: '12px', minWidth: '210px' }}>
+              <Store size={16} color="var(--primary)" style={{ flexShrink: 0 }} />
+              <CustomSelect
+                value={dashboardStoreFilter}
+                onChange={(e) => setDashboardStoreFilter(e.target.value)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-primary)',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  outline: 'none',
+                  padding: 0,
+                  height: 'auto',
+                  boxShadow: 'none'
+                }}
+                dropdownStyle={{
+                  minWidth: '220px',
+                  right: 0,
+                  left: 'auto',
+                  top: 'calc(100% + 8px)'
+                }}
+              >
+                <option value="all">Tous les points (Vue Globale)</option>
+                {stores.map(st => (
+                  <option key={st.id} value={st.id}>
+                    {st.nom} ({st.code})
+                  </option>
+                ))}
+              </CustomSelect>
+            </div>
+          )}
 
           <button
             type="button"

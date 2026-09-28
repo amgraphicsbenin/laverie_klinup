@@ -26,6 +26,8 @@ export default function CatalogTab({
   handleToggleCatalogItemActive,
   setShowAddCatalogModal,
   stores = [],
+  catalogStoreFilter = 'all',
+  setCatalogStoreFilter = () => {},
   selectedStoreId = '',
   refreshAdminData,
   catalog = []
@@ -260,6 +262,28 @@ export default function CatalogTab({
           />
         </div>
         
+        {/* Filtre Point de Laverie */}
+        {stores && stores.length > 0 && (
+          <div className="select-control-wrapper">
+            <CustomSelect
+              className="input-control"
+              value={catalogStoreFilter}
+              onChange={(e) => {
+                setCatalogStoreFilter(e.target.value);
+                setCatalogCurrentPage(1);
+              }}
+              style={{ minWidth: '160px' }}
+            >
+              <option value="all">Tous les points</option>
+              {stores.map(st => (
+                <option key={st.id} value={st.id}>
+                  {st.nom} ({st.code})
+                </option>
+              ))}
+            </CustomSelect>
+          </div>
+        )}
+
         {catalogCategory === 'individuel' && (
           <div className="select-control-wrapper">
             <CustomSelect

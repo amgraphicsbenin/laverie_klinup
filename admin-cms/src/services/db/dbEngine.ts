@@ -1,6 +1,6 @@
 import { DEFAULT_ROLES } from './seeds.js';
 import { memoryDb, listeners, notifyListeners } from './memoryStore.ts';
-import { performMutation, saveSession, removeSession, refreshCatalog } from './syncEngine.ts';
+import { performMutation, saveSession, removeSession } from './syncEngine.ts';
 import { Staff, Customer, Order, CatalogItem, ActivityLog, Store, Role, OrderStatus } from '../../types/index.ts';
 
 export { memoryDb, listeners, notifyListeners };
@@ -481,7 +481,6 @@ export const dbEngine = {
   },
 
   getCatalog: (): CatalogItem[] => [...memoryDb.catalog],
-  refreshCatalog: refreshCatalog,
   getCurrentUser: (): Staff | null => memoryDb.current_user ? { ...memoryDb.current_user } : null,
   getRoles: () => memoryDb.roles || [],
   saveRole: (roleData: any): any => {
@@ -1798,80 +1797,56 @@ export const dbEngine = {
       }
 
       try {
-        const effectiveStoreId = itemData.store_id || options.storeId;
-        const normalizedArticle = itemData.article ? itemData.article.trim().toLowerCase() : '';
-        const rawItemId = itemData.id ? String(itemData.id).trim() : '';
-
-        let existingItem: CatalogItem | undefined = undefined;
-
-        if (options.updateExisting) {
-          // A. Priorité 1 : Correspondance stricte par (store_id, service, nom d'article)
-          // C'est l'identité fonctionnelle absolue d'un produit dans une laverie
-          if (normalizedArticle && itemData.service && effectiveStoreId) {
-            existingItem = memoryDb.catalog.find(c =>
-              (c.store_id === effectiveStoreId || (!c.store_id && effectiveStoreId === 'store_akpakpa')) &&
-              c.service === itemData.service &&
-              c.article?.trim().toLowerCase() === normalizedArticle
-            );
-          }
-
-          // B. Priorité 2 : Si non trouvé par nom (ex: l'article a été renommé), recherche par ID exact + store + service
-          if (!existingItem && rawItemId) {
-            existingItem = memoryDb.catalog.find(c =>
-              c.id === rawItemId &&
-              (!effectiveStoreId || c.store_id === effectiveStoreId || !c.store_id) &&
-              (!itemData.service || c.service === itemData.service)
-            );
-          }
-
-          // C. Priorité 3 : Correspondance numérique si suffixe de service cohérent
-          if (!existingItem && rawItemId) {
-            const isRep = itemData.service === 'repassage' || rawItemId.includes('_rep');
-            const cleanDigits = rawItemId.replace(/\D/g, '');
-            if (cleanDigits) {
-              const expectedId = isRep ? `${cleanDigits}_rep` : cleanDigits;
-              existingItem = memoryDb.catalog.find(c => {
-                if (effectiveStoreId && c.store_id && c.store_id !== effectiveStoreId) return false;
-                if (itemData.service && c.service !== itemData.service) return false;
-                return c.id === expectedId || (isRep ? (c.id.endsWith('_rep') && c.id.replace(/\D/g, '') === cleanDigits) : c.id === cleanDigits);
-              });
-            }
-          }
-
-          // Si un article correspondant existe : MISE À JOUR
-          if (existingItem) {
-            await dbEngine.updateCatalogItem(existingItem.id, {
-              article: itemData.article || existingItem.article,
-              service: itemData.service || existingItem.service,
-              categorie: itemData.categorie || existingItem.categorie,
+        // 1. Recherche par ID direct pour mise à jour immédiate
+        if (itemData.id) {
+          const cleanId = String(itemData.id).replace(/\D/g, '') || String(itemData.id).trim();
+          const existingById = memoryDb.catalog.find(c => 
+            c.id === cleanId || 
+            String(c.id).replace(/\D/g, '') === cleanId
+          );
+          if (existingById) {
+            await dbEngine.updateCatalogItem(existingById.id, {
+              article: itemData.article || existingById.article,
+              service: itemData.service || existingById.service,
+              categorie: itemData.categorie || existingById.categorie,
               prix: itemData.prix,
-              prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : existingItem.prix_urgent,
-              description: itemData.description !== undefined ? itemData.description : existingItem.description,
-              is_active: itemData.is_active !== undefined ? itemData.is_active : existingItem.is_active,
-              statut: itemData.statut || (itemData.is_active !== undefined ? (itemData.is_active ? 'actif' : 'inactif') : existingItem.statut),
-              store_id: effectiveStoreId || existingItem.store_id
+              prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : existingById.prix_urgent,
+              description: itemData.description !== undefined ? itemData.description : existingById.description,
+              is_active: itemData.is_active !== undefined ? itemData.is_active : existingById.is_active,
+              statut: itemData.statut || (itemData.is_active !== undefined ? (itemData.is_active ? 'actif' : 'inactif') : existingById.statut),
+              store_id: itemData.store_id || existingById.store_id
             });
             updated++;
             continue;
           }
-        } else {
-          // Si updateExisting est false et que l'article existe déjà, on ignore le doublon
-          if (normalizedArticle && itemData.service && effectiveStoreId) {
-            const isDupe = memoryDb.catalog.some(c =>
-              (c.store_id === effectiveStoreId || (!c.store_id && effectiveStoreId === 'store_akpakpa')) &&
-              c.service === itemData.service &&
-              c.article?.trim().toLowerCase() === normalizedArticle
-            );
-            if (isDupe) {
-              continue;
-            }
+        }
+
+        // 2. Recherche par correspondance (store_id, service, nom d'article)
+        if (options.updateExisting && itemData.article && itemData.service && itemData.store_id) {
+          const existing = memoryDb.catalog.find(c => 
+            c.store_id === itemData.store_id &&
+            c.service === itemData.service &&
+            c.article?.trim().toLowerCase() === itemData.article?.trim().toLowerCase()
+          );
+          if (existing) {
+            await dbEngine.updateCatalogItem(existing.id, {
+              prix: itemData.prix,
+              prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : existing.prix_urgent,
+              description: itemData.description || existing.description,
+              is_active: itemData.is_active !== undefined ? itemData.is_active : existing.is_active,
+              statut: itemData.statut || (itemData.is_active !== undefined ? (itemData.is_active ? 'actif' : 'inactif') : existing.statut),
+              categorie: itemData.categorie || existing.categorie
+            });
+            updated++;
+            continue;
           }
         }
 
         // 3. Nouveau produit : attribuer un ID numérique incrémental si non fourni ou si aberrant (> 500)
         let cleanId = '';
-        let isRep = itemData.service === 'repassage' || (itemData.id ? String(itemData.id).includes('_rep') : false);
+        let isRep = false;
         if (itemData.id) {
+          isRep = String(itemData.id).includes('_rep');
           const digits = String(itemData.id).replace(/\D/g, '');
           const parsed = parseInt(digits, 10);
           if (!isNaN(parsed) && parsed > 0 && parsed <= 500) {

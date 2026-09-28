@@ -64,10 +64,12 @@ import HelpTab from '../features/help/components/HelpTab';
 import StatefulButton from './ui/StatefulButton';
 import PageShimmer from './ui/PageShimmer';
 
-export default function AdminView({ activeTab, onManageStaff, stores: propStores, selectedStoreId: propSelectedStoreId }) {
+export default function AdminView({ activeTab, onManageStaff }) {
   const currentUser = db.getCurrentUser();
-  const stores = propStores || (db.getStores ? db.getStores() : []);
-  const selectedStoreId = propSelectedStoreId || (db.getSelectedStoreId ? db.getSelectedStoreId() : 'all');
+  const stores = db.getStores ? db.getStores() : [];
+  const selectedStoreId = db.getSelectedStoreId ? db.getSelectedStoreId() : 'all';
+  const [dashboardStoreFilter, setDashboardStoreFilter] = useState('all');
+  const [catalogStoreFilter, setCatalogStoreFilter] = useState('all');
   const [catalog, setCatalog] = useState([]);
   const [orders, setOrders] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -384,7 +386,7 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
 
   useEffect(() => {
     setCatalogCurrentPage(1);
-  }, [catalogSearchText, catalogServiceFilter, catalogPriceFilter, catalogSortOrder, selectedStoreId]);
+  }, [catalogSearchText, catalogServiceFilter, catalogPriceFilter, catalogSortOrder, catalogStoreFilter]);
 
   const [timerSeconds, setTimerSeconds] = useState(5048); // 01:24:08 by default
   const [isTimerRunning, setIsTimerRunning] = useState(true);
@@ -593,17 +595,17 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
 
   useEffect(() => {
     setCatalog(db.getCatalog());
-    setOrders(db.getOrders());
-    setLogs(db.getLogs());
+    setOrders(db.getAllOrders ? db.getAllOrders() : db.getOrders());
+    setLogs(db.getAllLogs ? db.getAllLogs() : db.getLogs());
     setStaff(db.getAllStaff ? db.getAllStaff() : db.getStaff());
-    setCustomers(db.getCustomers());
+    setCustomers(db.getAllCustomers ? db.getAllCustomers() : db.getCustomers());
 
     const unsubscribe = db.subscribe(() => {
       setCatalog(db.getCatalog());
-      setOrders(db.getOrders());
-      setLogs(db.getLogs());
+      setOrders(db.getAllOrders ? db.getAllOrders() : db.getOrders());
+      setLogs(db.getAllLogs ? db.getAllLogs() : db.getLogs());
       setStaff(db.getAllStaff ? db.getAllStaff() : db.getStaff());
-      setCustomers(db.getCustomers());
+      setCustomers(db.getAllCustomers ? db.getAllCustomers() : db.getCustomers());
     });
     return () => unsubscribe();
   }, []);
@@ -624,11 +626,11 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
 
 
   const refreshAdminData = () => {
-    setCatalog([...db.getCatalog().map(item => ({ ...item }))]);
-    setOrders(db.getOrders());
-    setLogs(db.getLogs());
+    setCatalog(db.getCatalog());
+    setOrders(db.getAllOrders ? db.getAllOrders() : db.getOrders());
+    setLogs(db.getAllLogs ? db.getAllLogs() : db.getLogs());
     setStaff(db.getAllStaff ? db.getAllStaff() : db.getStaff());
-    setCustomers(db.getCustomers());
+    setCustomers(db.getAllCustomers ? db.getAllCustomers() : db.getCustomers());
   };
 
   const formatStopwatch = (totalSecs) => {
@@ -642,15 +644,27 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
     ].join(':');
   };
 
-  // --- STATISTIQUES & ANALYTICS ---
-  const nonCancelledOrders = orders.filter(o => o.statut !== 'annule');
+  // --- COMMANDES FILTRÉES POUR LE DASHBOARD (SCOPÉES AU POINT DE LAVERIE DU DASHBOARD) ---
+  const dashboardOrders = useMemo(() => {
+    if (dashboardStoreFilter === 'all') return orders;
+    return orders.filter(o => {
+      if (o.store_id === dashboardStoreFilter) return true;
+      const targetStore = stores.find(s => s.id === dashboardStoreFilter || s.code === dashboardStoreFilter);
+      if (targetStore && targetStore.code && o.store_id === targetStore.code) return true;
+      if (targetStore && targetStore.id && o.store_id === targetStore.id) return true;
+      return false;
+    });
+  }, [orders, dashboardStoreFilter, stores]);
+
+  // --- STATISTIQUES & ANALYTICS DU DASHBOARD ---
+  const nonCancelledOrders = dashboardOrders.filter(o => o.statut !== 'annule');
   const earnedRevenue = nonCancelledOrders.reduce((sum, o) => sum + o.prix_total, 0);
 
-  const totalOrdersCount = orders.length;
-  const activeOrdersCount = orders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule').length;
+  const totalOrdersCount = dashboardOrders.length;
+  const activeOrdersCount = dashboardOrders.filter(o => o.statut !== 'restitue' && o.statut !== 'annule').length;
 
-  const completedOrdersCount = orders.filter(o => o.statut === 'restitue').length;
-  const pendingOrdersCount = orders.filter(o => o.statut === 'en_attente').length;
+  const completedOrdersCount = dashboardOrders.filter(o => o.statut === 'restitue').length;
+  const pendingOrdersCount = dashboardOrders.filter(o => o.statut === 'en_attente').length;
 
   const statusDisplayLabels = {
     en_attente_validation: 'À valider (Livreur)',
@@ -710,7 +724,7 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
     let headers = [];
     let rows = [];
 
-    const filteredForExport = filterOrdersByKpiDate(orders);
+    const filteredForExport = filterOrdersByKpiDate(dashboardOrders);
     const filteredNonCancelled = filteredForExport.filter(o => o.statut !== 'annule');
     const filteredRevenue = filteredNonCancelled.reduce((sum, o) => sum + o.prix_total, 0);
     const dateRangeLabel = kpiDateFrom || kpiDateTo
@@ -1150,7 +1164,7 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
       daysOfWeek.push(label);
     }
 
-    orders.forEach(o => {
+    dashboardOrders.forEach(o => {
       const orderDate = new Date(o.created_at || Date.now());
       const diffTime = now - orderDate;
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
@@ -1171,7 +1185,7 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
     baseLavage = [0, 0, 0, 0, 0, 0, 0];
     baseRepassage = [0, 0, 0, 0, 0, 0, 0];
 
-    orders.forEach(o => {
+    dashboardOrders.forEach(o => {
       const orderDate = new Date(o.created_at || Date.now());
       const diffTime = now - orderDate;
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
@@ -1198,7 +1212,7 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
       daysOfWeek.push(monthNames[d.getMonth()]);
     }
 
-    orders.forEach(o => {
+    dashboardOrders.forEach(o => {
       const orderDate = new Date(o.created_at || Date.now());
       const diffMonths = (now.getFullYear() - orderDate.getFullYear()) * 12 + (now.getMonth() - orderDate.getMonth());
       
@@ -1221,8 +1235,15 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
 
     catalog.forEach(item => {
       if (!item || !item.article) return;
-      if (selectedStoreId !== 'all' && item.store_id && item.store_id !== 'all' && item.store_id !== selectedStoreId) {
-        return;
+      if (catalogStoreFilter !== 'all') {
+        const itemStore = item.store_id;
+        const targetStore = stores.find(s => s.id === catalogStoreFilter || s.code === catalogStoreFilter);
+        const targetCode = targetStore?.code;
+        const targetId = targetStore?.id || catalogStoreFilter;
+        const matchesStore = itemStore === targetId || itemStore === targetCode || itemStore === 'all' || !itemStore;
+        if (!matchesStore) {
+          return;
+        }
       }
       
       const itemCat = item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel');
@@ -1233,7 +1254,7 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
         const isNumericBase = /^\d+$/.test(baseNumeric);
         const articleKey = isNumericBase
           ? `id_${baseNumeric}__${item.store_id || 'default'}`
-          : ((selectedStoreId === 'all' && item.store_id)
+          : ((catalogStoreFilter === 'all' && item.store_id)
               ? `${item.article.trim().toLowerCase()}__${item.store_id}`
               : item.article.trim().toLowerCase());
         if (!groups[articleKey]) {
@@ -1266,9 +1287,15 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
           };
         }
       } else if (itemCat === 'abonnement' && catalogCategory === 'abonnement') {
-        // BUG FIX: also filter subscriptions by selected store (was missing)
-        if (selectedStoreId !== 'all' && item.store_id && item.store_id !== 'all' && item.store_id !== selectedStoreId) {
-          return;
+        if (catalogStoreFilter !== 'all') {
+          const itemStore = item.store_id;
+          const targetStore = stores.find(s => s.id === catalogStoreFilter || s.code === catalogStoreFilter);
+          const targetCode = targetStore?.code;
+          const targetId = targetStore?.id || catalogStoreFilter;
+          const matchesStore = itemStore === targetId || itemStore === targetCode || itemStore === 'all' || !itemStore;
+          if (!matchesStore) {
+            return;
+          }
         }
         rawGroupedCatalog.push(item);
       }
@@ -1334,8 +1361,8 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
 
   // BUG FIX: Memoize to avoid expensive recompute on every re-render
   const filteredCatalog = useMemo(() => getGroupedCatalog(), [
-    catalog, selectedStoreId, catalogCategory, catalogSearchText,
-    catalogServiceFilter, catalogPriceFilter, catalogSortOrder
+    catalog, catalogStoreFilter, catalogCategory, catalogSearchText,
+    catalogServiceFilter, catalogPriceFilter, catalogSortOrder, stores
   ]);
 
   // --- FILTRES LOGS ---
@@ -2447,9 +2474,12 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
           activeSubscriptionsCount={activeSubscriptionsCount}
           nonCancelledOrdersCount={nonCancelledOrdersCount}
           totalOrdersCount={totalOrdersCount}
-          orders={orders}
+          orders={dashboardOrders}
           customers={customers}
           staff={staff}
+          stores={stores}
+          dashboardStoreFilter={dashboardStoreFilter}
+          setDashboardStoreFilter={setDashboardStoreFilter}
           serviceLabels={serviceLabels}
           getOrderStatusLabel={getOrderStatusLabel}
           setActiveDetailsCard={setActiveDetailsCard}
@@ -2553,15 +2583,17 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
           handleToggleCatalogItemActive={handleToggleCatalogItemActive}
           setShowAddCatalogModal={(show) => {
             if (show) {
-              const defaultStore = (selectedStoreId && selectedStoreId !== 'all' && selectedStoreId !== 'GLOBAL')
-                ? selectedStoreId
+              const defaultStore = (catalogStoreFilter && catalogStoreFilter !== 'all' && catalogStoreFilter !== 'GLOBAL')
+                ? catalogStoreFilter
                 : '';
               setNewArtStoreId(defaultStore);
             }
             setShowAddCatalogModal(show);
           }}
           stores={stores}
-          selectedStoreId={selectedStoreId}
+          catalogStoreFilter={catalogStoreFilter}
+          setCatalogStoreFilter={setCatalogStoreFilter}
+          selectedStoreId={catalogStoreFilter}
           refreshAdminData={refreshAdminData}
           catalog={catalog}
         />
@@ -4804,13 +4836,13 @@ export default function AdminView({ activeTab, onManageStaff, stores: propStores
                 </div>
                 {(kpiDateFrom || kpiDateTo) && (
                   <span style={{ fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 700, background: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>
-                    {filterOrdersByKpiDate(orders).length} résultat(s)
+                    {filterOrdersByKpiDate(dashboardOrders).length} résultat(s)
                   </span>
                 )}
               </div>
 
               <div style={{ overflowY: 'auto', flexGrow: 1, paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                {(() => { const fo = filterOrdersByKpiDate(orders); return (<>
+                {(() => { const fo = filterOrdersByKpiDate(dashboardOrders); return (<>
                   {activeDetailsCard === 'ca' && renderCAReport(fo)}
                   {activeDetailsCard === 'completed' && renderCompletedOrdersList(fo)}
                   {activeDetailsCard === 'active' && renderActiveOrdersList(fo)}

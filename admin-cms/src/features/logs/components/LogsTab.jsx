@@ -379,9 +379,9 @@ export default function LogsTab({
               value={storeFilter}
               onChange={(e) => { setStoreFilter(e.target.value); setCurrentPage(1); }}
             >
-              <option value="all">Tous les Points</option>
+              <option value="all">Tous les points</option>
               {(stores || []).map(s => (
-                <option key={s.id} value={s.id}>{s.nom}</option>
+                <option key={s.id} value={s.id}>{s.nom} ({s.code})</option>
               ))}
             </CustomSelect>
           </div>
