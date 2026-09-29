@@ -216,7 +216,7 @@ export default function ExportCatalogModal({
 
   if (!isOpen) return null;
 
-  // ACTION 1 : Redirection directe vers la feuille Google Sheets associée (sans téléchargement de CSV)
+  // ACTION 1 : Redirection vers Google Sheets + copie des données dans le presse-papiers
   const handleOpenGoogleSheets = () => {
     let targetUrl = sheetUrlInput.trim();
     if (!targetUrl) {
@@ -232,8 +232,46 @@ export default function ExportCatalogModal({
       console.warn("Impossible de sauvegarder l'URL Google Sheets en local", e);
     }
 
-    window.open(targetUrl, '_blank');
-    onClose();
+    // Copier les données au format TSV dans le presse-papiers (format natif Google Sheets)
+    if (exportData && exportData.count > 0) {
+      const TSV_HEADER = 'ID_Produit\tStore_ID\tStore_Name\tStatut\tArticle\tTarif_Traitement\tTarif_Traitement_Express\tTarif_Repassage\tTarif_Repassage_Express\tCategorie\tDescription';
+      const tsvRows = exportData.rows.map(r => [
+        r.numId,
+        r.storeId,
+        r.storeName,
+        r.statut,
+        r.article,
+        r.tTraitement,
+        r.tTraitementExpress,
+        r.tRepassage,
+        r.tRepassageExpress,
+        r.cat,
+        r.desc
+      ].join('\t'));
+      const tsvContent = TSV_HEADER + '\n' + tsvRows.join('\n');
+
+      try {
+        navigator.clipboard.writeText(tsvContent);
+      } catch (e) {
+        console.warn("Impossible de copier les données dans le presse-papiers", e);
+      }
+    }
+
+    // Ouvrir l'URL via un élément <a> (plus fiable que window.open dans un contexte de portail React)
+    const anchor = document.createElement('a');
+    anchor.href = targetUrl;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+
+    // Fermer la modale après un bref délai pour garantir l'ouverture de l'onglet
+    setSuccessMessage(`Feuille Google Sheets ouverte ! Les données (${exportData.count} articles) ont été copiées dans le presse-papiers — collez avec Ctrl+V.`);
+    setTimeout(() => {
+      setSuccessMessage(null);
+      onClose();
+    }, 2500);
   };
 
   const handleSaveSheetUrl = () => {
