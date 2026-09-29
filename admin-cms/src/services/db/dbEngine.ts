@@ -1695,13 +1695,14 @@ export const dbEngine = {
     // Standard fonctionnel d'ID purement numérique
     let finalId = '';
     if (itemData.id && String(itemData.id).trim()) {
-      const isRep = String(itemData.id).includes('_rep');
-      const cleanDigits = String(itemData.id).replace(/\D/g, '');
+      const rawIdStr = String(itemData.id).trim();
+      const isRep = rawIdStr.includes('_rep');
+      const cleanDigits = rawIdStr.replace(/\D/g, '');
       const parsed = parseInt(cleanDigits, 10);
-      if (!isNaN(parsed) && parsed > 0 && parsed <= 500) {
-        finalId = isRep ? `${cleanDigits}_rep` : (cleanDigits ? cleanDigits : String(itemData.id).trim());
+      if (!isNaN(parsed) && parsed > 0) {
+        finalId = isRep ? `${cleanDigits}_rep` : cleanDigits;
       } else {
-        finalId = '';
+        finalId = rawIdStr;
       }
     }
     if (!finalId) {
@@ -1713,7 +1714,7 @@ export const dbEngine = {
         if (c.service === 'system_setting' || c.service === 'reward_catalog') return;
         if (/^\d+$/.test(String(c.id).trim())) {
           const n = parseInt(String(c.id).trim(), 10);
-          if (!isNaN(n) && n <= 500 && n > maxNum) maxNum = n;
+          if (!isNaN(n) && n > maxNum) maxNum = n;
         }
       });
       if (itemData.service === 'repassage') {
@@ -1777,7 +1778,7 @@ export const dbEngine = {
       if (c.service === 'system_setting' || c.service === 'reward_catalog') return;
       if (/^\d+$/.test(String(c.id).trim())) {
         const n = parseInt(String(c.id).trim(), 10);
-        if (!isNaN(n) && n <= 500) {
+        if (!isNaN(n)) {
           usedBatchNumbers.add(n);
           if (n > currentNextNum) currentNextNum = n;
         }
@@ -1797,75 +1798,61 @@ export const dbEngine = {
       }
 
       try {
-        // 1. Recherche par ID direct pour mise à jour immédiate
+        // 1. Recherche par ID exact d'abord
+        let existing = null;
         if (itemData.id) {
-          const cleanId = String(itemData.id).replace(/\D/g, '') || String(itemData.id).trim();
-          const existingById = memoryDb.catalog.find(c => 
-            c.id === cleanId || 
-            String(c.id).replace(/\D/g, '') === cleanId
-          );
-          if (existingById) {
-            await dbEngine.updateCatalogItem(existingById.id, {
-              article: itemData.article || existingById.article,
-              service: itemData.service || existingById.service,
-              categorie: itemData.categorie || existingById.categorie,
-              prix: itemData.prix,
-              prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : existingById.prix_urgent,
-              description: itemData.description !== undefined ? itemData.description : existingById.description,
-              is_active: itemData.is_active !== undefined ? itemData.is_active : existingById.is_active,
-              statut: itemData.statut || (itemData.is_active !== undefined ? (itemData.is_active ? 'actif' : 'inactif') : existingById.statut),
-              store_id: itemData.store_id || existingById.store_id
-            });
-            updated++;
-            continue;
-          }
+          existing = memoryDb.catalog.find(c => c.id === itemData.id);
         }
 
         // 2. Recherche par correspondance (store_id, service, nom d'article)
-        if (options.updateExisting && itemData.article && itemData.service && itemData.store_id) {
-          const existing = memoryDb.catalog.find(c => 
+        if (!existing && options.updateExisting && itemData.article && itemData.service && itemData.store_id) {
+          existing = memoryDb.catalog.find(c => 
             c.store_id === itemData.store_id &&
             c.service === itemData.service &&
             c.article?.trim().toLowerCase() === itemData.article?.trim().toLowerCase()
           );
-          if (existing) {
-            await dbEngine.updateCatalogItem(existing.id, {
-              prix: itemData.prix,
-              prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : existing.prix_urgent,
-              description: itemData.description || existing.description,
-              is_active: itemData.is_active !== undefined ? itemData.is_active : existing.is_active,
-              statut: itemData.statut || (itemData.is_active !== undefined ? (itemData.is_active ? 'actif' : 'inactif') : existing.statut),
-              categorie: itemData.categorie || existing.categorie
-            });
-            updated++;
-            continue;
+        }
+
+        if (existing) {
+          await dbEngine.updateCatalogItem(existing.id, {
+            article: itemData.article || existing.article,
+            service: itemData.service || existing.service,
+            categorie: itemData.categorie || existing.categorie,
+            prix: itemData.prix,
+            prix_urgent: itemData.prix_urgent !== undefined ? itemData.prix_urgent : existing.prix_urgent,
+            description: itemData.description !== undefined ? itemData.description : existing.description,
+            is_active: itemData.is_active !== undefined ? itemData.is_active : existing.is_active,
+            statut: itemData.statut || (itemData.is_active !== undefined ? (itemData.is_active ? 'actif' : 'inactif') : existing.statut),
+            store_id: itemData.store_id || existing.store_id
+          });
+          updated++;
+          continue;
+        }
+
+        // 3. Nouveau produit : attribuer un ID numérique propre
+        let finalId = itemData.id ? String(itemData.id).trim() : '';
+        if (!finalId) {
+          if (itemData.service === 'repassage') {
+            const sibling = memoryDb.catalog.find(c =>
+              c.article?.trim().toLowerCase() === (itemData.article || '').trim().toLowerCase() &&
+              c.store_id === itemData.store_id &&
+              c.service !== 'repassage'
+            );
+            if (sibling && sibling.id) {
+              const sibDigits = String(sibling.id).replace(/\D/g, '');
+              finalId = sibDigits ? `${sibDigits}_rep` : `${sibling.id}_rep`;
+            }
+          }
+          if (!finalId) {
+            do {
+              currentNextNum += 1;
+            } while (usedBatchNumbers.has(currentNextNum));
+            finalId = String(currentNextNum);
+            usedBatchNumbers.add(currentNextNum);
           }
         }
 
-        // 3. Nouveau produit : attribuer un ID numérique incrémental si non fourni ou si aberrant (> 500)
-        let cleanId = '';
-        let isRep = false;
-        if (itemData.id) {
-          isRep = String(itemData.id).includes('_rep');
-          const digits = String(itemData.id).replace(/\D/g, '');
-          const parsed = parseInt(digits, 10);
-          if (!isNaN(parsed) && parsed > 0 && parsed <= 500) {
-            cleanId = digits;
-            usedBatchNumbers.add(parsed);
-            if (parsed > currentNextNum) currentNextNum = parsed;
-          }
-        }
-
-        if (!cleanId) {
-          do {
-            currentNextNum += 1;
-          } while (usedBatchNumbers.has(currentNextNum));
-          cleanId = String(currentNextNum);
-          usedBatchNumbers.add(currentNextNum);
-        }
-
-        itemData.id = isRep ? `${cleanId}_rep` : cleanId;
-
+        itemData.id = finalId;
         await dbEngine.addCatalogItem(itemData);
         inserted++;
       } catch (err: any) {

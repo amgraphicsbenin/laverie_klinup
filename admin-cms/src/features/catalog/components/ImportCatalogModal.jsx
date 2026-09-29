@@ -108,6 +108,11 @@ export default function ImportCatalogModal({
       const parsed = parseInt(catMatch[1], 10);
       return !isNaN(parsed) && parsed > 0 ? parsed : fallbackNum;
     }
+    const repMatch = str.match(/^(\d+)_rep$/i);
+    if (repMatch) {
+      const parsed = parseInt(repMatch[1], 10);
+      return !isNaN(parsed) && parsed > 0 ? parsed : fallbackNum;
+    }
     return fallbackNum;
   };
 
@@ -241,12 +246,27 @@ export default function ImportCatalogModal({
       return { rows: [], stats: { total: 0, valid: 0, duplicates: 0, invalid: 0 } };
     }
 
-    // Détection du délimiteur
-    const firstLine = rawLines[0];
+    // Détection robuste du délimiteur (comptage d'occurrences sur les premières lignes)
+    const sampleText = rawLines.slice(0, 5).join('\n');
+    const countOccurrences = (str, ch) => {
+      let count = 0;
+      for (let i = 0; i < str.length; i++) {
+        if (str[i] === ch) count++;
+      }
+      return count;
+    };
+    const tabCount = countOccurrences(sampleText, '\t');
+    const semiCount = countOccurrences(sampleText, ';');
+    const commaCount = countOccurrences(sampleText, ',');
+
     let delimiter = ';';
-    if (firstLine.includes('\t')) delimiter = '\t';
-    else if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';';
-    else if (firstLine.includes(',')) delimiter = ',';
+    if (tabCount > semiCount && tabCount > commaCount) {
+      delimiter = '\t';
+    } else if (commaCount > semiCount && commaCount > tabCount) {
+      delimiter = ',';
+    } else {
+      delimiter = ';';
+    }
 
     const headerTokens = parseCSVLine(firstLine, delimiter).map(h => 
       h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\s_-]+/g, '')
@@ -307,10 +327,6 @@ export default function ImportCatalogModal({
     const existingById = new Map();
     const existingByNameAndStore = new Map(); // key -> existingItem
 
-    // Plafond de détection d'anomalie : un catalogue compte quelques dizaines d'articles (~50).
-    // Tout nombre démesuré (ex: 7206, 7207 provenant d'anciens hashes) est une anomalie à ignorer.
-    const MAX_ANOMALY_THRESHOLD = Math.max(500, (existingCatalog?.length || 0) * 3);
-
     (existingCatalog || []).forEach(item => {
       if (!item) return;
       const cat = (item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
@@ -322,7 +338,7 @@ export default function ImportCatalogModal({
       if (item.id) {
         const rawIdStr = String(item.id).trim();
         const num = extractNumericId(rawIdStr, null);
-        if (num !== null && num > 0 && num <= MAX_ANOMALY_THRESHOLD) {
+        if (num !== null && num > 0) {
           usedNumbers.add(num);
           if (num > nextAutoNum) nextAutoNum = num;
           existingById.set(String(num), item);
@@ -345,7 +361,7 @@ export default function ImportCatalogModal({
       if (tokens.every(t => !t || t.trim() === '')) continue;
       const rawId = (colIdProduit !== -1 ? (tokens[colIdProduit] || '') : '').trim();
       const num = extractNumericId(rawId, null);
-      if (num !== null && num > 0 && num <= MAX_ANOMALY_THRESHOLD) {
+      if (num !== null && num > 0) {
         usedNumbers.add(num);
         if (num > nextAutoNum) nextAutoNum = num;
       }
@@ -363,8 +379,7 @@ export default function ImportCatalogModal({
 
       const rawIdProduit = (colIdProduit !== -1 ? (tokens[colIdProduit] || '') : '').trim();
       const parsedExplicitId = extractNumericId(rawIdProduit, null);
-      // N'accepter l'ID du CSV que s'il est réaliste (<= MAX_ANOMALY_THRESHOLD). S'il est aberrant (ex: 7207), on l'ignore.
-      const cleanNumericId = (parsedExplicitId !== null && parsedExplicitId > 0 && parsedExplicitId <= MAX_ANOMALY_THRESHOLD)
+      const cleanNumericId = (parsedExplicitId !== null && parsedExplicitId > 0)
         ? String(parsedExplicitId)
         : '';
 
@@ -431,8 +446,8 @@ export default function ImportCatalogModal({
       const isDuplicate = existsById || existsByName;
 
       // Attribution de l'ID produit fonctionnel :
-      // - Si fourni dans le CSV (et valide <= MAX_ANOMALY_THRESHOLD) : conserver l'ID explicite
-      // - Si non fourni dans le CSV (ou aberrant) mais le produit existe déjà en DB : conserver l'ID propre de l'existant
+      // - Si fourni dans le CSV : conserver l'ID explicite
+      // - Si non fourni dans le CSV mais le produit existe déjà en DB : conserver l'ID propre de l'existant
       // - Si non fourni et produit réellement nouveau : incrémenter de façon séquentielle N+1
       let assignedNumericId = '';
       let isNewProduct = false;
@@ -445,10 +460,9 @@ export default function ImportCatalogModal({
       } else if (existingMatch) {
         // Le produit est déjà en base (par exemple après un premier import ou template d'update)
         const matchNum = extractNumericId(existingMatch.id, null);
-        if (matchNum !== null && matchNum > 0 && matchNum <= MAX_ANOMALY_THRESHOLD) {
+        if (matchNum !== null && matchNum > 0) {
           assignedNumericId = String(matchNum);
         } else {
-          // Si l'existant avait lui-même un ID corrompu/anormal, lui réattribuer un vrai ID séquentiel continu
           do {
             nextAutoNum += 1;
           } while (usedNumbers.has(nextAutoNum));
@@ -457,7 +471,7 @@ export default function ImportCatalogModal({
         }
         isNewProduct = false;
       } else {
-        // Vrai nouveau produit sans ID (ou ayant un ID aberrant dans le CSV) : attribution séquentielle N+1
+        // Vrai nouveau produit sans ID : attribution séquentielle N+1
         isNewProduct = true;
         do {
           nextAutoNum += 1;

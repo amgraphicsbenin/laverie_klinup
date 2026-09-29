@@ -76,63 +76,101 @@ export default function ExportCatalogModal({
   // Construction des données d'export prêtes à l'emploi pour Excel
   const exportData = useMemo(() => {
     const usedNumericIds = new Set();
-    const rows = [];
+    const groupsMap = new Map();
 
-    (itemsToExport || []).forEach((item, index) => {
-      let numId = null;
-      const strId = String(item.id || '').trim();
-      if (/^\d+$/.test(strId)) {
-        numId = parseInt(strId, 10);
-      } else {
-        const catMatch = strId.match(/^cat(\d+)$/i);
-        if (catMatch) numId = parseInt(catMatch[1], 10);
-      }
-      if (!numId || numId <= 0 || usedNumericIds.has(numId)) {
-        let candidate = index + 1;
-        while (usedNumericIds.has(candidate)) candidate++;
-        numId = candidate;
-      }
-      usedNumericIds.add(numId);
+    (itemsToExport || []).forEach((item) => {
+      if (!item || !item.article) return;
+      const cat = (item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
+      if (cat !== 'individuel' && cat !== 'abonnement') return;
+      if (item.service === 'system_setting' || item.service === 'reward_catalog') return;
 
       const storeObj = stores.find(s => s.id === item.store_id || s.code === item.store_id);
       const storeId = storeObj?.id || item.store_id || (stores[0]?.id || 'store_1');
       const storeName = storeObj?.nom || (stores[0]?.nom || 'Point Principal');
-      const statut = (item.is_active !== false && item.statut !== 0) ? 1 : 0;
-      const article = item.article || 'Article sans nom';
-      const cat = (item.categorie || catalogCategory || 'individuel').toLowerCase().trim();
-      const desc = item.description || (cat === 'abonnement' ? 'Formule abonnement' : 'Prestation pressing et repassage soigné');
 
-      let tTraitement = 0;
-      let tTraitementExpress = 0;
-      let tRepassage = 0;
-      let tRepassageExpress = 0;
+      const articleName = item.article.trim();
+      const groupKey = `${storeId}__${cat}__${articleName.toLowerCase()}`;
 
-      if (cat === 'abonnement') {
-        tTraitement = Number(item.prix) || 0;
+      // Extraction de l'ID numérique de base (supporte "1", "cat1", "1_rep", etc.)
+      let numId = null;
+      const rawIdStr = String(item.id || '').trim();
+      const baseNumericStr = rawIdStr.replace(/_rep$/i, '');
+      if (/^\d+$/.test(baseNumericStr)) {
+        numId = parseInt(baseNumericStr, 10);
       } else {
-        if (item.traitement) {
-          tTraitement = Number(item.traitement.prix) || 0;
-          tTraitementExpress = Number(item.traitement.prix_urgent) || 0;
-        }
-        if (item.repassage) {
-          tRepassage = Number(item.repassage.prix) || 0;
-          tRepassageExpress = Number(item.repassage.prix_urgent) || 0;
-        }
+        const catMatch = baseNumericStr.match(/^cat(\d+)$/i);
+        if (catMatch) numId = parseInt(catMatch[1], 10);
       }
 
-      rows.push({
-        numId,
-        storeId,
-        storeName,
-        statut,
-        article,
-        tTraitement,
-        tTraitementExpress,
-        tRepassage,
-        tRepassageExpress,
-        cat,
-        desc
-      });
+      if (!groupsMap.has(groupKey)) {
+        groupsMap.set(groupKey, {
+          numId: (numId && numId > 0) ? numId : null,
+          storeId,
+          storeName,
+          statut: (item.is_active !== false && item.statut !== 0 && item.statut !== 'inactif') ? 1 : 0,
+          article: articleName,
+          tTraitement: 0,
+          tTraitementExpress: 0,
+          tRepassage: 0,
+          tRepassageExpress: 0,
+          cat,
+          desc: item.description || (cat === 'abonnement' ? 'Formule abonnement' : 'Prestation pressing et repassage soigné')
+        });
+      }
+
+      const existingGroup = groupsMap.get(groupKey);
+
+      if (numId && numId > 0 && !existingGroup.numId) {
+        existingGroup.numId = numId;
+      }
+      if (item.is_active !== false && item.statut !== 0 && item.statut !== 'inactif') {
+        existingGroup.statut = 1;
+      }
+      if (item.description && (!existingGroup.desc || existingGroup.desc.startsWith('Prestation') || existingGroup.desc.startsWith('Formule'))) {
+        existingGroup.desc = item.description;
+      }
+
+      if (cat === 'abonnement') {
+        existingGroup.tTraitement = Number(item.prix) || existingGroup.tTraitement || 0;
+      } else {
+        // 1. Format groupé (CatalogTab filteredCatalog)
+        if (item.traitement) {
+          existingGroup.tTraitement = Number(item.traitement.prix) || existingGroup.tTraitement || 0;
+          existingGroup.tTraitementExpress = Number(item.traitement.prix_urgent) || existingGroup.tTraitementExpress || 0;
+        }
+        if (item.repassage) {
+          existingGroup.tRepassage = Number(item.repassage.prix) || existingGroup.tRepassage || 0;
+          existingGroup.tRepassageExpress = Number(item.repassage.prix_urgent) || existingGroup.tRepassageExpress || 0;
+        }
+
+        // 2. Format brut base de données (catalog array)
+        if (item.service === 'repassage') {
+          existingGroup.tRepassage = Number(item.prix) || 0;
+          existingGroup.tRepassageExpress = Number(item.prix_urgent) || 0;
+        } else if (item.service === 'lavage_simple' || item.service === 'traitement' || (!item.service && !item.traitement && !item.repassage)) {
+          existingGroup.tTraitement = Number(item.prix) || 0;
+          existingGroup.tTraitementExpress = Number(item.prix_urgent) || 0;
+        }
+      }
+    });
+
+    const rows = Array.from(groupsMap.values());
+
+    // Affecter des IDs uniques pour ceux qui en ont
+    rows.forEach((r) => {
+      if (r.numId && !usedNumericIds.has(r.numId)) {
+        usedNumericIds.add(r.numId);
+      }
+    });
+
+    // Compléter les IDs manquants ou en doublon
+    rows.forEach((r, idx) => {
+      if (!r.numId) {
+        let candidate = idx + 1;
+        while (usedNumericIds.has(candidate)) candidate++;
+        r.numId = candidate;
+        usedNumericIds.add(candidate);
+      }
     });
 
     // Tri par ID numérique croissant
