@@ -158,6 +158,9 @@ const PRESET_COLORS = [
 export default function StaffTab({
   subTab,
   staff,
+  stores = [],
+  storeFilter: propStoreFilter,
+  setStoreFilter: propSetStoreFilter,
   selectedStaffId,
   setSelectedStaffId,
   setShowNewStaffModal,
@@ -194,7 +197,17 @@ export default function StaffTab({
   // États pour la page "Gestion Utilisateurs" (Design & Flow identique au Catalogue)
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [storeFilter, setStoreFilter] = useState('all');
+  const [localStoreFilter, setLocalStoreFilter] = useState('all');
+  const storeFilter = propStoreFilter !== undefined ? propStoreFilter : localStoreFilter;
+  const setStoreFilter = propSetStoreFilter !== undefined ? propSetStoreFilter : setLocalStoreFilter;
+  const storesList = stores && stores.length > 0 ? stores : (db.getStores ? db.getStores() : []);
+
+  const getStoreName = (storeId) => {
+    if (!storeId || storeId === 'all') return 'Tous les points';
+    const found = storesList.find(st => st.id === storeId || st.code === storeId);
+    return found ? `${found.nom} (${found.code})` : storeId;
+  };
+
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedStaffIds, setSelectedStaffIds] = useState([]);
   const [staffCurrentPage, setStaffCurrentPage] = useState(1);
@@ -301,6 +314,13 @@ export default function StaffTab({
   const systemRolesCount = rolesList.filter(r => r.isSystem).length;
   const customRolesCount = rolesList.filter(r => !r.isSystem).length;
 
+  const storeStaffCount = staffList.filter(s => {
+    const sStoreId = s.store_id || s.laverie_id || s.store_code || s.laverie;
+    return storeFilter === 'all' ||
+      sStoreId === storeFilter ||
+      storesList.some(st => (st.id === storeFilter && (st.code === sStoreId || st.id === sStoreId)) || (st.code === storeFilter && st.id === sStoreId));
+  }).length;
+
   // Filtrage du personnel
   const filteredStaff = staffList.filter(s => {
     const prenom = (s.prenom || '').toLowerCase();
@@ -314,7 +334,7 @@ export default function StaffTab({
     const sStoreId = s.store_id || s.laverie_id || s.store_code || s.laverie;
     const matchesStore = storeFilter === 'all' ||
       sStoreId === storeFilter ||
-      (db.getStores ? db.getStores() : []).some(st => (st.id === storeFilter && (st.code === sStoreId || st.id === sStoreId)) || (st.code === storeFilter && st.id === sStoreId));
+      storesList.some(st => (st.id === storeFilter && (st.code === sStoreId || st.id === sStoreId)) || (st.code === storeFilter && st.id === sStoreId));
     const matchesStatus = statusFilter === 'all' || (s.statut || 'actif') === statusFilter;
 
     return matchesSearch && matchesRole && matchesStore && matchesStatus;
@@ -679,7 +699,7 @@ export default function StaffTab({
               </CustomSelect>
             </div>
 
-            {/* Filtre Boutique / Laverie */}
+            {/* Filtre Point de Laverie */}
             <div className="select-control-wrapper" style={{ minWidth: '170px' }}>
               <CustomSelect
                 className="input-control"
@@ -689,8 +709,8 @@ export default function StaffTab({
                   setStaffCurrentPage(1);
                 }}
               >
-                <option value="all">Toutes les laveries</option>
-                {db.getStores().map(st => (
+                <option value="all">Tous les points</option>
+                {storesList.map(st => (
                   <option key={st.id} value={st.id}>
                     {st.nom} ({st.code})
                   </option>
@@ -878,7 +898,7 @@ export default function StaffTab({
                           {/* Point de Laverie */}
                           <td style={{ padding: '0.75rem' }}>
                             {(() => {
-                              const stores = db.getStores();
+                              const stores = storesList;
                               const targetId = s.store_id || s.laverie_id || s.store_code || s.laverie;
                               const sStore = stores.find(st => 
                                 st.id === targetId || 
@@ -1134,8 +1154,12 @@ export default function StaffTab({
                 <Users size={24} />
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Utilisateurs Rattachés</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#16a34a', fontFamily: 'var(--font-title)' }}>{totalStaff}</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  {storeFilter !== 'all' ? 'Utilisateurs du Point' : 'Utilisateurs Rattachés'}
+                </div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#16a34a', fontFamily: 'var(--font-title)' }}>
+                  {storeFilter !== 'all' ? storeStaffCount : totalStaff}
+                </div>
               </div>
             </div>
           </div>
@@ -1217,9 +1241,9 @@ export default function StaffTab({
               </button>
             </div>
 
-            {/* Barre de Recherche & Filtres par type */}
+            {/* Barre de Recherche & Filtres par type et point de laverie */}
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div className="search-control-container" style={{ flex: 1, minWidth: '260px' }}>
+              <div className="search-control-container" style={{ flex: 1, minWidth: '240px' }}>
                 <Search size={15} className="search-control-icon" />
                 <input
                   type="text"
@@ -1237,6 +1261,22 @@ export default function StaffTab({
                     <X size={14} />
                   </button>
                 )}
+              </div>
+
+              {/* Filtre Point de Laverie */}
+              <div className="select-control-wrapper" style={{ minWidth: '170px' }}>
+                <CustomSelect
+                  className="input-control"
+                  value={storeFilter}
+                  onChange={(e) => setStoreFilter(e.target.value)}
+                >
+                  <option value="all">Tous les points</option>
+                  {storesList.map(st => (
+                    <option key={st.id} value={st.id}>
+                      {st.nom} ({st.code})
+                    </option>
+                  ))}
+                </CustomSelect>
               </div>
 
               {/* Pilules de filtrage type de rôle */}
@@ -1295,7 +1335,14 @@ export default function StaffTab({
                   ) : (
                     filteredRoles.map(role => {
                       const roleColor = role.color || '#2563eb';
-                      const assignedUsers = staffList.filter(s => s.role === role.key || s.role === role.id);
+                      const assignedUsers = staffList.filter(s => {
+                        const isRole = s.role === role.key || s.role === role.id;
+                        if (!isRole) return false;
+                        if (storeFilter === 'all') return true;
+                        const sStoreId = s.store_id || s.laverie_id || s.store_code || s.laverie;
+                        return sStoreId === storeFilter ||
+                          storesList.some(st => (st.id === storeFilter && (st.code === sStoreId || st.id === sStoreId)) || (st.code === storeFilter && st.id === sStoreId));
+                      });
                       const assignedCount = assignedUsers.length;
                       
                       const adminPerms = PERMISSIONS_CONFIG.filter(p => p.category === 'admin');
@@ -1464,11 +1511,16 @@ export default function StaffTab({
                                   </div>
                                   <span style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                                     <strong style={{ color: 'var(--text-primary)' }}>{assignedCount}</strong> {assignedCount > 1 ? 'membres' : 'membre'}
+                                    {storeFilter !== 'all' && (
+                                      <span style={{ marginLeft: '0.35rem', fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 600 }}>
+                                        ({getStoreName(storeFilter).split(' (')[0]})
+                                      </span>
+                                    )}
                                   </span>
                                 </>
                               ) : (
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                  0 membre
+                                  {storeFilter !== 'all' ? '0 sur ce point' : '0 membre'}
                                 </span>
                               )}
                             </div>
@@ -1656,11 +1708,11 @@ export default function StaffTab({
                     <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Point de Laverie</label>
                     <CustomSelect
                       className="input-control"
-                      value={editStaffStoreId || (db.getStores()[0]?.id || 'all')}
+                      value={editStaffStoreId || (storesList[0]?.id || 'all')}
                       onChange={(e) => setEditStaffStoreId(e.target.value)}
                     >
                       <option value="all">Tous les points (Accès Global)</option>
-                      {db.getStores().map(st => (
+                      {storesList.map(st => (
                         <option key={st.id} value={st.id}>
                           {st.nom} ({st.code})
                         </option>
@@ -2116,14 +2168,21 @@ export default function StaffTab({
               {/* Membres rattachés */}
               {(() => {
                 const rc = viewingRole.color || '#2563eb';
-                const assignedUsers = staffList.filter(s => s.role === viewingRole.key || s.role === viewingRole.id);
-                const allStores = db.getStores ? db.getStores() : [];
+                const assignedUsers = staffList.filter(s => {
+                  const isRole = s.role === viewingRole.key || s.role === viewingRole.id;
+                  if (!isRole) return false;
+                  if (storeFilter === 'all') return true;
+                  const sStoreId = s.store_id || s.laverie_id || s.store_code || s.laverie;
+                  return sStoreId === storeFilter ||
+                    storesList.some(st => (st.id === storeFilter && (st.code === sStoreId || st.id === sStoreId)) || (st.code === storeFilter && st.id === sStoreId));
+                });
+                const allStores = storesList;
 
                 return (
                   <div>
                     <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'0.85rem' }}>
                       <span style={{ fontSize:'0.68rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.8px', color:'var(--text-secondary)' }}>
-                        Membres Rattachés ({assignedUsers.length})
+                        Membres Rattachés ({assignedUsers.length}) {storeFilter !== 'all' && `- ${getStoreName(storeFilter)}`}
                       </span>
                       <div style={{ flex:1, height:'1px', background:'linear-gradient(to right, var(--border-color), transparent)' }} />
                     </div>

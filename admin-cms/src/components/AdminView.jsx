@@ -70,6 +70,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const selectedStoreId = db.getSelectedStoreId ? db.getSelectedStoreId() : 'all';
   const [dashboardStoreFilter, setDashboardStoreFilter] = useState('all');
   const [catalogStoreFilter, setCatalogStoreFilter] = useState('all');
+  const [staffStoreFilter, setStaffStoreFilter] = useState('all');
   const [catalog, setCatalog] = useState([]);
   const [orders, setOrders] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -2631,9 +2632,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
         <StaffTab
           subTab={activeTab === 'staff_roles' ? 'roles' : 'users'}
           staff={staff}
+          stores={stores}
+          storeFilter={staffStoreFilter}
+          setStoreFilter={setStaffStoreFilter}
           selectedStaffId={selectedStaffId}
           setSelectedStaffId={setSelectedStaffId}
-          setShowNewStaffModal={setShowNewStaffModal}
+          setShowNewStaffModal={(show) => {
+            if (show) {
+              const defaultStore = (staffStoreFilter && staffStoreFilter !== 'all' && staffStoreFilter !== 'GLOBAL')
+                ? staffStoreFilter
+                : '';
+              setNewStaffStoreId(defaultStore);
+            }
+            setShowNewStaffModal(show);
+          }}
           refreshAdminData={refreshAdminData}
           selectedMember={selectedMember}
           handleSaveStaff={handleSaveStaff}
