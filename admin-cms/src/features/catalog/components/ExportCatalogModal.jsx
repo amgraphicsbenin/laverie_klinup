@@ -3,17 +3,11 @@ import { createPortal } from 'react-dom';
 import { 
   FileSpreadsheet, 
   Download, 
-  ExternalLink, 
-  Copy, 
-  Check, 
   CheckCircle2, 
   X, 
-  Sparkles, 
   Store, 
   Layers, 
-  Table, 
-  HelpCircle,
-  FileText
+  Table
 } from 'lucide-react';
 
 const ModalPortal = ({ children }) => {
@@ -29,9 +23,7 @@ export default function ExportCatalogModal({
   catalogCategory = 'individuel',
   catalogStoreFilter = 'all'
 }) {
-  const [copiedStatus, setCopiedStatus] = useState(false);
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
-  const [googleSheetsOpened, setGoogleSheetsOpened] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   // Informations sur le point de vente actif
   const currentStoreName = useMemo(() => {
@@ -49,11 +41,8 @@ export default function ExportCatalogModal({
     return 'Tous les types';
   }, [catalogCategory]);
 
-  // Construction des données d'export unifiées (CSV & TSV Google Sheets)
+  // Construction des données d'export prêtes à l'emploi
   const exportData = useMemo(() => {
-    const CSV_HEADER_LINE = 'ID_Produit;Store_ID;Store_Name;Statut;Article;Tarif_Traitement;Tarif_Traitement_Express;Tarif_Repassage;Tarif_Repassage_Express;Categorie;Description\r\n';
-    const TSV_HEADER_LINE = 'ID_Produit\tStore_ID\tStore_Name\tStatut\tArticle\tTarif_Traitement\tTarif_Traitement_Express\tTarif_Repassage\tTarif_Repassage_Express\tCategorie\tDescription\r\n';
-
     const usedNumericIds = new Set();
     const rows = [];
 
@@ -117,8 +106,31 @@ export default function ExportCatalogModal({
     // Tri par ID numérique croissant
     rows.sort((a, b) => a.numId - b.numId);
 
-    // CSV délimité par point-virgule avec guillemets
-    const csvRows = rows.map(r => [
+    const storeSuffix = (catalogStoreFilter === 'all' || !catalogStoreFilter) ? 'tous_les_points' : (stores.find(s => s.id === catalogStoreFilter)?.code || 'point').toLowerCase();
+    const catSuffix = catalogCategory === 'individuel' ? 'vetements' : (catalogCategory === 'abonnement' ? 'abonnements' : 'global');
+    const dateStr = new Date().toISOString().slice(0, 10);
+
+    // 1. FORMAT GOOGLE SHEETS (Délimiteur virgule standard RFC 4180 avec encodage UTF-8)
+    const GS_HEADER = 'ID_Produit,Store_ID,Store_Name,Statut,Article,Tarif_Traitement,Tarif_Traitement_Express,Tarif_Repassage,Tarif_Repassage_Express,Categorie,Description\r\n';
+    const gsRows = rows.map(r => [
+      r.numId,
+      r.storeId,
+      `"${r.storeName.replace(/"/g, '""')}"`,
+      r.statut,
+      `"${r.article.replace(/"/g, '""')}"`,
+      r.tTraitement,
+      r.tTraitementExpress,
+      r.tRepassage,
+      r.tRepassageExpress,
+      r.cat,
+      `"${r.desc.replace(/"/g, '""')}"`
+    ].join(',')).join('\r\n');
+    const googleSheetsContent = '\uFEFF' + GS_HEADER + gsRows;
+    const googleSheetsFileName = `catalogue_google_sheets_${storeSuffix}_${catSuffix}_${dateStr}.csv`;
+
+    // 2. FORMAT EXCEL (Délimiteur point-virgule avec BOM UTF-8 pour Microsoft Excel francophone)
+    const EXCEL_HEADER = 'ID_Produit;Store_ID;Store_Name;Statut;Article;Tarif_Traitement;Tarif_Traitement_Express;Tarif_Repassage;Tarif_Repassage_Express;Categorie;Description\r\n';
+    const excelRows = rows.map(r => [
       r.numId,
       r.storeId,
       `"${r.storeName.replace(/"/g, '""')}"`,
@@ -131,109 +143,41 @@ export default function ExportCatalogModal({
       r.cat,
       `"${r.desc.replace(/"/g, '""')}"`
     ].join(';')).join('\r\n');
-
-    // TSV délimité par des tabulations pour collage direct instantané dans Google Sheets
-    const tsvRows = rows.map(r => [
-      r.numId,
-      r.storeId,
-      r.storeName,
-      r.statut,
-      r.article,
-      r.tTraitement,
-      r.tTraitementExpress,
-      r.tRepassage,
-      r.tRepassageExpress,
-      r.cat,
-      r.desc
-    ].join('\t')).join('\r\n');
-
-    const csvContent = '\uFEFF' + CSV_HEADER_LINE + csvRows;
-    const tsvContent = TSV_HEADER_LINE + tsvRows;
-
-    const storeSuffix = (catalogStoreFilter === 'all' || !catalogStoreFilter) ? 'tous_les_points' : (stores.find(s => s.id === catalogStoreFilter)?.code || 'point').toLowerCase();
-    const catSuffix = catalogCategory === 'individuel' ? 'vetements' : (catalogCategory === 'abonnement' ? 'abonnements' : 'global');
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const fileName = `catalogue_${storeSuffix}_${catSuffix}_${dateStr}.csv`;
+    const excelContent = '\uFEFF' + EXCEL_HEADER + excelRows;
+    const excelFileName = `catalogue_excel_${storeSuffix}_${catSuffix}_${dateStr}.csv`;
 
     return {
       rows,
       count: rows.length,
-      csvContent,
-      tsvContent,
-      fileName
+      googleSheetsContent,
+      googleSheetsFileName,
+      excelContent,
+      excelFileName
     };
   }, [itemsToExport, stores, catalogCategory, catalogStoreFilter]);
 
   if (!isOpen) return null;
 
-  // ACTION 1 : Export vers Excel (.CSV optimisé avec BOM UTF-8)
-  const handleExportExcel = () => {
+  const triggerDownload = (content, fileName, targetLabel) => {
     if (!exportData || exportData.count === 0) {
       alert("Aucune donnée à exporter.");
       return;
     }
 
-    const blob = new Blob([exportData.csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', exportData.fileName);
+    link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    setDownloadSuccess(true);
-    setTimeout(() => setDownloadSuccess(false), 4000);
-  };
-
-  // ACTION 2 : Export direct vers Google Sheets
-  const handleExportGoogleSheets = async () => {
-    if (!exportData || exportData.count === 0) {
-      alert("Aucune donnée à exporter.");
-      return;
-    }
-
-    try {
-      // 1. Copie des données au format TSV dans le presse-papier
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(exportData.tsvContent);
-      } else {
-        // Fallback textarea
-        const textarea = document.createElement('textarea');
-        textarea.value = exportData.tsvContent;
-        textarea.style.position = 'fixed';
-        textarea.style.left = '-9999px';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-      }
-
-      setCopiedStatus(true);
-      setGoogleSheetsOpened(true);
-
-      // 2. Ouverture immédiate d'une nouvelle feuille Google Sheets
-      window.open('https://sheets.new', '_blank');
-
-      setTimeout(() => setCopiedStatus(false), 6000);
-    } catch (err) {
-      console.error("Erreur lors de la copie pour Google Sheets:", err);
-      // Même en cas de restriction de presse-papier, ouvrir Google Sheets
-      window.open('https://sheets.new', '_blank');
-      setGoogleSheetsOpened(true);
-    }
-  };
-
-  const handleCopyOnly = async () => {
-    if (!exportData || exportData.count === 0) return;
-    try {
-      await navigator.clipboard.writeText(exportData.tsvContent);
-      setCopiedStatus(true);
-      setTimeout(() => setCopiedStatus(false), 3000);
-    } catch (err) {
-      console.error(err);
-    }
+    setSuccessMessage(`Fichier complet généré et téléchargé pour ${targetLabel} (${exportData.count} articles) !`);
+    setTimeout(() => {
+      setSuccessMessage(null);
+    }, 3500);
   };
 
   return (
@@ -260,7 +204,7 @@ export default function ExportCatalogModal({
           style={{
             background: 'var(--bg-card)',
             width: '100%',
-            maxWidth: '580px',
+            maxWidth: '560px',
             borderRadius: '20px',
             border: '1px solid var(--border-color)',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
@@ -297,7 +241,7 @@ export default function ExportCatalogModal({
                   Exporter le Catalogue des Produits
                 </h3>
                 <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                  Choisissez votre format d'exportation cible
+                  Choisissez le format du fichier exporté contenant toutes les données
                 </span>
               </div>
             </div>
@@ -365,94 +309,30 @@ export default function ExportCatalogModal({
               </div>
             </div>
 
-            {/* NOTIFICATION GOOGLE SHEETS OU TÉLÉCHARGEMENT */}
-            {googleSheetsOpened && (
+            {/* NOTIFICATION DISCRÈTE DE SUCCÈS APRÈS EXPORT */}
+            {successMessage && (
               <div style={{
                 background: 'rgba(16, 185, 129, 0.08)',
                 border: '1px solid rgba(16, 185, 129, 0.3)',
                 borderRadius: '12px',
-                padding: '0.85rem 1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.4rem',
-                animation: 'fadeIn 0.2s ease'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', fontWeight: 700, fontSize: '0.84rem' }}>
-                  <CheckCircle2 size={18} />
-                  <span>Données copiées & Google Sheets ouvert !</span>
-                </div>
-                <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                  Un nouveau classeur Google Sheets a été ouvert dans votre navigateur. Cliquez sur la cellule <strong>A1</strong> et faites <strong>Ctrl + V</strong> (ou <i>Coller</i>) pour injecter instantanément l'intégralité du tableau.
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.3rem' }}>
-                  <button
-                    type="button"
-                    onClick={handleCopyOnly}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid #10b981',
-                      color: '#10b981',
-                      padding: '0.3rem 0.65rem',
-                      borderRadius: '6px',
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem'
-                    }}
-                  >
-                    {copiedStatus ? <Check size={13} /> : <Copy size={13} />}
-                    <span>{copiedStatus ? 'Données recopiées !' : 'Recopier les données'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => window.open('https://sheets.new', '_blank')}
-                    style={{
-                      background: 'rgba(16, 185, 129, 0.15)',
-                      border: 'none',
-                      color: '#10b981',
-                      padding: '0.3rem 0.65rem',
-                      borderRadius: '6px',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem'
-                    }}
-                  >
-                    <ExternalLink size={13} />
-                    <span>Réouvrir Google Sheets</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {downloadSuccess && (
-              <div style={{
-                background: 'rgba(59, 130, 246, 0.08)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                borderRadius: '12px',
-                padding: '0.8rem 1rem',
+                padding: '0.75rem 1rem',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.6rem',
-                color: 'var(--primary)',
+                color: '#10b981',
                 fontWeight: 700,
                 fontSize: '0.82rem',
                 animation: 'fadeIn 0.2s ease'
               }}>
-                <CheckCircle2 size={17} />
-                <span>Le fichier Excel/CSV a été téléchargé avec succès sur votre appareil.</span>
+                <CheckCircle2 size={18} />
+                <span>{successMessage}</span>
               </div>
             )}
 
             {/* GRILLE DES 2 CHOIX D'EXPORTATION */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
               
-              {/* CARTE 1 : GOOGLE SHEETS DIRECT */}
+              {/* CARTE 1 : EXPORT POUR GOOGLE SHEETS */}
               <div 
                 style={{
                   background: 'var(--bg-app)',
@@ -463,7 +343,6 @@ export default function ExportCatalogModal({
                   flexDirection: 'column',
                   gap: '0.8rem',
                   position: 'relative',
-                  transition: 'all 0.2s ease',
                   boxShadow: '0 4px 12px rgba(16, 185, 129, 0.06)'
                 }}
               >
@@ -478,7 +357,7 @@ export default function ExportCatalogModal({
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    {/* Icône Google Sheets stylisée */}
+                    {/* Icône Google Sheets */}
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3Z" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       <path d="M3 9H21" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -497,22 +376,22 @@ export default function ExportCatalogModal({
                     background: 'rgba(16, 185, 129, 0.15)',
                     color: '#10b981'
                   }}>
-                    En ligne
+                    Google Sheets
                   </span>
                 </div>
 
                 <div>
                   <h4 style={{ margin: '0 0 0.3rem 0', fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                    Google Sheets Direct
+                    Export Google Sheets
                   </h4>
                   <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                    Ouvre immédiatement un nouveau classeur en ligne pré-formaté avec copie automatique des données.
+                    Télécharge le fichier CSV complet avec toutes les données, structuré pour Google Sheets et Google Drive.
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={handleExportGoogleSheets}
+                  onClick={() => triggerDownload(exportData.googleSheetsContent, exportData.googleSheetsFileName, 'Google Sheets')}
                   style={{
                     marginTop: 'auto',
                     padding: '0.65rem 1rem',
@@ -533,12 +412,12 @@ export default function ExportCatalogModal({
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.08)'}
                   onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}
                 >
-                  <ExternalLink size={15} />
-                  <span>Ouvrir Google Sheets</span>
+                  <Download size={15} />
+                  <span>Exporter pour Google Sheets</span>
                 </button>
               </div>
 
-              {/* CARTE 2 : EXPORT FICHIER EXCEL (.CSV BOM UTF-8) */}
+              {/* CARTE 2 : EXPORT POUR MICROSOFT EXCEL */}
               <div 
                 style={{
                   background: 'var(--bg-app)',
@@ -549,7 +428,6 @@ export default function ExportCatalogModal({
                   flexDirection: 'column',
                   gap: '0.8rem',
                   position: 'relative',
-                  transition: 'all 0.2s ease',
                   boxShadow: '0 4px 12px rgba(59, 130, 246, 0.06)'
                 }}
               >
@@ -576,22 +454,22 @@ export default function ExportCatalogModal({
                     background: 'var(--primary-light)',
                     color: 'var(--primary)'
                   }}>
-                    Fichier Local
+                    Microsoft Excel
                   </span>
                 </div>
 
                 <div>
                   <h4 style={{ margin: '0 0 0.3rem 0', fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                    Fichier Excel (.csv)
+                    Export Microsoft Excel
                   </h4>
                   <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                    Télécharge un fichier CSV encodé UTF-8 BOM avec séparateurs point-virgule, 100% compatible Excel.
+                    Télécharge le fichier CSV complet encodé UTF-8 BOM avec séparateurs point-virgule pour Excel.
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={handleExportExcel}
+                  onClick={() => triggerDownload(exportData.excelContent, exportData.excelFileName, 'Microsoft Excel')}
                   style={{
                     marginTop: 'auto',
                     padding: '0.65rem 1rem',
@@ -613,13 +491,13 @@ export default function ExportCatalogModal({
                   onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}
                 >
                   <Download size={15} />
-                  <span>Télécharger Excel (.csv)</span>
+                  <span>Exporter pour Excel</span>
                 </button>
               </div>
 
             </div>
 
-            {/* PIED DE MODALE & INFOS STRUCTURE */}
+            {/* PIED DE MODALE */}
             <div style={{
               borderTop: '1px solid var(--border-color)',
               paddingTop: '0.9rem',
