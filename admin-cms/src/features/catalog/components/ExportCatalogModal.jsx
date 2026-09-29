@@ -1,13 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   FileSpreadsheet, 
   Download, 
+  ExternalLink,
   CheckCircle2, 
   X, 
   Store, 
   Layers, 
-  Table
+  Table,
+  Link,
+  Edit2,
+  Check
 } from 'lucide-react';
 
 const ModalPortal = ({ children }) => {
@@ -24,15 +28,43 @@ export default function ExportCatalogModal({
   catalogStoreFilter = 'all'
 }) {
   const [successMessage, setSuccessMessage] = useState(null);
+  const [isEditingSheetUrl, setIsEditingSheetUrl] = useState(false);
+  const [sheetUrlInput, setSheetUrlInput] = useState('');
+
+  // Clé de stockage local pour l'URL Google Sheets associée au point ou globale
+  const storageKey = `klinup_google_sheet_url_${catalogStoreFilter || 'all'}`;
+
+  // Récupération de l'URL Google Sheets associée
+  const currentStoreObj = useMemo(() => {
+    if (!catalogStoreFilter || catalogStoreFilter === 'all' || catalogStoreFilter === 'GLOBAL') {
+      return null;
+    }
+    return stores.find(s => s.id === catalogStoreFilter || s.code === catalogStoreFilter) || null;
+  }, [catalogStoreFilter, stores]);
+
+  const associatedSheetUrl = useMemo(() => {
+    if (typeof window === 'undefined') return 'https://docs.google.com/spreadsheets/';
+    const storeUrl = currentStoreObj?.google_sheet_url || currentStoreObj?.sheet_url;
+    if (storeUrl && storeUrl.trim()) return storeUrl.trim();
+    
+    const localUrl = localStorage.getItem(storageKey) || localStorage.getItem('klinup_google_sheet_url_all');
+    if (localUrl && localUrl.trim()) return localUrl.trim();
+
+    return 'https://docs.google.com/spreadsheets/';
+  }, [currentStoreObj, storageKey]);
+
+  useEffect(() => {
+    setSheetUrlInput(associatedSheetUrl);
+    setIsEditingSheetUrl(false);
+  }, [associatedSheetUrl, isOpen]);
 
   // Informations sur le point de vente actif
   const currentStoreName = useMemo(() => {
     if (!catalogStoreFilter || catalogStoreFilter === 'all' || catalogStoreFilter === 'GLOBAL') {
       return 'Tous les points (Global)';
     }
-    const found = stores.find(s => s.id === catalogStoreFilter || s.code === catalogStoreFilter);
-    return found ? found.nom : catalogStoreFilter;
-  }, [catalogStoreFilter, stores]);
+    return currentStoreObj ? currentStoreObj.nom : catalogStoreFilter;
+  }, [catalogStoreFilter, currentStoreObj]);
 
   // Libellé de la catégorie
   const categoryLabel = useMemo(() => {
@@ -41,7 +73,7 @@ export default function ExportCatalogModal({
     return 'Tous les types';
   }, [catalogCategory]);
 
-  // Construction des données d'export prêtes à l'emploi
+  // Construction des données d'export prêtes à l'emploi pour Excel
   const exportData = useMemo(() => {
     const usedNumericIds = new Set();
     const rows = [];
@@ -110,25 +142,7 @@ export default function ExportCatalogModal({
     const catSuffix = catalogCategory === 'individuel' ? 'vetements' : (catalogCategory === 'abonnement' ? 'abonnements' : 'global');
     const dateStr = new Date().toISOString().slice(0, 10);
 
-    // 1. FORMAT GOOGLE SHEETS (Délimiteur virgule standard RFC 4180 avec encodage UTF-8)
-    const GS_HEADER = 'ID_Produit,Store_ID,Store_Name,Statut,Article,Tarif_Traitement,Tarif_Traitement_Express,Tarif_Repassage,Tarif_Repassage_Express,Categorie,Description\r\n';
-    const gsRows = rows.map(r => [
-      r.numId,
-      r.storeId,
-      `"${r.storeName.replace(/"/g, '""')}"`,
-      r.statut,
-      `"${r.article.replace(/"/g, '""')}"`,
-      r.tTraitement,
-      r.tTraitementExpress,
-      r.tRepassage,
-      r.tRepassageExpress,
-      r.cat,
-      `"${r.desc.replace(/"/g, '""')}"`
-    ].join(',')).join('\r\n');
-    const googleSheetsContent = '\uFEFF' + GS_HEADER + gsRows;
-    const googleSheetsFileName = `catalogue_google_sheets_${storeSuffix}_${catSuffix}_${dateStr}.csv`;
-
-    // 2. FORMAT EXCEL (Délimiteur point-virgule avec BOM UTF-8 pour Microsoft Excel francophone)
+    // FORMAT EXCEL (Délimiteur point-virgule avec BOM UTF-8 pour Microsoft Excel francophone)
     const EXCEL_HEADER = 'ID_Produit;Store_ID;Store_Name;Statut;Article;Tarif_Traitement;Tarif_Traitement_Express;Tarif_Repassage;Tarif_Repassage_Express;Categorie;Description\r\n';
     const excelRows = rows.map(r => [
       r.numId,
@@ -149,8 +163,6 @@ export default function ExportCatalogModal({
     return {
       rows,
       count: rows.length,
-      googleSheetsContent,
-      googleSheetsFileName,
       excelContent,
       excelFileName
     };
@@ -158,23 +170,58 @@ export default function ExportCatalogModal({
 
   if (!isOpen) return null;
 
-  const triggerDownload = (content, fileName, targetLabel) => {
+  // ACTION 1 : Redirection directe vers la feuille Google Sheets associée (sans téléchargement de CSV)
+  const handleOpenGoogleSheets = () => {
+    let targetUrl = sheetUrlInput.trim();
+    if (!targetUrl) {
+      targetUrl = 'https://docs.google.com/spreadsheets/';
+    } else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+    }
+
+    // Sauvegarde de l'URL si modifiée
+    try {
+      localStorage.setItem(storageKey, targetUrl);
+    } catch (e) {
+      console.warn("Impossible de sauvegarder l'URL Google Sheets en local", e);
+    }
+
+    window.open(targetUrl, '_blank');
+    onClose();
+  };
+
+  const handleSaveSheetUrl = () => {
+    let targetUrl = sheetUrlInput.trim();
+    if (targetUrl && !targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+      setSheetUrlInput(targetUrl);
+    }
+    try {
+      localStorage.setItem(storageKey, targetUrl || 'https://docs.google.com/spreadsheets/');
+    } catch (e) {
+      console.warn("Erreur sauvegarde URL", e);
+    }
+    setIsEditingSheetUrl(false);
+  };
+
+  // ACTION 2 : Téléchargement du fichier Excel (.csv UTF-8 BOM)
+  const handleDownloadExcel = () => {
     if (!exportData || exportData.count === 0) {
       alert("Aucune donnée à exporter.");
       return;
     }
 
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([exportData.excelContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', fileName);
+    link.setAttribute('download', exportData.excelFileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    setSuccessMessage(`Fichier complet généré et téléchargé pour ${targetLabel} (${exportData.count} articles) !`);
+    setSuccessMessage(`Fichier Excel téléchargé avec succès (${exportData.count} articles) !`);
     setTimeout(() => {
       setSuccessMessage(null);
     }, 3500);
@@ -241,7 +288,7 @@ export default function ExportCatalogModal({
                   Exporter le Catalogue des Produits
                 </h3>
                 <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                  Choisissez le format du fichier exporté contenant toutes les données
+                  Accédez à Google Sheets ou téléchargez le fichier Excel
                 </span>
               </div>
             </div>
@@ -309,7 +356,7 @@ export default function ExportCatalogModal({
               </div>
             </div>
 
-            {/* NOTIFICATION DISCRÈTE DE SUCCÈS APRÈS EXPORT */}
+            {/* NOTIFICATION DE SUCCÈS EXCEL */}
             {successMessage && (
               <div style={{
                 background: 'rgba(16, 185, 129, 0.08)',
@@ -332,7 +379,7 @@ export default function ExportCatalogModal({
             {/* GRILLE DES 2 CHOIX D'EXPORTATION */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
               
-              {/* CARTE 1 : EXPORT POUR GOOGLE SHEETS */}
+              {/* CARTE 1 : GOOGLE SHEETS DIRECT (REDIRECTION) */}
               <div 
                 style={{
                   background: 'var(--bg-app)',
@@ -376,22 +423,102 @@ export default function ExportCatalogModal({
                     background: 'rgba(16, 185, 129, 0.15)',
                     color: '#10b981'
                   }}>
-                    Google Sheets
+                    Redirection
                   </span>
                 </div>
 
                 <div>
                   <h4 style={{ margin: '0 0 0.3rem 0', fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                    Export Google Sheets
+                    Google Sheets
                   </h4>
                   <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                    Télécharge le fichier CSV complet avec toutes les données, structuré pour Google Sheets et Google Drive.
+                    Redirige et ouvre directement la feuille de calcul Google Sheets associée à votre catalogue.
                   </p>
+                </div>
+
+                {/* Lien associé ou configuration */}
+                <div style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '0.4rem 0.6rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontSize: '0.72rem'
+                }}>
+                  <Link size={12} color="var(--text-muted)" />
+                  {isEditingSheetUrl ? (
+                    <div style={{ display: 'flex', gap: '0.3rem', flex: 1 }}>
+                      <input
+                        type="text"
+                        value={sheetUrlInput}
+                        onChange={(e) => setSheetUrlInput(e.target.value)}
+                        placeholder="https://docs.google.com/spreadsheets/d/..."
+                        style={{
+                          flex: 1,
+                          fontSize: '0.72rem',
+                          padding: '0.2rem 0.4rem',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border-color)',
+                          background: 'var(--bg-app)',
+                          color: 'var(--text-primary)'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveSheetUrl}
+                        style={{
+                          background: '#10b981',
+                          border: 'none',
+                          color: '#fff',
+                          padding: '0.2rem 0.4rem',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Enregistrer l'URL"
+                      >
+                        <Check size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span 
+                        style={{ 
+                          flex: 1, 
+                          color: 'var(--text-secondary)', 
+                          whiteSpace: 'nowrap', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis',
+                          fontFamily: 'monospace' 
+                        }}
+                        title={sheetUrlInput || 'https://docs.google.com/spreadsheets/'}
+                      >
+                        {sheetUrlInput ? sheetUrlInput.replace(/^https?:\/\//, '') : 'docs.google.com/spreadsheets'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingSheetUrl(true)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          padding: '0.1rem'
+                        }}
+                        title="Modifier le lien Google Sheets"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => triggerDownload(exportData.googleSheetsContent, exportData.googleSheetsFileName, 'Google Sheets')}
+                  onClick={handleOpenGoogleSheets}
                   style={{
                     marginTop: 'auto',
                     padding: '0.65rem 1rem',
@@ -412,8 +539,8 @@ export default function ExportCatalogModal({
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.08)'}
                   onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}
                 >
-                  <Download size={15} />
-                  <span>Exporter pour Google Sheets</span>
+                  <ExternalLink size={15} />
+                  <span>Ouvrir Google Sheets</span>
                 </button>
               </div>
 
@@ -454,7 +581,7 @@ export default function ExportCatalogModal({
                     background: 'var(--primary-light)',
                     color: 'var(--primary)'
                   }}>
-                    Microsoft Excel
+                    Fichier Local
                   </span>
                 </div>
 
@@ -463,13 +590,13 @@ export default function ExportCatalogModal({
                     Export Microsoft Excel
                   </h4>
                   <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                    Télécharge le fichier CSV complet encodé UTF-8 BOM avec séparateurs point-virgule pour Excel.
+                    Télécharge le fichier CSV complet avec encodage UTF-8 BOM et séparateurs point-virgule pour Excel.
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => triggerDownload(exportData.excelContent, exportData.excelFileName, 'Microsoft Excel')}
+                  onClick={handleDownloadExcel}
                   style={{
                     marginTop: 'auto',
                     padding: '0.65rem 1rem',
@@ -491,7 +618,7 @@ export default function ExportCatalogModal({
                   onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}
                 >
                   <Download size={15} />
-                  <span>Exporter pour Excel</span>
+                  <span>Télécharger pour Excel (.csv)</span>
                 </button>
               </div>
 
