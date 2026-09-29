@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Upload, 
@@ -247,6 +247,7 @@ export default function ImportCatalogModal({
     }
 
     // Détection robuste du délimiteur (comptage d'occurrences sur les premières lignes)
+    const firstLine = rawLines[0];
     const sampleText = rawLines.slice(0, 5).join('\n');
     const countOccurrences = (str, ch) => {
       let count = 0;

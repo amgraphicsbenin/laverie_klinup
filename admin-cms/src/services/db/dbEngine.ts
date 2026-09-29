@@ -1839,8 +1839,14 @@ export const dbEngine = {
               c.service !== 'repassage'
             );
             if (sibling && sibling.id) {
-              const sibDigits = String(sibling.id).replace(/\D/g, '');
-              finalId = sibDigits ? `${sibDigits}_rep` : `${sibling.id}_rep`;
+              const sibIdStr = String(sibling.id).trim();
+              // Only derive sibling _rep ID from genuinely numeric IDs
+              if (/^\d+$/.test(sibIdStr)) {
+                finalId = `${sibIdStr}_rep`;
+              } else {
+                // Non-numeric ID (hash, etc.) — fall through to auto-increment
+                finalId = '';
+              }
             }
           }
           if (!finalId) {

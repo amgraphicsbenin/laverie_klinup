@@ -133,7 +133,7 @@ export default function ExportCatalogModal({
       if (cat === 'abonnement') {
         existingGroup.tTraitement = Number(item.prix) || existingGroup.tTraitement || 0;
       } else {
-        // 1. Format groupé (CatalogTab filteredCatalog)
+        // Format groupé (CatalogTab filteredCatalog) : sous-objets .traitement/.repassage
         if (item.traitement) {
           existingGroup.tTraitement = Number(item.traitement.prix) || existingGroup.tTraitement || 0;
           existingGroup.tTraitementExpress = Number(item.traitement.prix_urgent) || existingGroup.tTraitementExpress || 0;
@@ -143,33 +143,41 @@ export default function ExportCatalogModal({
           existingGroup.tRepassageExpress = Number(item.repassage.prix_urgent) || existingGroup.tRepassageExpress || 0;
         }
 
-        // 2. Format brut base de données (catalog array)
-        if (item.service === 'repassage') {
-          existingGroup.tRepassage = Number(item.prix) || 0;
-          existingGroup.tRepassageExpress = Number(item.prix_urgent) || 0;
-        } else if (item.service === 'lavage_simple' || item.service === 'traitement' || (!item.service && !item.traitement && !item.repassage)) {
-          existingGroup.tTraitement = Number(item.prix) || 0;
-          existingGroup.tTraitementExpress = Number(item.prix_urgent) || 0;
+        // Format brut base de données (catalog array) : .service + .prix plats
+        // Seulement si l'item n'a PAS de sous-objets groupés (sinon on écraserait les bonnes valeurs)
+        if (!item.traitement && !item.repassage) {
+          if (item.service === 'repassage') {
+            existingGroup.tRepassage = Number(item.prix) || existingGroup.tRepassage || 0;
+            existingGroup.tRepassageExpress = Number(item.prix_urgent) || existingGroup.tRepassageExpress || 0;
+          } else if (item.service === 'lavage_simple' || item.service === 'traitement' || !item.service) {
+            existingGroup.tTraitement = Number(item.prix) || existingGroup.tTraitement || 0;
+            existingGroup.tTraitementExpress = Number(item.prix_urgent) || existingGroup.tTraitementExpress || 0;
+          }
         }
       }
     });
 
     const rows = Array.from(groupsMap.values());
 
-    // Affecter des IDs uniques pour ceux qui en ont
+    // Premier passage : réserver les IDs uniques qui ne sont pas en conflit
     rows.forEach((r) => {
-      if (r.numId && !usedNumericIds.has(r.numId)) {
-        usedNumericIds.add(r.numId);
+      if (r.numId && r.numId > 0) {
+        if (usedNumericIds.has(r.numId)) {
+          // Doublon détecté — sera réassigné au passage suivant
+          r.numId = null;
+        } else {
+          usedNumericIds.add(r.numId);
+        }
       }
     });
 
-    // Compléter les IDs manquants ou en doublon
-    rows.forEach((r, idx) => {
+    // Deuxième passage : attribuer un ID unique à ceux qui n'en ont pas
+    let nextCandidate = 1;
+    rows.forEach((r) => {
       if (!r.numId) {
-        let candidate = idx + 1;
-        while (usedNumericIds.has(candidate)) candidate++;
-        r.numId = candidate;
-        usedNumericIds.add(candidate);
+        while (usedNumericIds.has(nextCandidate)) nextCandidate++;
+        r.numId = nextCandidate;
+        usedNumericIds.add(nextCandidate);
       }
     });
 
