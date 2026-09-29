@@ -28,6 +28,7 @@ export default function ImportCatalogModal({
   onClose,
   stores = [],
   selectedStoreId = '',
+  catalogCategory = 'individuel',
   existingCatalog = [],
   onImportSuccess
 }) {
@@ -40,13 +41,23 @@ export default function ImportCatalogModal({
 
   // Point de vente par défaut
   const defaultStoreId = useMemo(() => {
-    if (selectedStoreId && selectedStoreId !== 'all' && selectedStoreId !== 'GLOBAL') {
+    if (selectedStoreId && (selectedStoreId === 'all' || selectedStoreId === 'GLOBAL')) {
+      return 'all';
+    }
+    if (selectedStoreId) {
       return selectedStoreId;
     }
-    return validStores.length === 1 ? validStores[0].id : (validStores[0]?.id || '');
+    return validStores.length === 1 ? validStores[0].id : 'all';
   }, [selectedStoreId, validStores]);
 
   const [targetStoreId, setTargetStoreId] = useState(defaultStoreId);
+  const [exportCategoryFilter, setExportCategoryFilter] = useState(catalogCategory || 'individuel');
+
+  useEffect(() => {
+    setTargetStoreId(defaultStoreId);
+    setExportCategoryFilter(catalogCategory || 'individuel');
+  }, [isOpen, defaultStoreId, catalogCategory]);
+
   const [activeInputTab, setActiveInputTab] = useState('file'); // 'file' | 'paste'
   const [pastedText, setPastedText] = useState('');
   const [fileName, setFileName] = useState('');
@@ -59,7 +70,9 @@ export default function ImportCatalogModal({
   const fileInputRef = useRef(null);
 
   // Nom du point de vente actif
-  const currentStoreObj = validStores.find(s => s.id === targetStoreId);
+  const currentStoreObj = targetStoreId === 'all'
+    ? { id: 'all', nom: 'Tous les points (Global)', code: 'global' }
+    : validStores.find(s => s.id === targetStoreId);
   const currentStoreName = currentStoreObj ? currentStoreObj.nom : (validStores[0]?.nom || 'Point Principal');
 
   // Helper pour extraire un ID purement numérique réel (ignore les hashes alphanumériques type cat_v7v20mtc6)
@@ -80,13 +93,14 @@ export default function ImportCatalogModal({
 
   // 1. MODÈLE VIERGE AVEC EXEMPLES : IDs d'exemples strictement distincts (1 à 9 sans doublon entre types), montants = 0 si non applicables
   const handleDownloadTemplate = () => {
-    const sId = currentStoreObj ? currentStoreObj.id : (validStores[0]?.id || 'store_1');
-    const sName = currentStoreObj ? currentStoreObj.nom : (validStores[0]?.nom || 'Point Principal');
+    const sId = (targetStoreId && targetStoreId !== 'all') ? targetStoreId : (validStores[0]?.id || 'store_1');
+    const sName = (targetStoreId && targetStoreId !== 'all') ? (currentStoreObj?.nom || validStores[0]?.nom || 'Point Principal') : (validStores[0]?.nom || 'Point Principal');
 
-    // Les exemples possèdent des IDs séquentiels et distincts (1 à 8 pour individuel, 9 pour abonnement)
-    // Colonne 4 = Statut (1 = actif, 0 = inactif).
-    // Les colonnes de montants ont la valeur explicite 0 pour toute cellule non concernée.
-    const sampleRows = [
+    const sampleRows = exportCategoryFilter === 'abonnement' ? [
+      `1;${sId};${sName};1;Formule Mensuelle 30;15000;0;0;0;abonnement;30 vêtements par mois avec ramassage`,
+      `2;${sId};${sName};1;Abonnement Premium;35000;0;0;0;abonnement;50 vêtements max/mois | 2 ramassages gratuits`,
+      `3;${sId};${sName};1;Formule VIP Famille;60000;0;0;0;abonnement;100 vêtements max/mois | 4 ramassages gratuits`
+    ].join('\r\n') : (exportCategoryFilter === 'individuel' ? [
       `1;${sId};${sName};1;Chemise;1500;2250;800;1200;individuel;Coton, lin ou synthétique`,
       `2;${sId};${sName};1;Costume 2 pièces;3500;5000;2000;3000;individuel;Veste et pantalon pressing`,
       `3;${sId};${sName};1;Pantalon;1500;2000;800;1200;individuel;Jean, toile ou costume`,
@@ -94,16 +108,22 @@ export default function ImportCatalogModal({
       `5;${sId};${sName};1;Robe de soirée;4500;6500;2500;3500;individuel;Tissu délicat, soies ou perles`,
       `6;${sId};${sName};1;Veste / Blazer;2500;3500;1500;2000;individuel;Nettoyage à sec délicat`,
       `7;${sId};${sName};1;T-shirt / Polo;1000;1500;500;800;individuel;Lavage standard et repassage`,
-      `8;${sId};${sName};1;Drap 2 places;2000;0;1000;0;individuel;Linge de lit grand format`,
-      `9;${sId};${sName};1;Formule Mensuelle 30;15000;0;0;0;abonnement;30 vêtements par mois avec ramassage`
-    ].join('\r\n');
+      `8;${sId};${sName};1;Drap 2 places;2000;0;1000;0;individuel;Linge de lit grand format`
+    ].join('\r\n') : [
+      `1;${sId};${sName};1;Chemise;1500;2250;800;1200;individuel;Coton, lin ou synthétique`,
+      `2;${sId};${sName};1;Costume 2 pièces;3500;5000;2000;3000;individuel;Veste et pantalon pressing`,
+      `3;${sId};${sName};1;Pantalon;1500;2000;800;1200;individuel;Jean, toile ou costume`,
+      `4;${sId};${sName};1;Robe simple;2500;3500;1500;2000;individuel;Tenue quotidienne`,
+      `5;${sId};${sName};1;Formule Mensuelle 30;15000;0;0;0;abonnement;30 vêtements par mois avec ramassage`
+    ].join('\r\n'));
 
     const fullContent = '\uFEFF' + CSV_HEADER_LINE + sampleRows;
     const blob = new Blob([fullContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `template_catalogue_produits_${(currentStoreObj?.code || 'klinup').toLowerCase()}.csv`);
+    const catSuffix = exportCategoryFilter === 'individuel' ? '_vetements' : (exportCategoryFilter === 'abonnement' ? '_abonnements' : '');
+    link.setAttribute('download', `template_catalogue_produits_${(currentStoreObj?.code || 'klinup').toLowerCase()}${catSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -113,21 +133,27 @@ export default function ImportCatalogModal({
   // 2. EXPORT DU CATALOGUE EXISTANT : AUCUNE CELLULE VIDE & UNICITÉ STRICTE DES ID PRODUIT
   // RÈGLE STRICTE : Seuls les types 'individuel' et 'abonnement' sont exportables (exclut system_setting, reward_catalog, etc.)
   // Aucun ID PRODUIT ne peut être partagé entre articles de même type ou de différents types !
-  const handleExportExistingCatalog = () => {
+  const handleExportExistingCatalog = (overrideCat = null) => {
+    const activeCat = overrideCat || exportCategoryFilter;
     const catalogToExport = (existingCatalog || []).filter(c => {
       if (!c || !c.article) return false;
       const cat = (c.categorie || (c.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
       if (cat !== 'individuel' && cat !== 'abonnement') return false;
       if (c.service === 'system_setting' || c.service === 'reward_catalog') return false;
 
-      if (targetStoreId && targetStoreId !== 'all') {
+      // Filtrer par catégorie active
+      if (activeCat && activeCat !== 'all') {
+        if (cat !== activeCat) return false;
+      }
+
+      if (targetStoreId && targetStoreId !== 'all' && targetStoreId !== 'GLOBAL') {
         return !c.store_id || c.store_id === targetStoreId;
       }
       return true;
     });
 
     if (!catalogToExport || catalogToExport.length === 0) {
-      alert("Aucun article individuel ou abonnement présent dans le catalogue pour ce point de vente.");
+      alert("Aucun article présent dans le catalogue pour ces critères.");
       return;
     }
 
@@ -140,15 +166,16 @@ export default function ImportCatalogModal({
       if (cat !== 'individuel' && cat !== 'abonnement') return;
 
       const isItemActive = item.is_active !== false && item.statut !== 'inactif';
-      // Clé composite garantissant la séparation étanche entre individuel et abonnement
-      const key = `${(item.store_id || 'default')}__${cat}__${item.article.trim().toLowerCase()}`;
+      // Clé composite garantissant la séparation étanche entre individuel et abonnement et store
+      const itemStoreId = item.store_id || (targetStoreId !== 'all' ? targetStoreId : (validStores[0]?.id || 'store_1'));
+      const key = `${itemStoreId}__${cat}__${item.article.trim().toLowerCase()}`;
       if (!groups[key]) {
         const storeMatch = validStores.find(s => s.id === item.store_id || s.code === item.store_id);
 
         groups[key] = {
           rawId: item.id,
-          storeId: item.store_id || targetStoreId || validStores[0]?.id || '1',
-          storeName: storeMatch ? storeMatch.nom : currentStoreName,
+          storeId: itemStoreId,
+          storeName: storeMatch ? storeMatch.nom : (item.store_name || currentStoreName),
           statut: isItemActive ? 1 : 0, // 4ème colonne : 1 = actif, 0 = inactif
           article: item.article.trim(),
           tarifTraitement: 0,
@@ -156,7 +183,7 @@ export default function ImportCatalogModal({
           tarifRepassage: 0,
           tarifRepassageExpress: 0,
           categorie: cat,
-          description: (item.description && item.description.trim()) ? item.description.trim() : 'Prestation pressing et repassage soigné'
+          description: (item.description && item.description.trim()) ? item.description.trim() : (cat === 'abonnement' ? 'Forfait abonnement laverie' : 'Prestation pressing et repassage soigné')
         };
       } else {
         if (isItemActive) {
@@ -182,7 +209,7 @@ export default function ImportCatalogModal({
     // Passe 1 : Réserver les IDs des articles qui possèdent déjà un identifiant purement numérique unique réaliste
     groupList.forEach(g => {
       const num = extractNumericId(g.rawId, null);
-      if (num !== null && num > 0 && num <= groupList.length + 50 && !usedNumericIds.has(num)) {
+      if (num !== null && num > 0 && num <= groupList.length + 500 && !usedNumericIds.has(num)) {
         g.numericId = String(num);
         usedNumericIds.add(num);
       }
@@ -200,6 +227,9 @@ export default function ImportCatalogModal({
         usedNumericIds.add(nextAvailableId);
       }
     });
+
+    // Tri par ID numérique croissant
+    groupList.sort((a, b) => (parseInt(a.numericId, 10) || 0) - (parseInt(b.numericId, 10) || 0));
 
     // Génération avec garantie : AUCUNE CELLULE VIDE & Statut (1/0) en 4ème place & ID UNIQUE
     const exportRows = groupList.map(g => {
@@ -223,7 +253,9 @@ export default function ImportCatalogModal({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `catalogue_existant_export_${(currentStoreObj?.code || 'klinup').toLowerCase()}.csv`);
+    const storeCode = (targetStoreId === 'all' ? 'tous_les_points' : (currentStoreObj?.code || 'klinup')).toLowerCase();
+    const catCode = activeCat === 'individuel' ? '_vetements' : (activeCat === 'abonnement' ? '_abonnements' : '');
+    link.setAttribute('download', `catalogue_existant_export_${storeCode}${catCode}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -812,13 +844,44 @@ export default function ImportCatalogModal({
                   onChange={(e) => setTargetStoreId(e.target.value)}
                   style={{ height: '36px', fontSize: '0.82rem' }}
                 >
-                  <option value="" disabled>-- Choisir le point de laverie --</option>
+                  <option value="all">Tous les points (Catalogue Global)</option>
                   {validStores.map(st => (
                     <option key={st.id} value={st.id}>
                       {st.nom} ({st.code})
                     </option>
                   ))}
                 </CustomSelect>
+
+                {/* Filtre de catégorie pour l'export */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', marginTop: '0.2rem' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Type d'articles :</span>
+                  <div style={{ display: 'flex', gap: '0.3rem' }}>
+                    {[
+                      { id: 'individuel', label: 'Vêtements' },
+                      { id: 'abonnement', label: 'Abonnements' },
+                      { id: 'all', label: 'Tous' }
+                    ].map(cat => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setExportCategoryFilter(cat.id)}
+                        style={{
+                          padding: '0.2rem 0.55rem',
+                          fontSize: '0.7rem',
+                          fontWeight: exportCategoryFilter === cat.id ? 700 : 500,
+                          borderRadius: '6px',
+                          border: '1px solid',
+                          borderColor: exportCategoryFilter === cat.id ? 'var(--primary)' : 'var(--border-color)',
+                          background: exportCategoryFilter === cat.id ? 'var(--primary-light)' : 'transparent',
+                          color: exportCategoryFilter === cat.id ? 'var(--primary)' : 'var(--text-secondary)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.2rem' }}>
                   <button
@@ -840,7 +903,7 @@ export default function ImportCatalogModal({
                     }}
                     title="Nouveaux produits sans ID Produit, montants vides = 0"
                   >
-                    <Download size={13} /> Modèle Vierge
+                    <Download size={13} /> Modèle Vierge ({exportCategoryFilter === 'individuel' ? 'Vêtements' : exportCategoryFilter === 'abonnement' ? 'Abonnements' : 'Tous'})
                   </button>
 
                   <button
@@ -862,7 +925,7 @@ export default function ImportCatalogModal({
                     }}
                     title="Exporte tous les articles existants avec ID numérique et aucune cellule vide"
                   >
-                    <FileSpreadsheet size={13} /> Exporter l'Existant (Complet)
+                    <FileSpreadsheet size={13} /> Exporter ({exportCategoryFilter === 'individuel' ? 'Vêtements' : exportCategoryFilter === 'abonnement' ? 'Abonnements' : 'Complet'})
                   </button>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Plus, Search, Trash2, Edit, AlertCircle, Power, CheckCircle2, XCircle, ChevronDown, Upload, PlusCircle } from 'lucide-react';
+import { Sparkles, Plus, Search, Trash2, Edit, AlertCircle, Power, CheckCircle2, XCircle, ChevronDown, Upload, PlusCircle, Download, FileSpreadsheet } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import ImportCatalogModal from './ImportCatalogModal';
 
@@ -73,6 +73,87 @@ export default function CatalogTab({
     );
   };
 
+  // Export direct de la liste filtrée telle qu'affichée à l'écran
+  const handleExportDisplayedCatalog = () => {
+    if (!filteredCatalog || filteredCatalog.length === 0) {
+      alert("Aucun produit à exporter dans la vue actuelle.");
+      return;
+    }
+
+    const CSV_HEADER_LINE = 'ID_Produit;Store_ID;Store_Name;Statut;Article;Tarif_Traitement;Tarif_Traitement_Express;Tarif_Repassage;Tarif_Repassage_Express;Categorie;Description\r\n';
+
+    const usedNumericIds = new Set();
+    const rows = filteredCatalog.map((item, index) => {
+      let numId = null;
+      const strId = String(item.id || '').trim();
+      if (/^\d+$/.test(strId)) {
+        numId = parseInt(strId, 10);
+      } else {
+        const catMatch = strId.match(/^cat(\d+)$/i);
+        if (catMatch) numId = parseInt(catMatch[1], 10);
+      }
+      if (!numId || numId <= 0 || usedNumericIds.has(numId)) {
+        let candidate = index + 1;
+        while (usedNumericIds.has(candidate)) candidate++;
+        numId = candidate;
+      }
+      usedNumericIds.add(numId);
+
+      const storeObj = stores.find(s => s.id === item.store_id || s.code === item.store_id);
+      const storeId = storeObj?.id || item.store_id || (stores[0]?.id || 'store_1');
+      const storeName = storeObj?.nom || (stores[0]?.nom || 'Point Principal');
+      const statut = (item.is_active !== false && item.statut !== 0) ? 1 : 0;
+      const article = item.article || 'Article sans nom';
+      const cat = (item.categorie || catalogCategory || 'individuel').toLowerCase().trim();
+      const desc = item.description || (cat === 'abonnement' ? 'Formule abonnement' : 'Article pressing');
+
+      let tTraitement = 0;
+      let tTraitementExpress = 0;
+      let tRepassage = 0;
+      let tRepassageExpress = 0;
+
+      if (cat === 'abonnement') {
+        tTraitement = Number(item.prix) || 0;
+      } else {
+        if (item.traitement) {
+          tTraitement = Number(item.traitement.prix) || 0;
+          tTraitementExpress = Number(item.traitement.prix_urgent) || 0;
+        }
+        if (item.repassage) {
+          tRepassage = Number(item.repassage.prix) || 0;
+          tRepassageExpress = Number(item.repassage.prix_urgent) || 0;
+        }
+      }
+
+      return [
+        numId,
+        storeId,
+        `"${storeName.replace(/"/g, '""')}"`,
+        statut,
+        `"${article.replace(/"/g, '""')}"`,
+        tTraitement,
+        tTraitementExpress,
+        tRepassage,
+        tRepassageExpress,
+        cat,
+        `"${desc.replace(/"/g, '""')}"`
+      ].join(';');
+    }).join('\r\n');
+
+    const fullContent = '\uFEFF' + CSV_HEADER_LINE + rows;
+    const blob = new Blob([fullContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const storeSuffix = catalogStoreFilter === 'all' ? 'tous_les_points' : (stores.find(s => s.id === catalogStoreFilter)?.code || 'point');
+    const catSuffix = catalogCategory === 'individuel' ? 'vetements' : 'abonnements';
+    link.setAttribute('download', `catalogue_${storeSuffix}_${catSuffix}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="card" id="catalog-section" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: 'calc(100vh - 165px)', minHeight: '450px', maxHeight: '850px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexShrink: 0 }}>
@@ -81,31 +162,55 @@ export default function CatalogTab({
           Grille Tarifaire & Catalogue des Produits
         </h3>
 
-        {/* DROPDOWN BOUTON "AJOUTER UN ARTICLE" (Créer ou Importer) */}
-        <div style={{ position: 'relative' }} ref={dropdownRef}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          {/* BOUTON EXPORTER LE CATALOGUE AFFICHÉ */}
           <button
             type="button"
-            className="btn btn-primary"
-            onClick={() => setIsAddDropdownOpen(prev => !prev)}
+            className="btn btn-outline"
+            onClick={handleExportDisplayedCatalog}
+            title="Exporter directement la liste affichée sous forme de fichier CSV"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.45rem',
               fontWeight: 700,
-              padding: '0.55rem 1.15rem',
-              borderRadius: '12px'
+              padding: '0.55rem 0.95rem',
+              borderRadius: '12px',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-primary)',
+              background: 'var(--bg-card)',
+              fontSize: '0.85rem'
             }}
           >
-            <Plus size={16} />
-            <span>Ajouter un article</span>
-            <ChevronDown
-              size={15}
-              style={{
-                transform: isAddDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease'
-              }}
-            />
+            <Download size={15} color="var(--primary)" />
+            <span>Exporter ({filteredCatalog.length})</span>
           </button>
+
+          {/* DROPDOWN BOUTON "AJOUTER UN ARTICLE" (Créer ou Importer) */}
+          <div style={{ position: 'relative' }} ref={dropdownRef}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setIsAddDropdownOpen(prev => !prev)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                fontWeight: 700,
+                padding: '0.55rem 1.15rem',
+                borderRadius: '12px'
+              }}
+            >
+              <Plus size={16} />
+              <span>Ajouter un article</span>
+              <ChevronDown
+                size={15}
+                style={{
+                  transform: isAddDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease'
+                }}
+              />
+            </button>
 
           {isAddDropdownOpen && (
             <div
@@ -217,6 +322,7 @@ export default function CatalogTab({
           )}
         </div>
       </div>
+    </div>
 
       {/* Sub-tabs for Individual Clothes vs Subscriptions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
@@ -777,7 +883,8 @@ export default function CatalogTab({
         isOpen={showImportCatalogModal}
         onClose={() => setShowImportCatalogModal(false)}
         stores={stores}
-        selectedStoreId={selectedStoreId}
+        selectedStoreId={catalogStoreFilter || selectedStoreId}
+        catalogCategory={catalogCategory}
         existingCatalog={catalog}
         onImportSuccess={() => {
           if (refreshAdminData) refreshAdminData();
