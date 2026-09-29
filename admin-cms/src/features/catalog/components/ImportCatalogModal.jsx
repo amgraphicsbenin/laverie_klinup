@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { db } from '../../../services/db';
 import CustomSelect from '../../../components/CustomSelect';
+import ExportCatalogModal from './ExportCatalogModal';
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -52,11 +53,30 @@ export default function ImportCatalogModal({
 
   const [targetStoreId, setTargetStoreId] = useState(defaultStoreId);
   const [exportCategoryFilter, setExportCategoryFilter] = useState(catalogCategory || 'individuel');
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     setTargetStoreId(defaultStoreId);
     setExportCategoryFilter(catalogCategory || 'individuel');
   }, [isOpen, defaultStoreId, catalogCategory]);
+
+  const itemsToExport = useMemo(() => {
+    return (existingCatalog || []).filter(c => {
+      if (!c || !c.article) return false;
+      const cat = (c.categorie || (c.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
+      if (cat !== 'individuel' && cat !== 'abonnement') return false;
+      if (c.service === 'system_setting' || c.service === 'reward_catalog') return false;
+
+      if (exportCategoryFilter && exportCategoryFilter !== 'all') {
+        if (cat !== exportCategoryFilter) return false;
+      }
+
+      if (targetStoreId && targetStoreId !== 'all' && targetStoreId !== 'GLOBAL') {
+        return !c.store_id || c.store_id === targetStoreId;
+      }
+      return true;
+    });
+  }, [existingCatalog, exportCategoryFilter, targetStoreId]);
 
   const [activeInputTab, setActiveInputTab] = useState('file'); // 'file' | 'paste'
   const [pastedText, setPastedText] = useState('');
@@ -130,136 +150,13 @@ export default function ImportCatalogModal({
     URL.revokeObjectURL(url);
   };
 
-  // 2. EXPORT DU CATALOGUE EXISTANT : AUCUNE CELLULE VIDE & UNICITÉ STRICTE DES ID PRODUIT
-  // RÈGLE STRICTE : Seuls les types 'individuel' et 'abonnement' sont exportables (exclut system_setting, reward_catalog, etc.)
-  // Aucun ID PRODUIT ne peut être partagé entre articles de même type ou de différents types !
-  const handleExportExistingCatalog = (overrideCat = null) => {
-    const activeCat = overrideCat || exportCategoryFilter;
-    const catalogToExport = (existingCatalog || []).filter(c => {
-      if (!c || !c.article) return false;
-      const cat = (c.categorie || (c.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
-      if (cat !== 'individuel' && cat !== 'abonnement') return false;
-      if (c.service === 'system_setting' || c.service === 'reward_catalog') return false;
-
-      // Filtrer par catégorie active
-      if (activeCat && activeCat !== 'all') {
-        if (cat !== activeCat) return false;
-      }
-
-      if (targetStoreId && targetStoreId !== 'all' && targetStoreId !== 'GLOBAL') {
-        return !c.store_id || c.store_id === targetStoreId;
-      }
-      return true;
-    });
-
-    if (!catalogToExport || catalogToExport.length === 0) {
+  // 2. EXPORT DU CATALOGUE EXISTANT VIA LA MODALE DE CHOIX (GOOGLE SHEETS DIRECT OU EXCEL)
+  const handleExportExistingCatalog = () => {
+    if (!itemsToExport || itemsToExport.length === 0) {
       alert("Aucun article présent dans le catalogue pour ces critères.");
       return;
     }
-
-    // Regrouper par article, type et store pour le format propre d'export
-    const groups = {};
-
-    catalogToExport.forEach(item => {
-      if (!item || !item.article) return;
-      const cat = (item.categorie || (item.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
-      if (cat !== 'individuel' && cat !== 'abonnement') return;
-
-      const isItemActive = item.is_active !== false && item.statut !== 'inactif';
-      // Clé composite garantissant la séparation étanche entre individuel et abonnement et store
-      const itemStoreId = item.store_id || (targetStoreId !== 'all' ? targetStoreId : (validStores[0]?.id || 'store_1'));
-      const key = `${itemStoreId}__${cat}__${item.article.trim().toLowerCase()}`;
-      if (!groups[key]) {
-        const storeMatch = validStores.find(s => s.id === item.store_id || s.code === item.store_id);
-
-        groups[key] = {
-          rawId: item.id,
-          storeId: itemStoreId,
-          storeName: storeMatch ? storeMatch.nom : (item.store_name || currentStoreName),
-          statut: isItemActive ? 1 : 0, // 4ème colonne : 1 = actif, 0 = inactif
-          article: item.article.trim(),
-          tarifTraitement: 0,
-          tarifTraitementExpress: 0,
-          tarifRepassage: 0,
-          tarifRepassageExpress: 0,
-          categorie: cat,
-          description: (item.description && item.description.trim()) ? item.description.trim() : (cat === 'abonnement' ? 'Forfait abonnement laverie' : 'Prestation pressing et repassage soigné')
-        };
-      } else {
-        if (isItemActive) {
-          groups[key].statut = 1;
-        }
-      }
-
-      if (item.service === 'repassage') {
-        groups[key].tarifRepassage = Number(item.prix) || 0;
-        groups[key].tarifRepassageExpress = Number(item.prix_urgent) || 0;
-      } else if (item.service === 'abonnement' || item.categorie === 'abonnement') {
-        groups[key].tarifTraitement = Number(item.prix) || 0;
-      } else {
-        groups[key].tarifTraitement = Number(item.prix) || 0;
-        groups[key].tarifTraitementExpress = Number(item.prix_urgent) || 0;
-      }
-    });
-
-    // ATTRIBUTION GARANTIE SANS AUCUNE COLLISION D'ID NUMÉRIQUE
-    const groupList = Object.values(groups);
-    const usedNumericIds = new Set();
-
-    // Passe 1 : Réserver les IDs des articles qui possèdent déjà un identifiant purement numérique unique réaliste
-    groupList.forEach(g => {
-      const num = extractNumericId(g.rawId, null);
-      if (num !== null && num > 0 && num <= groupList.length + 500 && !usedNumericIds.has(num)) {
-        g.numericId = String(num);
-        usedNumericIds.add(num);
-      }
-    });
-
-    // Passe 2 : Pour tous les autres articles (alphanumériques catX/subX ou doublons),
-    // attribuer un numéro séquentiel unique strictly distinct sans aucun chevauchement
-    let nextAvailableId = 1;
-    groupList.forEach(g => {
-      if (!g.numericId) {
-        while (usedNumericIds.has(nextAvailableId)) {
-          nextAvailableId++;
-        }
-        g.numericId = String(nextAvailableId);
-        usedNumericIds.add(nextAvailableId);
-      }
-    });
-
-    // Tri par ID numérique croissant
-    groupList.sort((a, b) => (parseInt(a.numericId, 10) || 0) - (parseInt(b.numericId, 10) || 0));
-
-    // Génération avec garantie : AUCUNE CELLULE VIDE & Statut (1/0) en 4ème place & ID UNIQUE
-    const exportRows = groupList.map(g => {
-      return [
-        g.numericId, // ID numérique unique garanti (ex: 1, 2, 3...)
-        g.storeId,
-        `"${g.storeName.replace(/"/g, '""')}"`,
-        g.statut, // Statut : 1 (actif) ou 0 (inactif) à la 4ème place
-        `"${g.article.replace(/"/g, '""')}"`,
-        g.tarifTraitement, // 0 si non défini, jamais vide
-        g.tarifTraitementExpress, // 0 si non défini, jamais vide
-        g.tarifRepassage, // 0 si non défini, jamais vide
-        g.tarifRepassageExpress, // 0 si non défini, jamais vide
-        g.categorie,
-        `"${g.description.replace(/"/g, '""')}"` // Jamais vide
-      ].join(';');
-    }).join('\r\n');
-
-    const fullContent = '\uFEFF' + CSV_HEADER_LINE + exportRows;
-    const blob = new Blob([fullContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const storeCode = (targetStoreId === 'all' ? 'tous_les_points' : (currentStoreObj?.code || 'klinup')).toLowerCase();
-    const catCode = activeCat === 'individuel' ? '_vetements' : (activeCat === 'abonnement' ? '_abonnements' : '');
-    link.setAttribute('download', `catalogue_existant_export_${storeCode}${catCode}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setShowExportModal(true);
   };
 
   // 3. Parser de ligne CSV (conforme RFC 4180 : support apostrophes françaises & guillemets doublés)
@@ -1319,6 +1216,15 @@ export default function ImportCatalogModal({
 
         </div>
       </div>
+
+      <ExportCatalogModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        itemsToExport={itemsToExport}
+        stores={stores}
+        catalogCategory={exportCategoryFilter}
+        catalogStoreFilter={targetStoreId}
+      />
     </ModalPortal>
   );
 }
