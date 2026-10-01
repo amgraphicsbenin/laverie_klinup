@@ -43,14 +43,14 @@ export default function ExportCatalogModal({
   }, [catalogStoreFilter, stores]);
 
   const associatedSheetUrl = useMemo(() => {
-    if (typeof window === 'undefined') return 'https://docs.google.com/spreadsheets/';
+    if (typeof window === 'undefined') return 'https://sheets.new';
     const storeUrl = currentStoreObj?.google_sheet_url || currentStoreObj?.sheet_url;
     if (storeUrl && storeUrl.trim()) return storeUrl.trim();
     
     const localUrl = localStorage.getItem(storageKey) || localStorage.getItem('klinup_google_sheet_url_all');
     if (localUrl && localUrl.trim()) return localUrl.trim();
 
-    return 'https://docs.google.com/spreadsheets/';
+    return 'https://sheets.new';
   }, [currentStoreObj, storageKey]);
 
   useEffect(() => {
@@ -219,8 +219,8 @@ export default function ExportCatalogModal({
   // ACTION 1 : Redirection vers Google Sheets + copie des données dans le presse-papiers
   const handleOpenGoogleSheets = () => {
     let targetUrl = sheetUrlInput.trim();
-    if (!targetUrl) {
-      targetUrl = 'https://docs.google.com/spreadsheets/';
+    if (!targetUrl || targetUrl === 'https://docs.google.com/spreadsheets/' || targetUrl === 'https://docs.google.com/spreadsheets') {
+      targetUrl = 'https://sheets.new';
     } else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
       targetUrl = 'https://' + targetUrl;
     }
@@ -233,6 +233,7 @@ export default function ExportCatalogModal({
     }
 
     // Copier les données au format TSV dans le presse-papiers (format natif Google Sheets)
+    let copiedSuccess = false;
     if (exportData && exportData.count > 0) {
       const TSV_HEADER = 'ID_Produit\tStore_ID\tStore_Name\tStatut\tArticle\tTarif_Traitement\tTarif_Traitement_Express\tTarif_Repassage\tTarif_Repassage_Express\tCategorie\tDescription';
       const tsvRows = exportData.rows.map(r => [
@@ -251,22 +252,66 @@ export default function ExportCatalogModal({
       const tsvContent = TSV_HEADER + '\n' + tsvRows.join('\n');
 
       try {
-        navigator.clipboard.writeText(tsvContent);
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(tsvContent);
+          copiedSuccess = true;
+        }
       } catch (e) {
-        console.warn("Impossible de copier les données dans le presse-papiers", e);
+        console.warn("navigator.clipboard.writeText a échoué, tentative de fallback", e);
+      }
+
+      if (!copiedSuccess) {
+        try {
+          const textarea = document.createElement('textarea');
+          textarea.value = tsvContent;
+          textarea.style.position = 'fixed';
+          textarea.style.left = '-9999px';
+          textarea.style.top = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+          copiedSuccess = true;
+        } catch (err) {
+          console.warn("Fallback de copie au presse-papiers impossible", err);
+        }
       }
     }
 
-    // Ouvrir l'URL via un élément <a> (plus fiable que window.open dans un contexte de portail React)
-    const anchor = document.createElement('a');
-    anchor.href = targetUrl;
-    anchor.target = '_blank';
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    // Ouvrir l'URL de manière robuste (priorité à window.open pour éviter les bloqueurs de popups)
+    let opened = false;
+    try {
+      const win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      if (win && !win.closed && typeof win.closed !== 'undefined') {
+        opened = true;
+      }
+    } catch (e) {
+      console.warn("window.open a échoué", e);
+    }
 
-    // Fermer la modale après un bref délai pour garantir l'ouverture de l'onglet
+    // Fallback 1 : élément <a> dynamique
+    if (!opened) {
+      try {
+        const anchor = document.createElement('a');
+        anchor.href = targetUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        opened = true;
+      } catch (e) {
+        console.warn("L'ouverture via balise <a> a échoué", e);
+      }
+    }
+
+    // Fallback 2 : redirection directe dans le même onglet si l'ouverture dans un nouvel onglet a été bloquée
+    if (!opened) {
+      window.location.href = targetUrl;
+    }
+
+    // Message de confirmation
     setSuccessMessage(`Feuille Google Sheets ouverte ! Les données (${exportData.count} articles) ont été copiées dans le presse-papiers — collez avec Ctrl+V.`);
     setTimeout(() => {
       setSuccessMessage(null);
@@ -281,7 +326,7 @@ export default function ExportCatalogModal({
       setSheetUrlInput(targetUrl);
     }
     try {
-      localStorage.setItem(storageKey, targetUrl || 'https://docs.google.com/spreadsheets/');
+      localStorage.setItem(storageKey, targetUrl || 'https://sheets.new');
     } catch (e) {
       console.warn("Erreur sauvegarde URL", e);
     }
@@ -578,9 +623,9 @@ export default function ExportCatalogModal({
                           textOverflow: 'ellipsis',
                           fontFamily: 'monospace' 
                         }}
-                        title={sheetUrlInput || 'https://docs.google.com/spreadsheets/'}
+                        title={sheetUrlInput || 'https://sheets.new'}
                       >
-                        {sheetUrlInput ? sheetUrlInput.replace(/^https?:\/\//, '') : 'docs.google.com/spreadsheets'}
+                        {sheetUrlInput ? sheetUrlInput.replace(/^https?:\/\//, '') : 'sheets.new'}
                       </span>
                       <button
                         type="button"
