@@ -104,10 +104,32 @@ function LeafletZoneMap({ lat, lng, storeName, zones }) {
     });
     mapInstanceRef.current = map;
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    // Clé API CARTO Maps (paramétrée dans .env avec fallback de sécurité)
+    const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY || 'cb1_47to_1_39023a3cae806da7dd06d660';
+    const cartoTileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?api_key=${CARTO_API_KEY}`;
+
+    const tileLayer = L.tileLayer(cartoTileUrl, {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-    }).addTo(map);
+      subdomains: 'abcd',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>'
+    });
+
+    // Bascule automatique vers OpenStreetMap en cas de panne ou restriction réseau CARTO
+    tileLayer.on('tileerror', function () {
+      if (!this._hasFallback) {
+        this._hasFallback = true;
+        this.setUrl('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+      }
+    });
+
+    tileLayer.addTo(map);
+
+    // Forcer le calcul des dimensions après montage (évite les tuiles grises lors du changement d'onglet)
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 250);
 
     const colors = ['#002cf7', '#f97316', '#a855f7', '#10b981', '#ec4899', '#0284c7'];
     const sortedZones = [...zones].sort((a, b) => Number(b.max_km) - Number(a.max_km));
