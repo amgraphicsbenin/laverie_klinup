@@ -33,7 +33,9 @@ import {
   Tag,
   Shirt
 } from 'lucide-react';
+import { IconTag, IconUser, IconPhone, IconShirt } from '@tabler/icons-react';
 import CustomSelect from '../../../components/CustomSelect';
+import MultiSearchInput from '../../../components/ui/MultiSearchInput';
 import { exportOrdersCSV } from '../../../utils/exportUtils';
 
 // Helper component for rich Action Dropdown items
@@ -84,10 +86,10 @@ function ActionMenuItem({ icon: Icon, iconColor, label, onClick, color, isBold =
 
 // Types de recherche supportés dans la barre de recherche (icônes Tabler Lined)
 const SEARCH_TYPES = [
-  { id: 'id_code', label: 'N° Commande / Code', icon: Tag, placeholder: 'Entrez l\'ID ou code marquage...' },
-  { id: 'customer', label: 'Nom Client', icon: User, placeholder: 'Nom ou prénom du client...' },
-  { id: 'phone', label: 'Téléphone', icon: Phone, placeholder: 'Numéro de tél (ex: 97000000)...' },
-  { id: 'article', label: 'Article', icon: Shirt, placeholder: 'Nom d\'article (ex: Chemise, Robe...)...' }
+  { id: 'id_code', label: 'N° Commande / Code', icon: IconTag, placeholder: 'Entrez l\'ID ou code marquage...' },
+  { id: 'customer', label: 'Nom Client', icon: IconUser, placeholder: 'Nom ou prénom du client...' },
+  { id: 'phone', label: 'Téléphone', icon: IconPhone, placeholder: 'Numéro de tél (ex: 97000000)...' },
+  { id: 'article', label: 'Article', icon: IconShirt, placeholder: 'Nom d\'article (ex: Chemise, Robe...)...' }
 ];
 
 export default function OrdersTab({
@@ -530,93 +532,16 @@ export default function OrdersTab({
           {/* Bloc Recherche & Sélecteurs */}
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.55rem', flex: 1, minWidth: '280px' }}>
             {/* Barre de Recherche Multi-Critères (Sélecteur Type + Champ Saisie dynamique) */}
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'stretch',
-                borderRadius: '10px',
-                border: '1px solid var(--border-color)',
-                background: 'var(--bg-app)',
-                minWidth: '340px',
-                width: '390px',
-                maxWidth: '100%',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-              }}
-            >
-              {/* Sélecteur de Type de Recherche */}
-              <div style={{ width: '150px', flexShrink: 0 }}>
-                <CustomSelect
-                  value={searchType}
-                  onChange={(e) => setSearchType(e.target.value)}
-                  style={{
-                    fontSize: '0.76rem',
-                    fontWeight: 600,
-                    padding: '0.42rem 0.65rem',
-                    borderRadius: '9px 0 0 9px',
-                    background: 'transparent',
-                    border: 'none',
-                    borderRight: '1px solid var(--border-color)',
-                    height: '100%',
-                    color: 'var(--text-primary)'
-                  }}
-                  dropdownStyle={{ minWidth: '185px', zIndex: 1050 }}
-                >
-                  {SEARCH_TYPES.map(st => {
-                    const IconComp = st.icon;
-                    return (
-                      <option key={st.id} value={st.id}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-                          <IconComp size={14} />
-                          <span>{st.label}</span>
-                        </span>
-                      </option>
-                    );
-                  })}
-                </CustomSelect>
-              </div>
-
-              {/* Champ de Saisie de Recherche adapté au type sélectionné */}
-              <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-                <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                <input
-                  type={searchType === 'phone' ? 'tel' : 'text'}
-                  placeholder={searchPlaceholder}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    padding: '0.42rem 1.8rem 0.42rem 2rem',
-                    fontSize: '0.78rem',
-                    borderRadius: '0 9px 9px 0',
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--text-primary)',
-                    outline: 'none'
-                  }}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    title="Effacer la recherche"
-                    style={{
-                      position: 'absolute',
-                      right: '6px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--text-muted)',
-                      padding: 0
-                    }}
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
+            <MultiSearchInput
+              searchTypes={SEARCH_TYPES}
+              searchType={searchType}
+              onSearchTypeChange={setSearchType}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              width="390px"
+              minWidth="340px"
+              selectWidth="155px"
+            />
 
             {/* Sélecteur de Statut */}
             <div style={{ width: '150px' }}>

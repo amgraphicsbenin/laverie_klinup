@@ -1,8 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Plus, Search, Trash2, Edit, AlertCircle, Power, CheckCircle2, XCircle, ChevronDown, Upload, PlusCircle, Download, FileSpreadsheet, Zap } from 'lucide-react';
+import { IconShirt, IconTag, IconFileText, IconBuildingStore } from '@tabler/icons-react';
 import CustomSelect from '../../../components/CustomSelect';
+import MultiSearchInput from '../../../components/ui/MultiSearchInput';
 import ImportCatalogModal from './ImportCatalogModal';
 import ExportCatalogModal from './ExportCatalogModal';
+
+const CATALOG_SEARCH_TYPES = [
+  { id: 'article', label: 'Article / Produit', icon: IconShirt, placeholder: 'Nom d\'article (ex: Chemise, Pantalon...)...' },
+  { id: 'id', label: 'ID Produit', icon: IconTag, placeholder: 'ID ou référence du produit...' },
+  { id: 'description', label: 'Description', icon: IconFileText, placeholder: 'Mots-clés dans la description...' },
+  { id: 'store', label: 'Point de Laverie', icon: IconBuildingStore, placeholder: 'Nom ou code du point...' }
+];
 
 export default function CatalogTab({
   catalogCategory,
@@ -12,6 +21,8 @@ export default function CatalogTab({
   handleDeleteCatalogItemsBatch,
   catalogSearchText,
   setCatalogSearchText,
+  catalogSearchType = 'article',
+  setCatalogSearchType = () => {},
   catalogServiceFilter,
   setCatalogServiceFilter,
   catalogPriceFilter,
@@ -278,16 +289,15 @@ export default function CatalogTab({
 
       {/* Smart Filters panel */}
       <div className="smart-filter-panel">
-        <div className="search-control-container">
-          <Search size={16} className="search-control-icon" />
-          <input
-            type="text"
-            className="search-control-input"
-            placeholder="Rechercher un article..."
-            value={catalogSearchText}
-            onChange={(e) => setCatalogSearchText(e.target.value)}
-          />
-        </div>
+        <MultiSearchInput
+          searchTypes={CATALOG_SEARCH_TYPES}
+          searchType={catalogSearchType}
+          onSearchTypeChange={setCatalogSearchType}
+          searchQuery={catalogSearchText}
+          onSearchQueryChange={setCatalogSearchText}
+          width="380px"
+          minWidth="280px"
+        />
         
         {/* Filtre Point de Laverie */}
         {stores && stores.length > 0 && (

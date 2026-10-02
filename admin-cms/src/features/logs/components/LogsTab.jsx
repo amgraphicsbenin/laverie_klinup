@@ -34,12 +34,23 @@ import {
   Sparkles
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
+import MultiSearchInput from '../../../components/ui/MultiSearchInput';
+import { IconUser, IconActivity, IconFileText, IconTag } from '@tabler/icons-react';
 import { exportLogsCSV } from '../../../utils/exportUtils';
 import { db } from '../../../services/db';
+
+const LOGS_SEARCH_TYPES = [
+  { id: 'user', label: 'Utilisateur', icon: IconUser, placeholder: 'Nom, prénom ou email de l\'utilisateur...' },
+  { id: 'action', label: 'Type d\'Action', icon: IconActivity, placeholder: 'Intitulé ou code de l\'action...' },
+  { id: 'detail', label: 'Détails & Motif', icon: IconFileText, placeholder: 'Mots-clés dans les détails...' },
+  { id: 'id', label: 'ID Journal', icon: IconTag, placeholder: 'ID unique du log...' }
+];
 
 export default function LogsTab({
   logSearchText,
   setLogSearchText,
+  logSearchType = 'user',
+  setLogSearchType = () => {},
   logFilterAction,
   setLogFilterAction,
   filteredLogs,
@@ -156,22 +167,31 @@ export default function LogsTab({
       const meta = getActionMeta(log.action);
       const origin = getLogOrigin(log, user);
 
-      // 1. Filtre par recherche textuelle globale
+      // 1. Filtre par recherche textuelle selon logSearchType
       if (logSearchText) {
-        const query = logSearchText.toLowerCase();
+        const query = logSearchText.toLowerCase().trim();
         const userName = user ? `${user.prenom || ''} ${user.nom || ''}`.toLowerCase() : 'système';
         const userEmail = user?.email ? user.email.toLowerCase() : '';
         const actionLabel = (meta?.label || '').toLowerCase();
         const details = (log.details || '').toLowerCase();
         const logId = (log.id || '').toLowerCase();
 
-        const matchesSearch = userName.includes(query) ||
-          userEmail.includes(query) ||
-          actionLabel.includes(query) ||
-          details.includes(query) ||
-          logId.includes(query);
-
-        if (!matchesSearch) return false;
+        if (logSearchType === 'user') {
+          if (!userName.includes(query) && !userEmail.includes(query)) return false;
+        } else if (logSearchType === 'action') {
+          if (!actionLabel.includes(query) && !log.action.toLowerCase().includes(query)) return false;
+        } else if (logSearchType === 'detail') {
+          if (!details.includes(query)) return false;
+        } else if (logSearchType === 'id') {
+          if (!logId.includes(query)) return false;
+        } else {
+          const matchesSearch = userName.includes(query) ||
+            userEmail.includes(query) ||
+            actionLabel.includes(query) ||
+            details.includes(query) ||
+            logId.includes(query);
+          if (!matchesSearch) return false;
+        }
       }
 
       // 2. Filtre par Action Globale (Drop-down racine)
@@ -328,20 +348,22 @@ export default function LogsTab({
 
         {/* 3. BARRE DE FILTRES MULTI-CRITÈRES */}
         <div className="smart-filter-panel">
-          {/* Recherche Textuelle */}
-          <div className="search-control-container" style={{ flex: '1 1 240px' }}>
-            <Search size={15} className="search-control-icon" />
-            <input
-              type="text"
-              className="search-control-input"
-              placeholder="Rechercher par nom, email, détail, motif..."
-              value={logSearchText}
-              onChange={(e) => {
-                setLogSearchText(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-          </div>
+          {/* Recherche Textuelle Multi-Critères */}
+          <MultiSearchInput
+            searchTypes={LOGS_SEARCH_TYPES}
+            searchType={logSearchType}
+            onSearchTypeChange={(type) => {
+              setLogSearchType(type);
+              setCurrentPage(1);
+            }}
+            searchQuery={logSearchText}
+            onSearchQueryChange={(query) => {
+              setLogSearchText(query);
+              setCurrentPage(1);
+            }}
+            width="390px"
+            minWidth="280px"
+          />
 
           {/* Filtre par Origine Plateforme */}
           <div className="select-control-wrapper" style={{ minWidth: '160px' }}>

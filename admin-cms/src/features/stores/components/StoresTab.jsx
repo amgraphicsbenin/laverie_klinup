@@ -3,6 +3,15 @@ import { createPortal } from 'react-dom';
 import { db } from '../../../services/db';
 import StatefulButton from '../../../components/ui/StatefulButton';
 import TablerIcon from '../../../components/icons/tablerIcons';
+import MultiSearchInput from '../../../components/ui/MultiSearchInput';
+import { IconBuildingStore, IconTag, IconMapPin, IconUser } from '@tabler/icons-react';
+
+const STORE_SEARCH_TYPES = [
+  { id: 'name', label: 'Nom du Point', icon: IconBuildingStore, placeholder: 'Nom du point de laverie...' },
+  { id: 'code', label: 'Code Point', icon: IconTag, placeholder: 'Code (ex: KLP-101, HQ)...' },
+  { id: 'ville', label: 'Ville & Adresse', icon: IconMapPin, placeholder: 'Ville ou adresse physique...' },
+  { id: 'manager', label: 'Responsable', icon: IconUser, placeholder: 'Nom du responsable...' }
+];
 
 export default function StoresTab({ onShowSuccess }) {
   useEffect(() => {
@@ -34,6 +43,7 @@ export default function StoresTab({ onShowSuccess }) {
   }
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState('name'); // 'name' | 'code' | 'ville' | 'manager'
   const [statusFilter, setStatusFilter] = useState('tous'); // tous, actif, inactif
 
   // Modal State
@@ -162,12 +172,19 @@ export default function StoresTab({ onShowSuccess }) {
 
   const filteredStores = stores.filter(s => {
     const q = searchQuery.toLowerCase().trim();
-    const matchesSearch = !q || (
-      (s.nom && s.nom.toLowerCase().includes(q)) ||
-      (s.code && s.code.toLowerCase().includes(q)) ||
-      (s.ville && s.ville.toLowerCase().includes(q)) ||
-      (s.adresse && s.adresse.toLowerCase().includes(q))
-    );
+    let matchesSearch = true;
+    if (q) {
+      if (searchType === 'code') {
+        matchesSearch = !!(s.code && s.code.toLowerCase().includes(q));
+      } else if (searchType === 'ville') {
+        matchesSearch = !!((s.ville && s.ville.toLowerCase().includes(q)) || (s.adresse && s.adresse.toLowerCase().includes(q)));
+      } else if (searchType === 'manager') {
+        matchesSearch = !!(s.responsable_nom && s.responsable_nom.toLowerCase().includes(q));
+      } else {
+        // 'name'
+        matchesSearch = !!(s.nom && s.nom.toLowerCase().includes(q));
+      }
+    }
     const matchesStatus = statusFilter === 'tous' || s.statut === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -225,24 +242,15 @@ export default function StoresTab({ onShowSuccess }) {
       {/* TOOLBAR & SEARCH */}
       <div className="card" style={{ padding: '1rem 1.25rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '280px' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <TablerIcon name="search" size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="Rechercher un point par nom, code, ville, adresse..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.6rem 1rem 0.6rem 2.4rem',
-                borderRadius: '10px',
-                border: '1px solid var(--border-color)',
-                outline: 'none',
-                fontSize: '0.88rem',
-                background: 'var(--bg-app)'
-              }}
-            />
-          </div>
+          <MultiSearchInput
+            searchTypes={STORE_SEARCH_TYPES}
+            searchType={searchType}
+            onSearchTypeChange={setSearchType}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            width="420px"
+            minWidth="280px"
+          />
 
           <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--bg-app)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
             <button

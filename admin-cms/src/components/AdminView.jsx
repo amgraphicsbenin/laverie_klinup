@@ -307,6 +307,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const [catalogCategory, setCatalogCategory] = useState('individuel'); // 'individuel' or 'abonnement'
   const [selectedCatalogIds, setSelectedCatalogIds] = useState([]);
   const [catalogSearchText, setCatalogSearchText] = useState('');
+  const [catalogSearchType, setCatalogSearchType] = useState('article'); // 'article' | 'id' | 'description' | 'store'
   const [catalogServiceFilter, setCatalogServiceFilter] = useState('all');
   const [catalogPriceFilter, setCatalogPriceFilter] = useState('all');
   const [catalogSortOrder, setCatalogSortOrder] = useState('name_asc');
@@ -387,7 +388,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
   useEffect(() => {
     setCatalogCurrentPage(1);
-  }, [catalogSearchText, catalogServiceFilter, catalogPriceFilter, catalogSortOrder, catalogStoreFilter]);
+  }, [catalogSearchText, catalogSearchType, catalogServiceFilter, catalogPriceFilter, catalogSortOrder, catalogStoreFilter]);
 
   const [timerSeconds, setTimerSeconds] = useState(5048); // 01:24:08 by default
   const [isTimerRunning, setIsTimerRunning] = useState(true);
@@ -417,6 +418,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   // Logs filters
   const [logFilterAction, setLogFilterAction] = useState('all');
   const [logSearchText, setLogSearchText] = useState('');
+  const [logSearchType, setLogSearchType] = useState('user'); // 'user' | 'action' | 'detail' | 'id'
 
   // Staff Access management states
   const [selectedStaffId, setSelectedStaffId] = useState('');
@@ -1313,10 +1315,24 @@ export default function AdminView({ activeTab, onManageStaff }) {
       // Search query
       const activeSearch = catalogSearchText;
       if (activeSearch) {
-        const q = activeSearch.toLowerCase();
-        const matchName = item.article ? item.article.toLowerCase().includes(q) : false;
-        const matchDesc = item.description ? item.description.toLowerCase().includes(q) : false;
-        return matchName || matchDesc;
+        const q = activeSearch.toLowerCase().trim();
+        if (catalogSearchType === 'id') {
+          const matchId = item.id ? String(item.id).toLowerCase().includes(q) : false;
+          const matchAllIds = item.allIds ? item.allIds.some(subId => String(subId).toLowerCase().includes(q)) : false;
+          if (!matchId && !matchAllIds) return false;
+        } else if (catalogSearchType === 'description') {
+          const matchDesc = item.description ? item.description.toLowerCase().includes(q) : false;
+          if (!matchDesc) return false;
+        } else if (catalogSearchType === 'store') {
+          const targetStore = stores.find(s => s.id === item.store_id || s.code === item.store_id);
+          const storeName = (targetStore?.nom || item.store_name || item.store_id || '').toLowerCase();
+          const storeCode = (targetStore?.code || '').toLowerCase();
+          if (!storeName.includes(q) && !storeCode.includes(q)) return false;
+        } else {
+          // 'article'
+          const matchName = item.article ? item.article.toLowerCase().includes(q) : false;
+          if (!matchName) return false;
+        }
       }
       
       // Service filter for clothes
@@ -1362,7 +1378,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
   // BUG FIX: Memoize to avoid expensive recompute on every re-render
   const filteredCatalog = useMemo(() => getGroupedCatalog(), [
-    catalog, catalogStoreFilter, catalogCategory, catalogSearchText,
+    catalog, catalogStoreFilter, catalogCategory, catalogSearchText, catalogSearchType,
     catalogServiceFilter, catalogPriceFilter, catalogSortOrder, stores
   ]);
 
@@ -1372,11 +1388,25 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
     const activeSearch = logSearchText;
     if (activeSearch) {
-      const searchLower = activeSearch.toLowerCase();
+      const searchLower = activeSearch.toLowerCase().trim();
       const user = staff.find(s => s.id === log.user_id);
-      const userName = user ? `${user.prenom} ${user.nom}`.toLowerCase() : 'système';
+      const userName = user ? `${user.prenom || ''} ${user.nom || ''}`.toLowerCase() : 'système';
+      const userEmail = user?.email ? user.email.toLowerCase() : '';
+
+      if (logSearchType === 'user') {
+        return userName.includes(searchLower) || userEmail.includes(searchLower);
+      }
+      if (logSearchType === 'action') {
+        return log.action.toLowerCase().includes(searchLower);
+      }
+      if (logSearchType === 'detail') {
+        return (log.details || '').toLowerCase().includes(searchLower);
+      }
+      if (logSearchType === 'id') {
+        return (log.id || '').toLowerCase().includes(searchLower);
+      }
       return (
-        log.details.toLowerCase().includes(searchLower) ||
+        (log.details || '').toLowerCase().includes(searchLower) ||
         log.action.toLowerCase().includes(searchLower) ||
         userName.includes(searchLower)
       );
@@ -2558,6 +2588,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
           handleDeleteCatalogItemsBatch={handleDeleteCatalogItemsBatch}
           catalogSearchText={catalogSearchText}
           setCatalogSearchText={setCatalogSearchText}
+          catalogSearchType={catalogSearchType}
+          setCatalogSearchType={setCatalogSearchType}
           catalogServiceFilter={catalogServiceFilter}
           setCatalogServiceFilter={setCatalogServiceFilter}
           catalogPriceFilter={catalogPriceFilter}
@@ -2605,6 +2637,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
         <LogsTab
           logSearchText={logSearchText}
           setLogSearchText={setLogSearchText}
+          logSearchType={logSearchType}
+          setLogSearchType={setLogSearchType}
           logFilterAction={logFilterAction}
           setLogFilterAction={setLogFilterAction}
           filteredLogs={filteredLogs}

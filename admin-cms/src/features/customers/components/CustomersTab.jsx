@@ -36,12 +36,21 @@ import {
   ArrowDown
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
+import MultiSearchInput from '../../../components/ui/MultiSearchInput';
+import { IconUser, IconPhone, IconTag, IconMapPin } from '@tabler/icons-react';
 import { exportCustomersCSV } from '../../../utils/exportUtils';
 import { getFidelityTier, FIDELITY_TIERS, REWARD_CATALOG, renderTierIcon, renderRewardIcon } from '../../../utils/fidelityUtils.jsx';
 import { countries } from '../../../utils/countriesData';
 import { validatePhoneNumber, normalizePhoneNumber } from '../../../utils/phoneUtils';
 import { db } from '../../../services/db';
 import StatefulButton from '../../../components/ui/StatefulButton';
+
+const CUSTOMER_SEARCH_TYPES = [
+  { id: 'customer', label: 'Nom Client', icon: IconUser, placeholder: 'Nom ou prénom du client...' },
+  { id: 'phone', label: 'Téléphone', icon: IconPhone, placeholder: 'Numéro de tél (ex: 97000000)...', inputType: 'tel' },
+  { id: 'id', label: 'Réf Client', icon: IconTag, placeholder: 'Réf ou ID client...' },
+  { id: 'adresse', label: 'Adresse / Quartier', icon: IconMapPin, placeholder: 'Adresse, quartier, ville...' }
+];
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -70,6 +79,7 @@ export default function CustomersTab({
   setCreatedOrder
 }) {
   const [filterMode, setFilterMode] = useState('all'); // 'all', 'abonne', 'dette', 'fidelite'
+  const [crmSearchType, setCrmSearchType] = useState('customer'); // 'customer' | 'phone' | 'id' | 'adresse'
   const [tierFilter, setTierFilter] = useState('all'); // 'all', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM'
   const [storeFilter, setStoreFilter] = useState('all'); // 'all' or store_id
   const [copiedId, setCopiedId] = useState(null);
@@ -550,19 +560,25 @@ export default function CustomersTab({
       {(() => {
         const query = (crmSearch || '').toLowerCase().trim();
         let filteredCrm = (customers || []).filter(c => {
-          const nom = (c.nom || '').toLowerCase();
-          const prenom = (c.prenom || '').toLowerCase();
-          const fullName = `${prenom} ${nom}`.trim();
-          const reverseFullName = `${nom} ${prenom}`.trim();
-          const tel = (c.telephone || '').toLowerCase();
-          const matchesQuery = !query ||
-            nom.includes(query) ||
-            prenom.includes(query) ||
-            fullName.includes(query) ||
-            reverseFullName.includes(query) ||
-            tel.includes(query);
-
-          if (!matchesQuery) return false;
+          if (query) {
+            if (crmSearchType === 'phone') {
+              const tel = (c.telephone || '').toLowerCase();
+              if (!tel.includes(query)) return false;
+            } else if (crmSearchType === 'id') {
+              const id = String(c.id || '').toLowerCase();
+              if (!id.includes(query)) return false;
+            } else if (crmSearchType === 'adresse') {
+              const fullAddr = `${c.adresse || ''} ${c.quartier || ''} ${c.ville || ''}`.toLowerCase();
+              if (!fullAddr.includes(query)) return false;
+            } else {
+              // 'customer'
+              const nom = (c.nom || '').toLowerCase();
+              const prenom = (c.prenom || '').toLowerCase();
+              const fullName = `${prenom} ${nom}`.trim();
+              const reverseFullName = `${nom} ${prenom}`.trim();
+              if (!nom.includes(query) && !prenom.includes(query) && !fullName.includes(query) && !reverseFullName.includes(query)) return false;
+            }
+          }
           if (storeFilter !== 'all') {
             const matchStore = c.store_id === storeFilter ||
               availableStores.some(s => (s.id === storeFilter && s.code === c.store_id) || (s.code === storeFilter && s.id === c.store_id));
@@ -643,18 +659,17 @@ export default function CustomersTab({
                 </p>
               </div>
 
-              {/* Barre de Recherche & Filtre Point de Laverie */}
+              {/* Barre de Recherche Multi-Critères & Filtre Point de Laverie */}
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div className="search-control-container" style={{ flex: 1, minWidth: '260px' }}>
-                  <Search size={15} className="search-control-icon" />
-                  <input
-                    type="text"
-                    className="search-control-input"
-                    placeholder="Rechercher par Nom, Prénom ou Tél..."
-                    value={crmSearch}
-                    onChange={(e) => setCrmSearch(e.target.value)}
-                  />
-                </div>
+                <MultiSearchInput
+                  searchTypes={CUSTOMER_SEARCH_TYPES}
+                  searchType={crmSearchType}
+                  onSearchTypeChange={setCrmSearchType}
+                  searchQuery={crmSearch}
+                  onSearchQueryChange={setCrmSearch}
+                  width="390px"
+                  minWidth="280px"
+                />
                 {availableStores.length > 0 && (
                   <div style={{ minWidth: '180px' }}>
                     <CustomSelect

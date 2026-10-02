@@ -40,8 +40,23 @@ import {
   ToggleRight
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
+import MultiSearchInput from '../../../components/ui/MultiSearchInput';
+import { IconUser, IconMail, IconPhone, IconShieldCheck, IconFileText, IconTag } from '@tabler/icons-react';
 import { db } from '../../../services/db';
 import StatefulButton from '../../../components/ui/StatefulButton';
+
+const STAFF_SEARCH_TYPES = [
+  { id: 'name', label: 'Nom & Prénom', icon: IconUser, placeholder: 'Nom ou prénom du collaborateur...' },
+  { id: 'email', label: 'Email', icon: IconMail, placeholder: 'Adresse email professionnelle...' },
+  { id: 'phone', label: 'Téléphone', icon: IconPhone, placeholder: 'Numéro de téléphone...', inputType: 'tel' },
+  { id: 'role', label: 'Rôle / Poste', icon: IconShieldCheck, placeholder: 'Intitulé de poste ou rôle...' }
+];
+
+const ROLE_SEARCH_TYPES = [
+  { id: 'name', label: 'Nom du Rôle', icon: IconShieldCheck, placeholder: 'Nom ou intitulé du rôle...' },
+  { id: 'description', label: 'Description', icon: IconFileText, placeholder: 'Mots-clés dans la description...' },
+  { id: 'key', label: 'Identifiant / Clé', icon: IconTag, placeholder: 'Clé technique du rôle...' }
+];
 
 const PERMISSIONS_CONFIG = [
   // --- PLATAFORME ADMIN CMS ---
@@ -196,6 +211,7 @@ export default function StaffTab({
 
   // États pour la page "Gestion Utilisateurs" (Design & Flow identique au Catalogue)
   const [searchTerm, setSearchTerm] = useState('');
+  const [staffSearchType, setStaffSearchType] = useState('name'); // 'name' | 'email' | 'phone' | 'role'
   const [roleFilter, setRoleFilter] = useState('all');
   const [localStoreFilter, setLocalStoreFilter] = useState('all');
   const storeFilter = propStoreFilter !== undefined ? propStoreFilter : localStoreFilter;
@@ -216,7 +232,7 @@ export default function StaffTab({
   // Reset pagination on filter change (BUG-06)
   useEffect(() => {
     setStaffCurrentPage(1);
-  }, [searchTerm, roleFilter, storeFilter, statusFilter]);
+  }, [searchTerm, staffSearchType, roleFilter, storeFilter, statusFilter]);
 
   // Modale d'édition de profil utilisateur
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -232,6 +248,7 @@ export default function StaffTab({
   const [showViewRoleModal, setShowViewRoleModal] = useState(false);
   const [showEditRoleModal, setShowEditRoleModal] = useState(false);
   const [roleSearch, setRoleSearch] = useState('');
+  const [roleSearchType, setRoleSearchType] = useState('name'); // 'name' | 'description' | 'key'
   const [roleTypeFilter, setRoleTypeFilter] = useState('all');
   const [editRoleLabel, setEditRoleLabel] = useState('');
   const [editRoleShortLabel, setEditRoleShortLabel] = useState('');
@@ -327,9 +344,26 @@ export default function StaffTab({
     const nom = (s.nom || '').toLowerCase();
     const email = (s.email || '').toLowerCase();
     const tel = (s.telephone || '').toLowerCase();
-    const query = searchTerm.toLowerCase();
+    const query = searchTerm.toLowerCase().trim();
 
-    const matchesSearch = prenom.includes(query) || nom.includes(query) || email.includes(query) || tel.includes(query);
+    let matchesSearch = true;
+    if (query) {
+      if (staffSearchType === 'email') {
+        matchesSearch = email.includes(query);
+      } else if (staffSearchType === 'phone') {
+        matchesSearch = tel.includes(query);
+      } else if (staffSearchType === 'role') {
+        const roleObj = rolesList.find(r => r.key === s.role || r.id === s.role);
+        const roleLabel = (roleObj?.label || roleObj?.shortLabel || s.role || '').toLowerCase();
+        matchesSearch = roleLabel.includes(query);
+      } else {
+        // 'name'
+        const fullName = `${prenom} ${nom}`.trim();
+        const reverseName = `${nom} ${prenom}`.trim();
+        matchesSearch = prenom.includes(query) || nom.includes(query) || fullName.includes(query) || reverseName.includes(query);
+      }
+    }
+
     const matchesRole = roleFilter === 'all' || s.role === roleFilter || (rolesList.some(r => (r.key === roleFilter || r.id === roleFilter) && (r.key === s.role || r.id === s.role)));
     const sStoreId = s.store_id || s.laverie_id || s.store_code || s.laverie;
     const matchesStore = storeFilter === 'all' ||
@@ -358,7 +392,18 @@ export default function StaffTab({
     const desc = (role.description || '').toLowerCase();
     const key = (role.key || '').toLowerCase();
 
-    const matchesSearch = !query || label.includes(query) || shortLabel.includes(query) || desc.includes(query) || key.includes(query);
+    let matchesSearch = true;
+    if (query) {
+      if (roleSearchType === 'description') {
+        matchesSearch = desc.includes(query);
+      } else if (roleSearchType === 'key') {
+        matchesSearch = key.includes(query);
+      } else {
+        // 'name'
+        matchesSearch = label.includes(query) || shortLabel.includes(query);
+      }
+    }
+
     const matchesType =
       roleTypeFilter === 'all' ||
       (roleTypeFilter === 'system' && role.isSystem) ||
@@ -656,29 +701,22 @@ export default function StaffTab({
           {/* BARRE DE FILTRES INTELLIGENTS ET RECHERCHE */}
           <div className="smart-filter-panel">
             
-            {/* Zone de Recherche Texte */}
-            <div className="search-control-container">
-              <Search size={16} className="search-control-icon" />
-              <input
-                type="text"
-                className="search-control-input"
-                placeholder="Rechercher par nom, prénom, email, téléphone..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setStaffCurrentPage(1);
-                }}
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="search-control-clear"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
+            {/* Barre de Recherche Multi-Critères */}
+            <MultiSearchInput
+              searchTypes={STAFF_SEARCH_TYPES}
+              searchType={staffSearchType}
+              onSearchTypeChange={(type) => {
+                setStaffSearchType(type);
+                setStaffCurrentPage(1);
+              }}
+              searchQuery={searchTerm}
+              onSearchQueryChange={(query) => {
+                setSearchTerm(query);
+                setStaffCurrentPage(1);
+              }}
+              width="390px"
+              minWidth="280px"
+            />
 
             {/* Filtre Rôle */}
             <div className="select-control-wrapper" style={{ minWidth: '170px' }}>
@@ -1241,27 +1279,17 @@ export default function StaffTab({
               </button>
             </div>
 
-            {/* Barre de Recherche & Filtres par type et point de laverie */}
+            {/* Barre de Recherche Multi-Critères & Filtres par type et point de laverie */}
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div className="search-control-container" style={{ flex: 1, minWidth: '240px' }}>
-                <Search size={15} className="search-control-icon" />
-                <input
-                  type="text"
-                  className="search-control-input"
-                  placeholder="Rechercher par nom de rôle, tag, description..."
-                  value={roleSearch}
-                  onChange={(e) => setRoleSearch(e.target.value)}
-                />
-                {roleSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setRoleSearch('')}
-                    className="search-control-clear"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
+              <MultiSearchInput
+                searchTypes={ROLE_SEARCH_TYPES}
+                searchType={roleSearchType}
+                onSearchTypeChange={setRoleSearchType}
+                searchQuery={roleSearch}
+                onSearchQueryChange={setRoleSearch}
+                width="380px"
+                minWidth="260px"
+              />
 
               {/* Filtre Point de Laverie */}
               <div className="select-control-wrapper" style={{ minWidth: '170px' }}>
