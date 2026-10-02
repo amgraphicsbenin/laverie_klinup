@@ -429,14 +429,13 @@ const dynamicComponents = {
   "search": IconSearch,
 };
 
+export const dynamicMap = dynamicComponents;
+
 // Composant TablerIcon universel pour rendu dynamique par nom (ex: <TablerIcon name="settings" size={20} />)
 export const TablerIcon = forwardRef(({ name, size = 20, color = 'currentColor', stroke = 1.8, strokeWidth, className = '', style = {}, ...rest }, ref) => {
   if (!name) return null;
   const cleanName = String(name).trim();
-  const tablerKey = dynamicMap[cleanName] || 
-    (cleanName.startsWith('Icon') ? cleanName : ('Icon' + cleanName.charAt(0).toUpperCase() + cleanName.slice(1)));
-  
-  const Component = Tabler[tablerKey] || IconHelpCircle;
+  const Component = dynamicComponents[cleanName] || dynamicComponents[cleanName.toLowerCase()] || IconHelpCircle;
   return (
     <Component
       ref={ref}
