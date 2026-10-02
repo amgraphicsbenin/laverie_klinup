@@ -1093,7 +1093,10 @@ export default function ExportCatalogModal({
                       boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
                     }}
                   >
-                    ✓ Terminé
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Check size={16} />
+                      <span>Terminé</span>
+                    </span>
                   </button>
                 </div>
               </div>

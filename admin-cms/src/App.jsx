@@ -483,7 +483,7 @@ function App() {
       if (selectedLoginUser.code_pin === newCode) {
         setIsUnlocking(true);
         if (newCode === '000000') {
-          alert("🔒 Sécurité : Vous êtes connecté avec le PIN par défaut (000000). Pensez à réinitialiser votre PIN.");
+          alert("Sécurité : Vous êtes connecté avec le PIN par défaut (000000). Pensez à réinitialiser votre PIN.");
         }
         setTimeout(() => {
           db.setCurrentUser(selectedLoginUser);
@@ -627,7 +627,9 @@ function App() {
           textAlign: 'center',
           display: 'flex', flexDirection: 'column', gap: '1rem'
         }}>
-          <div style={{ color: '#ef4444', fontSize: '2rem' }}>⚠️</div>
+          <div style={{ color: '#ef4444', display: 'flex', justifyContent: 'center' }}>
+            <MIcon name="error" size={44} />
+          </div>
           <h2 style={{ color: '#fca5a5', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
             Connexion impossible
           </h2>

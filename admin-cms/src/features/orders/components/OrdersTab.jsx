@@ -29,7 +29,9 @@ import {
   Building2,
   SlidersHorizontal,
   ArrowUpDown,
-  X
+  X,
+  Tag,
+  Shirt
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import { exportOrdersCSV } from '../../../utils/exportUtils';
@@ -80,12 +82,12 @@ function ActionMenuItem({ icon: Icon, iconColor, label, onClick, color, isBold =
   );
 }
 
-// Types de recherche supportés dans la barre de recherche
+// Types de recherche supportés dans la barre de recherche (icônes Tabler Lined)
 const SEARCH_TYPES = [
-  { id: 'id_code', label: '🏷️ N° Commande / Code', placeholder: 'Entrez l\'ID ou code marquage...' },
-  { id: 'customer', label: '👤 Nom Client', placeholder: 'Nom ou prénom du client...' },
-  { id: 'phone', label: '📞 Téléphone', placeholder: 'Numéro de tél (ex: 97000000)...' },
-  { id: 'article', label: '👕 Article', placeholder: 'Nom d\'article (ex: Chemise, Robe...)...' }
+  { id: 'id_code', label: 'N° Commande / Code', icon: Tag, placeholder: 'Entrez l\'ID ou code marquage...' },
+  { id: 'customer', label: 'Nom Client', icon: User, placeholder: 'Nom ou prénom du client...' },
+  { id: 'phone', label: 'Téléphone', icon: Phone, placeholder: 'Numéro de tél (ex: 97000000)...' },
+  { id: 'article', label: 'Article', icon: Shirt, placeholder: 'Nom d\'article (ex: Chemise, Robe...)...' }
 ];
 
 export default function OrdersTab({
@@ -559,9 +561,17 @@ export default function OrdersTab({
                   }}
                   dropdownStyle={{ minWidth: '185px', zIndex: 1050 }}
                 >
-                  {SEARCH_TYPES.map(st => (
-                    <option key={st.id} value={st.id}>{st.label}</option>
-                  ))}
+                  {SEARCH_TYPES.map(st => {
+                    const IconComp = st.icon;
+                    return (
+                      <option key={st.id} value={st.id}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <IconComp size={14} />
+                          <span>{st.label}</span>
+                        </span>
+                      </option>
+                    );
+                  })}
                 </CustomSelect>
               </div>
 
@@ -722,12 +732,13 @@ export default function OrdersTab({
             {[
               { id: 'all', label: `Toutes (${orders.length})` },
               { id: 'actives', label: `Actives (${activeOrders.length})` },
-              { id: 'express', label: `🔥 Express (${expressOrdersCount})`, color: '#d97706' },
-              { id: 'retard', label: `⚠️ Retard (${lateOrdersCount})`, color: '#ef4444' },
-              { id: 'reste_a_payer', label: '💳 Reste à payer' },
-              { id: 'solde', label: '✅ Soldées' }
+              { id: 'express', label: `Express (${expressOrdersCount})`, icon: Zap },
+              { id: 'retard', label: `Retard (${lateOrdersCount})`, icon: AlertTriangle },
+              { id: 'reste_a_payer', label: 'Reste à payer', icon: CreditCard },
+              { id: 'solde', label: 'Soldées', icon: CheckCircle2 }
             ].map(pill => {
               const isActive = quickFilter === pill.id;
+              const PillIcon = pill.icon;
               return (
                 <button
                   key={pill.id}
@@ -739,13 +750,17 @@ export default function OrdersTab({
                     fontWeight: 700,
                     borderRadius: '7px',
                     border: isActive ? '1px solid transparent' : '1px solid var(--border-color)',
-                    background: isActive ? (pill.color || 'var(--primary)') : 'var(--bg-app)',
+                    background: isActive ? 'var(--primary)' : 'var(--bg-app)',
                     color: isActive ? '#fff' : 'var(--text-secondary)',
                     cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  {pill.label}
+                  {PillIcon && <PillIcon size={12} />}
+                  <span>{pill.label}</span>
                 </button>
               );
             })}
@@ -1218,8 +1233,9 @@ export default function OrdersTab({
                                   Point de Traitement : <strong style={{ color: 'var(--text-primary)' }}>{currentStore?.nom || 'Agence Principale'} ({currentStore?.code || 'HQ'})</strong>
                                 </div>
                                 {order.cree_par_livreur && (
-                                  <div style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', background: 'rgba(79, 70, 229, 0.08)', color: '#4f46e5', fontWeight: 600, fontSize: '0.72rem' }}>
-                                    🚚 Commande collectée sur le terrain par le livreur
+                                  <div style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', background: 'rgba(79, 70, 229, 0.08)', color: '#4f46e5', fontWeight: 600, fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <Truck size={14} />
+                                    <span>Commande collectée sur le terrain par le livreur</span>
                                   </div>
                                 )}
                               </div>

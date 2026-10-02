@@ -9,7 +9,10 @@ import {
   CheckCircle2, 
   Info, 
   Store, 
-  RefreshCw
+  RefreshCw,
+  AlertTriangle,
+  XCircle,
+  Check
 } from 'lucide-react';
 import { db } from '../../../services/db';
 import CustomSelect from '../../../components/CustomSelect';
@@ -1096,17 +1099,17 @@ export default function ImportCatalogModal({
                     <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                       Aperçu ({parsedData.stats.total} ligne{parsedData.stats.total > 1 ? 's' : ''}) :
                     </span>
-                    <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(22, 163, 74, 0.1)', color: '#16a34a', fontWeight: 700 }}>
-                      ✓ {parsedData.stats.valid} nouveau{parsedData.stats.valid > 1 ? 'x' : ''}
+                    <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(22, 163, 74, 0.1)', color: '#16a34a', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle2 size={12} /> {parsedData.stats.valid} nouveau{parsedData.stats.valid > 1 ? 'x' : ''}
                     </span>
                     {parsedData.stats.duplicates > 0 && (
-                      <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(217, 119, 6, 0.1)', color: '#d97706', fontWeight: 700 }}>
-                        ⚠ {parsedData.stats.duplicates} existant{parsedData.stats.duplicates > 1 ? 's' : ''}
+                      <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(217, 119, 6, 0.1)', color: '#d97706', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertTriangle size={12} /> {parsedData.stats.duplicates} existant{parsedData.stats.duplicates > 1 ? 's' : ''}
                       </span>
                     )}
                     {parsedData.stats.invalid > 0 && (
-                      <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(220, 38, 38, 0.1)', color: '#dc2626', fontWeight: 700 }}>
-                        ✕ {parsedData.stats.invalid} invalide{parsedData.stats.invalid > 1 ? 's' : ''}
+                      <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'rgba(220, 38, 38, 0.1)', color: '#dc2626', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <XCircle size={12} /> {parsedData.stats.invalid} invalide{parsedData.stats.invalid > 1 ? 's' : ''}
                       </span>
                     )}
                   </div>
@@ -1264,6 +1267,9 @@ export default function ImportCatalogModal({
                             {/* Statut de la ligne */}
                             <td style={{ padding: '0.45rem 0.75rem', textAlign: 'right' }}>
                               <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
                                 fontSize: '0.68rem',
                                 fontWeight: 700,
                                 padding: '0.2rem 0.5rem',
@@ -1272,7 +1278,13 @@ export default function ImportCatalogModal({
                                 background: !row.isValid ? 'rgba(220, 38, 38, 0.12)' : (row.isDuplicate ? 'rgba(217, 119, 6, 0.1)' : 'rgba(22, 163, 74, 0.1)'),
                                 border: !row.isValid ? '1px solid rgba(220, 38, 38, 0.3)' : 'none'
                               }}>
-                                {!row.isValid ? `✕ REJETÉ` : (row.isDuplicate ? (updateExisting ? 'Mise à jour' : 'Ignoré (Doublon)') : '✓ Valide')}
+                                {!row.isValid ? (
+                                  <><XCircle size={11} /> REJETÉ</>
+                                ) : (row.isDuplicate ? (
+                                  <>{updateExisting ? 'Mise à jour' : 'Ignoré (Doublon)'}</>
+                                ) : (
+                                  <><CheckCircle2 size={11} /> Valide</>
+                                ))}
                               </span>
                             </td>
 
@@ -1365,7 +1377,7 @@ export default function ImportCatalogModal({
               ) : parsedData.stats.isTemplateRejected ? (
                 <>
                   <AlertCircle size={15} />
-                  <span>⛔ Importation bloquée (Template rejeté)</span>
+                  <span>Importation bloquée (Template rejeté)</span>
                 </>
               ) : (
                 <>

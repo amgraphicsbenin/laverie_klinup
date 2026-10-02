@@ -314,9 +314,10 @@ ${payload.steps_to_reproduce ? `#### 🔄 Étapes pour reproduire :\n${payload.s
             <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-primary)' }}>Email du Support Développeur</div>
             <a
               href="mailto:andre.koutomi98@gmail.com"
-              style={{ fontSize: '0.82rem', color: '#a855f7', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.15rem' }}
+              style={{ fontSize: '0.82rem', color: '#a855f7', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}
             >
-              andre.koutomi98@gmail.com ✉
+              <span>andre.koutomi98@gmail.com</span>
+              <Mail size={14} />
             </a>
           </div>
         </div>

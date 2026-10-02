@@ -449,7 +449,7 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                         fontSize: '12px',
                         fontWeight: 'bold'
                       }}>
-                        {payWithSubscription && '✓'}
+                        {payWithSubscription && <Check size={11} strokeWidth={2.5} />}
                       </div>
                       <span style={{ fontSize: '13px', fontWeight: 700, color: subscribePlanId ? '#a1a1aa' : '#002cf7' }}>
                         Régler avec l'abonnement
@@ -880,9 +880,9 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
             <button
               type="button"
               onClick={() => setWithDelivery(!withDelivery)}
-              style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', backgroundColor: withDelivery ? '#3b82f6' : 'var(--border-color)', color: withDelivery ? '#ffffff' : 'var(--text-secondary)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+              style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', backgroundColor: withDelivery ? '#3b82f6' : 'var(--border-color)', color: withDelivery ? '#ffffff' : 'var(--text-secondary)', fontWeight: 700, fontSize: '13px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
             >
-              {withDelivery ? '✓ Oui' : 'Non'}
+              {withDelivery ? <><Check size={13} strokeWidth={2.5} /> Oui</> : 'Non'}
             </button>
           </div>
 
@@ -901,9 +901,9 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
             <button
               type="button"
               onClick={() => setWithPickup(!withPickup)}
-              style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', backgroundColor: withPickup ? '#8b5cf6' : 'var(--border-color)', color: withPickup ? '#ffffff' : 'var(--text-secondary)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+              style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', backgroundColor: withPickup ? '#8b5cf6' : 'var(--border-color)', color: withPickup ? '#ffffff' : 'var(--text-secondary)', fontWeight: 700, fontSize: '13px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
             >
-              {withPickup ? '✓ Oui' : 'Non'}
+              {withPickup ? <><Check size={13} strokeWidth={2.5} /> Oui</> : 'Non'}
             </button>
           </div>
 

@@ -353,7 +353,7 @@ export default function LogsTab({
               <option value="all">Toutes Origines</option>
               <option value="admin">Admin CMS</option>
               <option value="mobile">App Mobile</option>
-              <option value="system">🤖 Système</option>
+              <option value="system">Système</option>
             </CustomSelect>
           </div>
 
@@ -366,9 +366,9 @@ export default function LogsTab({
             >
               <option value="all">Toutes Catégories</option>
               <option value="security">Sécurité & Accès</option>
-              <option value="orders">🛍️ Commandes</option>
+              <option value="orders">Commandes</option>
               <option value="sales">Ventes & Dette</option>
-              <option value="system">⚙️ Système & Laveries</option>
+              <option value="system">Système & Laveries</option>
             </CustomSelect>
           </div>
 

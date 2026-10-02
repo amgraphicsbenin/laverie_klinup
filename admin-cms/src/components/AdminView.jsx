@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../services/db';
 import OrderFormModal from '../features/orders/components/OrderFormModal';
-import clothesIcon from '../assets/icon_clothes.png';
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -47,7 +46,8 @@ import {
   UserPlus,
   ShieldCheck,
   Download,
-  GripVertical
+  GripVertical,
+  Calendar
 } from 'lucide-react';
 import CustomSelect from './CustomSelect';
 import { validatePhoneNumber, normalizePhoneNumber } from '../utils/phoneUtils';
@@ -1892,18 +1892,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
   };
 
   const getAssetIcon = (itemName) => {
-    return (
-      <img
-        src={clothesIcon}
-        alt="Vêtement"
-        style={{
-          width: '16px',
-          height: '16px',
-          objectFit: 'contain',
-          display: 'block'
-        }}
-      />
-    );
+    return <Shirt size={16} stroke={1.8} />;
   };
 
   const getDynamicSku = (item) => {
@@ -4776,7 +4765,10 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 borderRadius: '12px',
                 border: '1px solid var(--border-color)',
               }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>📅 Filtrer par date :</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Calendar size={14} />
+                  <span>Filtrer par date :</span>
+                </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <input
                     type="date"

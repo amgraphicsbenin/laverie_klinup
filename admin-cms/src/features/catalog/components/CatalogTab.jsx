@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Plus, Search, Trash2, Edit, AlertCircle, Power, CheckCircle2, XCircle, ChevronDown, Upload, PlusCircle, Download, FileSpreadsheet } from 'lucide-react';
+import { Sparkles, Plus, Search, Trash2, Edit, AlertCircle, Power, CheckCircle2, XCircle, ChevronDown, Upload, PlusCircle, Download, FileSpreadsheet, Zap } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import ImportCatalogModal from './ImportCatalogModal';
 import ExportCatalogModal from './ExportCatalogModal';
@@ -472,12 +472,12 @@ export default function CatalogTab({
                                   {item.traitement.prix.toLocaleString()} F
                                 </span>
                                 {item.traitement.prix_urgent != null && Number(item.traitement.prix_urgent) > 0 ? (
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700 }}>
-                                    ⚡ {Number(item.traitement.prix_urgent).toLocaleString()} F
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <Zap size={11} /> {Number(item.traitement.prix_urgent).toLocaleString()} F
                                   </span>
                                 ) : (
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                    ⚡ Non défini
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <Zap size={11} /> Non défini
                                   </span>
                                 )}
                               </div>
@@ -494,12 +494,12 @@ export default function CatalogTab({
                                   {item.repassage.prix.toLocaleString()} F
                                 </span>
                                 {item.repassage.prix_urgent != null && Number(item.repassage.prix_urgent) > 0 ? (
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700 }}>
-                                    ⚡ {Number(item.repassage.prix_urgent).toLocaleString()} F
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <Zap size={11} /> {Number(item.repassage.prix_urgent).toLocaleString()} F
                                   </span>
                                 ) : (
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                    ⚡ Non défini
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <Zap size={11} /> Non défini
                                   </span>
                                 )}
                               </div>

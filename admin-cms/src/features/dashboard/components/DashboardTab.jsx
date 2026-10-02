@@ -21,7 +21,8 @@ import {
   ArrowUpRight,
   ShieldCheck,
   Calendar,
-  Store
+  Store,
+  X
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import { db } from '../../../services/db';
@@ -725,7 +726,9 @@ export default function DashboardTab({
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>
                 Clôture de Caisse Journalière (Z)
               </h3>
-              <button type="button" onClick={() => setShowCashClosureModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}>✕</button>
+              <button type="button" onClick={() => setShowCashClosureModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
+              </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
