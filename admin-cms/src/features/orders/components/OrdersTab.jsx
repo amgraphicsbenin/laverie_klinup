@@ -80,6 +80,16 @@ function ActionMenuItem({ icon: Icon, iconColor, label, onClick, color, isBold =
   );
 }
 
+// Types de recherche supportés dans la barre de recherche
+const SEARCH_TYPES = [
+  { id: 'all', label: '🔍 Tous critères', placeholder: 'ID, client, tél, article, service...' },
+  { id: 'id_code', label: '🏷️ N° Commande / Code', placeholder: 'Entrez l\'ID ou code marquage...' },
+  { id: 'customer', label: '👤 Nom Client', placeholder: 'Nom ou prénom du client...' },
+  { id: 'phone', label: '📞 Téléphone', placeholder: 'Numéro de tél (ex: 97000000)...' },
+  { id: 'article', label: '👕 Article', placeholder: 'Nom d\'article (ex: Chemise, Robe...)...' },
+  { id: 'service', label: '✨ Service', placeholder: 'Service (ex: Lavage, Repassage...)...' }
+];
+
 export default function OrdersTab({
   orders = [],
   customers = [],
@@ -107,11 +117,15 @@ export default function OrdersTab({
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [activeActionDropdown, setActiveActionDropdown] = useState(null); // { order, coords: { top, bottom, right } }
+  const [searchType, setSearchType] = useState('all'); // 'all' | 'id_code' | 'customer' | 'phone' | 'article' | 'service'
   const [searchQuery, setSearchQuery] = useState(historySearchQuery || '');
   const [selectedStatus, setSelectedStatus] = useState(historyFilterStatus || 'all');
   const [selectedStore, setSelectedStore] = useState('all');
   const [quickFilter, setQuickFilter] = useState('all'); // 'all', 'express', 'retard', 'reste_a_payer', 'solde', 'actives'
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' (défaut : plus récent au plus ancien), 'asc'
+
+  const currentSearchTypeObj = SEARCH_TYPES.find(t => t.id === searchType) || SEARCH_TYPES[0];
+  const searchPlaceholder = currentSearchTypeObj.placeholder;
 
   // Pagination states (Style Journaux d'Audit)
   const [currentPage, setCurrentPage] = useState(1);
@@ -270,15 +284,34 @@ export default function OrdersTab({
     const q = searchQuery.trim().toLowerCase();
     const qDigits = q.replace(/\D/g, '');
 
-    // Text search matching
+    // Text search matching selon le type de recherche sélectionné
     if (q) {
+      const matchIdCode = orderIdStr.includes(q) || code.includes(q);
+      const matchCustomer = clientName.includes(q);
       const matchPhone = clientPhone.includes(q) || (qDigits.length >= 3 && phoneDigits.includes(qDigits));
-      const matches = orderIdStr.includes(q) ||
-        code.includes(q) ||
-        clientName.includes(q) ||
-        matchPhone ||
-        article.includes(q) ||
-        service.includes(q);
+      const itemsArticle = (order.items || order.articles || [])
+        .map(it => it.article || it.nom || it.name || '')
+        .join(' ')
+        .toLowerCase();
+      const matchArticle = article.includes(q) || itemsArticle.includes(q);
+      const matchService = service.includes(q);
+
+      let matches = false;
+      if (searchType === 'id_code') {
+        matches = matchIdCode;
+      } else if (searchType === 'customer') {
+        matches = matchCustomer;
+      } else if (searchType === 'phone') {
+        matches = matchPhone;
+      } else if (searchType === 'article') {
+        matches = matchArticle;
+      } else if (searchType === 'service') {
+        matches = matchService;
+      } else {
+        // 'all' : recherche globale multi-critères
+        matches = matchIdCode || matchCustomer || matchPhone || matchArticle || matchService;
+      }
+
       if (!matches) return false;
     }
 
@@ -319,7 +352,7 @@ export default function OrdersTab({
   // Réinitialiser la page courante lors d'un changement de filtre
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedStatus, selectedStore, quickFilter, sortOrder]);
+  }, [searchQuery, searchType, selectedStatus, selectedStore, quickFilter, sortOrder]);
 
   // Calculs de pagination (Même système que les journaux d'audit)
   const totalPages = Math.ceil(filteredOrders.length / ordersPerPage) || 1;
@@ -499,44 +532,85 @@ export default function OrdersTab({
         }}>
           {/* Bloc Recherche & Sélecteurs */}
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.55rem', flex: 1, minWidth: '280px' }}>
-            {/* Input Recherche rapide */}
-            <div style={{ position: 'relative', width: '240px', minWidth: '180px' }}>
-              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                placeholder="ID commande, client, tél, article..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.42rem 1.8rem 0.42rem 2rem',
-                  fontSize: '0.78rem',
-                  borderRadius: '9px',
-                  border: '1px solid var(--border-color)',
-                  background: 'var(--bg-app)',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
+            {/* Barre de Recherche Multi-Critères (Sélecteur Type + Champ Saisie dynamique) */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'stretch',
+                borderRadius: '10px',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-app)',
+                minWidth: '340px',
+                width: '390px',
+                maxWidth: '100%',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+              }}
+            >
+              {/* Sélecteur de Type de Recherche */}
+              <div style={{ width: '150px', flexShrink: 0 }}>
+                <CustomSelect
+                  value={searchType}
+                  onChange={(e) => setSearchType(e.target.value)}
                   style={{
-                    position: 'absolute',
-                    right: '6px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    padding: '0.42rem 0.65rem',
+                    borderRadius: '9px 0 0 9px',
+                    background: 'transparent',
                     border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--text-muted)',
-                    padding: 0
+                    borderRight: '1px solid var(--border-color)',
+                    height: '100%',
+                    color: 'var(--text-primary)'
                   }}
+                  dropdownStyle={{ minWidth: '185px', zIndex: 1050 }}
                 >
-                  <X size={13} />
-                </button>
-              )}
+                  {SEARCH_TYPES.map(st => (
+                    <option key={st.id} value={st.id}>{st.label}</option>
+                  ))}
+                </CustomSelect>
+              </div>
+
+              {/* Champ de Saisie de Recherche adapté au type sélectionné */}
+              <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
+                <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                <input
+                  type={searchType === 'phone' ? 'tel' : 'text'}
+                  placeholder={searchPlaceholder}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    padding: '0.42rem 1.8rem 0.42rem 2rem',
+                    fontSize: '0.78rem',
+                    borderRadius: '0 9px 9px 0',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-primary)',
+                    outline: 'none'
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    title="Effacer la recherche"
+                    style={{
+                      position: 'absolute',
+                      right: '6px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text-muted)',
+                      padding: 0
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Sélecteur de Statut */}
@@ -796,12 +870,13 @@ export default function OrdersTab({
                       <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
                         Modifiez vos critères de recherche ou réinitialisez les filtres.
                       </div>
-                      {(searchQuery || selectedStatus !== 'all' || selectedStore !== 'all' || quickFilter !== 'all') && (
+                      {(searchQuery || searchType !== 'all' || selectedStatus !== 'all' || selectedStore !== 'all' || quickFilter !== 'all') && (
                         <button
                           type="button"
                           className="btn btn-outline"
                           onClick={() => {
                             setSearchQuery('');
+                            setSearchType('all');
                             setSelectedStatus('all');
                             setSelectedStore('all');
                             setQuickFilter('all');
