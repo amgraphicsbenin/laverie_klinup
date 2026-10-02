@@ -635,6 +635,9 @@ function App() {
         return;
       }
 
+      // Si l'événement provient de l'input masqué, ne pas le traiter ici pour éviter tout doublon
+      if (e.target === hiddenPinInputRef.current) return;
+
       // Bloquer la saisie si le compte est verrouillé
       if (pinLockoutState.isLocked) return;
 
@@ -1238,12 +1241,13 @@ function App() {
                         maxLength={6}
                         autoFocus
                         value={pinCode}
+                        disabled={pinLockoutState.isLocked}
                         onChange={(e) => {
+                          if (pinError || isUnlocking || pinLockoutState.isLocked) return;
                           const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                          if (val.length > pinCode.length) {
-                            handleKeypadPress(val[val.length - 1]);
-                          } else if (val.length < pinCode.length) {
-                            handleKeypadPress('delete');
+                          setPinCode(val);
+                          if (val.length === 6) {
+                            verifyPinCode(val);
                           }
                         }}
                         style={{
