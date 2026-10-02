@@ -9,12 +9,10 @@ import {
   CheckCircle2, 
   Info, 
   Store, 
-  ClipboardPaste,
   RefreshCw
 } from 'lucide-react';
 import { db } from '../../../services/db';
 import CustomSelect from '../../../components/CustomSelect';
-import ExportCatalogModal from './ExportCatalogModal';
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -75,33 +73,17 @@ export default function ImportCatalogModal({
 
   const [targetStoreId, setTargetStoreId] = useState(defaultStoreId);
   const [exportCategoryFilter, setExportCategoryFilter] = useState(catalogCategory || 'individuel');
-  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     setTargetStoreId(defaultStoreId);
     setExportCategoryFilter(catalogCategory || 'individuel');
+    if (!isOpen) {
+      setFileName('');
+      setRawContent('');
+      setImportStatus(null);
+    }
   }, [isOpen, defaultStoreId, catalogCategory]);
 
-  const itemsToExport = useMemo(() => {
-    return (existingCatalog || []).filter(c => {
-      if (!c || !c.article) return false;
-      const cat = (c.categorie || (c.service === 'abonnement' ? 'abonnement' : 'individuel')).toLowerCase().trim();
-      if (cat !== 'individuel' && cat !== 'abonnement') return false;
-      if (c.service === 'system_setting' || c.service === 'reward_catalog') return false;
-
-      if (exportCategoryFilter && exportCategoryFilter !== 'all') {
-        if (cat !== exportCategoryFilter) return false;
-      }
-
-      if (targetStoreId && targetStoreId !== 'all' && targetStoreId !== 'GLOBAL') {
-        return !c.store_id || c.store_id === targetStoreId;
-      }
-      return true;
-    });
-  }, [existingCatalog, exportCategoryFilter, targetStoreId]);
-
-  const [activeInputTab, setActiveInputTab] = useState('file'); // 'file' | 'paste'
-  const [pastedText, setPastedText] = useState('');
   const [fileName, setFileName] = useState('');
   const [rawContent, setRawContent] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -177,16 +159,7 @@ export default function ImportCatalogModal({
     URL.revokeObjectURL(url);
   };
 
-  // 2. EXPORT DU CATALOGUE EXISTANT VIA LA MODALE DE CHOIX (GOOGLE SHEETS DIRECT OU EXCEL)
-  const handleExportExistingCatalog = () => {
-    if (!itemsToExport || itemsToExport.length === 0) {
-      alert("Aucun article présent dans le catalogue pour ces critères.");
-      return;
-    }
-    setShowExportModal(true);
-  };
-
-  // 3. Parser de ligne CSV (conforme RFC 4180 : support apostrophes françaises & guillemets doublés)
+  // 2. Parser de ligne CSV (conforme RFC 4180 : support apostrophes françaises & guillemets doublés)
   const parseCSVLine = (line, delimiter) => {
     const result = [];
     let current = '';
@@ -255,7 +228,7 @@ export default function ImportCatalogModal({
   };
 
   // 6. Analyse des données brutes avec Auto-Incrémentation des ID numériques
-  const currentContent = activeInputTab === 'file' ? rawContent : pastedText;
+  const currentContent = rawContent;
 
   const parsedData = useMemo(() => {
     if (!currentContent || !currentContent.trim()) {
@@ -900,15 +873,15 @@ export default function ImportCatalogModal({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.2rem' }}>
+                <div style={{ marginTop: '0.2rem' }}>
                   <button
                     type="button"
                     className="btn btn-outline"
                     onClick={handleDownloadTemplate}
                     style={{
-                      flex: 1,
-                      padding: '0.4rem 0.6rem',
-                      fontSize: '0.75rem',
+                      width: '100%',
+                      padding: '0.45rem 0.75rem',
+                      fontSize: '0.76rem',
                       fontWeight: 700,
                       borderRadius: '8px',
                       borderColor: 'var(--primary)',
@@ -916,33 +889,11 @@ export default function ImportCatalogModal({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '0.4rem'
+                      gap: '0.45rem'
                     }}
                     title="Nouveaux produits sans ID Produit, montants vides = 0"
                   >
-                    <Download size={13} /> Modèle Vierge ({exportCategoryFilter === 'individuel' ? 'Vêtements' : exportCategoryFilter === 'abonnement' ? 'Abonnements' : 'Tous'})
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={handleExportExistingCatalog}
-                    style={{
-                      flex: 1,
-                      padding: '0.4rem 0.6rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      borderRadius: '8px',
-                      borderColor: '#10b981',
-                      color: '#10b981',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.4rem'
-                    }}
-                    title="Exporte tous les articles existants avec ID numérique et aucune cellule vide"
-                  >
-                    <FileSpreadsheet size={13} /> Exporter ({exportCategoryFilter === 'individuel' ? 'Vêtements' : exportCategoryFilter === 'abonnement' ? 'Abonnements' : 'Complet'})
+                    <Download size={14} /> Modèle Vierge ({exportCategoryFilter === 'individuel' ? 'Vêtements' : exportCategoryFilter === 'abonnement' ? 'Abonnements' : 'Tous'})
                   </button>
                 </div>
               </div>
@@ -963,124 +914,75 @@ export default function ImportCatalogModal({
 
             </div>
 
-            {/* ONGLET DE CHARGEMENT : FICHIER OU COPIER/COLLER */}
+            {/* CHARGEMENT DU FICHIER CSV / TXT */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveInputTab('file')}
+                <div
                   style={{
-                    background: activeInputTab === 'file' ? 'var(--primary-light)' : 'transparent',
-                    color: activeInputTab === 'file' ? 'var(--primary)' : 'var(--text-secondary)',
-                    fontWeight: activeInputTab === 'file' ? 700 : 500,
-                    border: 'none',
-                    padding: '0.4rem 0.8rem',
+                    background: 'var(--primary-light)',
+                    color: 'var(--primary)',
+                    fontWeight: 700,
+                    padding: '0.35rem 0.75rem',
                     borderRadius: '8px',
                     fontSize: '0.8rem',
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.4rem'
                   }}
                 >
                   <Upload size={14} /> Fichier CSV / TXT
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveInputTab('paste')}
-                  style={{
-                    background: activeInputTab === 'paste' ? 'var(--primary-light)' : 'transparent',
-                    color: activeInputTab === 'paste' ? 'var(--primary)' : 'var(--text-secondary)',
-                    fontWeight: activeInputTab === 'paste' ? 700 : 500,
-                    border: 'none',
-                    padding: '0.4rem 0.8rem',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem'
-                  }}
-                >
-                  <ClipboardPaste size={14} /> Coller depuis Sheets ou Excel
-                </button>
+                </div>
               </div>
 
-              {activeInputTab === 'file' ? (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  border: `2px dashed ${isDragging ? 'var(--primary)' : 'var(--border-color)'}`,
+                  borderRadius: '16px',
+                  padding: '1.4rem',
+                  textAlign: 'center',
+                  background: isDragging ? 'var(--primary-light)' : 'var(--bg-app)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv, .txt, .tsv"
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
                 <div
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
                   style={{
-                    border: `2px dashed ${isDragging ? 'var(--primary)' : 'var(--border-color)'}`,
-                    borderRadius: '16px',
-                    padding: '1.4rem',
-                    textAlign: 'center',
-                    background: isDragging ? 'var(--primary-light)' : 'var(--bg-app)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    background: 'var(--primary-light)',
+                    color: 'var(--primary)',
                     display: 'flex',
-                    flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '0.5rem'
+                    justifyContent: 'center'
                   }}
                 >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".csv, .txt, .tsv"
-                    style={{ display: 'none' }}
-                    onChange={handleFileChange}
-                  />
-                  <div
-                    style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '12px',
-                      background: 'var(--primary-light)',
-                      color: 'var(--primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Upload size={18} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {fileName ? `Fichier prêt : ${fileName}` : 'Glissez-déposez votre fichier CSV ici'}
-                    </div>
-                    <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-                      ou cliquez pour parcourir votre ordinateur (.csv ou .txt, séparateur point-virgule ou virgule)
-                    </div>
-                  </div>
+                  <Upload size={18} />
                 </div>
-              ) : (
                 <div>
-                  <textarea
-                    rows={4}
-                    className="input-control"
-                    placeholder={`Collez vos lignes CSV ou vos cellules copiées directement depuis Google Sheets / Excel...\nExemple :\n;store_1;Point Principal;1;Chemise;1500;2250;800;1200;individuel;Coton\n;store_1;Point Principal;1;Pantalon;1500;2000;800;1200;individuel;Jeans\n;store_1;Point Principal;0;Costume d'hiver;3500;5000;2000;3000;individuel;Hors saison`}
-                    value={pastedText}
-                    onChange={(e) => {
-                      setPastedText(e.target.value);
-                      setImportStatus(null);
-                    }}
-                    style={{
-                      width: '100%',
-                      fontFamily: 'monospace',
-                      fontSize: '0.78rem',
-                      lineHeight: 1.4,
-                      padding: '0.75rem',
-                      borderRadius: '12px'
-                    }}
-                  />
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                    Copiez une sélection de cellules dans Excel ou Google Sheets et collez-la directement.
-                  </span>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {fileName ? `Fichier prêt : ${fileName}` : 'Glissez-déposez votre fichier CSV ici'}
+                  </div>
+                  <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                    ou cliquez pour parcourir votre ordinateur (.csv ou .txt, séparateur point-virgule ou virgule)
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* PRÉVISUALISATION AVEC CHIPS INTELLIGENTS & ID NUMÉRIQUE */}
@@ -1480,15 +1382,6 @@ export default function ImportCatalogModal({
 
         </div>
       </div>
-
-      <ExportCatalogModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        itemsToExport={itemsToExport}
-        stores={stores}
-        catalogCategory={exportCategoryFilter}
-        catalogStoreFilter={targetStoreId}
-      />
     </ModalPortal>
   );
 }
