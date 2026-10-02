@@ -4,6 +4,7 @@ import AdminView from './components/AdminView';
 import CustomSelect from './components/CustomSelect';
 import { appEnv } from './services/supabaseClient';
 import logoBrand from './assets/logo_brand.png';
+import logoDark from './assets/logo_dark.png';
 import TablerIcon from './components/icons/tablerIcons';
 import {
   getPinLockoutState,
@@ -889,21 +890,25 @@ function App() {
               {!selectedLoginUser ? (
                 /* ── ÉTAPE 1 : IDENTIFICATION EMAIL ── */
                 <form onSubmit={handleEmailSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  {/* Logo Officiel de Pressing Pro */}
+                  {/* Logo Officiel Pressing Pro en noir pur sans fond sombre */}
                   <div style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '18px',
-                    overflow: 'hidden',
-                    background: '#0f172a',
-                    border: '1.5px solid rgba(226, 232, 240, 0.8)',
-                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(37, 99, 235, 0.08)',
+                    width: '58px',
+                    height: '58px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: '1.35rem'
+                    marginBottom: '1.25rem'
                   }}>
-                    <img src={logoBrand} alt="Pressing Pro" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img
+                      src={logoDark}
+                      alt="Pressing Pro"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        filter: 'brightness(0)'
+                      }}
+                    />
                   </div>
 
                   <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.35rem 0', letterSpacing: '-0.4px', textAlign: 'center' }}>
@@ -1024,21 +1029,25 @@ function App() {
                     <span>Changer de compte</span>
                   </button>
 
-                  {/* Logo Officiel Pressing Pro */}
+                  {/* Logo Officiel Pressing Pro en noir pur sans fond sombre */}
                   <div style={{
-                    width: '56px',
-                    height: '56px',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    background: '#0f172a',
-                    border: '1.5px solid rgba(226, 232, 240, 0.8)',
-                    boxShadow: '0 8px 20px rgba(15, 23, 42, 0.12)',
+                    width: '54px',
+                    height: '54px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginBottom: '1rem'
                   }}>
-                    <img src={logoBrand} alt="Pressing Pro" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img
+                      src={logoDark}
+                      alt="Pressing Pro"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        filter: 'brightness(0)'
+                      }}
+                    />
                   </div>
 
                   <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0', letterSpacing: '-0.4px', textAlign: 'center' }}>
