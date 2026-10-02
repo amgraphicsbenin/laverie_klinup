@@ -106,7 +106,7 @@ function LeafletZoneMap({ lat, lng, storeName, zones }) {
 
     // Clé API CARTO Maps (paramétrée dans .env avec fallback de sécurité)
     const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY || 'cb1_47to_1_39023a3cae806da7dd06d660';
-    const cartoTileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?api_key=${CARTO_API_KEY}`;
+    const cartoTileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`;
 
     const tileLayer = L.tileLayer(cartoTileUrl, {
       maxZoom: 19,
