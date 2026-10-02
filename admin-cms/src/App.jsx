@@ -26,7 +26,12 @@ import {
   IconCheck,
   IconShirt,
   IconBuildingStore,
-  IconSparkles
+  IconSparkles,
+  IconReceipt,
+  IconUsers,
+  IconChartBar,
+  IconTrendingUp,
+  IconShoppingBag
 } from '@tabler/icons-react';
 
 // Composant utilitaire basé sur la bibliothèque Tabler Lined (remplace Material Symbols)
@@ -808,31 +813,6 @@ function App() {
           }
         `}</style>
 
-        {/* Pilule Flottante Haute Gauche (Identité Marque) */}
-        <div style={{
-          position: 'absolute',
-          top: '24px',
-          left: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 14px 6px 8px',
-          borderRadius: '9999px',
-          background: 'rgba(255, 255, 255, 0.9)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255, 255, 255, 0.8)',
-          boxShadow: '0 4px 18px rgba(0, 0, 0, 0.04)',
-          color: '#0f172a',
-          fontSize: '0.84rem',
-          fontWeight: 700,
-          zIndex: 10
-        }}>
-          <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src={logoBrand} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
-          <span>Pressing Pro</span>
-        </div>
 
         {/* Pilule Flottante Haute Droite (Environnement / Domaine) */}
         <div style={{
@@ -909,21 +889,21 @@ function App() {
               {!selectedLoginUser ? (
                 /* ── ÉTAPE 1 : IDENTIFICATION EMAIL ── */
                 <form onSubmit={handleEmailSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  {/* Badge Icône Bouclier Bleu */}
+                  {/* Logo Officiel de Pressing Pro */}
                   <div style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '14px',
-                    background: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    color: '#2563eb',
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '18px',
+                    overflow: 'hidden',
+                    background: '#0f172a',
+                    border: '1.5px solid rgba(226, 232, 240, 0.8)',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(37, 99, 235, 0.08)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: '1.25rem',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.08)'
+                    marginBottom: '1.35rem'
                   }}>
-                    <IconShield size={22} stroke={2} />
+                    <img src={logoBrand} alt="Pressing Pro" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
 
                   <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.35rem 0', letterSpacing: '-0.4px', textAlign: 'center' }}>
@@ -1014,16 +994,6 @@ function App() {
                       Réinitialiser le PIN
                     </button>
                   </div>
-
-                  <p style={{
-                    fontSize: '0.72rem',
-                    color: '#94a3b8',
-                    textAlign: 'center',
-                    margin: '2.5rem 0 0 0',
-                    lineHeight: 1.45
-                  }}>
-                    Plateforme certifiée Pressing Pro • Chiffrement local sécurisé
-                  </p>
                 </form>
               ) : (
                 /* ── ÉTAPE 2 : SAISIE CODE PIN (STYLE IMAGE : 6 BOÎTES) ── */
@@ -1054,21 +1024,21 @@ function App() {
                     <span>Changer de compte</span>
                   </button>
 
-                  {/* Badge Icône Cadenas/Bouclier */}
+                  {/* Logo Officiel Pressing Pro */}
                   <div style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '14px',
-                    background: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    color: '#2563eb',
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    background: '#0f172a',
+                    border: '1.5px solid rgba(226, 232, 240, 0.8)',
+                    boxShadow: '0 8px 20px rgba(15, 23, 42, 0.12)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: '1rem',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.08)'
+                    marginBottom: '1rem'
                   }}>
-                    <IconShieldCheck size={24} stroke={2} />
+                    <img src={logoBrand} alt="Pressing Pro" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
 
                   <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0', letterSpacing: '-0.4px', textAlign: 'center' }}>
@@ -1192,7 +1162,7 @@ function App() {
                         </div>
                       )}
 
-                      {/* Les 6 Boîtes de saisie PIN (Exactement comme l'image fournie) */}
+                      {/* Les 6 Boîtes de saisie PIN */}
                       <div
                         onClick={() => {
                           if (hiddenPinInputRef.current) hiddenPinInputRef.current.focus();
@@ -1276,7 +1246,7 @@ function App() {
                         }}
                       />
 
-                      {/* Liens sous les boîtes (Conforme à l'image) */}
+                      {/* Liens sous les boîtes */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem', fontSize: '0.78rem' }}>
                         <span style={{ color: '#94a3b8' }}>Code PIN oublié ?</span>
                         <button
@@ -1327,16 +1297,6 @@ function App() {
                       >
                         <span>Vérifier l'identité</span>
                       </button>
-
-                      <p style={{
-                        fontSize: '0.72rem',
-                        color: '#94a3b8',
-                        textAlign: 'center',
-                        margin: '2rem 0 0 0',
-                        lineHeight: 1.45
-                      }}>
-                        Sécurisé par Pressing Pro • Saisie directe au clavier
-                      </p>
                     </>
                   )}
                 </div>
@@ -1345,7 +1305,7 @@ function App() {
           </div>
 
           {/* ========================================================
-             COLONNE DROITE : VISUEL SPATIAL & SHOWCASE ANTIGRAVITY
+             COLONNE DROITE : VISUEL SPATIAL & SHOWCASE ATOUTS GESTION ADMIN
              ======================================================== */}
           <div style={{
             background: 'linear-gradient(155deg, #f0f7ff 0%, #e0effe 45%, #eff6ff 100%)',
@@ -1358,27 +1318,8 @@ function App() {
             borderLeft: '1px solid rgba(226, 232, 240, 0.7)',
             boxSizing: 'border-box'
           }}>
-            {/* Badge Pilule Supérieure Verte */}
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '4px 12px',
-              borderRadius: '20px',
-              background: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              color: '#059669',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
-              <span>SÉCURITÉ PRESSING PRO ACTIVE</span>
-            </div>
-
             {/* Titre & Sous-titre Épuré */}
-            <div style={{ textAlign: 'center', margin: '1.25rem 0' }}>
+            <div style={{ textAlign: 'center', margin: '0.5rem 0 1rem 0' }}>
               <h2 style={{
                 fontSize: '2rem',
                 fontWeight: 900,
@@ -1388,133 +1329,213 @@ function App() {
                 margin: '0 0 0.5rem 0',
                 fontFamily: 'var(--font-title, Inter, sans-serif)'
               }}>
-                Gestion Caisse & Pressing <br />
+                Gestion Caisse &amp; Pressing <br />
                 <span style={{
                   background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent'
                 }}>
-                  Moderne & Sécurisée.
+                  Performante &amp; Intuitive.
                 </span>
               </h2>
               <p style={{
                 fontSize: '0.82rem',
                 color: '#64748b',
-                maxWidth: '320px',
+                maxWidth: '330px',
                 margin: '0 auto',
                 lineHeight: 1.5
               }}>
-                Chiffrement certifié, audit des flux et protection complète des données de caisse.
+                Commandes, catalogue de tarifs, gestion clients et suivi financier centralisés en temps réel.
               </p>
             </div>
 
-            {/* Carte Flottante 3D Centrale & Satellites (Conforme à l'image) */}
+            {/* Carte Flottante Centrale & Satellites (Atouts de gestion Admin) */}
             <div style={{
               position: 'relative',
               width: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '1.5rem 0'
+              margin: '1.25rem 0'
             }}>
-              {/* Satellite Flottant Haut-Droite (Pressing / Vêtement) */}
+              {/* Satellite Flottant Haut-Droite : Catalogue & Services Pressing */}
               <div style={{
                 position: 'absolute',
-                top: '-8px',
-                right: '28px',
-                width: '46px',
-                height: '46px',
-                borderRadius: '14px',
+                top: '-14px',
+                right: '18px',
+                padding: '8px 12px',
+                borderRadius: '16px',
                 background: '#ffffff',
-                boxShadow: '0 12px 28px -6px rgba(37, 99, 235, 0.18), 0 0 0 1px rgba(226, 232, 240, 0.6)',
+                boxShadow: '0 14px 30px -6px rgba(37, 99, 235, 0.16), 0 0 0 1px rgba(226, 232, 240, 0.7)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: '#0284c7',
+                gap: '8px',
                 zIndex: 2,
                 animation: 'floatSlow 4s ease-in-out infinite'
               }}>
-                <IconShirt size={22} stroke={1.8} />
-              </div>
-
-              {/* Carte Centrale Flottante (Data Fortress adaptée) */}
-              <div style={{
-                width: '210px',
-                borderRadius: '22px',
-                background: '#ffffff',
-                boxShadow: '0 20px 45px -10px rgba(37, 99, 235, 0.15), 0 0 0 1px rgba(226, 232, 240, 0.8)',
-                padding: '1.5rem 1.25rem',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                position: 'relative',
-                zIndex: 1
-              }}>
                 <div style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '18px',
-                  background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#0284c7',
+                  color: '#2563eb'
+                }}>
+                  <IconShirt size={18} stroke={1.8} />
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>Tarifs &amp; Articles</div>
+                  <div style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 600 }}>Catalogue pressing</div>
+                </div>
+              </div>
+
+              {/* Carte Centrale Principale : Caisse & Commandes en direct */}
+              <div style={{
+                width: '240px',
+                borderRadius: '24px',
+                background: '#ffffff',
+                boxShadow: '0 22px 50px -12px rgba(37, 99, 235, 0.16), 0 0 0 1px rgba(226, 232, 240, 0.8)',
+                padding: '1.4rem 1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                zIndex: 1
+              }}>
+                {/* Entête Carte Caisse */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '11px',
+                      background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#0284c7'
+                    }}>
+                      <IconReceipt size={20} stroke={2} />
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>Caisse Direct</div>
+                      <div style={{ fontSize: '0.66rem', color: '#64748b' }}>Dépôts &amp; Retraits</div>
+                    </div>
+                  </div>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    borderRadius: '20px',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    color: '#059669',
+                    fontSize: '0.64rem',
+                    fontWeight: 700
+                  }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }} />
+                    En direct
+                  </span>
+                </div>
+
+                {/* KPI & Graphique d'activité */}
+                <div style={{
+                  background: '#f8fafc',
+                  borderRadius: '14px',
+                  padding: '0.8rem 0.9rem',
+                  border: '1px solid #f1f5f9',
                   marginBottom: '0.85rem'
                 }}>
-                  <IconShieldCheck size={28} stroke={2} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.3px' }}>
+                      24 Dépôts
+                    </span>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px',
+                      color: '#10b981',
+                      fontSize: '0.7rem',
+                      fontWeight: 800
+                    }}>
+                      <IconTrendingUp size={13} stroke={2.5} />
+                      +18.4%
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '2px' }}>
+                    Commandes du jour enregistrées
+                  </div>
                 </div>
-                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                  Protection Caisse
-                </h4>
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', letterSpacing: '0.6px', textTransform: 'uppercase', marginTop: '4px' }}>
-                  CHIFFREMENT &amp; LOGS AUDITÉS
-                </span>
+
+                {/* Mini Indicateur de Flux */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', fontWeight: 600, color: '#64748b' }}>
+                    <span>Traitement &amp; Repassage</span>
+                    <span style={{ color: '#0284c7', fontWeight: 700 }}>88% prêt</span>
+                  </div>
+                  <div style={{ width: '100%', height: '5px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+                    <div style={{ width: '88%', height: '100%', background: 'linear-gradient(90deg, #38bdf8, #2563eb)', borderRadius: '9999px' }} />
+                  </div>
+                </div>
               </div>
 
-              {/* Satellite Flottant Bas-Gauche (Point de vente) */}
-              <div style={{
-                position: 'absolute',
-                bottom: '-8px',
-                left: '28px',
-                width: '46px',
-                height: '46px',
-                borderRadius: '14px',
-                background: '#ffffff',
-                boxShadow: '0 12px 28px -6px rgba(37, 99, 235, 0.18), 0 0 0 1px rgba(226, 232, 240, 0.6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#2563eb',
-                zIndex: 2,
-                animation: 'floatSlow 4s ease-in-out infinite 2s'
-              }}>
-                <IconBuildingStore size={22} stroke={1.8} />
-              </div>
-
-              {/* Badge Satellite Flottant Bas-Droite (Données Sécurisées) */}
+              {/* Satellite Flottant Bas-Gauche : Gestion & Fichier Clients */}
               <div style={{
                 position: 'absolute',
                 bottom: '-12px',
-                right: '18px',
-                padding: '6px 12px',
-                borderRadius: '12px',
+                left: '14px',
+                padding: '8px 12px',
+                borderRadius: '16px',
                 background: '#ffffff',
-                boxShadow: '0 10px 24px -5px rgba(16, 185, 129, 0.2), 0 0 0 1px rgba(226, 232, 240, 0.6)',
+                boxShadow: '0 14px 30px -6px rgba(99, 102, 241, 0.16), 0 0 0 1px rgba(226, 232, 240, 0.7)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '8px',
+                zIndex: 2,
+                animation: 'floatSlow 4s ease-in-out infinite 2s'
+              }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#4f46e5'
+                }}>
+                  <IconUsers size={18} stroke={1.8} />
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>Fichier Clients</div>
+                  <div style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 600 }}>Historique &amp; soldes</div>
+                </div>
+              </div>
+
+              {/* Satellite Flottant Bas-Droite : Statistiques & Clôture */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-16px',
+                right: '16px',
+                padding: '7px 13px',
+                borderRadius: '14px',
+                background: '#ffffff',
+                boxShadow: '0 12px 28px -5px rgba(16, 185, 129, 0.2), 0 0 0 1px rgba(226, 232, 240, 0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '7px',
                 color: '#059669',
-                fontSize: '0.7rem',
+                fontSize: '0.72rem',
                 fontWeight: 700,
                 zIndex: 3
               }}>
-                <IconCheck size={14} stroke={2.5} />
-                <span>Données Sécurisées</span>
+                <IconChartBar size={16} stroke={2} />
+                <span>Statistiques &amp; Rapports</span>
               </div>
             </div>
 
-            {/* Indicateur de Défilement Inférieur (Comme sur l'image) */}
+            {/* Indicateur de Défilement Inférieur */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '1rem' }}>
               <span style={{ width: '28px', height: '4px', borderRadius: '4px', background: '#cbd5e1' }} />
               <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#cbd5e1' }} />
