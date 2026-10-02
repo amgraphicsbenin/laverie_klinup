@@ -260,18 +260,23 @@ export default function OrdersTab({
   const filteredOrders = orders.filter(order => {
     const customer = customers.find(c => c.id === order.customer_id);
     const clientName = customer ? `${customer.prenom || ''} ${customer.nom || ''}`.toLowerCase() : (order.client_name || '').toLowerCase();
+    const rawClientPhone = customer ? String(customer.telephone || '') : String(order.client_telephone || '');
+    const clientPhone = rawClientPhone.toLowerCase();
+    const phoneDigits = rawClientPhone.replace(/\D/g, '');
     const orderIdStr = String(order.id || '').toLowerCase();
     const code = String(order.identifiant_unique_marquage || '').toLowerCase();
     const article = String(order.type_article || '').toLowerCase();
     const service = String(serviceLabels[order.type_service] || order.type_service || '').toLowerCase();
     const q = searchQuery.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, '');
 
     // Text search matching
     if (q) {
+      const matchPhone = clientPhone.includes(q) || (qDigits.length >= 3 && phoneDigits.includes(qDigits));
       const matches = orderIdStr.includes(q) ||
         code.includes(q) ||
         clientName.includes(q) ||
-        clientPhone.includes(q) ||
+        matchPhone ||
         article.includes(q) ||
         service.includes(q);
       if (!matches) return false;
