@@ -81,27 +81,94 @@
   padding: 0;
   font-family: var(--font-sans);
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.25s ease;
 }
 
-/* Custom premium scrollbar style — seule définition */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Apparition au survol ou au focus du conteneur (standard CSS / Firefox) */
+*:hover,
+*:focus-within {
+  scrollbar-color: rgba(100, 116, 139, 0.28) transparent;
 }
 
-::-webkit-scrollbar-track {
+/* Custom premium scrollbar style — Auto-hide & discret */
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.18);
-  border-radius: 10px;
-  transition: background 0.3s;
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.32);
+/* Curseur masqué par défaut (Auto-hide) */
+*::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Apparition fluide au survol ou au focus du conteneur */
+*:hover::-webkit-scrollbar-thumb,
+*:focus-within::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.25);
+}
+
+/* Accentuation subtile au survol direct du curseur de défilement */
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.48);
+}
+
+/* Maintien visible et net lors du défilement actif / clic */
+*::-webkit-scrollbar-thumb:active {
+  background-color: rgba(37, 99, 235, 0.6);
+}
+
+/* Adaptation pour les conteneurs sombres (dark mode & sidebar) */
+.dark-mode *:hover,
+.dark-mode *:focus-within,
+.sidebar *:hover,
+.sidebar *:focus-within {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.dark-mode *::-webkit-scrollbar-thumb,
+.sidebar *::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+.dark-mode *:hover::-webkit-scrollbar-thumb,
+.dark-mode *:focus-within::-webkit-scrollbar-thumb,
+.sidebar *:hover::-webkit-scrollbar-thumb,
+.sidebar *:focus-within::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.dark-mode *::-webkit-scrollbar-thumb:hover,
+.sidebar *::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.42);
+}
+
+.dark-mode *::-webkit-scrollbar-thumb:active,
+.sidebar *::-webkit-scrollbar-thumb:active {
+  background-color: rgba(56, 189, 248, 0.6);
+}
+
+/* Utilitaires de masquage de scrollbar (conserve le défilement fonctionnel) */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 body {
@@ -355,10 +422,25 @@ button, input, select, textarea {
   overflow-x: hidden; /* clip nav labels during collapse */
   padding: 0 0.6rem 0.5rem;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.1) transparent;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.25s ease;
+}
+.sidebar-nav:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 .sidebar-nav::-webkit-scrollbar { width: 4px; }
-.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.25s ease;
+}
+.sidebar-nav:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
 
 /* ── Section label ── */
 .sidebar-section-label {
