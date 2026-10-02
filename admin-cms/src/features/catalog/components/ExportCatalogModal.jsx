@@ -1,30 +1,24 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  FileSpreadsheet, 
-  Download, 
-  ExternalLink, 
-  CheckCircle2, 
-  X, 
-  Store, 
-  Layers, 
-  Table, 
-  Check,
-  Info,
-  Sparkles,
-  Settings,
-  HelpCircle,
-  Loader2,
-  ChevronDown,
-  ChevronUp
-} from 'lucide-react';
+  IconFileSpreadsheet, 
+  IconDownload, 
+  IconExternalLink, 
+  IconCircleCheck, 
+  IconX, 
+  IconBuildingStore, 
+  IconStack2, 
+  IconTable, 
+  IconCheck, 
+  IconInfoCircle, 
+  IconSparkles, 
+  IconLoader2,
+  IconArrowLeft
+} from '@tabler/icons-react';
 import { 
   getGoogleClientId, 
-  saveGoogleClientId, 
-  getCachedAccessToken, 
   requestGoogleAccessToken, 
-  createAndPopulateGoogleSheet, 
-  disconnectGoogle 
+  createAndPopulateGoogleSheet 
 } from '../../../services/googleDriveService';
 
 const ModalPortal = ({ children }) => {
@@ -43,17 +37,9 @@ export default function ExportCatalogModal({
   const [successMessage, setSuccessMessage] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
   const [step, setStep] = useState('choice'); // 'choice' | 'oauth_success'
-  const [hasCopied, setHasCopied] = useState(false);
-
-  // ÉTATS GOOGLE OAUTH
-  const [googleClientId, setGoogleClientId] = useState('');
-  const [isConfiguringClientId, setIsConfiguringClientId] = useState(false);
-  const [clientIdInput, setClientIdInput] = useState('');
-  const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [isExportingGoogle, setIsExportingGoogle] = useState(false);
   const [exportProgressText, setExportProgressText] = useState('');
   const [exportedSheetResult, setExportedSheetResult] = useState(null);
-  const [googleAuthConnected, setGoogleAuthConnected] = useState(false);
 
   const currentStoreObj = useMemo(() => {
     if (!catalogStoreFilter || catalogStoreFilter === 'all' || catalogStoreFilter === 'GLOBAL') {
@@ -64,16 +50,9 @@ export default function ExportCatalogModal({
 
   useEffect(() => {
     if (isOpen) {
-      const cid = getGoogleClientId();
-      setGoogleClientId(cid);
-      setClientIdInput(cid);
-      setIsConfiguringClientId(false);
-      setShowSetupGuide(false);
       setIsExportingGoogle(false);
       setExportedSheetResult(null);
-      setGoogleAuthConnected(!!getCachedAccessToken());
       setStep('choice');
-      setHasCopied(false);
       setSuccessMessage(null);
       setErrorMessage(null);
     }
@@ -341,7 +320,7 @@ export default function ExportCatalogModal({
     }
   };
 
-  // ACTION PRINCIPALE : Exportation OAuth Automatique vers Google Drive & Sheets
+  // ACTION PRINCIPALE : Exportation Automatique vers Google Sheets
   const handleOAuthExportGoogleSheets = async () => {
     if (!exportData || exportData.count === 0) {
       setErrorMessage("Aucune donnée à exporter.");
@@ -350,18 +329,17 @@ export default function ExportCatalogModal({
 
     const currentCid = getGoogleClientId();
     if (!currentCid) {
-      setIsConfiguringClientId(true);
+      setErrorMessage("L'intégration Google Sheets n'est pas encore configurée sur ce serveur.");
       return;
     }
 
     setErrorMessage(null);
     setIsExportingGoogle(true);
-    setExportProgressText("Authentification Google OAuth en cours...");
+    setExportProgressText("Connexion à Google en cours...");
 
     try {
-      // 1. Demande de token OAuth (popup Google si non encore connecté)
+      // 1. Demande d'accès Google
       const token = await requestGoogleAccessToken(currentCid);
-      setGoogleAuthConnected(true);
 
       // 2. Préparation du document
       const cleanStore = currentStoreName.replace(/ \([^)]*\)/, '');
@@ -397,8 +375,8 @@ export default function ExportCatalogModal({
         cleanCell(r.desc)
       ]);
 
-      // 3. Création du Spreadsheet & insertion des données via Google Sheets API v4
-      setExportProgressText(`Création de la feuille sur Google Drive & insertion de ${exportData.count} articles...`);
+      // 3. Création du Spreadsheet & insertion des données via Google Sheets API
+      setExportProgressText(`Création de votre feuille Google Sheets (${exportData.count} articles)...`);
       const result = await createAndPopulateGoogleSheet({
         title,
         headers,
@@ -422,33 +400,23 @@ export default function ExportCatalogModal({
 
       setStep('oauth_success');
     } catch (err) {
-      console.error("Erreur Google Drive OAuth:", err);
-      setErrorMessage(err.message || "Erreur lors de la communication avec Google Drive.");
+      console.error("Erreur Google Drive:", err);
+      let friendlyError = "Une erreur est survenue lors de l'exportation vers Google Sheets.";
+      if (err.message?.includes('popup') || err.message?.includes('blocked')) {
+        friendlyError = "La fenêtre Google a été bloquée par votre navigateur. Veuillez autoriser les fenêtres pop-up pour continuer.";
+      } else if (err.message?.includes('access_denied') || err.message?.includes('refus')) {
+        friendlyError = "L'accès à votre compte Google a été annulé.";
+      } else if (err.message) {
+        friendlyError = err.message;
+      }
+      setErrorMessage(friendlyError);
     } finally {
       setIsExportingGoogle(false);
       setExportProgressText('');
     }
   };
 
-  // Enregistrement du Client ID Google Cloud
-  const handleSaveClientId = () => {
-    const cleanId = clientIdInput.trim();
-    saveGoogleClientId(cleanId);
-    setGoogleClientId(cleanId);
-    setIsConfiguringClientId(false);
-    setSuccessMessage(cleanId ? "Identifiant Client Google OAuth enregistré !" : "Identifiant Client Google réinitialisé.");
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
-  // Déconnexion Google
-  const handleDisconnectGoogle = () => {
-    disconnectGoogle();
-    setGoogleAuthConnected(false);
-    setSuccessMessage("Session Google déconnectée.");
-    setTimeout(() => setSuccessMessage(null), 2500);
-  };
-
-  // ACTION : Télécharger CSV Excel
+  // ACTION : Télécharger pour Excel
   const handleDownloadExcel = () => {
     if (!exportData || exportData.count === 0) return;
     downloadBlob(exportData.excelContent, exportData.excelFileName);
@@ -480,7 +448,7 @@ export default function ExportCatalogModal({
           style={{
             background: 'var(--bg-card)',
             width: '100%',
-            maxWidth: step === 'choice' && isConfiguringClientId ? '660px' : '620px',
+            maxWidth: '560px',
             borderRadius: '20px',
             border: '1px solid var(--border-color)',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
@@ -513,16 +481,16 @@ export default function ExportCatalogModal({
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                {step === 'oauth_success' ? <CheckCircle2 size={24} /> : <FileSpreadsheet size={22} />}
+                {step === 'oauth_success' ? <IconCircleCheck size={24} stroke={1.8} /> : <IconFileSpreadsheet size={22} stroke={1.8} />}
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
-                  {step === 'oauth_success' ? 'Export Google Drive Réussi !' : 'Exporter le Catalogue des Produits'}
+                  {step === 'oauth_success' ? 'Exportation Réussie !' : 'Exporter le Catalogue des Produits'}
                 </h3>
                 <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
                   {step === 'oauth_success'
-                    ? 'Feuille de calcul créée et pré-remplie sur votre Google Drive'
-                    : `${exportData.count} articles prêts • Google Drive OAuth & Fichier Excel`}
+                    ? 'Votre feuille de calcul est prête sur Google Sheets'
+                    : `${exportData.count} article${exportData.count > 1 ? 's' : ''} prêt${exportData.count > 1 ? 's' : ''} à l'exportation`}
                 </span>
               </div>
             </div>
@@ -537,11 +505,14 @@ export default function ExportCatalogModal({
                 cursor: 'pointer',
                 padding: '0.4rem',
                 borderRadius: '8px',
-                display: 'flex'
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.15s ease'
               }}
               title="Fermer"
             >
-              <X size={20} />
+              <IconX size={20} stroke={1.8} />
             </button>
           </div>
 
@@ -561,14 +532,14 @@ export default function ExportCatalogModal({
               gap: '0.6rem'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Layers size={16} color="var(--primary)" />
+                <IconStack2 size={16} stroke={1.8} color="var(--primary)" />
                 <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                   {categoryLabel}
                 </span>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Store size={15} color="var(--text-secondary)" />
+                <IconBuildingStore size={15} stroke={1.8} color="var(--text-secondary)" />
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                   {currentStoreName}
                 </span>
@@ -585,7 +556,7 @@ export default function ExportCatalogModal({
                 alignItems: 'center',
                 gap: '0.3rem'
               }}>
-                <Table size={13} />
+                <IconTable size={13} stroke={1.8} />
                 <span>{exportData.count} article{exportData.count > 1 ? 's' : ''}</span>
               </div>
             </div>
@@ -605,7 +576,7 @@ export default function ExportCatalogModal({
                 fontSize: '0.82rem',
                 animation: 'fadeIn 0.2s ease'
               }}>
-                <CheckCircle2 size={18} />
+                <IconCircleCheck size={18} stroke={1.8} />
                 <span>{successMessage}</span>
               </div>
             )}
@@ -625,266 +596,120 @@ export default function ExportCatalogModal({
                 fontSize: '0.82rem',
                 animation: 'fadeIn 0.2s ease'
               }}>
-                <Info size={18} />
+                <IconInfoCircle size={18} stroke={1.8} />
                 <span>{errorMessage}</span>
               </div>
             )}
 
             {/* ========================================================================= */}
-            {/* VUE 1 : CHOIX PRINCIPAL AVEC GOOGLE DRIVE OAUTH DIRECT */}
+            {/* VUE 1 : CHOIX PRINCIPAL (GOOGLE SHEETS & EXCEL) */}
             {/* ========================================================================= */}
             {step === 'choice' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
 
-                {/* CARTE D'EXPORT GOOGLE DRIVE OAUTH (DIRECT & AUTOMATIQUE) */}
+                {/* OPTION 1 : GOOGLE SHEETS */}
                 <div style={{
                   background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.05) 100%)',
-                  border: '2px solid rgba(16, 185, 129, 0.5)',
-                  borderRadius: '18px',
-                  padding: '1.3rem',
+                  border: '1.5px solid rgba(16, 185, 129, 0.45)',
+                  borderRadius: '16px',
+                  padding: '1.25rem',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.9rem',
-                  position: 'relative',
-                  boxShadow: '0 8px 24px rgba(16, 185, 129, 0.12)'
+                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.08)'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{
-                        width: '46px',
-                        height: '46px',
-                        borderRadius: '14px',
-                        background: '#ffffff',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        {/* Logo officiel Google Sheets */}
-                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3Z" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M3 9H21" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M3 15H21" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M9 3V21" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M15 3V21" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <h4 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                            Google Sheets Automatique (OAuth Google Drive)
-                          </h4>
-                          <span style={{
-                            fontSize: '0.65rem',
-                            fontWeight: 800,
-                            padding: '0.15rem 0.5rem',
-                            borderRadius: '6px',
-                            background: '#10b981',
-                            color: '#ffffff'
-                          }}>
-                            Recommandé
-                          </span>
-                        </div>
-                        <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                          Crée directement le document pré-rempli dans votre Google Drive sans aucune action manuelle.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Statut connexion OAuth */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      {googleAuthConnected && (
-                        <button
-                          type="button"
-                          onClick={handleDisconnectGoogle}
-                          style={{
-                            background: 'transparent',
-                            border: '1px solid var(--border-color)',
-                            color: 'var(--text-muted)',
-                            borderRadius: '6px',
-                            padding: '0.2rem 0.5rem',
-                            fontSize: '0.7rem',
-                            cursor: 'pointer'
-                          }}
-                          title="Déconnecter la session Google"
-                        >
-                          Déconnexion
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => setIsConfiguringClientId(!isConfiguringClientId)}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.8)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '8px',
-                          padding: '0.3rem 0.6rem',
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          color: 'var(--text-secondary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Settings size={13} />
-                        <span>{googleClientId ? 'Client ID configuré' : 'Configurer OAuth'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* PANNEAU DE CONFIGURATION DU CLIENT ID OAUTH */}
-                  {isConfiguringClientId && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-color)',
+                      width: '44px',
+                      height: '44px',
                       borderRadius: '12px',
-                      padding: '1rem',
+                      background: '#ffffff',
+                      boxShadow: '0 3px 10px rgba(0,0,0,0.06)',
                       display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.75rem',
-                      animation: 'fadeIn 0.2s ease'
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          Configuration Google OAuth 2.0 (Google Cloud Console)
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowSetupGuide(!showSetupGuide)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--primary)',
-                            fontSize: '0.74rem',
-                            fontWeight: 600,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.3rem',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <HelpCircle size={13} />
-                          <span>Guide pas-à-pas {showSetupGuide ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</span>
-                        </button>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <input
-                          type="text"
-                          value={clientIdInput}
-                          onChange={(e) => setClientIdInput(e.target.value)}
-                          placeholder="Ex: 123456789-xxxxxxxx.apps.googleusercontent.com"
-                          style={{
-                            flex: 1,
-                            fontSize: '0.78rem',
-                            padding: '0.45rem 0.65rem',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border-color)',
-                            background: 'var(--bg-app)',
-                            color: 'var(--text-primary)'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleSaveClientId}
-                          style={{
-                            background: '#10b981',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '0.45rem 0.9rem',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.35rem'
-                          }}
-                        >
-                          <Check size={14} />
-                          <span>Enregistrer</span>
-                        </button>
-                      </div>
-
-                      {showSetupGuide && (
-                        <div style={{
-                          background: 'var(--bg-app)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '8px',
-                          padding: '0.85rem',
-                          fontSize: '0.74rem',
-                          color: 'var(--text-secondary)',
-                          lineHeight: 1.6
-                        }}>
-                          <strong style={{ color: 'var(--text-primary)' }}>Comment obtenir votre Client ID Google en 2 minutes :</strong>
-                          <ol style={{ margin: '0.35rem 0 0 0', paddingLeft: '1.2rem' }}>
-                            <li>Allez sur la <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>Google Cloud Console</a>.</li>
-                            <li>Créez un projet (ex: <em>KLIN UP Pressing</em>) et activez <strong>Google Sheets API</strong> et <strong>Google Drive API</strong>.</li>
-                            <li>Dans <em>Identifiants</em> &gt; <em>Créer des identifiants</em> &gt; <strong>ID client OAuth</strong> :</li>
-                            <li>Sélectionnez <strong>Application Web</strong> et ajoutez dans <em>Origines JavaScript autorisées</em> : <code>http://localhost:5174</code> et l'URL de votre site web.</li>
-                            <li>Copiez votre <strong>ID Client</strong> généré et collez-le ci-dessus.</li>
-                          </ol>
-                        </div>
-                      )}
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3Z" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M3 9H21" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M3 15H21" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M9 3V21" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M15 3V21" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </div>
-                  )}
-
-                  {/* BOUTON D'ACTION OAUTH */}
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                    <button
-                      type="button"
-                      onClick={handleOAuthExportGoogleSheets}
-                      disabled={isExportingGoogle}
-                      style={{
-                        flex: 1,
-                        minWidth: '220px',
-                        padding: '0.75rem 1.2rem',
-                        borderRadius: '12px',
-                        background: '#10b981',
-                        border: 'none',
-                        color: '#ffffff',
-                        fontWeight: 800,
-                        fontSize: '0.88rem',
-                        cursor: isExportingGoogle ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.55rem',
-                        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
-                        transition: 'all 0.15s ease',
-                        opacity: isExportingGoogle ? 0.8 : 1
-                      }}
-                      onMouseEnter={(e) => !isExportingGoogle && (e.currentTarget.style.filter = 'brightness(1.08)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.filter = 'none')}
-                    >
-                      {isExportingGoogle ? (
-                        <>
-                          <Loader2 size={17} className="animate-spin" />
-                          <span>{exportProgressText || "Création du document en cours..."}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={17} />
-                          <span>Créer & Exporter vers Google Sheets (OAuth)</span>
-                        </>
-                      )}
-                    </button>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                          Google Sheets
+                        </h4>
+                        <span style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '6px',
+                          background: '#10b981',
+                          color: '#ffffff'
+                        }}>
+                          Recommandé
+                        </span>
+                      </div>
+                      <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                        Crée et ouvre directement votre catalogue dans Google Sheets en ligne.
+                      </p>
+                    </div>
                   </div>
+
+                  {/* BOUTON D'ACTION GOOGLE SHEETS */}
+                  <button
+                    type="button"
+                    onClick={handleOAuthExportGoogleSheets}
+                    disabled={isExportingGoogle}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1.2rem',
+                      borderRadius: '12px',
+                      background: '#10b981',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
+                      cursor: isExportingGoogle ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.55rem',
+                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+                      transition: 'all 0.15s ease',
+                      opacity: isExportingGoogle ? 0.8 : 1
+                    }}
+                    onMouseEnter={(e) => !isExportingGoogle && (e.currentTarget.style.filter = 'brightness(1.08)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.filter = 'none')}
+                  >
+                    {isExportingGoogle ? (
+                      <>
+                        <IconLoader2 size={18} stroke={2} className="animate-spin" />
+                        <span>{exportProgressText || "Création en cours..."}</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconSparkles size={18} stroke={1.8} />
+                        <span>Créer & Exporter vers Google Sheets</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                {/* SÉPARATEUR ALTERNATIVES */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', margin: '0.2rem 0' }}>
+                {/* SÉPARATEUR */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', margin: '0.1rem 0' }}>
                   <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
                   <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Autre méthode d'exportation (Fichier local)
+                    Autre format disponible
                   </span>
                   <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
                 </div>
 
-                {/* OPTION : MICROSOFT EXCEL (.CSV) */}
+                {/* OPTION 2 : MICROSOFT EXCEL */}
                 <div style={{
                   background: 'var(--bg-app)',
                   border: '1.5px solid var(--border-color)',
@@ -908,19 +733,14 @@ export default function ExportCatalogModal({
                       justifyContent: 'center',
                       flexShrink: 0
                     }}>
-                      <FileSpreadsheet size={22} />
+                      <IconFileSpreadsheet size={22} stroke={1.8} />
                     </div>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          Microsoft Excel (.csv)
-                        </h5>
-                        <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', background: 'var(--bg-card)', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                          Fichier local
-                        </span>
-                      </div>
+                      <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        Microsoft Excel
+                      </h5>
                       <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                        Télécharge le fichier CSV complet avec séparateur point-virgule et encodage UTF-8 BOM adapté pour Excel.
+                        Télécharge le fichier de votre catalogue directement sur votre appareil.
                       </p>
                     </div>
                   </div>
@@ -944,7 +764,7 @@ export default function ExportCatalogModal({
                       flexShrink: 0
                     }}
                   >
-                    <Download size={15} />
+                    <IconDownload size={16} stroke={1.8} />
                     <span>Télécharger pour Excel</span>
                   </button>
                 </div>
@@ -957,8 +777,8 @@ export default function ExportCatalogModal({
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    11 colonnes standardisées : ID_Produit, Store_ID, Store_Name, Statut, Article, Tarifs...
+                  <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    Comprend l'ensemble des articles, tarifs et catégories du catalogue
                   </span>
 
                   <button
@@ -980,7 +800,7 @@ export default function ExportCatalogModal({
             )}
 
             {/* ========================================================================= */}
-            {/* VUE 2 : SUCCÈS EXPORT OAUTH DIRECT (DOCUMENT REMPLI EN LIGNE) */}
+            {/* VUE 2 : SUCCÈS EXPORT (DOCUMENT PRÊT DANS GOOGLE SHEETS) */}
             {/* ========================================================================= */}
             {step === 'oauth_success' && exportedSheetResult && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', animation: 'fadeIn 0.25s ease' }}>
@@ -1003,14 +823,14 @@ export default function ExportCatalogModal({
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}>
-                      <CheckCircle2 size={28} />
+                      <IconCircleCheck size={28} stroke={1.8} />
                     </div>
                     <div>
                       <h4 style={{ margin: '0 0 0.2rem 0', fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                        Document Google Sheets créé et complété !
+                        Document Google Sheets créé avec succès !
                       </h4>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        <strong>{exportedSheetResult.count} articles</strong> ont été insérés avec succès avec leurs tarifs et mise en forme.
+                        <strong>{exportedSheetResult.count} articles</strong> ont été exportés avec leurs tarifs.
                       </span>
                     </div>
                   </div>
@@ -1026,7 +846,7 @@ export default function ExportCatalogModal({
                     gap: '0.75rem'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
-                      <FileSpreadsheet size={16} color="#10b981" style={{ flexShrink: 0 }} />
+                      <IconFileSpreadsheet size={18} stroke={1.8} color="#10b981" style={{ flexShrink: 0 }} />
                       <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {exportedSheetResult.title}
                       </span>
@@ -1040,7 +860,7 @@ export default function ExportCatalogModal({
                         color: '#fff',
                         border: 'none',
                         borderRadius: '8px',
-                        padding: '0.4rem 0.8rem',
+                        padding: '0.45rem 0.85rem',
                         fontSize: '0.76rem',
                         fontWeight: 700,
                         cursor: 'pointer',
@@ -1050,8 +870,8 @@ export default function ExportCatalogModal({
                         flexShrink: 0
                       }}
                     >
-                      <ExternalLink size={13} />
-                      <span>Accéder au classeur</span>
+                      <IconExternalLink size={14} stroke={1.8} />
+                      <span>Ouvrir dans Google Sheets</span>
                     </button>
                   </div>
                 </div>
@@ -1072,10 +892,14 @@ export default function ExportCatalogModal({
                       color: 'var(--text-muted)',
                       fontSize: '0.78rem',
                       fontWeight: 600,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
                     }}
                   >
-                    ← Retour aux options
+                    <IconArrowLeft size={15} stroke={1.8} />
+                    <span>Retour</span>
                   </button>
 
                   <button
@@ -1094,7 +918,7 @@ export default function ExportCatalogModal({
                     }}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Check size={16} />
+                      <IconCheck size={16} stroke={1.8} />
                       <span>Terminé</span>
                     </span>
                   </button>
