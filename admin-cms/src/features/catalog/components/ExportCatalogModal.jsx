@@ -9,17 +9,12 @@ import {
   Store, 
   Layers, 
   Table, 
-  Link, 
-  Edit2, 
   Check,
-  Copy,
   Info,
-  ArrowRight,
   Sparkles,
   Settings,
   HelpCircle,
   Loader2,
-  Lock,
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
@@ -47,7 +42,7 @@ export default function ExportCatalogModal({
 }) {
   const [successMessage, setSuccessMessage] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [step, setStep] = useState('choice'); // 'choice' | 'sheets_guide' | 'oauth_success'
+  const [step, setStep] = useState('choice'); // 'choice' | 'oauth_success'
   const [hasCopied, setHasCopied] = useState(false);
 
   // ÉTATS GOOGLE OAUTH
@@ -60,12 +55,6 @@ export default function ExportCatalogModal({
   const [exportedSheetResult, setExportedSheetResult] = useState(null);
   const [googleAuthConnected, setGoogleAuthConnected] = useState(false);
 
-  // Lien Google Sheets personnalisé
-  const [isEditingSheetUrl, setIsEditingSheetUrl] = useState(false);
-  const [sheetUrlInput, setSheetUrlInput] = useState('');
-
-  const storageKey = `klinup_google_sheet_url_${catalogStoreFilter || 'all'}`;
-
   const currentStoreObj = useMemo(() => {
     if (!catalogStoreFilter || catalogStoreFilter === 'all' || catalogStoreFilter === 'GLOBAL') {
       return null;
@@ -73,24 +62,11 @@ export default function ExportCatalogModal({
     return stores.find(s => s.id === catalogStoreFilter || s.code === catalogStoreFilter) || null;
   }, [catalogStoreFilter, stores]);
 
-  const associatedSheetUrl = useMemo(() => {
-    if (typeof window === 'undefined') return 'https://sheets.new';
-    const storeUrl = currentStoreObj?.google_sheet_url || currentStoreObj?.sheet_url;
-    if (storeUrl && storeUrl.trim()) return storeUrl.trim();
-    
-    const localUrl = localStorage.getItem(storageKey) || localStorage.getItem('klinup_google_sheet_url_all');
-    if (localUrl && localUrl.trim()) return localUrl.trim();
-
-    return 'https://sheets.new';
-  }, [currentStoreObj, storageKey]);
-
   useEffect(() => {
     if (isOpen) {
       const cid = getGoogleClientId();
       setGoogleClientId(cid);
       setClientIdInput(cid);
-      setSheetUrlInput(associatedSheetUrl);
-      setIsEditingSheetUrl(false);
       setIsConfiguringClientId(false);
       setShowSetupGuide(false);
       setIsExportingGoogle(false);
@@ -101,7 +77,7 @@ export default function ExportCatalogModal({
       setSuccessMessage(null);
       setErrorMessage(null);
     }
-  }, [associatedSheetUrl, isOpen]);
+  }, [isOpen]);
 
   const currentStoreName = useMemo(() => {
     if (!catalogStoreFilter || catalogStoreFilter === 'all' || catalogStoreFilter === 'GLOBAL') {
@@ -472,25 +448,6 @@ export default function ExportCatalogModal({
     setTimeout(() => setSuccessMessage(null), 2500);
   };
 
-  // ACTION MANUELLE (Copie presse-papiers + sheets.new)
-  const handleOpenManualSheets = () => {
-    if (!exportData || exportData.count === 0) return;
-    copyToClipboard(exportData.tsvContent);
-    setHasCopied(true);
-    downloadBlob(exportData.googleSheetsContent, exportData.googleSheetsFileName);
-    openNewTab(sheetUrlInput.trim() || 'https://sheets.new');
-    setStep('sheets_guide');
-  };
-
-  // ACTION : Télécharger CSV Google Sheets uniquement
-  const handleDownloadGoogleSheetsCsvOnly = () => {
-    if (!exportData || exportData.count === 0) return;
-    copyToClipboard(exportData.tsvContent);
-    downloadBlob(exportData.googleSheetsContent, exportData.googleSheetsFileName);
-    setSuccessMessage(`Fichier Google Sheets CSV téléchargé (${exportData.count} articles) !`);
-    setTimeout(() => setSuccessMessage(null), 3500);
-  };
-
   // ACTION : Télécharger CSV Excel
   const handleDownloadExcel = () => {
     if (!exportData || exportData.count === 0) return;
@@ -541,7 +498,7 @@ export default function ExportCatalogModal({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: step === 'oauth_success' || step === 'sheets_guide'
+            background: step === 'oauth_success'
               ? 'linear-gradient(to right, rgba(16, 185, 129, 0.08), transparent)'
               : 'linear-gradient(to right, rgba(var(--primary-rgb, 59, 130, 246), 0.05), transparent)'
           }}>
@@ -550,8 +507,8 @@ export default function ExportCatalogModal({
                 width: '42px',
                 height: '42px',
                 borderRadius: '12px',
-                background: step === 'oauth_success' || step === 'sheets_guide' ? 'rgba(16, 185, 129, 0.15)' : 'var(--primary-light)',
-                color: step === 'oauth_success' || step === 'sheets_guide' ? '#10b981' : 'var(--primary)',
+                background: step === 'oauth_success' ? 'rgba(16, 185, 129, 0.15)' : 'var(--primary-light)',
+                color: step === 'oauth_success' ? '#10b981' : 'var(--primary)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -560,12 +517,12 @@ export default function ExportCatalogModal({
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
-                  {step === 'oauth_success' ? 'Export Google Drive Réussi !' : (step === 'sheets_guide' ? 'Guide de Transfert Google Sheets' : 'Exporter le Catalogue des Produits')}
+                  {step === 'oauth_success' ? 'Export Google Drive Réussi !' : 'Exporter le Catalogue des Produits'}
                 </h3>
                 <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
                   {step === 'oauth_success'
                     ? 'Feuille de calcul créée et pré-remplie sur votre Google Drive'
-                    : `${exportData.count} articles prêts • Google Drive OAuth & Fichiers locaux`}
+                    : `${exportData.count} articles prêts • Google Drive OAuth & Fichier Excel`}
                 </span>
               </div>
             </div>
@@ -922,134 +879,74 @@ export default function ExportCatalogModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', margin: '0.2rem 0' }}>
                   <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
                   <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Autres méthodes d'exportation
+                    Autre méthode d'exportation (Fichier local)
                   </span>
                   <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
                 </div>
 
-                {/* GRILLE DES 2 AUTRES OPTIONS D'EXPORTATION */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-                  
-                  {/* OPTION 1 : GOOGLE SHEETS FICHIER CSV DIRECT */}
-                  <div style={{
-                    background: 'var(--bg-app)',
-                    border: '1.5px solid var(--border-color)',
-                    borderRadius: '14px',
-                    padding: '1.1rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.7rem'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <FileSpreadsheet size={18} color="#10b981" />
-                        <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          Google Sheets (Fichier CSV)
-                        </h5>
-                      </div>
-                      <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Sans OAuth</span>
+                {/* OPTION : MICROSOFT EXCEL (.CSV) */}
+                <div style={{
+                  background: 'var(--bg-app)',
+                  border: '1.5px solid var(--border-color)',
+                  borderRadius: '14px',
+                  padding: '1.1rem 1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flex: 1, minWidth: '220px' }}>
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '10px',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      color: 'var(--primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <FileSpreadsheet size={22} />
                     </div>
-
-                    <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                      Télécharge le fichier CSV standard structuré pour Google Sheets et copie les données (Ctrl+V).
-                    </p>
-
-                    <div style={{ marginTop: 'auto', display: 'flex', gap: '0.5rem' }}>
-                      <button
-                        type="button"
-                        onClick={handleDownloadGoogleSheetsCsvOnly}
-                        style={{
-                          flex: 1,
-                          padding: '0.55rem',
-                          borderRadius: '8px',
-                          background: 'var(--bg-card)',
-                          border: '1px solid var(--border-color)',
-                          color: 'var(--text-primary)',
-                          fontWeight: 700,
-                          fontSize: '0.76rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.35rem'
-                        }}
-                      >
-                        <Download size={13} />
-                        <span>Télécharger CSV</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleOpenManualSheets}
-                        style={{
-                          padding: '0.55rem 0.75rem',
-                          borderRadius: '8px',
-                          background: 'transparent',
-                          border: '1px solid var(--border-color)',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.76rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
-                        }}
-                        title="Ouvrir sheets.new et coller manuellement"
-                      >
-                        <ExternalLink size={13} />
-                        <span>Coller</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* OPTION 2 : MICROSOFT EXCEL */}
-                  <div style={{
-                    background: 'var(--bg-app)',
-                    border: '1.5px solid var(--border-color)',
-                    borderRadius: '14px',
-                    padding: '1.1rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.7rem'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <FileSpreadsheet size={18} color="var(--primary)" />
-                        <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                           Microsoft Excel (.csv)
                         </h5>
+                        <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', background: 'var(--bg-card)', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                          Fichier local
+                        </span>
                       </div>
-                      <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Local</span>
+                      <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                        Télécharge le fichier CSV complet avec séparateur point-virgule et encodage UTF-8 BOM adapté pour Excel.
+                      </p>
                     </div>
-
-                    <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                      Télécharge le fichier CSV complet avec séparateur point-virgule et encodage UTF-8 BOM pour Excel.
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={handleDownloadExcel}
-                      style={{
-                        marginTop: 'auto',
-                        padding: '0.55rem',
-                        borderRadius: '8px',
-                        background: 'var(--primary)',
-                        border: 'none',
-                        color: '#fff',
-                        fontWeight: 700,
-                        fontSize: '0.76rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.35rem'
-                      }}
-                    >
-                      <Download size={13} />
-                      <span>Télécharger pour Excel</span>
-                    </button>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={handleDownloadExcel}
+                    style={{
+                      padding: '0.6rem 1.15rem',
+                      borderRadius: '10px',
+                      background: 'var(--primary)',
+                      border: 'none',
+                      color: '#fff',
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      boxShadow: '0 2px 6px rgba(var(--primary-rgb, 59, 130, 246), 0.25)',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Download size={15} />
+                    <span>Télécharger pour Excel</span>
+                  </button>
                 </div>
 
                 {/* PIED DE MODALE CHOIX */}
@@ -1197,120 +1094,6 @@ export default function ExportCatalogModal({
                     }}
                   >
                     ✓ Terminé
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ========================================================================= */}
-            {/* VUE 3 : GUIDE DE COLLAGE MANUEL (FALLBACK) */}
-            {/* ========================================================================= */}
-            {step === 'sheets_guide' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-                <div style={{
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  border: '1.5px solid rgba(16, 185, 129, 0.4)',
-                  borderRadius: '16px',
-                  padding: '1rem 1.25rem',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.85rem'
-                }}>
-                  <CheckCircle2 size={24} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ margin: '0 0 0.2rem 0', fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      Feuille Google Sheets ouverte !
-                    </h4>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      Vos <strong>{exportData.count} articles</strong> sont copiés dans votre presse-papiers.
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{
-                  background: 'var(--bg-app)',
-                  border: '1.5px solid rgba(16, 185, 129, 0.4)',
-                  borderRadius: '14px',
-                  padding: '1.05rem 1.2rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.65rem'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#10b981' }}>
-                      ⚡ Coller dans Google Sheets (1 seconde)
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        copyToClipboard(exportData.tsvContent);
-                        setHasCopied(true);
-                        setTimeout(() => setHasCopied(false), 2000);
-                      }}
-                      style={{
-                        background: hasCopied ? '#10b981' : 'var(--bg-card)',
-                        color: hasCopied ? '#fff' : 'var(--text-primary)',
-                        border: hasCopied ? '1px solid #10b981' : '1px solid var(--border-color)',
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
-                        padding: '0.35rem 0.75rem',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {hasCopied ? <Check size={14} /> : <Copy size={14} />}
-                      <span>{hasCopied ? 'Données Recopiées !' : 'Recopier'}</span>
-                    </button>
-                  </div>
-
-                  <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                    <li>Allez sur l'onglet <strong>Google Sheets</strong> qui vient de s'ouvrir.</li>
-                    <li>Cliquez sur la première cellule <strong>A1</strong> (en haut à gauche).</li>
-                    <li>Appuyez sur <kbd style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', padding: '0.12rem 0.4rem', borderRadius: '4px', fontWeight: 700, color: 'var(--text-primary)' }}>Ctrl</kbd> + <kbd style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', padding: '0.12rem 0.4rem', borderRadius: '4px', fontWeight: 700, color: 'var(--text-primary)' }}>V</kbd>.</li>
-                  </ol>
-                </div>
-
-                <div style={{
-                  borderTop: '1px solid var(--border-color)',
-                  paddingTop: '0.9rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => setStep('choice')}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--text-muted)',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    ← Retour
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    style={{
-                      background: '#10b981',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      padding: '0.5rem 1.1rem',
-                      fontSize: '0.82rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    ✓ Fermer
                   </button>
                 </div>
               </div>
