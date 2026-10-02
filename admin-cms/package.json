@@ -11,11 +11,12 @@
   },
   "dependencies": {
     "@iconify-json/solar": "^1.2.12",
+    "@iconify-json/tabler": "^1.2.41",
     "@iconify/react": "^6.0.2",
     "@supabase/supabase-js": "^2.108.2",
+    "@tabler/icons-react": "^3.48.0",
     "libphonenumber-js": "^1.13.10",
     "lucide-react": "^0.475.0",
-    "material-symbols": "^0.45.3",
     "motion": "^13.4.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"

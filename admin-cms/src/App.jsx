@@ -4,23 +4,18 @@ import AdminView from './components/AdminView';
 import CustomSelect from './components/CustomSelect';
 import { appEnv } from './services/supabaseClient';
 import logoBrand from './assets/logo_brand.png';
-// Composant utilitaire pour les icônes Google Material Symbols
-const MIcon = ({ name, size = 20, style = {}, className = '', filled = false }) => (
-  <span
-    className={`material-symbols-rounded${className ? ' ' + className : ''}`}
-    style={{
-      fontSize: size,
-      lineHeight: 1,
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontVariationSettings: `'FILL' ${filled ? 1 : 0}, 'wght' 400, 'GRAD' 0, 'opsz' 24`,
-      userSelect: 'none',
-      ...style
-    }}
-  >
-    {name}
-  </span>
+import TablerIcon from './components/icons/tablerIcons';
+
+// Composant utilitaire basé sur la bibliothèque Tabler Lined (remplace Material Symbols)
+const MIcon = ({ name, size = 20, style = {}, className = '', stroke = 1.8, strokeWidth, filled, ...rest }) => (
+  <TablerIcon
+    name={name}
+    size={size}
+    stroke={strokeWidth !== undefined ? strokeWidth : stroke}
+    style={style}
+    className={className}
+    {...rest}
+  />
 );
 
 function App() {

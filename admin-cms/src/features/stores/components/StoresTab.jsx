@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../../../services/db';
 import StatefulButton from '../../../components/ui/StatefulButton';
+import TablerIcon from '../../../components/icons/tablerIcons';
 
 export default function StoresTab({ onShowSuccess }) {
   useEffect(() => {
@@ -20,8 +21,8 @@ export default function StoresTab({ onShowSuccess }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', width: '100%' }}>
         <div className="card modal-dialog-card" style={{ maxWidth: '440px', padding: '2.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', borderRadius: '24px' }}>
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--danger)' }}>
-            <span className="material-symbols-rounded" style={{ fontSize: '36px' }}>gpp_bad</span>
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <TablerIcon name="gpp_bad" size={36} />
           </div>
           <h3 style={{ fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Accès Réservé</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', margin: 0 }}>
@@ -180,7 +181,7 @@ export default function StoresTab({ onShowSuccess }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
         <div className="card" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(0, 44, 247, 0.08)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-rounded" style={{ fontSize: '26px' }}>store</span>
+            <TablerIcon name="store" size={26} />
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Total Points Laverie</div>
@@ -190,7 +191,7 @@ export default function StoresTab({ onShowSuccess }) {
 
         <div className="card" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-rounded" style={{ fontSize: '26px' }}>check_circle</span>
+            <TablerIcon name="check_circle" size={26} />
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Points Actifs</div>
@@ -200,7 +201,7 @@ export default function StoresTab({ onShowSuccess }) {
 
         <div className="card" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-rounded" style={{ fontSize: '26px' }}>group</span>
+            <TablerIcon name="group" size={26} />
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Staff Actif Enregistré</div>
@@ -210,7 +211,7 @@ export default function StoresTab({ onShowSuccess }) {
 
         <div className="card" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', border: selectedStoreId !== 'all' ? '1.5px solid var(--primary)' : '1px solid var(--border-color)' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: selectedStoreId !== 'all' ? 'var(--primary)' : 'rgba(245, 158, 11, 0.1)', color: selectedStoreId !== 'all' ? '#ffffff' : '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-rounded" style={{ fontSize: '26px' }}>hub</span>
+            <TablerIcon name="hub" size={26} />
           </div>
           <div>
             <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Contexte Connecté</div>
@@ -225,7 +226,7 @@ export default function StoresTab({ onShowSuccess }) {
       <div className="card" style={{ padding: '1rem 1.25rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '280px' }}>
           <div style={{ position: 'relative', flex: 1 }}>
-            <span className="material-symbols-rounded" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '20px' }}>search</span>
+            <TablerIcon name="search" size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
               placeholder="Rechercher un point par nom, code, ville, adresse..."
@@ -302,7 +303,7 @@ export default function StoresTab({ onShowSuccess }) {
             onClick={openCreateModal}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem', borderRadius: '10px', fontWeight: 700 }}
           >
-            <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>add_location_alt</span>
+            <TablerIcon name="add_location_alt" size={20} />
             Nouveau Point de Laverie
           </button>
         )}
@@ -312,7 +313,7 @@ export default function StoresTab({ onShowSuccess }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
         {filteredStores.length === 0 ? (
           <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-secondary)' }}>
-            <span className="material-symbols-rounded" style={{ fontSize: '48px', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>storefront</span>
+            <TablerIcon name="storefront" size={48} style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }} />
             <div style={{ fontSize: '1rem', fontWeight: 700 }}>Aucun point de laverie trouvé</div>
             <p style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>Essayez de modifier votre recherche ou ajoutez un nouveau point de laverie.</p>
           </div>
@@ -350,7 +351,7 @@ export default function StoresTab({ onShowSuccess }) {
                       justifyContent: 'center',
                       fontWeight: 800
                     }}>
-                      <span className="material-symbols-rounded" style={{ fontSize: '24px' }}>domain</span>
+                      <TablerIcon name="domain" size={24} />
                     </div>
                     <div>
                       <h3 style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', margin: 0 }}>
@@ -385,17 +386,17 @@ export default function StoresTab({ onShowSuccess }) {
                 {/* Details list */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.82rem', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', paddingVertical: '0.85rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="material-symbols-rounded" style={{ fontSize: '18px', color: 'var(--text-muted)' }}>location_on</span>
+                    <TablerIcon name="location_on" size={18} style={{ color: 'var(--text-muted)' }} />
                     <span>{store.adresse || 'Adresse non renseignée'} ({store.ville || 'Cotonou'})</span>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="material-symbols-rounded" style={{ fontSize: '18px', color: 'var(--text-muted)' }}>call</span>
+                    <TablerIcon name="call" size={18} style={{ color: 'var(--text-muted)' }} />
                     <span>{store.telephone || 'Non renseigné'}</span>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="material-symbols-rounded" style={{ fontSize: '18px', color: 'var(--text-muted)' }}>person</span>
+                    <TablerIcon name="person" size={18} style={{ color: 'var(--text-muted)' }} />
                     <span>Responsable : <strong>{store.responsable_nom || 'Non assigné'}</strong></span>
                   </div>
 
@@ -429,7 +430,7 @@ export default function StoresTab({ onShowSuccess }) {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                   {isConnected ? (
                     <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>check_circle</span>
+                      <TablerIcon name="check_circle" size={18} />
                       Point Connecté Actif
                     </span>
                   ) : (
@@ -439,7 +440,7 @@ export default function StoresTab({ onShowSuccess }) {
                       className="btn btn-outline"
                       style={{ padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                     >
-                      <span className="material-symbols-rounded" style={{ fontSize: '16px' }}>login</span>
+                      <TablerIcon name="login" size={16} />
                       Se connecter à ce point
                     </button>
                   )}
@@ -453,7 +454,7 @@ export default function StoresTab({ onShowSuccess }) {
                         style={{ padding: '0.4rem', borderRadius: '8px' }}
                         title="Éditer le point"
                       >
-                        <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>edit</span>
+                        <TablerIcon name="edit" size={18} />
                       </button>
                       <button
                         type="button"
@@ -462,7 +463,7 @@ export default function StoresTab({ onShowSuccess }) {
                         style={{ padding: '0.4rem', borderRadius: '8px', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' }}
                         title="Supprimer le point"
                       >
-                        <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>delete</span>
+                        <TablerIcon name="delete" size={18} />
                       </button>
                     </div>
                   )}
@@ -479,11 +480,11 @@ export default function StoresTab({ onShowSuccess }) {
           <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '640px', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', borderRadius: '24px', margin: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
               <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span className="material-symbols-rounded">store</span>
+                <TablerIcon name="store" size={20} />
                 {editingStore ? "Modifier le Point de Laverie" : "Nouveau Point de Laverie"}
               </h3>
               <button type="button" onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                <span className="material-symbols-rounded">close</span>
+                <TablerIcon name="close" size={20} />
               </button>
             </div>
 
