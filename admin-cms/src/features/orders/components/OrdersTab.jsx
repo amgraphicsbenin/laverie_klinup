@@ -82,12 +82,10 @@ function ActionMenuItem({ icon: Icon, iconColor, label, onClick, color, isBold =
 
 // Types de recherche supportés dans la barre de recherche
 const SEARCH_TYPES = [
-  { id: 'all', label: '🔍 Tous critères', placeholder: 'ID, client, tél, article, service...' },
   { id: 'id_code', label: '🏷️ N° Commande / Code', placeholder: 'Entrez l\'ID ou code marquage...' },
   { id: 'customer', label: '👤 Nom Client', placeholder: 'Nom ou prénom du client...' },
   { id: 'phone', label: '📞 Téléphone', placeholder: 'Numéro de tél (ex: 97000000)...' },
-  { id: 'article', label: '👕 Article', placeholder: 'Nom d\'article (ex: Chemise, Robe...)...' },
-  { id: 'service', label: '✨ Service', placeholder: 'Service (ex: Lavage, Repassage...)...' }
+  { id: 'article', label: '👕 Article', placeholder: 'Nom d\'article (ex: Chemise, Robe...)...' }
 ];
 
 export default function OrdersTab({
@@ -117,7 +115,7 @@ export default function OrdersTab({
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [activeActionDropdown, setActiveActionDropdown] = useState(null); // { order, coords: { top, bottom, right } }
-  const [searchType, setSearchType] = useState('all'); // 'all' | 'id_code' | 'customer' | 'phone' | 'article' | 'service'
+  const [searchType, setSearchType] = useState('id_code'); // 'id_code' | 'customer' | 'phone' | 'article'
   const [searchQuery, setSearchQuery] = useState(historySearchQuery || '');
   const [selectedStatus, setSelectedStatus] = useState(historyFilterStatus || 'all');
   const [selectedStore, setSelectedStore] = useState('all');
@@ -305,11 +303,8 @@ export default function OrdersTab({
         matches = matchPhone;
       } else if (searchType === 'article') {
         matches = matchArticle;
-      } else if (searchType === 'service') {
-        matches = matchService;
       } else {
-        // 'all' : recherche globale multi-critères
-        matches = matchIdCode || matchCustomer || matchPhone || matchArticle || matchService;
+        matches = matchIdCode;
       }
 
       if (!matches) return false;
@@ -870,13 +865,13 @@ export default function OrdersTab({
                       <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
                         Modifiez vos critères de recherche ou réinitialisez les filtres.
                       </div>
-                      {(searchQuery || searchType !== 'all' || selectedStatus !== 'all' || selectedStore !== 'all' || quickFilter !== 'all') && (
+                      {(searchQuery || searchType !== 'id_code' || selectedStatus !== 'all' || selectedStore !== 'all' || quickFilter !== 'all') && (
                         <button
                           type="button"
                           className="btn btn-outline"
                           onClick={() => {
                             setSearchQuery('');
-                            setSearchType('all');
+                            setSearchType('id_code');
                             setSelectedStatus('all');
                             setSelectedStore('all');
                             setQuickFilter('all');
