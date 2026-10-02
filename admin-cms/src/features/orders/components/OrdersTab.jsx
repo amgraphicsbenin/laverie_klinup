@@ -399,7 +399,7 @@ export default function OrdersTab({
             <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               En Atelier (Actives)
             </div>
-            <div style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
+            <div style={{ fontSize: '1.35rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
               {activeOrders.length} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)' }}>dépôts</span>
             </div>
           </div>
@@ -433,7 +433,7 @@ export default function OrdersTab({
             <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Traitements Express
             </div>
-            <div style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#d97706', lineHeight: 1.1, marginTop: '2px' }}>
+            <div style={{ fontSize: '1.35rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: '#d97706', lineHeight: 1.1, marginTop: '2px' }}>
               {expressOrdersCount} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)' }}>urgentes</span>
             </div>
           </div>
@@ -467,7 +467,7 @@ export default function OrdersTab({
             <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Prêtes / À Livrer
             </div>
-            <div style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#10b981', lineHeight: 1.1, marginTop: '2px' }}>
+            <div style={{ fontSize: '1.35rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: '#10b981', lineHeight: 1.1, marginTop: '2px' }}>
               {readyOrdersCount} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)' }}>disponibles</span>
             </div>
           </div>
@@ -501,7 +501,7 @@ export default function OrdersTab({
             <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Alertes Retard
             </div>
-            <div style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: lateOrdersCount > 0 ? '#ef4444' : 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
+            <div style={{ fontSize: '1.35rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: lateOrdersCount > 0 ? '#ef4444' : 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
               {lateOrdersCount} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)' }}>dépassements</span>
             </div>
           </div>
@@ -881,7 +881,7 @@ export default function OrdersTab({
                                   <>
                                     <span style={{
                                       fontFamily: 'var(--font-title)',
-                                      fontWeight: 800,
+                                      fontWeight: 600,
                                       fontSize: '0.84rem',
                                       color: 'var(--text-primary)',
                                       letterSpacing: '0.2px'
@@ -1057,7 +1057,7 @@ export default function OrdersTab({
                         {/* 7. Finances & Règlement */}
                         <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
                               {(order.prix_total || 0).toLocaleString()} F CFA
                             </div>
                             <div style={{ fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>

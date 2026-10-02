@@ -484,7 +484,7 @@ export default function ExportCatalogModal({
                 {step === 'oauth_success' ? <IconCircleCheck size={24} stroke={1.8} /> : <IconFileSpreadsheet size={22} stroke={1.8} />}
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
                   {step === 'oauth_success' ? 'Exportation Réussie !' : 'Exporter le Catalogue des Produits'}
                 </h3>
                 <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
@@ -640,7 +640,7 @@ export default function ExportCatalogModal({
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <h4 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        <h4 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                           Google Sheets
                         </h4>
                         <span style={{
@@ -736,7 +736,7 @@ export default function ExportCatalogModal({
                       <IconFileSpreadsheet size={22} stroke={1.8} />
                     </div>
                     <div>
-                      <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                         Microsoft Excel
                       </h5>
                       <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
@@ -826,7 +826,7 @@ export default function ExportCatalogModal({
                       <IconCircleCheck size={28} stroke={1.8} />
                     </div>
                     <div>
-                      <h4 style={{ margin: '0 0 0.2rem 0', fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      <h4 style={{ margin: '0 0 0.2rem 0', fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                         Document Google Sheets créé avec succès !
                       </h4>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>

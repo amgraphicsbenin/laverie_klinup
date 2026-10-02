@@ -756,7 +756,7 @@ function App() {
 
           {/* Marque Pressing Pro */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.5px' }}>
+            <span style={{ fontSize: '1.65rem', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.5px' }}>
               PRESSING
             </span>
             <span style={{
@@ -773,7 +773,7 @@ function App() {
 
           <span style={{
             fontSize: '0.72rem',
-            fontWeight: 800,
+            fontWeight: 600,
             color: '#64748b',
             letterSpacing: '2.5px',
             textTransform: 'uppercase',
@@ -920,7 +920,7 @@ function App() {
             <IconAlertTriangle size={28} stroke={2} />
           </div>
 
-          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem 0', letterSpacing: '-0.3px' }}>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 600, color: '#0f172a', margin: '0 0 0.5rem 0', letterSpacing: '-0.3px' }}>
             Connexion impossible
           </h2>
           <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1.5rem 0', lineHeight: 1.5 }}>
@@ -1093,7 +1093,7 @@ function App() {
                     />
                   </div>
 
-                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.35rem 0', letterSpacing: '-0.4px', textAlign: 'center' }}>
+                  <h2 style={{ fontSize: '1.45rem', fontWeight: 600, color: '#0f172a', margin: '0 0 0.35rem 0', letterSpacing: '-0.4px', textAlign: 'center' }}>
                     Accès Administration
                   </h2>
                   <p style={{ fontSize: '0.82rem', color: '#64748b', textAlign: 'center', margin: '0 0 1.8rem 0', lineHeight: 1.45 }}>
@@ -1232,7 +1232,7 @@ function App() {
                     />
                   </div>
 
-                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0', letterSpacing: '-0.4px', textAlign: 'center' }}>
+                  <h2 style={{ fontSize: '1.45rem', fontWeight: 600, color: '#0f172a', margin: '0 0 0.25rem 0', letterSpacing: '-0.4px', textAlign: 'center' }}>
                     Authentification PIN
                   </h2>
                   <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '0 0 1.5rem 0', lineHeight: 1.45 }}>
@@ -1271,7 +1271,7 @@ function App() {
                       </div>
 
                       <div>
-                        <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#9f1239' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 600, color: '#9f1239' }}>
                           Compte temporairement bloqué
                         </h4>
                         <p style={{ margin: '4px 0 0 0', fontSize: '0.76rem', color: '#be123c', lineHeight: 1.4 }}>
@@ -1514,7 +1514,7 @@ function App() {
             <div style={{ textAlign: 'center', margin: '0.5rem 0 1rem 0' }}>
               <h2 style={{
                 fontSize: '2rem',
-                fontWeight: 900,
+                fontWeight: 600,
                 color: '#0f172a',
                 letterSpacing: '-0.8px',
                 lineHeight: 1.18,
@@ -1578,7 +1578,7 @@ function App() {
                   <IconShirt size={18} stroke={1.8} />
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>Tarifs &amp; Articles</div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#0f172a', lineHeight: 1.2 }}>Tarifs &amp; Articles</div>
                   <div style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 600 }}>Catalogue pressing</div>
                 </div>
               </div>
@@ -1700,7 +1700,7 @@ function App() {
                   <IconUsers size={18} stroke={1.8} />
                 </div>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>Fichier Clients</div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#0f172a', lineHeight: 1.2 }}>Fichier Clients</div>
                   <div style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 600 }}>Historique &amp; soldes</div>
                 </div>
               </div>
@@ -1755,7 +1755,7 @@ function App() {
           }}>
             <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '380px', maxWidth: '90%', padding: '1.75rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', gap: '1rem', color: '#0f172a', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25)', border: '1px solid #e2e8f0', background: '#ffffff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.05rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: '#0f172a' }}>Réinitialiser le code PIN</h3>
+                <h3 style={{ fontSize: '1.05rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: '#0f172a' }}>Réinitialiser le code PIN</h3>
                 <button type="button" onClick={() => setShowResetPinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', padding: '4px' }}>
                   <IconX size={18} stroke={2} />
                 </button>
@@ -1831,7 +1831,7 @@ function App() {
                   padding: '2px 8px',
                   borderRadius: '9999px',
                   fontSize: '0.65rem',
-                  fontWeight: 800,
+                  fontWeight: 600,
                   letterSpacing: '0.6px',
                   textTransform: 'uppercase',
                   background: appEnv === 'test' ? 'rgba(234, 179, 8, 0.16)' : 'rgba(249, 115, 22, 0.16)',
@@ -2180,7 +2180,7 @@ function App() {
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-app)' }}>
-                          <span style={{ fontWeight: 800, fontSize: '0.85rem', fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Notifications</span>
+                          <span style={{ fontWeight: 600, fontSize: '0.85rem', fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>Notifications</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             {notifications.length > 0 && (
                               <button
@@ -2314,7 +2314,7 @@ function App() {
               <div style={{ background: 'var(--status-late-light)', padding: '1rem', borderRadius: '50%', color: 'var(--status-late)' }}>
                 <MIcon name="gpp_bad" size={48} />
               </div>
-              <h2 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 700 }}>Espace Réservé</h2>
+              <h2 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 600 }}>Espace Réservé</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6' }}>
                 Désolé <strong>{currentUser?.prenom} {currentUser?.nom}</strong>, votre rôle <strong>{currentUser?.role}</strong> ne vous autorise pas à accéder au CMS Administrateur.<br />
                 Veuillez utiliser l'application de terrain sur le port <strong>5174</strong>.
@@ -2352,7 +2352,7 @@ function App() {
           animation: 'fadeIn 0.2s ease-out'
         }}>
           <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '360px', padding: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)' }}>
-            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.25rem', fontWeight: 700 }}>Confirmer la déconnexion</h3>
+            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.25rem', fontWeight: 600 }}>Confirmer la déconnexion</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Êtes-vous sûr de vouloir vous déconnecter de la plateforme Admin CMS ?</p>
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
               <button className="btn btn-outline" onClick={() => setShowLogoutConfirm(false)}>Annuler</button>
@@ -2417,7 +2417,7 @@ function App() {
                   <MIcon name="help" size={22} filled />
                 </div>
               )}
-              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0 }}>
+              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0 }}>
                 {customDialog.title}
               </h3>
             </div>

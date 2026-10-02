@@ -122,7 +122,7 @@ export default function DashboardTab({
               {currentStore ? `Point Actif (${currentStore.code})` : 'Vue Globale Réseau'}
             </span>
           </div>
-          <h2 style={{ fontSize: '1.65rem', fontWeight: 800, fontFamily: 'var(--font-title)', margin: 0, letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>
+          <h2 style={{ fontSize: '1.65rem', fontWeight: 600, fontFamily: 'var(--font-title)', margin: 0, letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>
             {currentStore ? `Supervision - ${currentStore.nom}` : 'Supervision Globale Pressing Pro'}
           </h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -242,7 +242,7 @@ export default function DashboardTab({
             </div>
           </div>
 
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-title)', letterSpacing: '-0.5px', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 600, fontFamily: 'var(--font-title)', letterSpacing: '-0.5px', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
             {earnedRevenue.toLocaleString()} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>F CFA</span>
           </div>
 
@@ -278,7 +278,7 @@ export default function DashboardTab({
             </div>
           </div>
 
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-title)', letterSpacing: '-0.5px', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 600, fontFamily: 'var(--font-title)', letterSpacing: '-0.5px', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
             {completedOrdersCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>colis</span>
           </div>
 
@@ -314,7 +314,7 @@ export default function DashboardTab({
             </div>
           </div>
 
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-title)', letterSpacing: '-0.5px', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 600, fontFamily: 'var(--font-title)', letterSpacing: '-0.5px', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
             {activeOrdersCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>en cours</span>
           </div>
 
@@ -351,7 +351,7 @@ export default function DashboardTab({
             </div>
           </div>
 
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-title)', letterSpacing: '-0.5px', marginBottom: '0.5rem', color: pendingOrdersCount > 0 ? '#d97706' : 'var(--text-primary)' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 600, fontFamily: 'var(--font-title)', letterSpacing: '-0.5px', marginBottom: '0.5rem', color: pendingOrdersCount > 0 ? '#d97706' : 'var(--text-primary)' }}>
             {pendingOrdersCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>à trier</span>
           </div>
 
@@ -369,7 +369,7 @@ export default function DashboardTab({
       <div className="card" style={{ padding: '1.5rem', borderRadius: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
           <div>
-            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Activity size={20} color="var(--primary)" />
               Flux de Production & Traitement Atelier en Direct
             </h3>
@@ -446,7 +446,7 @@ export default function DashboardTab({
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem', borderRadius: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
               Volume de Linge Traité
             </h3>
             <CustomSelect 
@@ -515,7 +515,7 @@ export default function DashboardTab({
         {/* COLONNE GAUCHE : ÉQUIPE DU JOUR & AGENTS */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.35rem', borderRadius: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.65rem' }}>
-            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Users size={18} color="var(--primary)" /> Équipe du Jour & Présences
             </h3>
             <button
@@ -597,7 +597,7 @@ export default function DashboardTab({
         {/* COLONNE DROITE : METRIQUES DE PERFORMANCE & PANIER MOYEN */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.35rem', borderRadius: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.65rem' }}>
-            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.05rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Award size={18} color="#d97706" /> Performance Services & CRM
             </h3>
           </div>
@@ -648,7 +648,7 @@ export default function DashboardTab({
       {/* ACTIVITÉS & COMMANDES RÉCENTES */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem', borderRadius: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-          <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <ShoppingBag size={18} color="var(--primary)" /> Commandes & Activités Récentes en Direct
           </h3>
           <button 
@@ -723,7 +723,7 @@ export default function DashboardTab({
         <div className="modal-backdrop" onClick={() => setShowCashClosureModal(false)}>
           <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '560px', borderRadius: '24px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', background: 'var(--bg-card, #ffffff)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', margin: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-title)' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, fontFamily: 'var(--font-title)' }}>
                 Clôture de Caisse Journalière (Z)
               </h3>
               <button type="button" onClick={() => setShowCashClosureModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>

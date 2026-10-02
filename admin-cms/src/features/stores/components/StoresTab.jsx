@@ -33,7 +33,7 @@ export default function StoresTab({ onShowSuccess }) {
           <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '50%', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
             <TablerIcon name="gpp_bad" size={36} />
           </div>
-          <h3 style={{ fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0 }}>Accès Réservé</h3>
+          <h3 style={{ fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0 }}>Accès Réservé</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', margin: 0 }}>
             Seuls les Super Administrateurs disposent des privilèges requis pour administrer les points de laverie et basculer entre les établissements.
           </p>
@@ -202,7 +202,7 @@ export default function StoresTab({ onShowSuccess }) {
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Total Points Laverie</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>{stores.length}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>{stores.length}</div>
           </div>
         </div>
 
@@ -212,7 +212,7 @@ export default function StoresTab({ onShowSuccess }) {
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Points Actifs</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-title)' }}>{totalActive} / {stores.length}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#10b981', fontFamily: 'var(--font-title)' }}>{totalActive} / {stores.length}</div>
           </div>
         </div>
 
@@ -222,7 +222,7 @@ export default function StoresTab({ onShowSuccess }) {
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Staff Actif Enregistré</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#6366f1', fontFamily: 'var(--font-title)' }}>{staff.length} agents</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#6366f1', fontFamily: 'var(--font-title)' }}>{staff.length} agents</div>
           </div>
         </div>
 
@@ -232,7 +232,7 @@ export default function StoresTab({ onShowSuccess }) {
           </div>
           <div>
             <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Contexte Connecté</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: selectedStoreId !== 'all' ? 'var(--primary)' : 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: selectedStoreId !== 'all' ? 'var(--primary)' : 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
               {currentActiveStoreObj ? currentActiveStoreObj.nom : 'Tous les points (Vue Globale)'}
             </div>
           </div>
@@ -362,7 +362,7 @@ export default function StoresTab({ onShowSuccess }) {
                       <TablerIcon name="domain" size={24} />
                     </div>
                     <div>
-                      <h3 style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', margin: 0 }}>
+                      <h3 style={{ fontSize: '1.05rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', margin: 0 }}>
                         {store.nom}
                       </h3>
                       <span style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 700, background: 'rgba(0, 44, 247, 0.08)', padding: '0.15rem 0.5rem', borderRadius: '4px', marginTop: '0.2rem', display: 'inline-block' }}>
@@ -487,7 +487,7 @@ export default function StoresTab({ onShowSuccess }) {
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
           <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '640px', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', borderRadius: '24px', margin: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
-              <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <TablerIcon name="store" size={20} />
                 {editingStore ? "Modifier le Point de Laverie" : "Nouveau Point de Laverie"}
               </h3>

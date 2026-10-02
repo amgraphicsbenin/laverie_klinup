@@ -444,7 +444,7 @@ export default function CustomersTab({
             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Portefeuille Clients
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
+            <div style={{ fontSize: '1.45rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: '2px' }}>
               {totalCustomers} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>fiches</span>
             </div>
           </div>
@@ -478,7 +478,7 @@ export default function CustomersTab({
             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Abonnés Actifs
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#10b981', lineHeight: 1.1, marginTop: '2px' }}>
+            <div style={{ fontSize: '1.45rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: '#10b981', lineHeight: 1.1, marginTop: '2px' }}>
               {activeSubscribers} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>actifs</span>
             </div>
           </div>
@@ -512,7 +512,7 @@ export default function CustomersTab({
             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Fidélité & Rewards
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#d97706', lineHeight: 1.1, marginTop: '2px' }}>
+            <div style={{ fontSize: '1.45rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: '#d97706', lineHeight: 1.1, marginTop: '2px' }}>
               {totalFidelityPoints.toLocaleString('fr-FR')} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>pts</span>
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -549,7 +549,7 @@ export default function CustomersTab({
             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Comptes en Dette
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: '#ef4444', lineHeight: 1.1, marginTop: '2px' }}>
+            <div style={{ fontSize: '1.45rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: '#ef4444', lineHeight: 1.1, marginTop: '2px' }}>
               {totalDebtAmount.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>F</span>
             </div>
           </div>
@@ -627,7 +627,7 @@ export default function CustomersTab({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.9rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                    <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.25rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                       Portefeuille Clients CRM
                     </h3>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '12px', background: 'var(--primary-light)', color: 'var(--primary)' }}>
@@ -1068,7 +1068,7 @@ export default function CustomersTab({
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-app)', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Users size={18} color="var(--primary)" />
-                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                         Fiche Client CRM
                       </h4>
                     </div>
@@ -1104,7 +1104,7 @@ export default function CustomersTab({
                           {activeCustomer.prenom.charAt(0)}{activeCustomer.nom.charAt(0)}
                         </div>
                         <div>
-                          <h4 style={{ fontSize: '1.2rem', fontWeight: 900, fontFamily: 'var(--font-title)', margin: 0, color: 'var(--text-primary)' }}>
+                          <h4 style={{ fontSize: '1.2rem', fontWeight: 600, fontFamily: 'var(--font-title)', margin: 0, color: 'var(--text-primary)' }}>
                             {activeCustomer.prenom} {activeCustomer.nom}
                           </h4>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
@@ -1182,7 +1182,7 @@ export default function CustomersTab({
                         <span style={{ fontSize: '0.68rem', color: currentTier.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                           {renderTierIcon(currentTier.iconName, 12, currentTier.color)} Statut {currentTier.name}
                         </span>
-                        <strong style={{ fontSize: '1.2rem', fontFamily: 'var(--font-title)', color: currentTier.color, fontWeight: 900 }}>
+                        <strong style={{ fontSize: '1.2rem', fontFamily: 'var(--font-title)', color: currentTier.color, fontWeight: 600 }}>
                           {activeCustomer.points_fidelite || 0} <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>pts</span>
                         </strong>
                       </div>
@@ -1193,7 +1193,7 @@ export default function CustomersTab({
                           <CreditCard size={12} color={activeCustomer.solde_dette > 0 ? '#ef4444' : '#10b981'} /> Dette Restante
                         </span>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <strong style={{ fontSize: '1.2rem', fontFamily: 'var(--font-title)', color: activeCustomer.solde_dette > 0 ? '#ef4444' : '#10b981', fontWeight: 900 }}>
+                          <strong style={{ fontSize: '1.2rem', fontFamily: 'var(--font-title)', color: activeCustomer.solde_dette > 0 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
                             {activeCustomer.solde_dette.toLocaleString()} <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>F</span>
                           </strong>
                           {activeCustomer.solde_dette > 0 && (
@@ -1307,7 +1307,7 @@ export default function CustomersTab({
                             {renderTierIcon(currentTier.iconName, 18, currentTier.color)}
                           </div>
                           <div>
-                            <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: 'var(--text-primary)' }}>{currentTier.title}</h5>
+                            <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)' }}>{currentTier.title}</h5>
                             <span style={{ fontSize: '0.7rem', color: currentTier.color, fontWeight: 700 }}>Statut Fidélité Actif</span>
                           </div>
                         </div>
@@ -1550,7 +1550,7 @@ export default function CustomersTab({
 
                     {/* Historique individuel des commandes du client */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.2rem' }}>
-                      <h4 style={{ fontSize: '0.92rem', fontWeight: 900, fontFamily: 'var(--font-title)', margin: 0, color: 'var(--text-primary)' }}>
+                      <h4 style={{ fontSize: '0.92rem', fontWeight: 600, fontFamily: 'var(--font-title)', margin: 0, color: 'var(--text-primary)' }}>
                         Historique des Dépôts du Client
                       </h4>
 
@@ -1647,7 +1647,7 @@ export default function CustomersTab({
             >
               {/* Header exact match with Nouvelle Commande modal */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, fontFamily: 'inherit' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, fontFamily: 'inherit' }}>
                   Fidélité & Échange de Points
                 </h3>
                 <button
@@ -2006,7 +2006,7 @@ export default function CustomersTab({
                     <Edit size={20} />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                    <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                       Modifier le Profil Client
                     </h3>
                     <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
@@ -2368,7 +2368,7 @@ export default function CustomersTab({
                       <Trash2 size={20} />
                     </div>
                     <div>
-                      <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                      <h3 style={{ fontSize: '1.05rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                         Supprimer le profil client
                       </h3>
                       <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-secondary)' }}>

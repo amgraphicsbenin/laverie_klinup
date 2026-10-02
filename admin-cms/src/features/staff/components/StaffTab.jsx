@@ -627,7 +627,7 @@ export default function StaffTab({
           {/* EN-TÊTE BANNIÈRE DE LA SECTION */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
             <div>
-              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.15rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+              <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.15rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                 <Users size={20} color="var(--primary)" />
                 Répertoire du Personnel & Gestion des Accès
               </h3>
@@ -1163,7 +1163,7 @@ export default function StaffTab({
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Rôles Configurés</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>{totalRoles}</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>{totalRoles}</div>
               </div>
             </div>
 
@@ -1173,7 +1173,7 @@ export default function StaffTab({
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Rôles Système (Natifs)</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-title)' }}>{systemRolesCount}</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 600, color: '#2563eb', fontFamily: 'var(--font-title)' }}>{systemRolesCount}</div>
               </div>
             </div>
 
@@ -1183,7 +1183,7 @@ export default function StaffTab({
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Rôles Sur-mesure</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#8b5cf6', fontFamily: 'var(--font-title)' }}>{customRolesCount}</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 600, color: '#8b5cf6', fontFamily: 'var(--font-title)' }}>{customRolesCount}</div>
               </div>
             </div>
 
@@ -1195,7 +1195,7 @@ export default function StaffTab({
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                   {storeFilter !== 'all' ? 'Utilisateurs du Point' : 'Utilisateurs Rattachés'}
                 </div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#16a34a', fontFamily: 'var(--font-title)' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 600, color: '#16a34a', fontFamily: 'var(--font-title)' }}>
                   {storeFilter !== 'all' ? storeStaffCount : totalStaff}
                 </div>
               </div>
@@ -1233,7 +1233,7 @@ export default function StaffTab({
                   style={{
                     fontFamily: 'var(--font-title)',
                     fontSize: '1.2rem',
-                    fontWeight: 800,
+                    fontWeight: 600,
                     margin: 0,
                     color: 'var(--text-primary)',
                     display: 'flex',
@@ -1407,7 +1407,7 @@ export default function StaffTab({
                                 <ShieldCheck size={18} />
                               </div>
                               <div style={{ minWidth: 0 }}>
-                                <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)', fontFamily: 'var(--font-title)' }}>
                                   {role.label}
                                 </div>
                                 <div
@@ -1640,7 +1640,7 @@ export default function StaffTab({
                   {(selectedMember.prenom || 'U')[0]}{(selectedMember.nom || 'M')[0]}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                     Édition du Profil — {selectedMember.prenom} {selectedMember.nom}
                   </h3>
                   <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
@@ -1659,7 +1659,7 @@ export default function StaffTab({
               
               {/* SECTION 1 : INFORMATIONS GÉNÉRALES */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <h5 style={{ fontSize: '0.82rem', fontWeight: 800, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <h5 style={{ fontSize: '0.82rem', fontWeight: 600, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   1. Informations Générales
                 </h5>
 
@@ -1712,7 +1712,7 @@ export default function StaffTab({
 
               {/* SECTION 2 : RÔLE, STATUT & BOUTIQUE */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                <h5 style={{ fontSize: '0.82rem', fontWeight: 800, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <h5 style={{ fontSize: '0.82rem', fontWeight: 600, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   2. Rôle, Statut & Point de Laverie
                 </h5>
 
@@ -1769,7 +1769,7 @@ export default function StaffTab({
 
               {/* SECTION 3 : CODE PIN */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                <h5 style={{ fontSize: '0.82rem', fontWeight: 800, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <h5 style={{ fontSize: '0.82rem', fontWeight: 600, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   3. Authentification par Code PIN
                 </h5>
 
@@ -1803,7 +1803,7 @@ export default function StaffTab({
 
               {/* SECTION 4 : MATRICE GRANULAIRE DE PERMISSIONS SUR-MESURE */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h5 style={{ fontSize: '0.82rem', fontWeight: 800, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <h5 style={{ fontSize: '0.82rem', fontWeight: 600, margin: 0, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Sliders size={15} color="var(--primary)" />
                   4. Habilitations Sur-Mesure Bi-Plateforme
                 </h5>
@@ -1925,7 +1925,7 @@ export default function StaffTab({
           <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '600px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color, rgba(0,0,0,0.08))', borderRadius: '24px' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
-              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <ShieldCheck size={20} /> Créer un nouveau Rôle
               </h3>
               <button type="button" onClick={() => setShowNewRoleModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
@@ -2062,7 +2062,7 @@ export default function StaffTab({
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
-                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
+                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
                           {viewingRole.label}
                         </h4>
                         <span style={{
@@ -2342,7 +2342,7 @@ export default function StaffTab({
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                    <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
+                    <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
                       {editRoleLabel || selectedRoleObj.label}
                     </h4>
                     <span style={{

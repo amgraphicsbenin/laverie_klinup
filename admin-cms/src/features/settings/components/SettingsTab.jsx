@@ -632,7 +632,7 @@ export default function SettingsTab({
                       <Zap size={18} />
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Service Express (Urgence)</h4>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Service Express (Urgence)</h4>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Traitement prioritaire en laverie</span>
                     </div>
                   </div>
@@ -727,7 +727,7 @@ export default function SettingsTab({
                       <Clock size={18} />
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Service Standard</h4>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Service Standard</h4>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Délai habituel de remise en laverie</span>
                     </div>
                   </div>
@@ -792,7 +792,7 @@ export default function SettingsTab({
                       <Crown size={18} />
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Attribution des Points</h4>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Attribution des Points</h4>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Calcul automatique des points fidélité</span>
                     </div>
                   </div>
@@ -863,7 +863,7 @@ export default function SettingsTab({
                     <Award size={18} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Seuils des Paliers de Fidélité</h4>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Seuils des Paliers de Fidélité</h4>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Niveaux de progression clients</span>
                   </div>
                 </div>
@@ -984,7 +984,7 @@ export default function SettingsTab({
                       <Gift size={18} />
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Catalogue des Récompenses Client</h4>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Catalogue des Récompenses Client</h4>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Offres configurables échangeables en caisse et sur l'application mobile ({rewardCatalog.length} offres)</span>
                     </div>
                   </div>
@@ -1101,7 +1101,7 @@ export default function SettingsTab({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
                   <Receipt size={20} color="var(--primary)" />
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-primary)' }}>Personnalisation des Reçus & Factures</h4>
+                    <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-primary)' }}>Personnalisation des Reçus & Factures</h4>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Mentions légales et configuration des formats d'impression</span>
                   </div>
                 </div>
@@ -1164,7 +1164,7 @@ export default function SettingsTab({
                       <Maximize2 size={16} />
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>Dimensions & Format de la Facture</h4>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Dimensions & Format de la Facture</h4>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Format de sortie pour impression physique et génération PDF sur l'app & l'admin</span>
                     </div>
                   </div>
@@ -1397,7 +1397,7 @@ export default function SettingsTab({
                     <Lock size={28} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Accès Restreint — Configuration Système</h4>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Accès Restreint — Configuration Système</h4>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1449,7 +1449,7 @@ export default function SettingsTab({
                           <Database size={18} />
                         </div>
                         <div>
-                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Moteur de Base de Données</h4>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Moteur de Base de Données</h4>
                           <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Synchronisation PostgreSQL / Supabase Cloud</span>
                         </div>
                       </div>
@@ -1512,7 +1512,7 @@ export default function SettingsTab({
                           
                         </div>
                         <div>
-                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Intégration Trello (Kanban Bugs)</h4>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Intégration Trello (Kanban Bugs)</h4>
                           <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Création automatique de cartes sur votre tableau</span>
                         </div>
                       </div>
@@ -1598,7 +1598,7 @@ export default function SettingsTab({
                         <Sparkles size={18} />
                       </div>
                       <div>
-                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Diagnostic & Cache Local</h4>
+                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Diagnostic & Cache Local</h4>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Optimisation des performances navigateurs</span>
                       </div>
                     </div>
@@ -1652,7 +1652,7 @@ export default function SettingsTab({
                       <Truck size={22} />
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Tarification des Frais de Livraison par Zone (GPS)</h4>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Tarification des Frais de Livraison par Zone (GPS)</h4>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Calcul kilométrique automatique depuis le point central de chaque laverie</span>
                     </div>
                   </div>
@@ -1731,7 +1731,7 @@ export default function SettingsTab({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Compass size={18} color="var(--primary)" />
-                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>Aperçu MapView Radar Google Maps</h4>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Aperçu MapView Radar Google Maps</h4>
                     </div>
                     <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', fontSize: '0.7rem' }}>
                       {deliveryZonesList.length} Zones Actives
@@ -1761,7 +1761,7 @@ export default function SettingsTab({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Layers size={18} color="var(--primary)" />
-                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>Tranches Kilométriques & Tarifs</h4>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Tranches Kilométriques & Tarifs</h4>
                     </div>
                     <button
                       type="button"
@@ -1838,7 +1838,7 @@ export default function SettingsTab({
                       <MapPin size={22} />
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Tarification des Frais de Récupération par Zone (GPS)</h4>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Tarification des Frais de Récupération par Zone (GPS)</h4>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Frais appliqués lorsque le client demande une récupération à domicile</span>
                     </div>
                   </div>
@@ -1849,7 +1849,7 @@ export default function SettingsTab({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Layers size={18} color="var(--primary)" />
-                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>Tranches Kilométriques (Récupération) & Tarifs</h4>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Tranches Kilométriques (Récupération) & Tarifs</h4>
                     </div>
                     <button
                       type="button"
@@ -1993,7 +1993,7 @@ export default function SettingsTab({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Gift size={20} color="var(--primary)" />
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {editingReward ? 'Modifier la Récompense' : 'Nouvelle Récompense Client'}
                   </h3>
                 </div>
@@ -2150,7 +2150,7 @@ export default function SettingsTab({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Truck size={20} color="var(--primary)" />
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {editingZone ? 'Modifier la Zone Kilométrique' : 'Nouvelle Zone de Livraison'}
                   </h3>
                 </div>
@@ -2274,7 +2274,7 @@ export default function SettingsTab({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <MapPin size={20} color="var(--primary)" />
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {editingZone ? 'Modifier la Zone de Récupération' : 'Nouvelle Zone de Récupération'}
                   </h3>
                 </div>

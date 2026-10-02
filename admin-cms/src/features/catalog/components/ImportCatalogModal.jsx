@@ -787,7 +787,7 @@ export default function ImportCatalogModal({
                 <FileSpreadsheet size={20} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600, fontFamily: 'var(--font-title)', color: 'var(--text-primary)' }}>
                   Importer & Synchroniser les Produits du Catalogue
                 </h3>
                 <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
@@ -1019,7 +1019,7 @@ export default function ImportCatalogModal({
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#dc2626' }}>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#dc2626' }}>
                             TEMPLATE REJETÉ : Données non conformes ({parsedData.stats.invalid} ligne{parsedData.stats.invalid > 1 ? 's' : ''} en anomalie)
                           </h4>
                           <span style={{

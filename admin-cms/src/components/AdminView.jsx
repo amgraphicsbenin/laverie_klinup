@@ -885,17 +885,17 @@ export default function AdminView({ activeTab, onManageStaff }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <div className="card" style={{ padding: '1rem', background: 'var(--primary-light)', border: '1px solid rgba(59, 130, 246, 0.2)', transition: 'none', transform: 'none', boxShadow: 'none' }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Revenu (période filtrée)</span>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0.2rem 0 0', color: 'var(--secondary)' }}>{filteredRevenue.toLocaleString()} F CFA</h3>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 600, margin: '0.2rem 0 0', color: 'var(--secondary)' }}>{filteredRevenue.toLocaleString()} F CFA</h3>
             {(kpiDateFrom || kpiDateTo) && <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>{filteredNonCancelled.length} commandes</span>}
           </div>
           <div className="card" style={{ padding: '1rem', background: 'var(--accent-light)', border: '1px solid rgba(217, 70, 239, 0.2)', transition: 'none', transform: 'none', boxShadow: 'none' }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Encours Dette Clients</span>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0.2rem 0 0', color: 'var(--accent)' }}>{totalDebt.toLocaleString()} F CFA</h3>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 600, margin: '0.2rem 0 0', color: 'var(--accent)' }}>{totalDebt.toLocaleString()} F CFA</h3>
           </div>
         </div>
 
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', transition: 'none', transform: 'none', boxShadow: 'none' }}>
-          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>Répartition par type de service</h4>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 600, margin: 0 }}>Répartition par type de service</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {Object.entries(revenueByService).map(([svcKey, amount]) => {
               const label = serviceLabels[svcKey] || svcKey;
@@ -916,7 +916,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
         </div>
 
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', transition: 'none', transform: 'none', boxShadow: 'none' }}>
-          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>Transactions ({filteredOrders.length} résultats)</h4>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 600, margin: 0 }}>Transactions ({filteredOrders.length} résultats)</h4>
           <div className="table-container">
             <table>
               <thead>
@@ -2731,7 +2731,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           <div className="modal-backdrop">
             <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '560px', background: 'var(--bg-card)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   Ajouter un Employé
                 </h3>
                 <button
@@ -2872,7 +2872,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   Ajouter au Catalogue
                 </h3>
                 <button
@@ -3406,7 +3406,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   Options d'Édition Avancées
                 </h3>
                 <button
@@ -3916,7 +3916,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           <div className="modal-backdrop" onClick={() => setShowNewCustomerModal(false)}>
             <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   Nouveau Client
                 </h3>
                 <button
@@ -4116,7 +4116,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           <div className="modal-backdrop" onClick={() => setShowDebtPaymentModal(false)}>
             <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '520px', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   Règlement Dette
                 </h3>
                 <button
@@ -4210,7 +4210,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           <div className="modal-backdrop" onClick={() => { setShowDeliveryPaymentModal(false); setMomoRefNumber(''); setMomoRefError(''); setMomoOperator('MTN'); }}>
             <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '520px', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   {delivFinalStatus === 'en_cours_lavage' ? 'Règlement Obligatoire Avant Lavage' : 'Règlement du Solde & Validation'}
                 </h3>
                 <button
@@ -4331,7 +4331,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           <div className="modal-backdrop" onClick={() => { setShowCancelModal(false); setOrderToCancel(null); }}>
             <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '500px', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, color: 'var(--danger)' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, color: 'var(--danger)' }}>
                   Annuler la Commande
                 </h3>
                 <button
@@ -4432,7 +4432,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 }}>
                   {/* ---- EN-TÊTE DYNAMIQUE ---- */}
                   <div style={{ textAlign: 'center', paddingBottom: '16px', marginBottom: '16px', borderBottom: '2px dashed #cccccc' }}>
-                    <h1 style={{ margin: 0, fontSize: effW >= 140 ? '22px' : '18px', fontWeight: '900', color: '#000000', letterSpacing: '1px', whiteSpace: 'pre-line' }}>
+                    <h1 style={{ margin: 0, fontSize: effW >= 140 ? '22px' : '18px', fontWeight: 600, color: '#000000', letterSpacing: '1px', whiteSpace: 'pre-line' }}>
                       {sysSettings.receipt_header || 'Pressing Pro - Laverie & Pressing Premium'}
                     </h1>
                     <p style={{ margin: '4px 0 12px', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
@@ -4747,7 +4747,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           <div className="modal-backdrop" onClick={() => setActiveDetailsCard(null)}>
             <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '880px', maxHeight: '88vh', overflow: 'hidden', background: 'var(--bg-card, #ffffff)', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25), 0 10px 25px -5px rgba(15, 23, 42, 0.12)', border: '1px solid var(--border-color)', borderRadius: '24px', cursor: 'default', margin: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontFamily: 'var(--font-title)', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   {activeDetailsCard === 'ca' && <TrendingUp size={20} className="text-primary" />}
                   {activeDetailsCard === 'completed' && <CheckCircle size={20} style={{ color: 'var(--status-ready)' }} />}
                   {activeDetailsCard === 'active' && <Clock size={20} style={{ color: 'var(--primary)' }} />}

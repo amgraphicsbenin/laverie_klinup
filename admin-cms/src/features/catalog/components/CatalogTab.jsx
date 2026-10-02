@@ -89,7 +89,7 @@ export default function CatalogTab({
   return (
     <div className="card" id="catalog-section" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: 'calc(100vh - 165px)', minHeight: '450px', maxHeight: '850px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexShrink: 0 }}>
-        <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+        <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
           <Sparkles size={18} color="var(--primary)" />
           Grille Tarifaire & Catalogue des Produits
         </h3>

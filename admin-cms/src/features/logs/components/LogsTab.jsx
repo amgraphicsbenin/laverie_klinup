@@ -679,7 +679,7 @@ export default function LogsTab({
                     <ActionIcon size={24} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{meta.label}</h4>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>{meta.label}</h4>
                     <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontFamily: 'monospace', fontWeight: 700, marginTop: '0.15rem' }}>
                       ID Trace: {selectedLog.id}
                     </div>

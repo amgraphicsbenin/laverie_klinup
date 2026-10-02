@@ -340,7 +340,7 @@ ${payload.steps_to_reproduce ? `#### 🔄 Étapes pour reproduire :\n${payload.s
           gap: '1.25rem'
         }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <MessageSquare size={20} color="var(--primary)" /> Formulaire de Demande d'Aide & Signalement
             </h3>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
@@ -645,7 +645,7 @@ ${payload.steps_to_reproduce ? `#### 🔄 Étapes pour reproduire :\n${payload.s
             gap: '1rem'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Clock size={18} color="var(--primary)" /> Vos Tickets Récents
               </h3>
               <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', fontSize: '0.7rem' }}>
@@ -750,7 +750,7 @@ ${payload.steps_to_reproduce ? `#### 🔄 Étapes pour reproduire :\n${payload.s
             flexDirection: 'column',
             gap: '0.85rem'
           }}>
-            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Sparkles size={16} color="var(--primary)" /> Foire Aux Questions (FAQ)
             </h4>
 

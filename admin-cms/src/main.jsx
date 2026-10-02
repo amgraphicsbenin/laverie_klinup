@@ -58,7 +58,7 @@ class ErrorBoundary extends Component {
               fontWeight: 'bold'
             }}>⚠️</div>
             
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 600, color: '#0f172a', margin: 0 }}>
               Incident d'Affichage Détecté
             </h2>
             
