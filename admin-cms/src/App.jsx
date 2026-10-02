@@ -5,6 +5,18 @@ import CustomSelect from './components/CustomSelect';
 import { appEnv } from './services/supabaseClient';
 import logoBrand from './assets/logo_brand.png';
 import TablerIcon from './components/icons/tablerIcons';
+import {
+  getPinLockoutState,
+  recordFailedPinAttempt,
+  clearPinLockout,
+  PIN_SECURITY_CONFIG
+} from './utils/securityUtils';
+import {
+  IconShieldLock,
+  IconAlertTriangle,
+  IconClock,
+  IconLock
+} from '@tabler/icons-react';
 
 // Composant utilitaire basé sur la bibliothèque Tabler Lined (remplace Material Symbols)
 const MIcon = ({ name, size = 20, style = {}, className = '', stroke = 1.8, strokeWidth, filled, ...rest }) => (
@@ -32,6 +44,22 @@ function App() {
   const [pinCode, setPinCode] = useState('');
   const [pinError, setPinError] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [pinLockoutState, setPinLockoutState] = useState({
+    isLocked: false,
+    remainingSeconds: 0,
+    failedAttempts: 0,
+    totalFailures: 0
+  });
+
+  const formatLockoutDuration = (seconds) => {
+    if (!seconds || seconds <= 0) return '0s';
+    if (seconds >= 60) {
+      const mins = Math.floor(seconds / 60);
+      const remaining = seconds % 60;
+      return `${mins}m ${remaining < 10 ? '0' : ''}${remaining}s`;
+    }
+    return `${seconds}s`;
+  };
 
   const [loginEmail, setLoginEmail] = useState('');
   const [showResetPinModal, setShowResetPinModal] = useState(false);
@@ -466,8 +494,36 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [customDialog]);
 
+  // Synchronisation du Security Guard PIN pour l'utilisateur sélectionné
+  useEffect(() => {
+    if (selectedLoginUser) {
+      const userKey = selectedLoginUser.id || selectedLoginUser.email;
+      const currentLockout = getPinLockoutState(userKey);
+      setPinLockoutState(currentLockout);
+      setPinCode('');
+      setPinError(false);
+    } else {
+      setPinLockoutState({ isLocked: false, remainingSeconds: 0, failedAttempts: 0, totalFailures: 0 });
+      setPinCode('');
+      setPinError(false);
+    }
+  }, [selectedLoginUser]);
+
+  // Compte à rebours temps réel pendant le verrouillage Security Guard
+  useEffect(() => {
+    if (!pinLockoutState.isLocked || !selectedLoginUser) return;
+
+    const timer = setInterval(() => {
+      const userKey = selectedLoginUser.id || selectedLoginUser.email;
+      const current = getPinLockoutState(userKey);
+      setPinLockoutState(current);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [pinLockoutState.isLocked, selectedLoginUser]);
+
   const handleKeypadPress = (val) => {
-    if (pinError || isUnlocking) return;
+    if (pinError || isUnlocking || pinLockoutState.isLocked) return;
 
     if (val === 'delete') {
       setPinCode(prev => prev.slice(0, -1));
@@ -480,8 +536,14 @@ function App() {
     setPinCode(newCode);
 
     if (newCode.length === 6) {
+      const userKey = selectedLoginUser?.id || selectedLoginUser?.email;
+
       if (selectedLoginUser.code_pin === newCode) {
+        // Authentification réussie : réinitialiser le compteur de tentatives
+        clearPinLockout(userKey);
+        setPinLockoutState({ isLocked: false, remainingSeconds: 0, failedAttempts: 0, totalFailures: 0 });
         setIsUnlocking(true);
+
         if (newCode === '000000') {
           alert("Sécurité : Vous êtes connecté avec le PIN par défaut (000000). Pensez à réinitialiser votre PIN.");
         }
@@ -492,7 +554,32 @@ function App() {
           setIsUnlocking(false);
         }, 300);
       } else {
+        // Code PIN erroné : enregistrement et calcul du verrouillage progressif
+        const lockoutResult = recordFailedPinAttempt(userKey);
+        setPinLockoutState(lockoutResult);
         setPinError(true);
+
+        // Journalisation de sécurité
+        if (lockoutResult.isLocked) {
+          try {
+            db.logAction?.(
+              'BLOCAGE_SECURITE_PIN',
+              `Compte ${selectedLoginUser.prenom} ${selectedLoginUser.nom} (${selectedLoginUser.email}) bloqué temporairement pour ${lockoutResult.remainingSeconds}s après ${lockoutResult.failedAttempts} tentatives consécutives incorrectes.`
+            );
+          } catch (logErr) {
+            console.warn('[SECURITY GUARD] Échec logAction:', logErr);
+          }
+        } else if (lockoutResult.failedAttempts >= PIN_SECURITY_CONFIG.WARNING_THRESHOLD) {
+          try {
+            db.logAction?.(
+              'ALERTE_PIN_INCORRECT',
+              `Alerte sécurité : ${lockoutResult.failedAttempts}/5 tentatives échouées pour ${selectedLoginUser.prenom} ${selectedLoginUser.nom} (${selectedLoginUser.email}).`
+            );
+          } catch (logErr) {
+            console.warn('[SECURITY GUARD] Échec logAction:', logErr);
+          }
+        }
+
         setTimeout(() => {
           setPinCode('');
           setPinError(false);
@@ -505,18 +592,24 @@ function App() {
     if (!selectedLoginUser) return;
 
     const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setSelectedLoginUser(null);
+        return;
+      }
+
+      // Bloquer la saisie si le compte est verrouillé
+      if (pinLockoutState.isLocked) return;
+
       if (e.key >= '0' && e.key <= '9') {
         handleKeypadPress(e.key);
       } else if (e.key === 'Backspace') {
         handleKeypadPress('delete');
-      } else if (e.key === 'Escape') {
-        setSelectedLoginUser(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedLoginUser, pinCode, pinError, isUnlocking]);
+  }, [selectedLoginUser, pinCode, pinError, isUnlocking, pinLockoutState.isLocked]);
 
 
   // Persist sidebar collapsed state
@@ -794,25 +887,167 @@ function App() {
                       : "Agent d'accueil"}
             </p>
 
-            <div className={`pin-dots-row ${pinError ? 'shake' : ''}`}>
-              {[0, 1, 2, 3, 4, 5].map(idx => (
+            {pinLockoutState.isLocked ? (
+              <div
+                style={{
+                  width: '100%',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1.5px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: '16px',
+                  padding: '1.25rem 1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  gap: '0.85rem',
+                  animation: 'fadeIn 0.25s ease-out',
+                  boxShadow: '0 8px 24px rgba(239, 68, 68, 0.12)',
+                  marginBottom: '1rem'
+                }}
+              >
                 <div
-                  key={idx}
-                  className={`pin-dot ${pinCode.length > idx ? 'filled' : ''} ${pinError ? 'error' : ''}`}
-                />
-              ))}
-            </div>
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    background: 'rgba(239, 68, 68, 0.18)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#f87171'
+                  }}
+                >
+                  <IconShieldLock size={32} stroke={1.8} />
+                </div>
 
-            <p style={{
-              color: 'rgba(255, 255, 255, 0.65)',
-              fontSize: '0.85rem',
-              textAlign: 'center',
-              marginTop: '1.5rem',
-              marginBottom: '1rem',
-              lineHeight: 1.4
-            }}>
-              Saisissez votre code PIN à 6 chiffres à l'aide de votre clavier physique.
-            </p>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#fca5a5' }}>
+                    Compte Temporairement Verrouillé
+                  </h4>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    marginTop: '4px',
+                    fontSize: '0.74rem',
+                    color: 'rgba(255, 255, 255, 0.75)'
+                  }}>
+                    <IconLock size={13} stroke={2} />
+                    <span>Sécurité anti-force brute activée ({pinLockoutState.failedAttempts} échecs)</span>
+                  </div>
+                </div>
+
+                {/* Countdown Badge */}
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    background: 'rgba(239, 68, 68, 0.22)',
+                    border: '1px solid rgba(239, 68, 68, 0.45)',
+                    padding: '0.55rem 1.1rem',
+                    borderRadius: '12px',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '0.92rem',
+                    letterSpacing: '0.3px',
+                    boxShadow: '0 0 12px rgba(239, 68, 68, 0.2)'
+                  }}
+                >
+                  <IconClock size={18} stroke={2.2} style={{ color: '#fca5a5' }} />
+                  <span>
+                    Réessayez dans {formatLockoutDuration(pinLockoutState.remainingSeconds)}
+                  </span>
+                </div>
+
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.4 }}>
+                  La saisie du code PIN est temporairement suspendue pour protéger les données du compte.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(selectedLoginUser.email || '');
+                    setShowResetPinModal(true);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#38bdf8',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    marginTop: '0.25rem'
+                  }}
+                >
+                  Code oublié ? Réinitialiser le PIN
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Warning Banner if failures >= 3 */}
+                {pinLockoutState.failedAttempts >= PIN_SECURITY_CONFIG.WARNING_THRESHOLD && (
+                  <div
+                    style={{
+                      width: '100%',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                      borderRadius: '10px',
+                      padding: '0.6rem 0.85rem',
+                      marginBottom: '1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      textAlign: 'left',
+                      color: '#fbbf24',
+                      fontSize: '0.78rem',
+                      lineHeight: 1.3
+                    }}
+                  >
+                    <IconAlertTriangle size={18} stroke={2} style={{ flexShrink: 0, color: '#f59e0b' }} />
+                    <div>
+                      <strong>Attention :</strong> {pinLockoutState.failedAttempts}/5 tentatives échouées. Le compte sera verrouillé après 5 échecs.
+                    </div>
+                  </div>
+                )}
+
+                {/* Subtle warning if 1 or 2 failures */}
+                {pinLockoutState.failedAttempts > 0 && pinLockoutState.failedAttempts < PIN_SECURITY_CONFIG.WARNING_THRESHOLD && (
+                  <div
+                    style={{
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      fontSize: '0.78rem',
+                      marginBottom: '0.75rem',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {pinLockoutState.failedAttempts}/5 tentative{pinLockoutState.failedAttempts > 1 ? 's' : ''} incorrecte{pinLockoutState.failedAttempts > 1 ? 's' : ''}
+                  </div>
+                )}
+
+                <div className={`pin-dots-row ${pinError ? 'shake' : ''}`}>
+                  {[0, 1, 2, 3, 4, 5].map(idx => (
+                    <div
+                      key={idx}
+                      className={`pin-dot ${pinCode.length > idx ? 'filled' : ''} ${pinError ? 'error' : ''}`}
+                    />
+                  ))}
+                </div>
+
+                <p style={{
+                  color: 'rgba(255, 255, 255, 0.65)',
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  marginTop: '0.5rem',
+                  marginBottom: '1rem',
+                  lineHeight: 1.4
+                }}>
+                  Saisissez votre code PIN à 6 chiffres à l'aide de votre clavier physique.
+                </p>
+              </>
+            )}
 
             <button
               type="button"

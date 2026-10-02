@@ -59,40 +59,154 @@ export async function verifyPinHash(inputPin, storedHash, salt) {
 }
 
 /**
- * Gère le Rate Limiting (anti-force brute) sur la saisie de PIN
+ * 🛡️ Security Guard Configuration pour la saisie de PIN Admin (Anti-Force Brute)
  */
-const pinAttemptsMap = new Map();
+export const PIN_SECURITY_CONFIG = {
+  WARNING_THRESHOLD: 3,        // Avertissement après 3 tentatives infructueuses
+  MAX_ATTEMPTS_BEFORE_LOCK: 5, // Déclenchement du verrouillage après 5 échecs
+  LOCKOUT_DURATION_TIER_1: 30, // 1er palier (5 échecs) : 30 secondes
+  LOCKOUT_DURATION_TIER_2: 120,// 2e palier (6 échecs) : 2 minutes (120 secondes)
+  LOCKOUT_DURATION_TIER_3: 300 // 3e palier (7+ échecs) : 5 minutes (300 secondes)
+};
 
-export function checkPinRateLimit(agentId, maxAttempts = 3, lockoutMinutes = 5) {
-  const now = Date.now();
-  const record = pinAttemptsMap.get(agentId) || { attempts: 0, lockoutUntil: 0 };
+const STORAGE_PREFIX = 'klinup_pin_guard_';
 
-  if (record.lockoutUntil > now) {
-    const remainingSec = Math.ceil((record.lockoutUntil - now) / 1000);
+/**
+ * Récupère l'état de sécurité et de blocage pour un utilisateur
+ * @param {string} userId - ID ou email de l'employé
+ * @returns {{ isLocked: boolean, remainingSeconds: number, failedAttempts: number, totalFailures: number, lockoutUntil: number }}
+ */
+export function getPinLockoutState(userId) {
+  if (!userId) {
+    return { isLocked: false, remainingSeconds: 0, failedAttempts: 0, totalFailures: 0, lockoutUntil: 0 };
+  }
+
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(`${STORAGE_PREFIX}${userId}`) : null;
+    if (!raw) {
+      return { isLocked: false, remainingSeconds: 0, failedAttempts: 0, totalFailures: 0, lockoutUntil: 0 };
+    }
+
+    const data = JSON.parse(raw);
+    const now = Date.now();
+    const lockoutUntil = Number(data.lockoutUntil) || 0;
+    const failedAttempts = Number(data.failedAttempts) || 0;
+    const totalFailures = Number(data.totalFailures) || 0;
+
+    if (lockoutUntil > now) {
+      const remainingSeconds = Math.ceil((lockoutUntil - now) / 1000);
+      return {
+        isLocked: true,
+        remainingSeconds,
+        failedAttempts,
+        totalFailures,
+        lockoutUntil
+      };
+    }
+
+    // Période de verrouillage expirée
+    return {
+      isLocked: false,
+      remainingSeconds: 0,
+      failedAttempts,
+      totalFailures,
+      lockoutUntil: 0
+    };
+  } catch (err) {
+    console.warn('[SECURITY GUARD] Erreur lors de la lecture du lockout state:', err);
+    return { isLocked: false, remainingSeconds: 0, failedAttempts: 0, totalFailures: 0, lockoutUntil: 0 };
+  }
+}
+
+/**
+ * Vérifie le statut de verrouillage d'un employé
+ * @param {string} agentId - ID de l'employé
+ * @returns {{ allowed: boolean, message?: string, remainingSec?: number, attempts?: number }}
+ */
+export function checkPinRateLimit(agentId) {
+  const state = getPinLockoutState(agentId);
+  if (state.isLocked) {
     return {
       allowed: false,
-      message: `Compte temporairement bloqué suite à trop d'échecs. Réessayez dans ${remainingSec} secondes.`,
-      remainingSec
+      message: `Compte temporairement bloqué suite à des échecs répétés. Réessayez dans ${state.remainingSeconds} secondes.`,
+      remainingSec: state.remainingSeconds
     };
   }
 
-  return { allowed: true, attempts: record.attempts };
+  return { allowed: true, attempts: state.failedAttempts };
 }
 
-export function recordFailedPinAttempt(agentId, maxAttempts = 3, lockoutMinutes = 5) {
-  const now = Date.now();
-  const record = pinAttemptsMap.get(agentId) || { attempts: 0, lockoutUntil: 0 };
-  
-  record.attempts += 1;
-  if (record.attempts >= maxAttempts) {
-    record.lockoutUntil = now + (lockoutMinutes * 60 * 1000);
-    record.attempts = 0; // réinitialiser le compteur après blocage
+/**
+ * Enregistre un échec de saisie de PIN et calcule le palier de verrouillage adéquat
+ * @param {string} userId - ID de l'employé
+ * @returns {{ isLocked: boolean, remainingSeconds: number, failedAttempts: number, totalFailures: number, isNewLockout: boolean, lockoutDuration: number }}
+ */
+export function recordFailedPinAttempt(userId) {
+  if (!userId) {
+    return { isLocked: false, remainingSeconds: 0, failedAttempts: 1, totalFailures: 1, isNewLockout: false, lockoutDuration: 0 };
   }
 
-  pinAttemptsMap.set(agentId, record);
-  return record;
+  const current = getPinLockoutState(userId);
+  const now = Date.now();
+  const nextFailedAttempts = current.failedAttempts + 1;
+  const nextTotalFailures = current.totalFailures + 1;
+
+  let lockoutDuration = 0;
+  let isNewLockout = false;
+
+  if (nextFailedAttempts >= 7) {
+    lockoutDuration = PIN_SECURITY_CONFIG.LOCKOUT_DURATION_TIER_3; // 300s (5 min)
+    isNewLockout = true;
+  } else if (nextFailedAttempts >= 6) {
+    lockoutDuration = PIN_SECURITY_CONFIG.LOCKOUT_DURATION_TIER_2; // 120s (2 min)
+    isNewLockout = true;
+  } else if (nextFailedAttempts >= PIN_SECURITY_CONFIG.MAX_ATTEMPTS_BEFORE_LOCK) {
+    lockoutDuration = PIN_SECURITY_CONFIG.LOCKOUT_DURATION_TIER_1; // 30s
+    isNewLockout = true;
+  }
+
+  const lockoutUntil = isNewLockout ? (now + lockoutDuration * 1000) : 0;
+
+  const payload = {
+    failedAttempts: nextFailedAttempts,
+    totalFailures: nextTotalFailures,
+    lockoutUntil,
+    lastAttemptAt: now
+  };
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(`${STORAGE_PREFIX}${userId}`, JSON.stringify(payload));
+    }
+  } catch (err) {
+    console.warn('[SECURITY GUARD] Erreur lors de la sauvegarde du lockout state:', err);
+  }
+
+  return {
+    isLocked: isNewLockout,
+    remainingSeconds: lockoutDuration,
+    failedAttempts: nextFailedAttempts,
+    totalFailures: nextTotalFailures,
+    isNewLockout,
+    lockoutDuration
+  };
 }
 
-export function clearPinAttempts(agentId) {
-  pinAttemptsMap.delete(agentId);
+/**
+ * Réinitialise complètement le compteur de sécurité lors d'une authentification réussie
+ * @param {string} userId - ID de l'employé
+ */
+export function clearPinAttempts(userId) {
+  if (!userId) return;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(`${STORAGE_PREFIX}${userId}`);
+    }
+  } catch (err) {
+    console.warn('[SECURITY GUARD] Erreur lors de la réinitialisation du lockout state:', err);
+  }
+}
+
+export function clearPinLockout(userId) {
+  clearPinAttempts(userId);
 }
