@@ -658,130 +658,309 @@ function App() {
     localStorage.setItem('klin_up_sidebar_collapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
-  // ── Supabase loading screen ──────────────────────────────────────────────
+  // ── Supabase loading screen (Harmonisé avec le nouveau design Login) ──────
   if (isInitializing) {
     return (
       <div style={{
         minHeight: '100vh',
+        width: '100%',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
-        gap: '2rem',
+        background: 'radial-gradient(circle at 50% 15%, #ffffff 0%, #f0f7ff 35%, #dbeafe 70%, #93c5fd 100%)',
+        padding: '2rem 1.5rem',
+        position: 'relative',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
         fontFamily: 'var(--font-body, Inter, sans-serif)',
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+        {/* Pilule Flottante Haute Droite (Environnement / Domaine) */}
+        <div style={{
+          position: 'absolute',
+          top: '24px',
+          right: '28px',
+          padding: '8px 18px',
+          borderRadius: '9999px',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.8)',
+          boxShadow: '0 4px 18px rgba(0, 0, 0, 0.04)',
+          color: '#475569',
+          fontSize: '0.8rem',
+          fontWeight: 600,
+          zIndex: 10
+        }}>
+          {appEnv && appEnv !== 'production' ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: appEnv === 'test' ? '#eab308' : '#f97316' }} />
+              <strong style={{ color: appEnv === 'test' ? '#b45309' : '#c2410c' }}>ENVIRONNEMENT {appEnv.toUpperCase()}</strong>
+            </span>
+          ) : (
+            <span>@klinup.ci</span>
+          )}
+        </div>
+
+        {/* Halo lumineux d'arrière-plan pour profondeur spatiale */}
+        <div style={{
+          position: 'absolute',
+          top: '35%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '650px',
+          height: '450px',
+          background: 'radial-gradient(circle, rgba(147, 197, 253, 0.35) 0%, rgba(191, 219, 254, 0.15) 50%, transparent 70%)',
+          filter: 'blur(70px)',
+          pointerEvents: 'none',
+          zIndex: 0
+        }} />
+
+        {/* Carte Centrale Élégante */}
+        <div style={{
+          width: '100%',
+          maxWidth: '420px',
+          background: '#ffffff',
+          borderRadius: '30px',
+          boxShadow: '0 25px 80px -15px rgba(37, 99, 235, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.9)',
+          padding: '3.2rem 2.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          position: 'relative',
+          zIndex: 1,
+          animation: 'splashFadeIn 0.35s ease-out forwards',
+          boxSizing: 'border-box'
+        }}>
+          {/* Logo officiel en noir pur sans fond sombre */}
           <div style={{
-            width: '84px',
-            height: '84px',
-            borderRadius: '22px',
-            overflow: 'hidden',
-            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.45), 0 0 24px rgba(59, 130, 246, 0.3)',
-            border: '1.5px solid rgba(255, 255, 255, 0.18)',
-            background: '#0f172a',
+            width: '64px',
+            height: '64px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            marginBottom: '1.25rem'
           }}>
-            <img src={logoBrand} alt="Pressing Pro" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img
+              src={logoDark}
+              alt="Pressing Pro"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                filter: 'brightness(0)'
+              }}
+            />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.85rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.5px', textTransform: 'uppercase' }}>
-                Pressing
-              </span>
-              <span style={{ fontSize: '1.85rem', fontWeight: 900, color: '#38bdf8', letterSpacing: '-0.5px', textTransform: 'uppercase' }}>
-                Pro
-              </span>
-            </div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.45)', letterSpacing: '2.5px', textTransform: 'uppercase', marginTop: '3px' }}>
-              Administration &amp; Caisse
+
+          {/* Marque Pressing Pro */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '1.65rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.5px' }}>
+              PRESSING
+            </span>
+            <span style={{
+              fontSize: '1.65rem',
+              fontWeight: 900,
+              background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.5px'
+            }}>
+              PRO
             </span>
           </div>
+
+          <span style={{
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            color: '#64748b',
+            letterSpacing: '2.5px',
+            textTransform: 'uppercase',
+            marginBottom: '2.2rem'
+          }}>
+            Administration &amp; Caisse
+          </span>
+
+          {/* Indicateur de chargement moderne */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', width: '100%' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              border: '3.5px solid rgba(37, 99, 235, 0.12)',
+              borderTop: '3.5px solid #2563eb',
+              borderRadius: '50%',
+              animation: 'spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+            }} />
+            <p style={{
+              color: '#64748b',
+              fontSize: '0.88rem',
+              fontWeight: 500,
+              margin: 0,
+              letterSpacing: '0.01em'
+            }}>
+              Connexion au serveur en cours…
+            </p>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              color: '#64748b',
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              marginTop: '0.6rem'
+            }}>
+              <IconShieldCheck size={14} stroke={2} style={{ color: '#2563eb' }} />
+              <span>Session sécurisée &amp; chiffrée</span>
+            </div>
+          </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-          <div style={{
-            width: '44px', height: '44px',
-            border: '3px solid rgba(255,255,255,0.1)',
-            borderTop: '3px solid #38bdf8',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-          }} />
-          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', margin: 0, letterSpacing: '0.05em' }}>
-            Connexion au serveur en cours…
-          </p>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+          @keyframes splashFadeIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+          }
+        `}</style>
       </div>
     );
   }
 
-  // ── Supabase connection error screen ─────────────────────────────────────
+  // ── Supabase connection error screen (Harmonisé avec le nouveau design Login) ──────
   if (initError) {
     return (
       <div style={{
         minHeight: '100vh',
+        width: '100%',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
-        gap: '1.5rem',
-        padding: '2rem',
+        background: 'radial-gradient(circle at 50% 15%, #ffffff 0%, #f0f7ff 35%, #dbeafe 70%, #93c5fd 100%)',
+        padding: '2rem 1.5rem',
+        position: 'relative',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
         fontFamily: 'var(--font-body, Inter, sans-serif)',
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+        {/* Pilule Flottante Haute Droite */}
+        <div style={{
+          position: 'absolute',
+          top: '24px',
+          right: '28px',
+          padding: '8px 18px',
+          borderRadius: '9999px',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.8)',
+          boxShadow: '0 4px 18px rgba(0, 0, 0, 0.04)',
+          color: '#475569',
+          fontSize: '0.8rem',
+          fontWeight: 600,
+          zIndex: 10
+        }}>
+          {appEnv && appEnv !== 'production' ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: appEnv === 'test' ? '#eab308' : '#f97316' }} />
+              <strong style={{ color: appEnv === 'test' ? '#b45309' : '#c2410c' }}>ENVIRONNEMENT {appEnv.toUpperCase()}</strong>
+            </span>
+          ) : (
+            <span>@klinup.ci</span>
+          )}
+        </div>
+
+        {/* Halo lumineux d'arrière-plan */}
+        <div style={{
+          position: 'absolute',
+          top: '35%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '650px',
+          height: '450px',
+          background: 'radial-gradient(circle, rgba(147, 197, 253, 0.35) 0%, rgba(191, 219, 254, 0.15) 50%, transparent 70%)',
+          filter: 'blur(70px)',
+          pointerEvents: 'none',
+          zIndex: 0
+        }} />
+
+        {/* Carte Erreur */}
+        <div style={{
+          width: '100%',
+          maxWidth: '440px',
+          background: '#ffffff',
+          borderRadius: '30px',
+          boxShadow: '0 25px 80px -15px rgba(239, 68, 68, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.9)',
+          padding: '3rem 2.2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          position: 'relative',
+          zIndex: 1,
+          boxSizing: 'border-box'
+        }}>
           <div style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: '18px',
-            overflow: 'hidden',
-            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.4)',
-            border: '1.5px solid rgba(255, 255, 255, 0.15)',
-            background: '#0f172a',
+            width: '56px',
+            height: '56px',
+            borderRadius: '16px',
+            background: '#fee2e2',
+            color: '#dc2626',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            marginBottom: '1.25rem'
           }}>
-            <img src={logoBrand} alt="Pressing Pro" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <IconAlertTriangle size={28} stroke={2} />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.5px' }}>PRESSING</span>
-            <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#38bdf8', letterSpacing: '-0.5px' }}>PRO</span>
-          </div>
-        </div>
-        <div style={{
-          background: 'rgba(239, 68, 68, 0.08)',
-          border: '1px solid rgba(239, 68, 68, 0.3)',
-          borderRadius: '16px',
-          padding: '2rem',
-          maxWidth: '420px',
-          width: '100%',
-          textAlign: 'center',
-          display: 'flex', flexDirection: 'column', gap: '1rem'
-        }}>
-          <div style={{ color: '#ef4444', display: 'flex', justifyContent: 'center' }}>
-            <MIcon name="error" size={44} />
-          </div>
-          <h2 style={{ color: '#fca5a5', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem 0', letterSpacing: '-0.3px' }}>
             Connexion impossible
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', margin: 0, lineHeight: 1.6 }}>
-            {initError}
+          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1.5rem 0', lineHeight: 1.5 }}>
+            Impossible d'établir la liaison avec la base de données.
           </p>
+
+          <div style={{
+            width: '100%',
+            background: '#fef2f2',
+            border: '1px solid #fee2e2',
+            borderRadius: '12px',
+            padding: '0.9rem',
+            color: '#b91c1c',
+            fontSize: '0.82rem',
+            lineHeight: 1.5,
+            marginBottom: '1.5rem',
+            textAlign: 'left',
+            boxSizing: 'border-box',
+            wordBreak: 'break-word'
+          }}>
+            {initError}
+          </div>
+
           <button
             onClick={() => { setInitError(null); setIsInitializing(true); db.init().then(() => { setCurrentUser(db.getCurrentUser()); setStaffList(db.getStaff()); setDbIsRemote(db.isRemote()); setSelectedStoreIdState(db.getSelectedStoreId()); setIsInitializing(false); }).catch(err => { setInitError(err?.message || 'Erreur de connexion.'); setIsInitializing(false); }); }}
             style={{
-              background: 'rgba(56, 189, 248, 0.15)',
-              border: '1px solid rgba(56, 189, 248, 0.4)',
-              color: '#38bdf8',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '10px',
+              width: '100%',
+              background: '#2563eb',
+              color: '#ffffff',
+              padding: '0.85rem 1.5rem',
+              borderRadius: '12px',
+              border: 'none',
               cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.85rem',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+              transition: 'background 0.15s ease'
             }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#1d4ed8'}
+            onMouseLeave={(e) => e.currentTarget.style.background = '#2563eb'}
           >
             Réessayer la connexion
           </button>
