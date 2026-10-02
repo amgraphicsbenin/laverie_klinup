@@ -24,6 +24,16 @@ const ModalPortal = ({ children }) => {
 // En-tête officiel du CSV intégrant ID_Produit (numérique seul), Store_ID, Store_Name, Statut (1/0)
 const CSV_HEADER_LINE = 'ID_Produit;Store_ID;Store_Name;Statut;Article;Tarif_Traitement;Tarif_Traitement_Express;Tarif_Repassage;Tarif_Repassage_Express;Categorie;Description\r\n';
 
+// Helper de normalisation pour la validation stricte des noms et identifiants
+const normalizeClean = (str) => {
+  return String(str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+};
+
 export default function ImportCatalogModal({
   isOpen,
   onClose,
@@ -35,10 +45,22 @@ export default function ImportCatalogModal({
 }) {
   if (!isOpen) return null;
 
-  // Filtrer les points de vente valides (exclure 'all' et 'GLOBAL')
-  const validStores = useMemo(() => {
-    return (stores || []).filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL');
+  // Récupérer et filtrer les points de vente valides (exclure 'all' et 'GLOBAL')
+  const allAvailableStores = useMemo(() => {
+    let list = stores || [];
+    if (!list || list.length === 0) {
+      try {
+        list = db.getStores() || [];
+      } catch (e) {
+        list = [];
+      }
+    }
+    return list;
   }, [stores]);
+
+  const validStores = useMemo(() => {
+    return (allAvailableStores || []).filter(st => st && st.id !== 'all' && st.code !== 'GLOBAL');
+  }, [allAvailableStores]);
 
   // Point de vente par défaut
   const defaultStoreId = useMemo(() => {
@@ -303,6 +325,14 @@ export default function ImportCatalogModal({
     const hasHeader = colArticle !== -1 || colTraitement !== -1 || colRepassage !== -1 || colStatut !== -1;
     const startIndex = hasHeader ? 1 : 0;
 
+    const missingHeaders = [];
+    if (hasHeader) {
+      if (colStoreId === -1) missingHeaders.push('Store_ID');
+      if (colStoreName === -1) missingHeaders.push('Store_Name');
+      if (colStatut === -1) missingHeaders.push('Statut');
+      if (colCategorie === -1) missingHeaders.push('Categorie');
+    }
+
     if (!hasHeader) {
       colIdProduit = 0;
       colStoreId = 1;
@@ -395,27 +425,104 @@ export default function ImportCatalogModal({
       const rawCat = (colCategorie !== -1 ? (tokens[colCategorie] || '') : '').toLowerCase().trim();
       const description = (colDescription !== -1 ? (tokens[colDescription] || '') : '').trim();
 
-      // Résolution du statut (colonne 4 : 1 = actif, 0 = inactif)
-      let parsedIsActive = true;
-      if (rawStatut === '0' || rawStatut.toLowerCase() === 'inactif' || rawStatut.toLowerCase() === 'false' || rawStatut.toLowerCase() === 'desactive') {
-        parsedIsActive = false;
+      const errors = [];
+
+      // A. CONTRÔLE D'EN-TÊTE
+      if (hasHeader && missingHeaders.length > 0) {
+        errors.push(`Colonnes obligatoires manquantes dans l'en-tête : ${missingHeaders.join(', ')}`);
       }
 
-      // Résolution du Store
+      // B. 1. CONTRÔLE STRICT STORE_ID
       let resolvedStore = null;
-      if (rawStoreId) {
-        resolvedStore = validStores.find(s => s.id === rawStoreId || s.code.toLowerCase() === rawStoreId.toLowerCase());
-      }
-      if (!resolvedStore && rawStoreName) {
-        resolvedStore = validStores.find(s => s.nom.toLowerCase() === rawStoreName.toLowerCase() || s.nom.toLowerCase().includes(rawStoreName.toLowerCase()));
-      }
-      if (!resolvedStore) {
-        resolvedStore = validStores.find(s => s.id === targetStoreId) || validStores[0] || null;
+      let isStoreIdValid = false;
+
+      if (!rawStoreId) {
+        errors.push("Store_ID manquant : l'identifiant du point de vente est obligatoire.");
+      } else {
+        resolvedStore = validStores.find(s => 
+          (s.id && String(s.id).trim().toLowerCase() === rawStoreId.toLowerCase()) ||
+          (s.code && String(s.code).trim().toLowerCase() === rawStoreId.toLowerCase())
+        );
+        if (resolvedStore) {
+          isStoreIdValid = true;
+        } else {
+          const availableList = validStores.map(s => s.code ? `${s.code} (${s.id})` : s.id).join(', ');
+          errors.push(`Store_ID '${rawStoreId}' inconnu ou invalide (points valides : ${availableList || 'aucun point configuré'}).`);
+        }
       }
 
-      const finalStore = resolvedStore;
-      const finalIsActive = parsedIsActive;
-      const finalStatutVal = parsedIsActive ? 1 : 0;
+      // C. 2. CONTRÔLE STRICT STORE_NAME
+      let isStoreNameValid = false;
+      if (!rawStoreName) {
+        errors.push("Store_Name manquant : le nom officiel du point de vente est obligatoire.");
+      } else {
+        if (resolvedStore) {
+          const normRaw = normalizeClean(rawStoreName);
+          const normStoreNom = normalizeClean(resolvedStore.nom);
+          const normStoreCode = normalizeClean(resolvedStore.code);
+          const isNameMatch = normRaw === normStoreNom || 
+                              normRaw === normStoreCode || 
+                              (normRaw.length >= 4 && normStoreNom.includes(normRaw)) || 
+                              (normStoreNom.length >= 4 && normRaw.includes(normStoreNom));
+          if (isNameMatch) {
+            isStoreNameValid = true;
+          } else {
+            errors.push(`Store_Name '${rawStoreName}' ne correspond pas au Store_ID '${rawStoreId}' (nom attendu : '${resolvedStore.nom}').`);
+          }
+        } else {
+          const storeByName = validStores.find(s => {
+            const normRaw = normalizeClean(rawStoreName);
+            const normStoreNom = normalizeClean(s.nom);
+            return normRaw === normStoreNom || (normRaw.length >= 4 && normStoreNom.includes(normRaw));
+          });
+          if (storeByName) {
+            isStoreNameValid = true;
+            resolvedStore = storeByName;
+          } else {
+            errors.push(`Store_Name '${rawStoreName}' invalide ou introuvable.`);
+          }
+        }
+      }
+
+      // D. 3. CONTRÔLE STRICT STATUT (doit être '1' ou '0')
+      let parsedIsActive = false;
+      let isStatutValid = false;
+      const cleanStatutLower = rawStatut.toLowerCase().trim();
+
+      if (!rawStatut) {
+        errors.push("Statut manquant : doit être obligatoirement '1' (actif) ou '0' (inactif).");
+      } else if (cleanStatutLower === '1' || cleanStatutLower === 'actif' || cleanStatutLower === 'true') {
+        isStatutValid = true;
+        parsedIsActive = true;
+      } else if (cleanStatutLower === '0' || cleanStatutLower === 'inactif' || cleanStatutLower === 'false') {
+        isStatutValid = true;
+        parsedIsActive = false;
+      } else {
+        errors.push(`Statut '${rawStatut}' invalide : doit être strictement '1' (actif) ou '0' (inactif).`);
+      }
+
+      // E. 4. CONTRÔLE STRICT CATEGORIE (doit être 'individuel' ou 'abonnement')
+      let finalCategory = '';
+      let isCategoryValid = false;
+      const cleanCatLower = rawCat.toLowerCase().trim();
+
+      if (!rawCat) {
+        errors.push("Catégorie manquante : doit être obligatoirement 'individuel' ou 'abonnement'.");
+      } else if (cleanCatLower === 'individuel') {
+        isCategoryValid = true;
+        finalCategory = 'individuel';
+      } else if (cleanCatLower === 'abonnement') {
+        isCategoryValid = true;
+        finalCategory = 'abonnement';
+      } else {
+        finalCategory = cleanCatLower;
+        errors.push(`Catégorie '${rawCat}' invalide : seules les catégories 'individuel' et 'abonnement' sont autorisées.`);
+      }
+
+      // F. 5. CONTRÔLE NOM D'ARTICLE
+      if (!articleName) {
+        errors.push("Nom d'article manquant.");
+      }
 
       // Montants : cellule vide = 0
       const prixTraitement = cleanPrice(rawTraitement);
@@ -423,22 +530,35 @@ export default function ImportCatalogModal({
       const prixRepassage = cleanPrice(rawRepassage);
       const prixRepassageUrgent = cleanPrice(rawRepassageUrgent);
 
-      // Validation stricte du type de produit : SEULS 'individuel' et 'abonnement' sont acceptés
-      const normalizedCat = rawCat ? rawCat.toLowerCase().trim() : '';
-      let isCategoryValid = true;
-      let finalCategory = 'individuel';
+      // G. 6. CONTRÔLE TARIFS
+      if (isCategoryValid) {
+        if (finalCategory === 'individuel') {
+          if (prixTraitement === 0 && prixRepassage === 0) {
+            errors.push("Au moins un tarif (Lavage/Traitement ou Repassage) doit être > 0.");
+          }
+        } else if (finalCategory === 'abonnement') {
+          if (prixTraitement === 0 && prixRepassage === 0) {
+            errors.push("Tarif d'abonnement supérieur à 0 requis.");
+          }
+        }
+      }
 
-      if (!normalizedCat || normalizedCat === 'individuel') {
-        finalCategory = 'individuel';
-      } else if (normalizedCat === 'abonnement' || normalizedCat.includes('abonn')) {
-        finalCategory = 'abonnement';
-      } else {
-        isCategoryValid = false;
-        finalCategory = normalizedCat;
+      // H. 7. CONTRÔLE COLLISION D'ID DANS LE FICHIER
+      if (cleanNumericId) {
+        if (seenIdsInFile.has(cleanNumericId)) {
+          const firstSeen = seenIdsInFile.get(cleanNumericId);
+          errors.push(`Collision critique d'ID : L'ID Produit '${cleanNumericId}' est déjà utilisé par '${firstSeen.article}' (ligne ${firstSeen.lineIndex}).`);
+        } else {
+          seenIdsInFile.set(cleanNumericId, {
+            lineIndex: i + 1,
+            article: articleName || 'Sans nom',
+            categorie: finalCategory || rawCat
+          });
+        }
       }
 
       // Détection de correspondance avec le catalogue existant (par ID ou par Store + Nom)
-      const storeIdForCheck = finalStore?.id || targetStoreId;
+      const storeIdForCheck = resolvedStore?.id || rawStoreId || targetStoreId;
       const keyForCheck = `${storeIdForCheck}__${articleName.toLowerCase()}`;
       
       const existsById = cleanNumericId ? existingById.has(cleanNumericId) : false;
@@ -447,9 +567,6 @@ export default function ImportCatalogModal({
       const isDuplicate = existsById || existsByName;
 
       // Attribution de l'ID produit fonctionnel :
-      // - Si fourni dans le CSV : conserver l'ID explicite
-      // - Si non fourni dans le CSV mais le produit existe déjà en DB : conserver l'ID propre de l'existant
-      // - Si non fourni et produit réellement nouveau : incrémenter de façon séquentielle N+1
       let assignedNumericId = '';
       let isNewProduct = false;
 
@@ -459,7 +576,6 @@ export default function ImportCatalogModal({
         const parsed = parseInt(cleanNumericId, 10);
         if (!isNaN(parsed)) usedNumbers.add(parsed);
       } else if (existingMatch) {
-        // Le produit est déjà en base (par exemple après un premier import ou template d'update)
         const matchNum = extractNumericId(existingMatch.id, null);
         if (matchNum !== null && matchNum > 0) {
           assignedNumericId = String(matchNum);
@@ -472,7 +588,6 @@ export default function ImportCatalogModal({
         }
         isNewProduct = false;
       } else {
-        // Vrai nouveau produit sans ID : attribution séquentielle N+1
         isNewProduct = true;
         do {
           nextAutoNum += 1;
@@ -481,39 +596,9 @@ export default function ImportCatalogModal({
         usedNumbers.add(nextAutoNum);
       }
 
-      // Validation
-      const errors = [];
-
-      // DÉTECTION STRICTE DE COLLISION D'ID DANS LE FICHIER
-      if (cleanNumericId) {
-        if (seenIdsInFile.has(cleanNumericId)) {
-          const firstSeen = seenIdsInFile.get(cleanNumericId);
-          errors.push(`Collision critique d'ID : L'ID Produit '${cleanNumericId}' est déjà utilisé par '${firstSeen.article}' (${firstSeen.categorie}, ligne ${firstSeen.lineIndex}). Deux articles (qu'ils soient de même type ou de types différents) ne peuvent pas partager le même ID.`);
-        } else {
-          seenIdsInFile.set(cleanNumericId, {
-            lineIndex: i + 1,
-            article: articleName || 'Sans nom',
-            categorie: finalCategory
-          });
-        }
-      }
-
-      if (!isCategoryValid) {
-        errors.push(`Catégorie '${rawCat}' interdite : seuls 'individuel' et 'abonnement' sont acceptés`);
-      }
-      if (!articleName) {
-        errors.push("Nom d'article manquant");
-      }
-      if (finalCategory === 'individuel') {
-        if (prixTraitement === 0 && prixRepassage === 0) {
-          errors.push("Au moins un tarif (Traitement ou Repassage) doit être > 0");
-        }
-      } else if (finalCategory === 'abonnement') {
-        if (prixTraitement === 0 && prixRepassage === 0) {
-          errors.push("Tarif d'abonnement > 0 requis");
-        }
-      }
-
+      const finalStore = resolvedStore;
+      const finalIsActive = parsedIsActive;
+      const finalStatutVal = parsedIsActive ? 1 : 0;
       const isValid = errors.length === 0;
 
       if (!isValid) invalidCount++;
@@ -523,12 +608,20 @@ export default function ImportCatalogModal({
       rows.push({
         rowIdx: i,
         lineIndex: i + 1,
-        idProduit: cleanNumericId, // ID numérique d'origine du CSV (vide si non spécifié)
-        assignedNumericId, // ID numérique standard fonctionnel résolu
+        idProduit: cleanNumericId,
+        assignedNumericId,
         isNewProduct,
-        storeId: finalStore?.id || '',
-        storeName: finalStore?.nom || 'Inconnu',
+        rawStoreId,
+        rawStoreName,
+        rawStatut,
+        rawCat,
+        storeId: finalStore?.id || rawStoreId,
+        storeName: finalStore?.nom || rawStoreName || 'Inconnu',
         storeCode: finalStore?.code || '',
+        isStoreIdValid,
+        isStoreNameValid,
+        isStatutValid,
+        isCategoryValid,
         statutVal: finalStatutVal,
         isActive: finalIsActive,
         article: articleName,
@@ -536,7 +629,7 @@ export default function ImportCatalogModal({
         prixTraitementUrgent,
         prixRepassage,
         prixRepassageUrgent,
-        categorie: finalCategory,
+        categorie: finalCategory || rawCat,
         description: description || 'Prestation pressing standard',
         isValid,
         isDuplicate,
@@ -545,19 +638,31 @@ export default function ImportCatalogModal({
       });
     }
 
+    const isTemplateRejected = invalidCount > 0 || (hasHeader && missingHeaders.length > 0);
+
     return {
       rows,
+      missingHeaders: hasHeader ? missingHeaders : [],
       stats: {
         total: rows.length,
         valid: validCount,
         duplicates: duplicateCount,
-        invalid: invalidCount
+        invalid: invalidCount,
+        isTemplateRejected
       }
     };
   }, [currentContent, existingCatalog, targetStoreId, validStores]);
 
   // 7. Exécution de l'importation avec IDs purement numériques et montants vides = 0
   const handleExecuteImport = async () => {
+    if (parsedData.stats.isTemplateRejected || parsedData.stats.invalid > 0) {
+      setImportStatus({
+        type: 'error',
+        message: `Template rejeté : Le fichier contient ${parsedData.stats.invalid} ligne(s) non conforme(s). Les champs Store_ID, Store_Name, Statut et Categorie doivent être strictement valides avant toute importation.`
+      });
+      return;
+    }
+
     const rowsToImport = parsedData.rows.filter(r => r.isValid && (updateExisting || !r.isDuplicate));
     if (rowsToImport.length === 0) {
       setImportStatus({ type: 'error', message: "Aucun article valide à importer selon vos critères." });
@@ -845,14 +950,14 @@ export default function ImportCatalogModal({
               {/* Guide et Règles du Template */}
               <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.15)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.45rem' }}>
                 <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Info size={15} /> Règles & Format du Template CSV
+                  <Info size={15} /> Règles & Contrôles Stricts du Template CSV
                 </div>
                 <div style={{ fontSize: '0.71rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                  • <strong>ID Produit</strong> : laissez vide pour les nouveaux articles (affectation automatique d'un ID numérique).<br/>
-                  • <strong>Statut (colonne 4)</strong> : <code>1</code> = produit actif, <code>0</code> = produit inactif.<br/>
-                  • <strong>Montants</strong> : les cellules vides sont automatiquement affectées à 0 F.<br/>
-                  • <strong>Catégories autorisées</strong> : uniquement <code>individuel</code> et <code>abonnement</code>.<br/>
-                  • <strong>Export de l'existant</strong> : garanti complet, sans aucune cellule vide.
+                  • <strong>Store_ID & Store_Name</strong> : obligatoires et doivent correspondre à un point de vente valide.<br/>
+                  • <strong>Statut (colonne 4)</strong> : strictement <code>1</code> (actif) ou <code>0</code> (inactif).<br/>
+                  • <strong>Catégorie (colonne 10)</strong> : strictement <code>individuel</code> ou <code>abonnement</code>.<br/>
+                  • <strong>ID Produit</strong> : laissez vide pour les nouveaux articles (affectation séquentielle N+1).<br/>
+                  • <strong>Contrôle strict</strong> : si une seule ligne est incorrecte, le template est <strong>rejeté</strong>.
                 </div>
               </div>
 
@@ -980,8 +1085,109 @@ export default function ImportCatalogModal({
 
             {/* PRÉVISUALISATION AVEC CHIPS INTELLIGENTS & ID NUMÉRIQUE */}
             {parsedData.rows.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                 
+                {/* BANNIÈRE DE REJET SI TEMPLATE NON CONFORME */}
+                {parsedData.stats.isTemplateRejected && (
+                  <div style={{
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    border: '2px solid rgba(239, 68, 68, 0.45)',
+                    borderRadius: '16px',
+                    padding: '1.1rem 1.25rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                    animation: 'fadeIn 0.2s ease'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                      <div style={{
+                        background: '#dc2626',
+                        color: '#ffffff',
+                        borderRadius: '12px',
+                        padding: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <AlertCircle size={24} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#dc2626' }}>
+                            TEMPLATE REJETÉ : Données non conformes ({parsedData.stats.invalid} ligne{parsedData.stats.invalid > 1 ? 's' : ''} en anomalie)
+                          </h4>
+                          <span style={{
+                            background: '#dc2626',
+                            color: '#fff',
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '6px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            Importation Bloquée
+                          </span>
+                        </div>
+                        <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                          L'application exige la conformité absolue des données. Les champs <strong>Store_ID</strong>, <strong>Store_Name</strong>, <strong>Statut</strong> et <strong>Categorie</strong> doivent être valides sur 100% des lignes pour que le template soit accepté.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Liste des anomalies détectées */}
+                    <div style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: '10px',
+                      padding: '0.75rem 1rem',
+                      maxHeight: '130px',
+                      overflowY: 'auto'
+                    }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '0.35rem' }}>
+                        Détail des anomalies à corriger dans le fichier :
+                      </span>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.73rem', color: '#dc2626', lineHeight: 1.6 }}>
+                        {parsedData.missingHeaders.length > 0 && (
+                          <li>
+                            <strong>Structure globale :</strong> Colonnes obligatoires manquantes dans l'en-tête ({parsedData.missingHeaders.join(', ')})
+                          </li>
+                        )}
+                        {parsedData.rows.filter(r => !r.isValid).slice(0, 10).map((r, i) => (
+                          <li key={i}>
+                            <strong>Ligne {r.lineIndex} [{r.article || 'Sans nom'}] :</strong> {r.errors.join(' • ')}
+                          </li>
+                        ))}
+                        {parsedData.rows.filter(r => !r.isValid).length > 10 && (
+                          <li style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                            ... et {parsedData.rows.filter(r => !r.isValid).length - 10} autre(s) ligne(s) non conforme(s).
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* BANNIÈRE DE CONFORMITÉ 100% */}
+                {!parsedData.stats.isTemplateRejected && (
+                  <div style={{
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    border: '1.5px solid rgba(16, 185, 129, 0.35)',
+                    borderRadius: '14px',
+                    padding: '0.75rem 1.1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    animation: 'fadeIn 0.2s ease'
+                  }}>
+                    <CheckCircle2 size={20} color="#10b981" style={{ flexShrink: 0 }} />
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', lineHeight: 1.45 }}>
+                      <strong style={{ color: '#10b981' }}>Template validé & conforme :</strong> Les contrôles sur <strong>Store_ID</strong>, <strong>Store_Name</strong>, <strong>Statut</strong> et <strong>Categorie</strong> sont tous validés ({parsedData.stats.total} ligne{parsedData.stats.total > 1 ? 's' : ''} prêtes à être importées).
+                    </div>
+                  </div>
+                )}
+
                 {/* En-tête statistiques de l'aperçu */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -1048,10 +1254,13 @@ export default function ImportCatalogModal({
                         }
 
                         return (
-                          <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', opacity: !row.isValid ? 0.6 : 1 }}>
+                          <tr key={idx} style={{
+                            borderBottom: '1px solid var(--border-color)',
+                            background: !row.isValid ? 'rgba(239, 68, 68, 0.04)' : 'transparent'
+                          }}>
                             
                             {/* Numéro de ligne */}
-                            <td style={{ padding: '0.45rem 0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                            <td style={{ padding: '0.45rem 0.75rem', color: !row.isValid ? '#dc2626' : 'var(--text-muted)', fontFamily: 'monospace', fontWeight: !row.isValid ? 700 : 500 }}>
                               {row.lineIndex}
                             </td>
 
@@ -1074,17 +1283,34 @@ export default function ImportCatalogModal({
 
                             {/* Point de Laverie (Store ID & Store Name) */}
                             <td style={{ padding: '0.45rem 0.75rem' }}>
-                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                {row.storeName}
-                              </span>
-                              <span style={{ opacity: 0.6, fontSize: '0.7rem', marginLeft: '0.35rem' }}>
-                                ({row.storeCode || row.storeId})
-                              </span>
+                              {!row.isStoreIdValid || !row.isStoreNameValid ? (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    ✕ {row.rawStoreName || '<Store_Name manquant>'}
+                                  </span>
+                                  <div style={{ fontSize: '0.69rem', color: '#dc2626', fontFamily: 'monospace', marginTop: '0.1rem' }}>
+                                    ID: {row.rawStoreId || '<vide>'} (Invalide)
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    {row.storeName}
+                                  </span>
+                                  <span style={{ opacity: 0.6, fontSize: '0.7rem', marginLeft: '0.35rem' }}>
+                                    ({row.storeCode || row.storeId})
+                                  </span>
+                                </div>
+                              )}
                             </td>
 
                             {/* Statut (1 = Actif, 0 = Inactif) */}
                             <td style={{ padding: '0.45rem 0.75rem' }}>
-                              {row.isActive ? (
+                              {!row.isStatutValid ? (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', background: 'rgba(220, 38, 38, 0.1)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                  ✕ '{row.rawStatut || 'vide'}' (Invalide)
+                                </span>
+                              ) : row.isActive ? (
                                 <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981' }}>
                                   1 (Actif)
                                 </span>
@@ -1097,7 +1323,7 @@ export default function ImportCatalogModal({
 
                             {/* Nom de l'article */}
                             <td style={{ padding: '0.45rem 0.75rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                              {row.article || '<Sans nom>'}
+                              {row.article || <span style={{ color: '#dc2626', fontStyle: 'italic' }}>&lt;Nom manquant&gt;</span>}
                             </td>
 
                             {/* Tarif Lavage / Traitement (0 si non configuré) */}
@@ -1118,19 +1344,33 @@ export default function ImportCatalogModal({
 
                             {/* Catégorie */}
                             <td style={{ padding: '0.45rem 0.75rem' }}>
-                              <span style={{
-                                fontSize: '0.72rem',
-                                fontWeight: 700,
-                                color: row.categorie === 'abonnement' ? '#8b5cf6' : (row.categorie === 'individuel' ? 'var(--primary)' : '#dc2626')
-                              }}>
-                                {row.categorie === 'abonnement' ? 'Abonnement' : (row.categorie === 'individuel' ? 'Individuel' : `${row.categorie} (Interdit)`)}
-                              </span>
+                              {!row.isCategoryValid ? (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', background: 'rgba(220, 38, 38, 0.1)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                  ✕ '{row.rawCat || 'vide'}' (Interdit)
+                                </span>
+                              ) : (
+                                <span style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  color: row.categorie === 'abonnement' ? '#8b5cf6' : (row.categorie === 'individuel' ? 'var(--primary)' : '#dc2626')
+                                }}>
+                                  {row.categorie === 'abonnement' ? 'Abonnement' : (row.categorie === 'individuel' ? 'Individuel' : `${row.categorie} (Interdit)`)}
+                                </span>
+                              )}
                             </td>
 
                             {/* Statut de la ligne */}
                             <td style={{ padding: '0.45rem 0.75rem', textAlign: 'right' }}>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '8px', color: statusColor, background: statusBg }}>
-                                {statusLabel}
+                              <span style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '8px',
+                                color: !row.isValid ? '#dc2626' : (row.isDuplicate ? '#d97706' : '#16a34a'),
+                                background: !row.isValid ? 'rgba(220, 38, 38, 0.12)' : (row.isDuplicate ? 'rgba(217, 119, 6, 0.1)' : 'rgba(22, 163, 74, 0.1)'),
+                                border: !row.isValid ? '1px solid rgba(220, 38, 38, 0.3)' : 'none'
+                              }}>
+                                {!row.isValid ? `✕ REJETÉ` : (row.isDuplicate ? (updateExisting ? 'Mise à jour' : 'Ignoré (Doublon)') : '✓ Valide')}
                               </span>
                             </td>
 
@@ -1195,6 +1435,7 @@ export default function ImportCatalogModal({
               onClick={handleExecuteImport}
               disabled={
                 isProcessing ||
+                parsedData.stats.isTemplateRejected ||
                 parsedData.rows.filter(r => r.isValid && (updateExisting || !r.isDuplicate)).length === 0
               }
               style={{
@@ -1205,16 +1446,24 @@ export default function ImportCatalogModal({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                background: '#10b981',
-                borderColor: '#10b981',
+                background: parsedData.stats.isTemplateRejected ? '#dc2626' : '#10b981',
+                borderColor: parsedData.stats.isTemplateRejected ? '#dc2626' : '#10b981',
                 color: '#fff',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-                opacity: (parsedData.rows.filter(r => r.isValid && (updateExisting || !r.isDuplicate)).length === 0) ? 0.6 : 1
+                boxShadow: parsedData.stats.isTemplateRejected
+                  ? '0 4px 12px rgba(220, 38, 38, 0.25)'
+                  : '0 4px 12px rgba(16, 185, 129, 0.25)',
+                opacity: (parsedData.stats.isTemplateRejected || parsedData.rows.filter(r => r.isValid && (updateExisting || !r.isDuplicate)).length === 0) ? 0.7 : 1,
+                cursor: (parsedData.stats.isTemplateRejected || parsedData.rows.filter(r => r.isValid && (updateExisting || !r.isDuplicate)).length === 0) ? 'not-allowed' : 'pointer'
               }}
             >
               {isProcessing ? (
                 <>
                   <RefreshCw size={15} className="spin-animation" /> Importation en cours...
+                </>
+              ) : parsedData.stats.isTemplateRejected ? (
+                <>
+                  <AlertCircle size={15} />
+                  <span>⛔ Importation bloquée (Template rejeté)</span>
                 </>
               ) : (
                 <>
