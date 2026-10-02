@@ -15,7 +15,12 @@ import {
   IconShieldLock,
   IconAlertTriangle,
   IconClock,
-  IconLock
+  IconLock,
+  IconMail,
+  IconArrowRight,
+  IconArrowLeft,
+  IconBackspace,
+  IconX
 } from '@tabler/icons-react';
 
 // Composant utilitaire basé sur la bibliothèque Tabler Lined (remplace Material Symbols)
@@ -751,328 +756,531 @@ function App() {
 
   if (!currentUser) {
     return (
-      <div className="lockscreen-container">
-        <div className="lockscreen-logo-area" style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
-          <h1 style={{ color: '#ffffff', fontSize: '2.2rem', fontWeight: 800, margin: '0 0 0.25rem', letterSpacing: '-0.5px' }}>
-            Pressing Pro - Admin
-          </h1>
-          {appEnv && (appEnv === 'test' || appEnv === 'staging' || appEnv === 'beta') && (
-            <div style={{ marginBottom: '0.4rem' }}>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '2px 9px',
-                  borderRadius: '9999px',
-                  fontSize: '0.7rem',
-                  fontWeight: 800,
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                  background: appEnv === 'test' ? 'rgba(234, 179, 8, 0.18)' : 'rgba(249, 115, 22, 0.18)',
-                  color: appEnv === 'test' ? '#facc15' : '#fb923c',
-                  border: `1px solid ${appEnv === 'test' ? 'rgba(234, 179, 8, 0.35)' : 'rgba(249, 115, 22, 0.35)'}`,
-                }}
-              >
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    backgroundColor: appEnv === 'test' ? '#facc15' : '#fb923c',
-                    boxShadow: `0 0 6px ${appEnv === 'test' ? '#facc15' : '#fb923c'}`,
-                  }}
-                />
-                {appEnv === 'test' ? 'Test' : 'Staging'}
+      <div className="lockscreen-container" style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'radial-gradient(ellipse at 50% 15%, #1e1e5a 0%, #0d0d2b 80%, #070719 100%)',
+        padding: '1.5rem',
+        position: 'relative',
+        overflow: 'hidden',
+        boxSizing: 'border-box'
+      }}>
+        {/* Glow lumineux décoratif d'arrière-plan */}
+        <div style={{
+          position: 'absolute',
+          top: '20%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '520px',
+          height: '380px',
+          background: 'radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, rgba(99, 102, 241, 0.05) 50%, transparent 70%)',
+          filter: 'blur(60px)',
+          pointerEvents: 'none',
+          zIndex: 0
+        }} />
+
+        {/* Carte de Connexion Principale */}
+        <div style={{
+          position: 'relative',
+          zIndex: 1,
+          width: '100%',
+          maxWidth: '390px',
+          background: 'rgba(23, 23, 56, 0.72)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '24px',
+          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          padding: '2.2rem 1.85rem',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          animation: 'lockscreenFadeIn 0.3s ease-out forwards',
+          boxSizing: 'border-box'
+        }}>
+          {/* Logo & Identité visuelle */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem', textAlign: 'center' }}>
+            <div style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35), 0 0 16px rgba(56, 189, 248, 0.25)',
+              border: '1.5px solid rgba(255, 255, 255, 0.2)',
+              background: '#0f172a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '0.65rem'
+            }}>
+              <img src={logoBrand} alt="Pressing Pro" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '1.45rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.3px' }}>
+                Pressing
+              </span>
+              <span style={{ fontSize: '1.45rem', fontWeight: 900, color: '#38bdf8', letterSpacing: '-0.3px' }}>
+                Pro
               </span>
             </div>
-          )}
-          <p className="lockscreen-subtitle" style={{ color: 'rgba(255, 255, 255, 0.6)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
-            Plateforme Pressing Pro Admin CMS
-          </p>
-        </div>
 
-        {!selectedLoginUser ? (
-          <form onSubmit={handleEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: '320px', animation: 'fadeIn 0.3s ease-out forwards' }}>
-            <div style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.7)', fontWeight: 600, textAlign: 'center', marginBottom: '0.5rem' }}>
-              Connexion Administration
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <input
-                type="email"
-                required
-                placeholder="Email de l'administrateur"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value.trimStart())}
-                style={{
-                  width: '100%',
-                  padding: '0.95rem 1.25rem',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: '#fff',
-                  fontSize: '0.95rem',
-                  outline: 'none',
-                  transition: 'all 0.2s ease',
-                  textAlign: 'center'
-                }}
-                onFocus={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.5)'}
-                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.15)'}
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="btn"
-              style={{
-                background: '#ffffff',
-                color: '#1a1a5e',
-                padding: '0.95rem',
-                borderRadius: '14px',
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                border: 'none',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
-              }}
-            >
-              Continuer
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowResetPinModal(true)}
-              style={{
-                background: 'transparent',
-                color: 'rgba(255,255,255,0.6)',
-                border: 'none',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                marginTop: '0.5rem',
-                textAlign: 'center',
-                transition: 'color 0.2s ease'
-              }}
-            >
-              Réinitialiser le PIN
-            </button>
-          </form>
-        ) : (
-          <div className="pin-view-container" style={{ maxWidth: '320px' }}>
-            <button
-              type="button"
-              className="pin-view-back"
-              onClick={() => setSelectedLoginUser(null)}
-            >
-              ← Retour
-            </button>
-
-            <div
-              className="pin-user-avatar"
-              style={{
-                background: selectedLoginUser.role === 'super_admin' ? 'hsl(224, 76%, 48%)' : selectedLoginUser.role === 'manager' ? 'hsl(271, 76%, 53%)' : 'hsl(162, 76%, 38%)'
-              }}
-            >
-              {selectedLoginUser.prenom[0]}{selectedLoginUser.nom[0]}
-            </div>
-            <h3 className="pin-user-name">{selectedLoginUser.prenom} {selectedLoginUser.nom}</h3>
-            <p className="pin-user-role">
-              {selectedLoginUser.role === 'super_admin' ? 'Super Administrateur'
-                : selectedLoginUser.role === 'manager' ? 'Gestionnaire'
-                  : selectedLoginUser.role === 'livreur' ? 'Livreur'
-                    : selectedLoginUser.role === 'agent_lavage_repassage' ? 'Agent de lavage / Repassage'
-                      : "Agent d'accueil"}
-            </p>
-
-            {pinLockoutState.isLocked ? (
-              <div
-                style={{
-                  width: '100%',
-                  background: 'rgba(239, 68, 68, 0.08)',
-                  border: '1.5px solid rgba(239, 68, 68, 0.35)',
-                  borderRadius: '16px',
-                  padding: '1.25rem 1rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                  gap: '0.85rem',
-                  animation: 'fadeIn 0.25s ease-out',
-                  boxShadow: '0 8px 24px rgba(239, 68, 68, 0.12)',
-                  marginBottom: '1rem'
-                }}
-              >
-                <div
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+              <span style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 500 }}>
+                Espace d'administration
+              </span>
+              {appEnv && (appEnv === 'test' || appEnv === 'staging' || appEnv === 'beta') && (
+                <span
                   style={{
-                    width: '56px',
-                    height: '56px',
-                    borderRadius: '50%',
-                    background: 'rgba(239, 68, 68, 0.18)',
-                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#f87171'
-                  }}
-                >
-                  <IconShieldLock size={32} stroke={1.8} />
-                </div>
-
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#fca5a5' }}>
-                    Compte Temporairement Verrouillé
-                  </h4>
-                  <div style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '4px',
-                    marginTop: '4px',
-                    fontSize: '0.74rem',
-                    color: 'rgba(255, 255, 255, 0.75)'
-                  }}>
-                    <IconLock size={13} stroke={2} />
-                    <span>Sécurité anti-force brute activée ({pinLockoutState.failedAttempts} échecs)</span>
-                  </div>
-                </div>
-
-                {/* Countdown Badge */}
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    background: 'rgba(239, 68, 68, 0.22)',
-                    border: '1px solid rgba(239, 68, 68, 0.45)',
-                    padding: '0.55rem 1.1rem',
-                    borderRadius: '12px',
-                    color: '#ffffff',
+                    padding: '1px 7px',
+                    borderRadius: '9999px',
+                    fontSize: '0.66rem',
                     fontWeight: 700,
-                    fontSize: '0.92rem',
-                    letterSpacing: '0.3px',
-                    boxShadow: '0 0 12px rgba(239, 68, 68, 0.2)'
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.4px',
+                    background: appEnv === 'test' ? 'rgba(234, 179, 8, 0.18)' : 'rgba(249, 115, 22, 0.18)',
+                    color: appEnv === 'test' ? '#facc15' : '#fb923c',
+                    border: `1px solid ${appEnv === 'test' ? 'rgba(234, 179, 8, 0.3)' : 'rgba(249, 115, 22, 0.3)'}`,
                   }}
                 >
-                  <IconClock size={18} stroke={2.2} style={{ color: '#fca5a5' }} />
-                  <span>
-                    Réessayez dans {formatLockoutDuration(pinLockoutState.remainingSeconds)}
-                  </span>
-                </div>
+                  <span
+                    style={{
+                      width: '5px',
+                      height: '5px',
+                      borderRadius: '50%',
+                      backgroundColor: appEnv === 'test' ? '#facc15' : '#fb923c',
+                    }}
+                  />
+                  {appEnv === 'test' ? 'Test' : 'Staging'}
+                </span>
+              )}
+            </div>
+          </div>
 
-                <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.4 }}>
-                  La saisie du code PIN est temporairement suspendue pour protéger les données du compte.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setResetEmail(selectedLoginUser.email || '');
-                    setShowResetPinModal(true);
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#38bdf8',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    textDecoration: 'underline',
-                    cursor: 'pointer',
-                    marginTop: '0.25rem'
-                  }}
-                >
-                  Code oublié ? Réinitialiser le PIN
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Warning Banner if failures >= 3 */}
-                {pinLockoutState.failedAttempts >= PIN_SECURITY_CONFIG.WARNING_THRESHOLD && (
-                  <div
+          {!selectedLoginUser ? (
+            /* ========================================================
+               ÉTAPE 1 : IDENTIFICATION PAR EMAIL
+               ======================================================== */
+            <form onSubmit={handleEmailSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.75)', marginBottom: '0.4rem' }}>
+                  Adresse email
+                </label>
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <IconMail size={18} stroke={1.8} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.45)', pointerEvents: 'none' }} />
+                  <input
+                    type="email"
+                    required
+                    placeholder="prenom.nom@pressingpro.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value.trimStart())}
                     style={{
                       width: '100%',
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      border: '1px solid rgba(245, 158, 11, 0.4)',
-                      borderRadius: '10px',
-                      padding: '0.6rem 0.85rem',
-                      marginBottom: '1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      textAlign: 'left',
-                      color: '#fbbf24',
-                      fontSize: '0.78rem',
-                      lineHeight: 1.3
+                      padding: '0.8rem 1rem 0.8rem 2.4rem',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.16)',
+                      background: 'rgba(15, 23, 42, 0.45)',
+                      color: '#fff',
+                      fontSize: '0.88rem',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      boxSizing: 'border-box'
                     }}
-                  >
-                    <IconAlertTriangle size={18} stroke={2} style={{ flexShrink: 0, color: '#f59e0b' }} />
-                    <div>
-                      <strong>Attention :</strong> {pinLockoutState.failedAttempts}/5 tentatives échouées. Le compte sera verrouillé après 5 échecs.
-                    </div>
-                  </div>
-                )}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#38bdf8';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(56, 189, 248, 0.2)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.16)';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
+              </div>
 
-                {/* Subtle warning if 1 or 2 failures */}
-                {pinLockoutState.failedAttempts > 0 && pinLockoutState.failedAttempts < PIN_SECURITY_CONFIG.WARNING_THRESHOLD && (
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)',
+                  color: '#ffffff',
+                  padding: '0.82rem',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  border: 'none',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.45rem',
+                  marginTop: '0.2rem'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.08)'}
+                onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}
+              >
+                <span>Continuer</span>
+                <IconArrowRight size={17} stroke={2} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowResetPinModal(true)}
+                style={{
+                  background: 'transparent',
+                  color: 'rgba(255, 255, 255, 0.55)',
+                  border: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  marginTop: '0.2rem',
+                  transition: 'color 0.2s ease'
+                }}
+                onMouseEnter={(e) => e.target.style.color = 'rgba(255, 255, 255, 0.9)'}
+                onMouseLeave={(e) => e.target.style.color = 'rgba(255, 255, 255, 0.55)'}
+              >
+                Code PIN oublié ?
+              </button>
+            </form>
+          ) : (
+            /* ========================================================
+               ÉTAPE 2 : SAISIE DU CODE PIN
+               ======================================================== */
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              {/* Navigation retour en haut */}
+              <button
+                type="button"
+                onClick={() => setSelectedLoginUser(null)}
+                style={{
+                  alignSelf: 'flex-start',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: 0,
+                  marginBottom: '1rem',
+                  transition: 'color 0.15s ease'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'}
+              >
+                <IconArrowLeft size={15} stroke={2} />
+                <span>Changer de compte</span>
+              </button>
+
+              {/* Avatar de l'utilisateur sélectionné */}
+              <div
+                style={{
+                  width: '58px',
+                  height: '58px',
+                  borderRadius: '50%',
+                  background: selectedLoginUser.role === 'super_admin' ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : selectedLoginUser.role === 'manager' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '1.25rem',
+                  color: '#ffffff',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+                  border: '2px solid rgba(255, 255, 255, 0.2)',
+                  marginBottom: '0.5rem'
+                }}
+              >
+                {selectedLoginUser.prenom[0]}{selectedLoginUser.nom[0]}
+              </div>
+
+              <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 800, color: '#ffffff' }}>
+                {selectedLoginUser.prenom} {selectedLoginUser.nom}
+              </h3>
+
+              <span style={{
+                display: 'inline-block',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                color: 'rgba(255, 255, 255, 0.7)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginTop: '0.25rem',
+                marginBottom: '1.2rem',
+                padding: '0.2rem 0.6rem',
+                background: 'rgba(255, 255, 255, 0.08)',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                {selectedLoginUser.role === 'super_admin' ? 'Super Administrateur'
+                  : selectedLoginUser.role === 'manager' ? 'Gestionnaire'
+                    : selectedLoginUser.role === 'livreur' ? 'Livreur'
+                      : selectedLoginUser.role === 'agent_lavage_repassage' ? 'Agent Lavage / Repassage'
+                        : "Agent d'Accueil"}
+              </span>
+
+              {pinLockoutState.isLocked ? (
+                /* ========================================================
+                   ÉTAT VERROUILLÉ (INFOS USER-FRIENDLY & SIMPLES)
+                   ======================================================== */
+                <div
+                  style={{
+                    width: '100%',
+                    background: 'rgba(239, 68, 68, 0.09)',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    borderRadius: '16px',
+                    padding: '1.2rem 1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    gap: '0.75rem',
+                    animation: 'fadeIn 0.2s ease-out',
+                    boxSizing: 'border-box'
+                  }}
+                >
                   <div
                     style={{
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      fontSize: '0.78rem',
-                      marginBottom: '0.75rem',
-                      textAlign: 'center'
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: 'rgba(239, 68, 68, 0.18)',
+                      border: '1px solid rgba(239, 68, 68, 0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#f87171'
                     }}
                   >
-                    {pinLockoutState.failedAttempts}/5 tentative{pinLockoutState.failedAttempts > 1 ? 's' : ''} incorrecte{pinLockoutState.failedAttempts > 1 ? 's' : ''}
+                    <IconShieldLock size={26} stroke={1.8} />
                   </div>
-                )}
 
-                <div className={`pin-dots-row ${pinError ? 'shake' : ''}`}>
-                  {[0, 1, 2, 3, 4, 5].map(idx => (
-                    <div
-                      key={idx}
-                      className={`pin-dot ${pinCode.length > idx ? 'filled' : ''} ${pinError ? 'error' : ''}`}
-                    />
-                  ))}
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#fca5a5' }}>
+                      Compte temporairement bloqué
+                    </h4>
+                    <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.35 }}>
+                      Trop de tentatives de code incorrectes ({pinLockoutState.failedAttempts} échecs).
+                    </p>
+                  </div>
+
+                  {/* Badge Compte à rebours */}
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      background: 'rgba(239, 68, 68, 0.22)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      padding: '0.45rem 0.95rem',
+                      borderRadius: '10px',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: '0.88rem'
+                    }}
+                  >
+                    <IconClock size={16} stroke={2.2} style={{ color: '#fca5a5' }} />
+                    <span>Réessayez dans {formatLockoutDuration(pinLockoutState.remainingSeconds)}</span>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.5)', lineHeight: 1.3 }}>
+                    La saisie est suspendue quelques instants pour protéger votre compte.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(selectedLoginUser.email || '');
+                      setShowResetPinModal(true);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#38bdf8',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      marginTop: '0.15rem'
+                    }}
+                  >
+                    Code oublié ? Réinitialiser le PIN
+                  </button>
                 </div>
+              ) : (
+                /* ========================================================
+                   ÉTAT NORMAL (SAISIE PIN & PAVÉ TACTILE)
+                   ======================================================== */
+                <>
+                  {/* Bannière d'avertissement après 3 échecs */}
+                  {pinLockoutState.failedAttempts >= PIN_SECURITY_CONFIG.WARNING_THRESHOLD && (
+                    <div
+                      style={{
+                        width: '100%',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        borderRadius: '10px',
+                        padding: '0.5rem 0.75rem',
+                        marginBottom: '0.85rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        textAlign: 'left',
+                        color: '#fbbf24',
+                        fontSize: '0.75rem',
+                        lineHeight: 1.3,
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <IconAlertTriangle size={16} stroke={2} style={{ flexShrink: 0, color: '#f59e0b' }} />
+                      <div>
+                        <strong>Attention :</strong> {pinLockoutState.failedAttempts}/5 tentatives. Le compte sera temporairement bloqué après 5 échecs.
+                      </div>
+                    </div>
+                  )}
 
-                <p style={{
-                  color: 'rgba(255, 255, 255, 0.65)',
-                  fontSize: '0.85rem',
-                  textAlign: 'center',
-                  marginTop: '0.5rem',
-                  marginBottom: '1rem',
-                  lineHeight: 1.4
-                }}>
-                  Saisissez votre code PIN à 6 chiffres à l'aide de votre clavier physique.
-                </p>
-              </>
-            )}
+                  {/* Message d'erreur discret lors du shake */}
+                  {pinError && (
+                    <div style={{ color: '#ef4444', fontSize: '0.76rem', fontWeight: 600, marginBottom: '0.4rem', animation: 'fadeIn 0.15s ease' }}>
+                      Code PIN incorrect
+                    </div>
+                  )}
 
-            <button
-              type="button"
-              onClick={() => setSelectedLoginUser(null)}
-              style={{
-                width: '100%',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: 'rgba(255, 255, 255, 0.8)',
-                padding: '0.75rem 1rem',
-                borderRadius: '12px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                marginTop: '0.5rem'
-              }}
-              onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.15)'}
-              onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.08)'}
-            >
-              Annuler / Changer de compte
-            </button>
-          </div>
-        )}
+                  {/* Indicateur de points PIN */}
+                  <div className={`pin-dots-row ${pinError ? 'shake' : ''}`} style={{ marginBottom: '1.1rem' }}>
+                    {[0, 1, 2, 3, 4, 5].map(idx => (
+                      <div
+                        key={idx}
+                        className={`pin-dot ${pinCode.length > idx ? 'filled' : ''} ${pinError ? 'error' : ''}`}
+                      />
+                    ))}
+                  </div>
 
+                  {/* Pavé numérique tactile & interactif */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '0.55rem',
+                    width: '100%',
+                    maxWidth: '240px',
+                    marginBottom: '1rem'
+                  }}>
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => handleKeypadPress(num)}
+                        style={{
+                          height: '50px',
+                          borderRadius: '14px',
+                          background: 'rgba(255, 255, 255, 0.07)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          color: '#ffffff',
+                          fontSize: '1.2rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s ease',
+                          userSelect: 'none'
+                        }}
+                        onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
+                        onMouseUp={(e) => e.currentTarget.style.transform = 'none'}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)'}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.07)'; e.currentTarget.style.transform = 'none'; }}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                    <div /> {/* Emplacement vide pour équilibre visuel */}
+                    <button
+                      type="button"
+                      onClick={() => handleKeypadPress('0')}
+                      style={{
+                        height: '50px',
+                        borderRadius: '14px',
+                        background: 'rgba(255, 255, 255, 0.07)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        color: '#ffffff',
+                        fontSize: '1.2rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                        userSelect: 'none'
+                      }}
+                      onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
+                      onMouseUp={(e) => e.currentTarget.style.transform = 'none'}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)'}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.07)'; e.currentTarget.style.transform = 'none'; }}
+                    >
+                      0
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleKeypadPress('delete')}
+                      title="Effacer"
+                      style={{
+                        height: '50px',
+                        borderRadius: '14px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                        userSelect: 'none'
+                      }}
+                      onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
+                      onMouseUp={(e) => e.currentTarget.style.transform = 'none'}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'; e.currentTarget.style.transform = 'none'; }}
+                    >
+                      <IconBackspace size={19} stroke={1.8} />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(selectedLoginUser.email || '');
+                      setShowResetPinModal(true);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.5)',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'color 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.color = 'rgba(255, 255, 255, 0.85)'}
+                    onMouseLeave={(e) => e.target.style.color = 'rgba(255, 255, 255, 0.5)'}
+                  >
+                    Code PIN oublié ?
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Modal Réinitialiser le PIN */}
         {showResetPinModal && (
           <div style={{
             position: 'fixed',
@@ -1080,43 +1288,49 @@ function App() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.12)',
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
             animation: 'fadeIn 0.2s ease-out'
           }}>
-            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '360px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.10)', border: '1px solid rgba(0,0,0,0.08)' }}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{ width: '380px', maxWidth: '90%', padding: '1.75rem', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '1rem', color: 'var(--text-primary)', boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.35)', border: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--primary)' }}>Réinitialiser le PIN</h3>
-                <button type="button" onClick={() => setShowResetPinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                  <MIcon name="close" size={20} />
+                <h3 style={{ fontSize: '1.05rem', fontFamily: 'var(--font-title)', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Réinitialiser le code PIN</h3>
+                <button type="button" onClick={() => setShowResetPinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', padding: '4px' }}>
+                  <IconX size={18} stroke={2} />
                 </button>
               </div>
 
               <form onSubmit={handleRequestPinResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                  Saisissez votre email professionnel. Une demande de réinitialisation sera envoyée à l'administrateur pour approbation.
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.45', margin: 0 }}>
+                  Saisissez votre email professionnel. Une demande sera transmise pour réinitialiser votre code d'accès.
                 </p>
-                <input
-                  type="email"
-                  required
-                  placeholder="votre.email@pressingpro.com"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border-color)',
-                    outline: 'none',
-                    fontSize: '0.9rem'
-                  }}
-                />
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                  <button type="button" className="btn btn-outline" onClick={() => setShowResetPinModal(false)}>Annuler</button>
-                  <button type="submit" className="btn btn-primary">Envoyer</button>
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    type="email"
+                    required
+                    placeholder="prenom.nom@pressingpro.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border-color)',
+                      outline: 'none',
+                      fontSize: '0.88rem',
+                      background: 'var(--bg-app)',
+                      color: 'var(--text-primary)',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowResetPinModal(false)} style={{ padding: '0.5rem 1rem', borderRadius: '10px', fontSize: '0.82rem' }}>Annuler</button>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1.2rem', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 700 }}>Envoyer la demande</button>
                 </div>
               </form>
             </div>
