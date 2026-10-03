@@ -269,12 +269,7 @@ export function StatefulButton({
     >
       <View style={s.row}>
         {renderLeading()}
-        <View style={s.labels}>
-          <Text numberOfLines={1} style={s.label}>{currentLabel}</Text>
-          {isIndeterminate && effectiveProps.completionLabel ? (
-            <Text numberOfLines={1} style={s.hint}>{effectiveProps.completionLabel}</Text>
-          ) : null}
-        </View>
+        <Text numberOfLines={1} style={s.label}>{currentLabel}</Text>
       </View>
     </Pressable>
   );
