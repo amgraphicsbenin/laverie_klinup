@@ -5,7 +5,9 @@
  * automatique et l'abonnement aux événements Postgres en temps réel.
  */
 
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Application from 'expo-application';
 import { supabase } from '../supabaseClient';
 import { memoryDb, notifyListeners, isPendingOrderUpdate, removePendingOrderUpdate } from './memoryStore';
 import { hydrateOrder, startOrderStateCron } from './orderUtils';
@@ -67,13 +69,70 @@ const saveData = async (key, data) => {
 /**
  * Charge l'ensemble des données locales persistées en mémoire vive.
  */
+const INSTALL_TIME_KEY = 'klin_up_installation_time';
+
+/**
+ * Détecte si l'application a été fraîchement installée ou réinstallée.
+ * En cas de réinstallation (ou si des données de session ont été restaurées
+ * par une sauvegarde cloud Android Auto Backup / Google Drive),
+ * la session est immédiatement purgée pour forcer la connexion par email et code PIN.
+ */
+async function verifyInstallSessionIntegrity() {
+  try {
+    if (Platform.OS === 'web') return;
+
+    if (!Application || typeof Application.getInstallationTimeAsync !== 'function') {
+      return;
+    }
+
+    const installDate = await Application.getInstallationTimeAsync();
+    if (!installDate || typeof installDate.getTime !== 'function') return;
+
+    const currentInstallTime = installDate.getTime().toString();
+    const storedInstallTime = await AsyncStorage.getItem(INSTALL_TIME_KEY);
+
+    if (!storedInstallTime) {
+      // Première initialisation du suivi d'installation sur cet appareil.
+      // Si un utilisateur est déjà présent dans AsyncStorage à ce stade, il provient
+      // obligatoirement d'une restauration cloud (Android Auto Backup / Google Drive)
+      // d'une installation antérieure.
+      const restoredUser = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      if (restoredUser) {
+        console.warn('[Auth Security] Session résiduelle issue d\'un backup cloud détectée lors d\'une nouvelle installation. Purge immédiate !');
+        await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        memoryDb.current_user = null;
+      }
+      await AsyncStorage.setItem(INSTALL_TIME_KEY, currentInstallTime);
+    } else if (storedInstallTime !== currentInstallTime) {
+      // L'application a été désinstallée puis réinstallée : la date d'installation native du package a changé.
+      // Purge absolue de toute session restaurée.
+      console.warn('[Auth Security] Réinstallation détectée (timestamp d\'installation différent). Purge de la session précédente.');
+      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      memoryDb.current_user = null;
+      await AsyncStorage.setItem(INSTALL_TIME_KEY, currentInstallTime);
+    }
+  } catch (err) {
+    console.warn('[Auth Security] Erreur lors de la vérification de l\'intégrité de l\'installation :', err?.message || err);
+  }
+}
+
 /**
  * Charge les préférences de session (utilisateur connecté, mode sombre) depuis AsyncStorage.
  */
 export async function loadFromLocalStorage() {
   try {
+    // 1. Vérification de sécurité anti-restauration de session sur réinstallation
+    await verifyInstallSessionIntegrity();
+
+    // 2. Chargement de l'utilisateur connecté s'il existe
     const userRaw = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (userRaw) memoryDb.current_user = JSON.parse(userRaw);
+    if (userRaw) {
+      memoryDb.current_user = JSON.parse(userRaw);
+    } else {
+      memoryDb.current_user = null;
+    }
+
+    // 3. Chargement des préférences d'affichage
     const darkRaw = await AsyncStorage.getItem('klin_up_dark_mode');
     if (darkRaw) memoryDb.dark_mode = JSON.parse(darkRaw);
   } catch (e) {
@@ -375,7 +434,7 @@ export async function initDb(isRetry = false) {
         memoryDb.pickup_zones = pickupRes.value.data;
       }
 
-      memoryDb.current_user = await loadData(STORAGE_KEYS.CURRENT_USER, null);
+      memoryDb.current_user = memoryDb.current_user ?? (await loadData(STORAGE_KEYS.CURRENT_USER, null));
       isUsingRemote = true;
 
       console.log("[DB Sync] ✅ Connecté à Supabase.");

@@ -46,6 +46,7 @@ module.exports = ({ config }) => {
     android: {
       ...(config.android || {}),
       package: currentProfile.androidPackage,
+      allowBackup: false,
     },
     extra: {
       ...(config.extra || {}),
