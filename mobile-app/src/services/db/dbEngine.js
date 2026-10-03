@@ -1052,6 +1052,7 @@ export const db = {
 
     // L'identifiant de marquage est strictement harmonisé sur l'ID numérique de commande
     const finalMarquage = finalOrderId;
+    const codeMarquage = finalMarquage;
 
     const expressHoursItem = memoryDb.catalog.find(c => c.id === 'setting_express_hours');
     const expressHours = expressHoursItem ? Number(expressHoursItem.prix) : 6;
@@ -1150,6 +1151,9 @@ export const db = {
       prix_base_avant_remise: basePriceBeforeRemise
     };
 
+    // ── Protection contre l'écrasement concurrent lors de la création ──
+    addPendingOrderUpdate(newOrder.id);
+
     // ── Mise à jour optimiste de l'UI ──
     memoryDb.orders.unshift(newOrder);
     db.notify();
@@ -1162,18 +1166,22 @@ export const db = {
       if (idx !== -1) memoryDb.orders.splice(idx, 1);
       db.notify();
       throw e;
+    } finally {
+      removePendingOrderUpdate(newOrder.id);
     }
 
+    const displayMarquage = newOrder.identifiant_unique_marquage || codeMarquage || finalOrderId;
+
     if (isCreatedByLivreur) {
-      db.logAction('CREATION_COMMANDE', `Commande ${codeMarquage} créée par le livreur ${currentUser ? `${currentUser.prenom} ${currentUser.nom}` : ''} (en attente de validation caisse)`);
+      db.logAction('CREATION_COMMANDE', `Commande ${displayMarquage} créée par le livreur ${currentUser ? `${currentUser.prenom} ${currentUser.nom}` : ''} (en attente de validation caisse)`);
     } else if (isSubscriptionOrder) {
       if (subscribedPlan) {
-        db.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} créée avec souscription immédiate à ${subscribedPlan.article} (${totalClothes} vêtements débités)`);
+        db.logAction('COMMANDE_ABONNEMENT', `Commande ${displayMarquage} créée avec souscription immédiate à ${subscribedPlan.article} (${totalClothes} vêtements débités)`);
       } else {
-        db.logAction('COMMANDE_ABONNEMENT', `Commande ${codeMarquage} (${totalClothes} vêtements) débitée de l'abonnement ${customer.active_subscription.name}`);
+        db.logAction('COMMANDE_ABONNEMENT', `Commande ${displayMarquage} (${totalClothes} vêtements) débitée de l'abonnement ${customer.active_subscription.name}`);
       }
     } else {
-      db.logAction('CREATION_COMMANDE', `Commande ${codeMarquage} créée pour ${customer ? customer.prenom + ' ' + customer.nom : 'Client inconnu'} (${totalPrice} FCFA)`);
+      db.logAction('CREATION_COMMANDE', `Commande ${displayMarquage} créée pour ${customer ? customer.prenom + ' ' + customer.nom : 'Client inconnu'} (${totalPrice} FCFA)`);
     }
 
     if (customer) {

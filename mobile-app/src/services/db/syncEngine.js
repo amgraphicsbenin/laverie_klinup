@@ -544,7 +544,7 @@ export async function startPeriodicSync() {
         .filter(q => q.table === 'orders' && q.action === 'insert')
         .map(q => q.recordId);
       (memoryDb.orders || []).forEach(localOrder => {
-        if (localOrder && localOrder.id && pendingOfflineOrderIds.includes(localOrder.id) && !mergedOrders.some(r => r.id === localOrder.id)) {
+        if (localOrder && localOrder.id && (pendingOfflineOrderIds.includes(localOrder.id) || isPendingOrderUpdate(localOrder.id)) && !mergedOrders.some(r => r.id === localOrder.id)) {
           mergedOrders.push(hydrateOrder(localOrder));
         }
       });
