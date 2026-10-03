@@ -10,6 +10,7 @@ import {
   Platform,
   Easing,
   Vibration,
+  ActivityIndicator,
 } from 'react-native';
 import {
   AlertTriangle,
@@ -437,9 +438,15 @@ export function AnimatedBadge({
             ]}
           >
             {displayedContent.shouldSpin && !displayedContent.icon ? (
-              <Animated.View style={{ transform: [{ rotate: continuousSpinDeg }] }}>
-                <ActiveIcon size={iconSize} color={activeTextColor} strokeWidth={2.4} />
-              </Animated.View>
+              Platform.OS === 'web' ? (
+                <View style={{ width: iconSize, height: iconSize, justifyContent: 'center', alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={activeTextColor} style={{ transform: [{ scale: (iconSize / 20) }] }} />
+                </View>
+              ) : (
+                <Animated.View style={{ transform: [{ rotate: continuousSpinDeg }] }}>
+                  <ActiveIcon size={iconSize} color={activeTextColor} strokeWidth={2.4} />
+                </Animated.View>
+              )
             ) : (
               displayedContent.icon ?? (
                 <ActiveIcon size={iconSize} color={activeTextColor} strokeWidth={2.4} />

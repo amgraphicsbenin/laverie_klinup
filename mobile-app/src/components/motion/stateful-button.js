@@ -3,11 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  Animated,
   Pressable,
   Platform,
-  Easing,
   Vibration,
+  ActivityIndicator,
 } from 'react-native';
 import { Check, X } from 'lucide-react-native';
 
@@ -15,44 +14,17 @@ import { Check, X } from 'lucide-react-native';
  *  StatefulButton — Style ButtonRoot + SpinnerRoot
  *
  *  idle:     [Icon] Label           — pleine opacité, cliquable
- *  pending:  [Spinner] Label        — opacité réduite, non cliquable
+ *  pending:  [Spinner] Label        — indicateur de chargement rotatif actif
  *  success:  [✓] Label              — couleur verte
  *  error:    [✗] Label              — couleur rouge
  */
 
-// ── Spinner : arc rotatif simple ───────────────────────────────────────────
-function Spinner({ size = 15, color = '#ffffff', strokeWidth = 2 }) {
-  const spin = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(spin, {
-        toValue: 1, duration: 650, easing: Easing.linear, useNativeDriver: true,
-      })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [spin]);
-
+// ── Spinner : indicateur de chargement rotatif fluide multi-plateforme ────────
+function Spinner({ color = '#ffffff' }) {
   return (
-    <Animated.View
-      style={{
-        marginRight: 7,
-        transform: [{
-          rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }),
-        }],
-      }}
-    >
-      <View
-        style={{
-          width: size, height: size, borderRadius: size / 2,
-          borderWidth: strokeWidth,
-          borderColor: 'transparent',
-          borderTopColor: color,
-          borderRightColor: color,
-        }}
-      />
-    </Animated.View>
+    <View style={s.spinnerWrapper}>
+      <ActivityIndicator size="small" color={color} />
+    </View>
   );
 }
 
@@ -164,6 +136,7 @@ export function StatefulButton({
       const handler = onHumanComplete || onComplete;
       setOptimisticState('loading');
       setInternalState('loading');
+      const t0 = Date.now();
       try {
         if (typeof handler === 'function') {
           const res = handler();
@@ -172,10 +145,14 @@ export function StatefulButton({
             if (r === false) { setOptimisticState(null); setInternalState('indeterminate'); return; }
           }
         }
+        const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
+        if (w > 0) await new Promise(r => setTimeout(r, w));
         triggerHaptic('success');
         setOptimisticState('success'); setInternalState('success');
         scheduleReset();
       } catch (_) {
+        const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
+        if (w > 0) await new Promise(r => setTimeout(r, w));
         triggerHaptic('error');
         setOptimisticState(null); setInternalState('error');
         scheduleReset();
@@ -191,18 +168,27 @@ export function StatefulButton({
     const action = onPress || onComplete;
 
     if (goesIndeterminate) {
-      setOptimisticState('indeterminate'); setInternalState('indeterminate');
+      setOptimisticState('loading'); setInternalState('loading');
+      const t0 = Date.now();
       if (typeof action === 'function') {
         try {
           const result = action();
           if (result && typeof result.then === 'function') {
             const res = await result;
-            if (res === false) { activePropsRef.current = null; setOptimisticState(null); setInternalState('idle'); }
+            if (res === false) { activePropsRef.current = null; setOptimisticState(null); setInternalState('idle'); return; }
           }
+          const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
+          if (w > 0) await new Promise(r => setTimeout(r, w));
+          triggerHaptic('success');
+          setOptimisticState('indeterminate'); setInternalState('indeterminate');
         } catch (_) {
+          const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
+          if (w > 0) await new Promise(r => setTimeout(r, w));
           triggerHaptic('error'); activePropsRef.current = null;
           setOptimisticState(null); setInternalState('error'); scheduleReset();
         }
+      } else {
+        setOptimisticState('indeterminate'); setInternalState('indeterminate');
       }
       return;
     }
@@ -249,7 +235,7 @@ export function StatefulButton({
 
   // ── Icon ───────────────────────────────────────────────────────────────
   const renderLeading = () => {
-    if (isPending) return <Spinner size={15} color="#ffffff" strokeWidth={2} />;
+    if (isPending) return <Spinner color="#ffffff" />;
     if (currentState === 'success') return <Check size={16} color="#fff" strokeWidth={3} style={s.mr} />;
     if (currentState === 'error')   return <X size={16} color="#fff" strokeWidth={3} style={s.mr} />;
     const ic = effectiveProps.icon || icon || thumbIcon;
@@ -275,7 +261,7 @@ export function StatefulButton({
           borderRadius: height / 2,
           backgroundColor: bgColor,
           shadowColor: bgColor,
-          opacity: disabled ? 0.5 : isPending ? 0.8 : pressed ? 0.85 : 1,
+          opacity: disabled ? 0.5 : isBusy ? 0.82 : pressed ? 0.85 : 1,
         },
         style,
       ]}
@@ -310,6 +296,13 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  spinnerWrapper: {
+    marginRight: 8,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   mr: { marginRight: 7 },
   labels: {
