@@ -1867,7 +1867,7 @@ export default function GestionScreen({
                                   isDarkMode={isDarkMode}
                                   disabled={!canLivrer}
                                   height={42}
-                                  minLoadingDuration={1500}
+                                  minLoadingDuration={250}
                                   icon={<Truck size={16} color="#ffffff" />}
                                   loadingText="Préparation livraison..."
                                   completeLabel="Prêt pour livraison"
@@ -1882,7 +1882,7 @@ export default function GestionScreen({
                                   isDarkMode={isDarkMode}
                                   disabled={!canRecuperer}
                                   height={42}
-                                  minLoadingDuration={1500}
+                                  minLoadingDuration={250}
                                   icon={<UserCheck size={16} color="#ffffff" />}
                                   loadingText="Validation retrait..."
                                   completeLabel="Remis au client"
@@ -1931,7 +1931,7 @@ export default function GestionScreen({
                         return (
                           <View style={{ marginHorizontal: 2, marginTop: 6 }}>
                             <SlideActionButton
-                              key={`btn-${item.id}-${item.statut}`}
+                              key={`btn-${item.id}`}
                               state={isIntermediate ? 'indeterminate' : undefined}
                               transitionsToIndeterminate={nextStyle.transitionsToIndeterminate}
                               persistIntermediate={nextStyle.persistIntermediate}
@@ -1941,7 +1941,7 @@ export default function GestionScreen({
                               isDarkMode={isDarkMode}
                               disabled={!canTransition}
                               height={42}
-                              minLoadingDuration={1500}
+                              minLoadingDuration={250}
                               icon={getNextStatusIcon(item.statut)}
                               loadingText={nextStyle.loadingText}
                               completeLabel={nextStyle.completeLabel}
@@ -2408,7 +2408,7 @@ export default function GestionScreen({
                             isDarkMode={isDarkMode}
                             disabled={!canLivrer}
                             height={46}
-                            minLoadingDuration={1500}
+                            minLoadingDuration={250}
                             icon={<Truck size={17} color="#ffffff" />}
                             loadingText="Préparation livraison..."
                             completeLabel="Prêt pour livraison"
@@ -2423,7 +2423,7 @@ export default function GestionScreen({
                             isDarkMode={isDarkMode}
                             disabled={!canRecuperer}
                             height={46}
-                            minLoadingDuration={1500}
+                            minLoadingDuration={250}
                             icon={<UserCheck size={17} color="#ffffff" />}
                             loadingText="Validation retrait..."
                             completeLabel="Remis au client"
@@ -2471,7 +2471,7 @@ export default function GestionScreen({
                   return (
                     <View style={{ marginTop: 20, marginBottom: 20 }}>
                       <SlideActionButton
-                        key={`detail-btn-${selectedOrder.id}-${selectedOrder.statut}`}
+                        key={`detail-btn-${selectedOrder.id}`}
                         state={isIntermediate ? 'indeterminate' : undefined}
                         transitionsToIndeterminate={nextStyle.transitionsToIndeterminate}
                         persistIntermediate={nextStyle.persistIntermediate}
@@ -2481,7 +2481,7 @@ export default function GestionScreen({
                         isDarkMode={isDarkMode}
                         disabled={!canTransition}
                         height={46}
-                        minLoadingDuration={1500}
+                        minLoadingDuration={250}
                         icon={getNextStatusIcon(selectedOrder.statut)}
                         loadingText={nextStyle.loadingText}
                         completeLabel={nextStyle.completeLabel}

@@ -158,6 +158,20 @@ function App() {
     setCloseModalsTrigger(prev => prev + 1);
   };
 
+  // Synchronisation temps réel de la commande sélectionnée avec dbState.orders (WebSocket & mutations)
+  useEffect(() => {
+    if (!selectedOrder?.id) return;
+    const liveOrder = (dbState.orders || []).find(o => o && String(o.id) === String(selectedOrder.id));
+    if (liveOrder && (
+      liveOrder.statut !== selectedOrder.statut ||
+      liveOrder.solde_paid_at !== selectedOrder.solde_paid_at ||
+      liveOrder.avance_payee !== selectedOrder.avance_payee ||
+      liveOrder.updated_at !== selectedOrder.updated_at
+    )) {
+      setSelectedOrder(liveOrder);
+    }
+  }, [dbState.orders, selectedOrder]);
+
   // Re-render on language change
   useEffect(() => {
     const unsub = subscribeToLangChange(() => {

@@ -1469,8 +1469,9 @@ export const db = {
       updateData.subscription_details = order.subscription_details;
     }
 
-    // ── Libérer la commande et notifier l'UI de façon optimiste ──
-    removePendingOrderUpdate(sOrderId);
+    // ── Notifier l'UI de façon optimiste et instantanée ──
+    // Le verrou addPendingOrderUpdate(sOrderId) reste actif pour empêcher
+    // le sync périodique de réécrire l'ancien statut avant confirmation WebSocket / serveur.
     db.notify();
 
     try {
@@ -1478,7 +1479,19 @@ export const db = {
       sendOrderNotification('UPDATE', order, oldStatus);
     } catch (e) {
       console.warn('[DB Sync] Erreur lors de la mise à jour distante du statut de la commande :', e);
-      // NOTE: Rollback should ideally be implemented here if it fails
+      // Rollback local en cas d'erreur réseau
+      order.statut = oldStatus;
+      order.solde_paid_at = oldSoldePaidAt;
+      order.subscription_details = oldSubscriptionDetails;
+      if (customer && oldCustomerDette !== null) {
+        customer.solde_dette = oldCustomerDette;
+        customer.points_fidelite = oldCustomerPoints;
+      }
+      db.notify();
+      throw e;
+    } finally {
+      // Libérer le verrou en local (si non déjà consommé par l'événement Realtime WebSocket)
+      removePendingOrderUpdate(sOrderId);
     }
     return order;
   },

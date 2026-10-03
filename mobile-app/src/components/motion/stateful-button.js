@@ -46,8 +46,8 @@ export function StatefulButton({
   isDarkMode = false,
   disabled = false,
   height = 42,
-  resetDelay = 1200,
-  minLoadingDuration = 1500,
+  resetDelay = 400,
+  minLoadingDuration = 250,
   style,
   ...props
 }) {
@@ -56,6 +56,23 @@ export function StatefulButton({
   // ── State machine ──────────────────────────────────────────────────────
   const [internalState, setInternalState] = useState('idle');
   const [optimisticState, setOptimisticState] = useState(null);
+
+  // ── Détection de transition externe (WebSocket / store DB réactif) ────
+  const propsSignature = `${controlledState}__${children}__${color}__${indeterminateText}`;
+  const prevSignatureRef = useRef(propsSignature);
+  const activeActionSignatureRef = useRef(null);
+
+  useEffect(() => {
+    if (prevSignatureRef.current !== propsSignature) {
+      prevSignatureRef.current = propsSignature;
+      // Les données de statut ont évolué de l'extérieur (ex: Realtime WebSocket)
+      activePropsRef.current = null;
+      activeActionSignatureRef.current = null;
+      setOptimisticState(null);
+      setInternalState('idle');
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    }
+  }, [propsSignature]);
 
   useEffect(() => {
     if (optimisticState === null || controlledState === undefined) return;
@@ -131,6 +148,7 @@ export function StatefulButton({
   const handlePress = async () => {
     if (isDisabled) return;
     triggerHaptic('tick');
+    activeActionSignatureRef.current = propsSignature;
 
     if (isIndeterminate) {
       const handler = onHumanComplete || onComplete;
@@ -142,19 +160,38 @@ export function StatefulButton({
           const res = handler();
           if (res && typeof res.then === 'function') {
             const r = await res;
-            if (r === false) { setOptimisticState(null); setInternalState('indeterminate'); return; }
+            if (r === false) {
+              setOptimisticState(null);
+              setInternalState('indeterminate');
+              return;
+            }
           }
         }
         const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
         if (w > 0) await new Promise(r => setTimeout(r, w));
+
+        // Spontanéité WebSocket : si le statut a basculé vers une autre étape, transition directe et immédiate
+        if (prevSignatureRef.current !== activeActionSignatureRef.current) {
+          activePropsRef.current = null;
+          activeActionSignatureRef.current = null;
+          setOptimisticState(null);
+          setInternalState('idle');
+          triggerHaptic('success');
+          return;
+        }
+
         triggerHaptic('success');
-        setOptimisticState('success'); setInternalState('success');
+        setOptimisticState('success');
+        setInternalState('success');
         scheduleReset();
       } catch (_) {
         const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
         if (w > 0) await new Promise(r => setTimeout(r, w));
         triggerHaptic('error');
-        setOptimisticState(null); setInternalState('error');
+        activePropsRef.current = null;
+        activeActionSignatureRef.current = null;
+        setOptimisticState(null);
+        setInternalState('error');
         scheduleReset();
       }
       return;
@@ -168,32 +205,58 @@ export function StatefulButton({
     const action = onPress || onComplete;
 
     if (goesIndeterminate) {
-      setOptimisticState('loading'); setInternalState('loading');
+      setOptimisticState('loading');
+      setInternalState('loading');
       const t0 = Date.now();
       if (typeof action === 'function') {
         try {
           const result = action();
           if (result && typeof result.then === 'function') {
             const res = await result;
-            if (res === false) { activePropsRef.current = null; setOptimisticState(null); setInternalState('idle'); return; }
+            if (res === false) {
+              activePropsRef.current = null;
+              activeActionSignatureRef.current = null;
+              setOptimisticState(null);
+              setInternalState('idle');
+              return;
+            }
           }
           const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
           if (w > 0) await new Promise(r => setTimeout(r, w));
+
+          if (prevSignatureRef.current !== activeActionSignatureRef.current) {
+            activePropsRef.current = null;
+            activeActionSignatureRef.current = null;
+            setOptimisticState(null);
+            setInternalState('idle');
+            triggerHaptic('success');
+            return;
+          }
+
           triggerHaptic('success');
-          setOptimisticState('indeterminate'); setInternalState('indeterminate');
+          setOptimisticState('indeterminate');
+          setInternalState('indeterminate');
         } catch (_) {
           const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
           if (w > 0) await new Promise(r => setTimeout(r, w));
-          triggerHaptic('error'); activePropsRef.current = null;
-          setOptimisticState(null); setInternalState('error'); scheduleReset();
+          triggerHaptic('error');
+          activePropsRef.current = null;
+          activeActionSignatureRef.current = null;
+          setOptimisticState(null);
+          setInternalState('error');
+          scheduleReset();
         }
       } else {
-        setOptimisticState('indeterminate'); setInternalState('indeterminate');
+        setOptimisticState('indeterminate');
+        setInternalState('indeterminate');
       }
       return;
     }
 
-    if (controlledState !== undefined) { if (typeof action === 'function') action(); return; }
+    if (controlledState !== undefined) {
+      if (typeof action === 'function') action();
+      return;
+    }
 
     setInternalState('loading');
     const t0 = Date.now();
@@ -202,26 +265,53 @@ export function StatefulButton({
         const result = action();
         if (result && typeof result.then === 'function') {
           const res = await result;
-          if (res === false) { activePropsRef.current = null; setInternalState('idle'); return; }
+          if (res === false) {
+            activePropsRef.current = null;
+            activeActionSignatureRef.current = null;
+            setInternalState('idle');
+            return;
+          }
         }
       }
       const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
       if (w > 0) await new Promise(r => setTimeout(r, w));
-      setInternalState('success'); scheduleReset();
+
+      if (prevSignatureRef.current !== activeActionSignatureRef.current) {
+        activePropsRef.current = null;
+        activeActionSignatureRef.current = null;
+        setOptimisticState(null);
+        setInternalState('idle');
+        triggerHaptic('success');
+        return;
+      }
+
+      setInternalState('success');
+      scheduleReset();
     } catch (_) {
       const w = Math.max(0, minLoadingDuration - (Date.now() - t0));
       if (w > 0) await new Promise(r => setTimeout(r, w));
-      setInternalState('error'); scheduleReset();
+      triggerHaptic('error');
+      activePropsRef.current = null;
+      activeActionSignatureRef.current = null;
+      setInternalState('error');
+      scheduleReset();
     }
   };
 
   const scheduleReset = useCallback(() => {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
     if (resetDelay > 0) {
       resetTimerRef.current = setTimeout(() => {
-        activePropsRef.current = null; setOptimisticState(null); setInternalState('idle');
+        activePropsRef.current = null;
+        activeActionSignatureRef.current = null;
+        setOptimisticState(null);
+        setInternalState('idle');
       }, resetDelay);
     } else {
-      activePropsRef.current = null; setOptimisticState(null); setInternalState('idle');
+      activePropsRef.current = null;
+      activeActionSignatureRef.current = null;
+      setOptimisticState(null);
+      setInternalState('idle');
     }
   }, [resetDelay]);
 
