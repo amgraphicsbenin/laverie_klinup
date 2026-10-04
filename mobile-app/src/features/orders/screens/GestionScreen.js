@@ -1,25 +1,45 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Modal as RNModal, Alert, KeyboardAvoidingView, Platform, BackHandler, RefreshControl, Linking, Animated, Dimensions } from 'react-native';
-import { SmoothScrollView as ScrollView, SmoothFlatList as FlatList } from '../../../components/SmoothScroll';
-import { Plus, Search, User, Phone, MapPin, Settings, FolderHeart, Calendar, CreditCard, ShoppingBag, Receipt, Printer, Trash2, Edit3, X, Check, ChevronRight, Clock, Sparkles, Shirt, Wind, Truck, CheckCircle, UserCheck, Download, Award, Ban, ArrowLeft, Zap, Package, AlarmClock, BadgeCheck } from 'lucide-react-native';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  Platform,
+  BackHandler,
+  RefreshControl,
+  Animated,
+  Dimensions,
+  ActivityIndicator
+} from 'react-native';
+import { SmoothFlatList as FlatList } from '../../../components/SmoothScroll';
+import {
+  Search,
+  X,
+  Package,
+  Clock,
+  Sparkles,
+  AlertTriangle,
+  RotateCcw
+} from 'lucide-react-native';
 import { db } from '../../../services/db';
-import { CustomSelect } from '../../../components/CustomSelect';
-import { SlideActionButton } from '../../../components/motion/slide-action-button';
-import { AnimatedBadge } from '../../../components/motion/animated-badge';
-import { Modal, ConfirmationModal, Button as ModalButton } from '../../../components/ui/modal';
-import SafeBlurView from '../../../components/SafeBlurView';
-const BlurView = SafeBlurView;
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { MotiView } from '../../../components/SafeView';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useScrollPaddingBottom } from '../../../hooks/useTabBarHeight';
 import ClientsScreen from '../../clients/screens/ClientsScreen';
 import { useDbState } from '../../../hooks/useDbState';
 import ClientDetailModal from '../../../components/ClientDetailModal';
 import { OrderFormModal } from '../../../components/OrderFormModal';
-import { t } from '../../../services/i18n';
 import { sendOrderCreatedWhatsAppNotification } from '../../../utils/phoneUtils';
+
+// Composants modulaires d'ordres
+import OrderCard from '../components/OrderCard';
+import OrderDetailModal from '../components/OrderDetailModal';
+import CancelModal from '../components/CancelModal';
+import PaymentModal from '../components/PaymentModal';
+import InvoiceModal from '../components/InvoiceModal';
+import CustomerCreateEditModal from '../components/CustomerCreateEditModal';
 
 export default function GestionScreen({
   selectedOrder,
@@ -41,7 +61,9 @@ export default function GestionScreen({
 }) {
   const { orders, customers, catalog, currentUser, isDarkMode } = useDbState();
   const styles = useMemo(() => getStyles(isDarkMode), [isDarkMode]);
-  const [subTab, setSubTab] = useState('orders'); // orders, clients, catalog
+
+  // Onglets Gestion (Commandes ⇄ Clients)
+  const [subTab, setSubTab] = useState('orders');
   const [tabBarWidth, setTabBarWidth] = useState(() => Dimensions.get('window').width - 40);
   const [pagerWidth, setPagerWidth] = useState(() => Dimensions.get('window').width);
   const [hasMountedClients, setHasMountedClients] = useState(subTab === 'clients');
@@ -62,7 +84,7 @@ export default function GestionScreen({
     }).start();
   }, [subTab]);
 
-  // Notify parent to disable horizontal swipe when viewing Client tab in Gestion
+  // Désactiver le swipe parent sur l'onglet Clients
   useEffect(() => {
     if (onDisableSwipeChange) {
       onDisableSwipeChange(subTab === 'clients');
@@ -73,6 +95,8 @@ export default function GestionScreen({
       }
     };
   }, [subTab, onDisableSwipeChange]);
+
+  // Pull to refresh
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
     setRefreshing(true);
@@ -84,35 +108,18 @@ export default function GestionScreen({
       setRefreshing(false);
     }
   };
-  const activeFilterStyles = {
-    actives: {
-      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0, 44, 247, 0.08)',
-      borderColor: isDarkMode ? '#38bdf8' : '#002cf7',
-      textColor: isDarkMode ? '#38bdf8' : '#002cf7',
-    },
-    urgentes: {
-      backgroundColor: isDarkMode ? 'rgba(244, 63, 94, 0.15)' : 'rgba(225, 29, 72, 0.08)',
-      borderColor: isDarkMode ? '#f43f5e' : '#e11d48',
-      textColor: isDarkMode ? '#f87171' : '#e11d48',
-    },
-    retard: {
-      backgroundColor: isDarkMode ? 'rgba(251, 191, 36, 0.15)' : 'rgba(217, 119, 6, 0.08)',
-      borderColor: isDarkMode ? '#fbbf24' : '#d97706',
-      textColor: isDarkMode ? '#fbbf24' : '#d97706',
-    }
-  };
-  const cancelBtnStyle = {
-    backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)',
-    borderColor: isDarkMode ? '#ef4444' : 'rgba(239, 68, 68, 0.15)',
-  };
+
+  // Filtres et Recherche
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('actives'); // actives, urgentes, retard
+
+  // Animations d'actions de statut
   const [animatingOrderIds, setAnimatingOrderIds] = useState({});
 
   const triggerFinalStatusAnimation = async (orderId, nextStatus, callback) => {
-    // 1. Exécuter l'action réseau / base de données (avec spinner + confirmation de succès fusionnée dans le modal)
     if (typeof callback === 'function') {
       await callback();
     }
-    // 2. Sortie fluide de la carte dans la liste
     setAnimatingOrderIds(prev => ({ ...prev, [orderId]: { status: nextStatus, phase: 'exit' } }));
     setTimeout(() => {
       setAnimatingOrderIds(prev => {
@@ -123,388 +130,29 @@ export default function GestionScreen({
     }, 300);
   };
 
+  // Modales d'ordre
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [orderToCancel, setOrderToCancel] = useState(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const [cancelReasonError, setCancelReasonError] = useState('');
-
-  // Payment confirmation modal states
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [paymentOrder, setPaymentOrder] = useState(null);
   const [paymentNextStatus, setPaymentNextStatus] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Espèces');
-  const [momoRefNumber, setMomoRefNumber] = useState('');
-  const [momoRefError, setMomoRefError] = useState('');
-  const [momoOperator, setMomoOperator] = useState('MTN');
   const [editingOrder, setEditingOrder] = useState(null);
 
-  const validateCancelReason = (text) => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return "Le motif de l'annulation est obligatoire.";
-    }
-    const hasLetter = /[a-zA-Z\u00C0-\u00FF]/.test(trimmed);
-    if (!hasLetter) {
-      return "Le motif doit contenir des lettres explicatives (pas seulement des chiffres ou symboles).";
-    }
-    return null;
-  };
-
-  const handleConfirmCancelOrder = () => {
-    const error = validateCancelReason(cancelReason);
-    if (error) {
-      setCancelReasonError(error);
-      return;
-    }
-
-    const order = orderToCancel;
-    if (!order) return;
-
-    setCancelModalVisible(false);
-
-    const performCancel = async () => {
-      try {
-        db.cancelOrder(order.id, cancelReason.trim());
-        if (onShowSuccess) {
-          onShowSuccess("Commande annulée avec succès.");
-        }
-        if (showOrderDetails) {
-          setShowOrderDetails(false);
-          setSelectedOrder(null);
-        }
-      } catch (e) {
-        Alert.alert("Erreur", "Impossible d'annuler cette commande.");
-      }
-    };
-
-    triggerFinalStatusAnimation(order.id, 'annule', performCancel);
-  };
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('actives'); // actives, urgentes, retard
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [invoiceOrder, setInvoiceOrder] = useState(null);
-
-  // Close all local modals when trigger increments
-  useEffect(() => {
-    if (closeAllModalsTrigger > 0) {
-      setShowCustomerModal(false);
-      setSelectedClient(null);
-      setShowInvoiceModal(false);
-      setShowOrderDetails(false);
-      setCancelModalVisible(false);
-      setPaymentModalVisible(false);
-      if (setSelectedOrder) setSelectedOrder(null);
-    }
-  }, [closeAllModalsTrigger]);
-  const scrollPaddingBottom = useScrollPaddingBottom();
-
-  const setShowOrderForm = setOrderFormVisible;
-
-  const handleShowInvoice = (order, e) => {
-    e.stopPropagation();
-    setInvoiceOrder(order);
-    setShowInvoiceModal(true);
-  };
-
-  const getDisplayTicketId = (order) => {
-    if (!order) return '-';
-    return String(order.id || order.identifiant_unique_marquage || order.ticket_numero || '-');
-  };
-
-  const getItemsSummary = (items) => {
-    if (!items || items.length === 0) return 'Aucun article';
-    return items.map(a => `${a.article} x${a.quantite || a.quantity}`).join(', ');
-  };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-    } catch (e) {
-      return dateStr;
-    }
-  };
-
-
-
-  // Switch to orders or clients tab if a dashboard filter is applied
-  useEffect(() => {
-    if (gestionFilter === 'clients') {
-      setSubTab('clients');
-    } else if (gestionFilter) {
-      setSubTab('orders');
-    }
-  }, [gestionFilter]);
-
-
-
-  const isTransitionAllowed = (status, targetStatus) => {
-    if (!currentUser) return false;
-    const role = currentUser.role;
-    if (role === 'super_admin' || role === 'manager') return true;
-
-    const s = String(status || '').trim().toLowerCase();
-
-    if (role === 'agent_lavage_repassage') {
-      const allowed = [
-        'en_attente', 'attente', 'pending',
-        'traitement', 'en_traitement', 'processing', 'in_treatment',
-        'en_cours_lavage', 'lavage_cours', 'washing', 'lave', 'lavé',
-        'en_cours_repassage', 'repassage_cours', 'ironing',
-        'retard', 'en_retard', 'late'
-      ];
-      return allowed.includes(s) && (
-        targetStatus === 'traitement' ||
-        targetStatus === 'en_cours_lavage' ||
-        targetStatus === 'en_cours_repassage' ||
-        targetStatus === 'pret'
-      );
-    }
-
-    if (role === 'agent_accueil') {
-      const isValidation = ['en_attente_validation', 'attente_validation'].includes(s);
-      const isPret = ['pret', 'prêt', 'ready', 'pret_a_livrer'].includes(s);
-      const isAttente = ['retard', 'en_retard', 'late', 'en_attente', 'attente', 'pending'].includes(s);
-      return (
-        (isValidation && (targetStatus === 'en_attente' || targetStatus === 'traitement')) ||
-        (isPret && (targetStatus === 'a_livrer' || targetStatus === 'a_recuperer' || targetStatus === 'restitue' || targetStatus === 'livre')) ||
-        (s === 'a_recuperer' && (targetStatus === 'restitue' || targetStatus === 'livre')) ||
-        (isAttente && targetStatus === 'traitement')
-      );
-    }
-
-    if (role === 'livreur') {
-      const isEnLivraison = ['en_cours_livraison', 'en_cours_de_livraison', 'in_delivery', 'delivering', 'livraison'].includes(s);
-      return (
-        (s === 'a_livrer' && targetStatus === 'en_cours_livraison') ||
-        (isEnLivraison && (targetStatus === 'restitue' || targetStatus === 'livre')) ||
-        ((s === 'retard' || s === 'en_retard' || s === 'late') && (targetStatus === 'en_cours_livraison' || targetStatus === 'restitue' || targetStatus === 'livre'))
-      );
-    }
-
-    return false;
-  };
-
-  // Modals visibility
-  const [showOrderDetails, setShowOrderDetails] = useState(false);
-
-  const getNextStatusStyle = (currentStatus) => {
-    const s = String(currentStatus || '').trim().toLowerCase();
-    switch (s) {
-      case 'en_attente_validation':
-      case 'attente_validation':
-        return {
-          bg: '#059669',
-          text: '#ffffff',
-          label: 'Valider la commande (Caisse)',
-          completeLabel: 'Commande validée',
-          loadingText: 'Validation caisse...',
-        };
-      case 'attente':
-      case 'en_attente':
-      case 'pending':
-      case 'retard':
-      case 'en_retard':
-      case 'late':
-        return {
-          bg: '#7c3aed',
-          text: '#ffffff',
-          label: t('orders.passer_traitement', {}, 'Passer au traitement'),
-          completeLabel: 'En traitement',
-          loadingText: 'Traitement en cours...',
-        };
-      case 'traitement':
-      case 'en_traitement':
-      case 'processing':
-      case 'in_treatment':
-        return {
-          bg: '#002cf7',
-          text: '#ffffff',
-          label: t('orders.lancer_lavage', {}, 'Lancer le lavage'),
-          completeLabel: 'Lavage lancé',
-          loadingText: 'Lancement du lavage...',
-          indeterminateText: 'Lavage en cours...',
-          completionLabel: 'Toucher pour repasser',
-          // Immediate shimmer on tap — no loading flash
-          transitionsToIndeterminate: true,
-          persistIntermediate: true,
-        };
-      case 'lavage_cours':
-      case 'en_cours_lavage':
-      case 'washing':
-      case 'lave':
-      case 'lavé':
-        return {
-          bg: '#0d9488',
-          text: '#ffffff',
-          label: t('orders.passer_repassage', {}, 'Passer au repassage'),
-          completeLabel: 'En repassage',
-          loadingText: 'Passage au repassage...',
-          indeterminateText: 'Lavage en cours...',
-          completionLabel: 'Toucher pour repasser',
-          persistIntermediate: true,
-        };
-      case 'repassage_cours':
-      case 'en_cours_repassage':
-      case 'ironing':
-        return {
-          bg: '#059669',
-          text: '#ffffff',
-          label: t('orders.statut_pret', {}, 'Marquer comme prêt'),
-          completeLabel: 'Commande prête',
-          loadingText: 'Validation...',
-          indeterminateText: 'Repassage en cours...',
-          completionLabel: 'Toucher pour finaliser',
-          persistIntermediate: true,
-        };
-      case 'pret':
-      case 'prêt':
-      case 'ready':
-      case 'pret_a_livrer':
-        return {
-          bg: '#2563eb',
-          text: '#ffffff',
-          label: t('orders.statut_livraison', {}, 'Lancer la livraison'),
-          completeLabel: 'En livraison',
-          loadingText: 'Préparation...',
-          indeterminateText: 'Livraison en cours...',
-          completionLabel: 'Toucher pour valider la remise',
-          // Immediate shimmer on tap — livraison is a continuous process
-          transitionsToIndeterminate: true,
-          persistIntermediate: true,
-        };
-      case 'a_livrer':
-        return {
-          bg: '#2563eb',
-          text: '#ffffff',
-          label: 'Démarrer la livraison',
-          completeLabel: 'Livraison démarrée',
-          loadingText: 'Démarrage...',
-          indeterminateText: 'Livraison en cours...',
-          completionLabel: 'Toucher pour valider la remise',
-          transitionsToIndeterminate: true,
-          persistIntermediate: true,
-        };
-      case 'en_cours_livraison':
-      case 'en_cours_de_livraison':
-      case 'in_delivery':
-      case 'delivering':
-      case 'livraison':
-        return {
-          bg: '#059669',
-          text: '#ffffff',
-          label: 'Confirmer la livraison',
-          completeLabel: 'Commande livrée',
-          loadingText: 'Confirmation...',
-          indeterminateText: 'Livraison en cours...',
-          completionLabel: 'Toucher pour valider la remise',
-          persistIntermediate: true,
-        };
-      case 'a_recuperer':
-        return {
-          bg: '#059669',
-          text: '#ffffff',
-          label: 'Remettre au client',
-          completeLabel: 'Commande remise',
-          loadingText: 'Validation retrait...',
-        };
-      case 'restitue':
-      case 'restitué':
-      case 'livre':
-      case 'livré':
-      case 'delivered':
-        return {
-          bg: '#10b981',
-          text: '#ffffff',
-          label: 'Commande terminée',
-          completeLabel: 'Terminée',
-          loadingText: 'Clôture...',
-        };
-      default:
-        return {
-          bg: '#002cf7',
-          text: '#ffffff',
-          label: 'Mettre à jour le statut',
-          completeLabel: 'Mis à jour',
-          loadingText: 'Mise à jour...',
-        };
-    }
-  };
-
-
-  const getNextStatusIcon = (status) => {
-    const iconS = String(status || '').trim().toLowerCase();
-    if (iconS === 'en_attente_validation' || iconS === 'attente_validation') {
-      return <CheckCircle size={16} color="#ffffff" />;
-    }
-    if (iconS === 'attente' || iconS === 'en_attente' || iconS === 'pending' || iconS === 'retard' || iconS === 'en_retard' || iconS === 'late') {
-      return <Sparkles size={16} color="#ffffff" />;
-    }
-    if (iconS === 'traitement' || iconS === 'en_traitement' || iconS === 'processing' || iconS === 'in_treatment') {
-      return <Wind size={16} color="#ffffff" />;
-    }
-    if (iconS === 'lavage_cours' || iconS === 'en_cours_lavage' || iconS === 'washing' || iconS === 'lave' || iconS === 'lavé') {
-      return <Shirt size={16} color="#ffffff" />;
-    }
-    if (iconS === 'repassage_cours' || iconS === 'en_cours_repassage' || iconS === 'ironing') {
-      return <CheckCircle size={16} color="#ffffff" />;
-    }
-    if (iconS === 'pret' || iconS === 'prêt' || iconS === 'ready' || iconS === 'pret_a_livrer' || iconS === 'a_livrer') {
-      return <Truck size={16} color="#ffffff" />;
-    }
-    if (iconS === 'en_cours_livraison' || iconS === 'en_cours_de_livraison' || iconS === 'in_delivery' || iconS === 'delivering' || iconS === 'livraison') {
-      return <ShoppingBag size={16} color="#ffffff" />;
-    }
-    if (iconS === 'a_recuperer') {
-      return <UserCheck size={16} color="#ffffff" />;
-    }
-    return <ChevronRight size={16} color="#ffffff" strokeWidth={2.6} />;
-  };
-  const [selectedCategory, setSelectedCategory] = useState('Tous');
+  // Modale client
   const [showCustomerModal, setShowCustomerModal] = useState(false);
-
-  // Customer Form state
   const [editingCustomer, setEditingCustomer] = useState(null);
-  const [custNom, setCustNom] = useState('');
-  const [custPrenom, setCustPrenom] = useState('');
-  const [custTelephone, setCustTelephone] = useState('');
-  const [custAdresse, setCustAdresse] = useState('');
-  const [custPreferences, setCustPreferences] = useState('Plié');
-  const [custSubscriptionPlanId, setCustSubscriptionPlanId] = useState('');
-
-
-
-  // Client Details View
   const [selectedClient, setSelectedClient] = useState(null);
   const [wasEditingFromFiche, setWasEditingFromFiche] = useState(null);
 
-  const handleCloseCustomerModal = () => {
-    setShowCustomerModal(false);
-    setEditingCustomer(null);
-    setCustNom('');
-    setCustPrenom('');
-    setCustTelephone('');
-    setCustAdresse('');
-    setCustPreferences('Plié');
-    setCustSubscriptionPlanId('');
-    if (wasEditingFromFiche) {
-      const origClient = db.getCustomers().find(c => c.id === wasEditingFromFiche);
-      if (origClient) {
-        setSelectedClient(origClient);
-      }
-      setWasEditingFromFiche(null);
-    }
-  };
-
+  // Synchronisation avec selectedOrder parent
   useEffect(() => {
-    if (selectedOrder) {
-      setShowOrderDetails(true);
-    } else {
-      setShowOrderDetails(false);
-    }
+    setShowOrderDetails(!!selectedOrder);
   }, [selectedOrder]);
 
+  // Synchronisation avec initialSelectedClient
   useEffect(() => {
     if (initialSelectedClient) {
       setSelectedClient(initialSelectedClient);
@@ -514,12 +162,59 @@ export default function GestionScreen({
     }
   }, [initialSelectedClient]);
 
-  // Handle Android back button/gesture to close modals and forms inside GestionScreen
+  // Prise en compte des filtres Dashboard
+  useEffect(() => {
+    if (gestionFilter === 'clients') {
+      setSubTab('clients');
+    } else if (gestionFilter) {
+      setSubTab('orders');
+    }
+  }, [gestionFilter]);
+
+  // Fermeture centralisée de toutes les modales
+  useEffect(() => {
+    if (closeAllModalsTrigger > 0) {
+      setShowCustomerModal(false);
+      setSelectedClient(null);
+      setShowInvoiceModal(false);
+      setShowOrderDetails(false);
+      setCancelModalVisible(false);
+      setPaymentModalVisible(false);
+      setEditingOrder(null);
+      if (setSelectedOrder) setSelectedOrder(null);
+    }
+  }, [closeAllModalsTrigger]);
+
+  // Notification de visibilité des modales au parent
+  useEffect(() => {
+    if (onModalStateChange) {
+      const isAnyModalOpen =
+        showInvoiceModal ||
+        showCustomerModal ||
+        selectedClient !== null ||
+        showOrderDetails ||
+        paymentModalVisible ||
+        cancelModalVisible ||
+        editingOrder !== null;
+      onModalStateChange(isAnyModalOpen);
+    }
+  }, [
+    showInvoiceModal,
+    showCustomerModal,
+    selectedClient,
+    showOrderDetails,
+    paymentModalVisible,
+    cancelModalVisible,
+    editingOrder,
+    onModalStateChange
+  ]);
+
+  // Gestion de la touche retour Android
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
     const backAction = () => {
-      if (editingOrder) {
+      if (editingOrder !== null) {
         setEditingOrder(null);
         return true;
       }
@@ -528,8 +223,21 @@ export default function GestionScreen({
         setInvoiceOrder(null);
         return true;
       }
+      if (cancelModalVisible) {
+        setCancelModalVisible(false);
+        return true;
+      }
+      if (paymentModalVisible) {
+        setPaymentModalVisible(false);
+        return true;
+      }
       if (showCustomerModal) {
-        handleCloseCustomerModal();
+        setShowCustomerModal(false);
+        setEditingCustomer(null);
+        return true;
+      }
+      if (selectedClient !== null) {
+        setSelectedClient(null);
         return true;
       }
       if (showOrderDetails) {
@@ -537,22 +245,14 @@ export default function GestionScreen({
         if (setSelectedOrder) setSelectedOrder(null);
         return true;
       }
-      if (selectedClient) {
-        setSelectedClient(null);
-        return true;
-      }
       if (subTab === 'clients') {
         setSubTab('orders');
         return true;
       }
-      return false; // let it propagate to parent back handler (which changes tab to accueil)
+      return false;
     };
 
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      backAction
-    );
-
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
   }, [
     subTab,
@@ -561,364 +261,44 @@ export default function GestionScreen({
     showOrderDetails,
     selectedClient,
     setSelectedOrder,
-    wasEditingFromFiche,
+    paymentModalVisible,
+    cancelModalVisible,
     editingOrder
   ]);
 
-  // Notify parent of modal visibility
-  useEffect(() => {
-    if (onModalStateChange) {
-      const isAnyModalOpen = showInvoiceModal || showCustomerModal || selectedClient !== null || showOrderDetails || paymentModalVisible || cancelModalVisible || editingOrder !== null;
-      onModalStateChange(isAnyModalOpen);
-    }
-  }, [showInvoiceModal, showCustomerModal, selectedClient, showOrderDetails, paymentModalVisible, cancelModalVisible, editingOrder, onModalStateChange]);
+  // Dictionnaire de clients pour recherche instantanée O(1)
+  const customerMap = useMemo(() => {
+    const map = new Map();
+    (customers || []).forEach(c => map.set(c.id, c));
+    return map;
+  }, [customers]);
 
-  const handleCloseOrderDetails = () => {
-    setShowOrderDetails(false);
-    setSelectedOrder(null);
-  };
+  // Utilitaires de formatage
+  const getDisplayTicketId = useCallback((order) => {
+    if (!order) return '-';
+    return String(order.id || order.identifiant_unique_marquage || order.ticket_numero || '-');
+  }, []);
 
-  // Status transitions
-  const handleNextStatus = async (order, updateSelected = false, explicitTarget = null) => {
-    if (!order) return;
-    let nextStatus = explicitTarget;
-    const status = String(order.statut || order.status || '').trim().toLowerCase();
+  const getItemsSummary = useCallback((items) => {
+    if (!items || items.length === 0) return 'Aucun article';
+    return items.map(a => `${a.article} x${a.quantite || a.quantity}`).join(', ');
+  }, []);
 
-    if (!nextStatus) {
-      if (status === 'attente' || status === 'en_attente' || status === 'pending') nextStatus = 'traitement';
-      else if (status === 'traitement' || status === 'en_traitement' || status === 'processing' || status === 'in_treatment') nextStatus = 'en_cours_lavage';
-      else if (status === 'lavage_cours' || status === 'en_cours_lavage' || status === 'washing' || status === 'lave' || status === 'lavé') nextStatus = 'en_cours_repassage';
-      else if (status === 'repassage_cours' || status === 'en_cours_repassage' || status === 'ironing') nextStatus = 'pret';
-      else if (status === 'pret' || status === 'prêt' || status === 'ready' || status === 'pret_a_livrer') nextStatus = 'a_livrer';
-      else if (status === 'a_livrer') nextStatus = 'en_cours_livraison';
-      else if (status === 'en_cours_livraison' || status === 'en_cours_de_livraison' || status === 'in_delivery' || status === 'delivering' || status === 'livraison') nextStatus = 'restitue';
-      else if (status === 'a_recuperer') nextStatus = 'restitue';
-      else if (status === 'retard' || status === 'en_retard' || status === 'late') nextStatus = 'traitement';
-      else nextStatus = 'traitement';
-    }
-
-    const isFinal = nextStatus === 'livre' || nextStatus === 'restitue';
-    const total = Number(order.prix_total || order.total || 0);
-    const avance = Number(order.avance_payee || order.avance || 0);
-    const remainingToPay = Math.max(0, total - avance);
-    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
-
-    // Exiger le règlement du solde avant le lavage (ou pour tout statut post-traitement)
-    const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'livre', 'restitue'].includes(nextStatus);
-    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
-      setPaymentOrder(order);
-      setPaymentNextStatus(nextStatus);
-      setPaymentMethod('Espèces');
-      setMomoRefNumber('');
-      setMomoRefError('');
-      setMomoOperator('MTN');
-      setPaymentModalVisible(true);
-      return false;
-    }
-
-    const performUpdate = async () => {
-      try {
-        await db.updateOrderStatus(order.id, nextStatus);
-        if (updateSelected) {
-          const updated = db.getOrders().find(o => o.id === order.id);
-          if (updated) setSelectedOrder(updated);
-        }
-      } catch (e) {
-        Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
-        throw e;
-      }
-    };
-
-    if (isFinal) {
-      if (showOrderDetails) {
-        setShowOrderDetails(false);
-        setSelectedOrder(null);
-      }
-      // Délai pour laisser le spinner du bouton s'afficher avant l'animation de sortie
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      await triggerFinalStatusAnimation(order.id, nextStatus, performUpdate);
-    } else {
-      await performUpdate();
-    }
-  };
-
-  const handleValidateOrder = async (order) => {
-    if (!order) return;
+  const formatDate = useCallback((dateStr) => {
+    if (!dateStr) return 'N/A';
     try {
-      let validatedOrder;
-      if (typeof db.validateOrderByCashier === 'function') {
-        validatedOrder = await db.validateOrderByCashier(order.id);
-      } else {
-        validatedOrder = await db.updateOrderStatus(order.id, 'en_attente');
-      }
-
-      const freshOrder = validatedOrder || (db.getOrders ? db.getOrders().find(o => o.id === order.id) : null) || order;
-
-      // RÈGLE MÉTIER : C'est uniquement après la validation de la caisse que le premier message client doit être généré
-      const targetCustomer = (customers || []).find(c => c.id === freshOrder.customer_id) ||
-                             (db.getCustomers ? db.getCustomers().find(c => c.id === freshOrder.customer_id) : null);
-      if (targetCustomer) {
-        sendOrderCreatedWhatsAppNotification(freshOrder, targetCustomer);
-      }
-
-      if (selectedOrder && selectedOrder.id === order.id) {
-        const updated = (db.getOrders ? db.getOrders() : []).find(o => o.id === order.id);
-        if (updated) setSelectedOrder(updated);
-      }
-      if (onShowSuccess) {
-        onShowSuccess("Commande validée avec succès par la caisse !");
-      }
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
     } catch (e) {
-      console.error("Error validating order by cashier:", e);
-      Alert.alert("Erreur", e.message || "Impossible de valider la commande.");
+      return dateStr;
     }
-  };
+  }, []);
 
-  const handleConfirmPaymentAndComplete = async () => {
-    if (!paymentOrder) return;
-    if (paymentMethod === 'Mobile Money') {
-      const ref = momoRefNumber.trim();
-      if (!ref) {
-        setMomoRefError("Le numéro de référence est obligatoire.");
-        return;
-      }
-      if (!/^\d{8,15}$/.test(ref)) {
-        setMomoRefError("Le numéro de référence doit contenir entre 8 et 15 chiffres.");
-        return;
-      }
-    }
+  const formatPrice = useCallback((price) => {
+    return (price || 0).toLocaleString('fr-FR') + ' FCFA';
+  }, []);
 
-    const total = Number(paymentOrder.prix_total || paymentOrder.total || 0);
-    const avance = Number(paymentOrder.avance_payee || paymentOrder.avance || 0);
-    const soldeRestant = Math.max(0, total - avance);
-    const targetStatus = paymentNextStatus || 'en_cours_lavage';
-    const isFinal = targetStatus === 'livre' || targetStatus === 'restitue';
-
-    const performUpdate = async () => {
-      try {
-        await db.deliverOrderWithPayment(
-          paymentOrder.id,
-          soldeRestant,
-          paymentMethod,
-          targetStatus,
-          paymentMethod === 'Mobile Money' ? momoRefNumber.trim() : null,
-          paymentMethod === 'Mobile Money' ? momoOperator : null
-        );
-        if (onShowSuccess) {
-          onShowSuccess(targetStatus === 'en_cours_lavage' ? "Solde réglé. Commande transmise au lavage !" : "Paiement enregistré et commande mise à jour.");
-        }
-      } catch (e) {
-        console.error("Error validating payment:", e);
-        Alert.alert("Erreur", e.message || "Impossible de valider le règlement.");
-      }
-    };
-
-    setPaymentModalVisible(false);
-    if (showOrderDetails) {
-      setShowOrderDetails(false);
-      setSelectedOrder(null);
-    }
-
-    if (isFinal) {
-      await triggerFinalStatusAnimation(paymentOrder.id, targetStatus, performUpdate);
-    } else {
-      await performUpdate();
-    }
-  };
-
-  const handleUpdateStatusDirect = async (order, nextStatus) => {
-    return handleNextStatus(order, true, nextStatus);
-  };
-
-  const handleNextStatusDirectList = async (order, nextStatus) => {
-    return handleNextStatus(order, false, nextStatus);
-  };
-
-  const handleCancelOrder = (order) => {
-    setOrderToCancel(order);
-    setCancelReason('');
-    setCancelReasonError('');
-    setCancelModalVisible(true);
-  };
-
-  const handleDeleteOrder = (order) => {
-    Alert.alert(
-      "Supprimer la commande",
-      `Voulez-vous vraiment supprimer définitivement la commande ${getDisplayTicketId(order)} ? Cette action est irréversible.`,
-      [
-        { text: "Non", style: "cancel" },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: () => {
-            try {
-              db.deleteOrder(order.id);
-              if (onShowSuccess) {
-                onShowSuccess("Commande supprimée avec succès.");
-              }
-              if (showOrderDetails) {
-                setShowOrderDetails(false);
-                setSelectedOrder(null);
-              }
-            } catch (e) {
-              Alert.alert("Erreur", "Impossible de supprimer cette commande.");
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  // Customer Management
-  const handleSaveCustomer = async () => {
-    if (!custNom || !custTelephone) {
-      Alert.alert("Erreur", "Le nom et le téléphone sont obligatoires.");
-      return false;
-    }
-
-    try {
-      const isEditing = !!editingCustomer;
-      if (editingCustomer) {
-        await db.updateCustomer(editingCustomer.id, {
-          nom: custNom,
-          prenom: custPrenom,
-          telephone: custTelephone,
-          adresse: custAdresse,
-          preferences_pliage: custPreferences
-        });
-
-        if (wasEditingFromFiche === editingCustomer.id) {
-          const updatedClient = db.getCustomers().find(c => c.id === editingCustomer.id);
-          if (updatedClient) {
-            setSelectedClient(updatedClient);
-          }
-        }
-      } else {
-        const newCustomer = await db.addCustomer({
-          nom: custNom,
-          prenom: custPrenom,
-          telephone: custTelephone,
-          adresse: custAdresse,
-          preferences_pliage: custPreferences,
-          store_id: currentUser?.store_id
-        });
-        if (newCustomer && custSubscriptionPlanId) {
-          await db.subscribeCustomer(newCustomer.id, custSubscriptionPlanId);
-        }
-      }
-
-      // Délai de 2 secondes sur le spinner intégré du bouton
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      setTimeout(() => {
-        setCustNom('');
-        setCustPrenom('');
-        setCustTelephone('');
-        setCustAdresse('');
-        setCustPreferences('Plié');
-        setCustSubscriptionPlanId('');
-        setEditingCustomer(null);
-        setWasEditingFromFiche(null);
-        setShowCustomerModal(false);
-        if (onShowSuccess) {
-          onShowSuccess(isEditing ? "Profil client modifié avec succès !" : "Nouveau client créé avec succès !");
-        }
-      }, 700);
-
-      return true;
-    } catch (e) {
-      Alert.alert("Erreur", "Impossible d'enregistrer le profil client.");
-      return false;
-    }
-  };
-
-  const handleEditCustomer = (client) => {
-    if (selectedClient && selectedClient.id === client.id) {
-      setWasEditingFromFiche(client.id);
-      setSelectedClient(null);
-    } else {
-      setWasEditingFromFiche(null);
-    }
-    setEditingCustomer(client);
-    setCustNom(client.nom);
-    setCustPrenom(client.prenom);
-    setCustTelephone(client.telephone);
-    setCustAdresse(client.adresse || '');
-    setCustPreferences(client.preferences_pliage || 'Plié');
-    setShowCustomerModal(true);
-  };
-
-  const handleDeleteCustomer = (id) => {
-    Alert.alert(
-      "Confirmation",
-      "Voulez-vous vraiment supprimer ce client ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Supprimer", style: "destructive", onPress: async () => {
-            try {
-              await db.deleteCustomer(id);
-              setSelectedClient(null);
-              if (onShowSuccess) {
-                onShowSuccess("Profil client supprimé avec succès.");
-              }
-            } catch (e) {
-              Alert.alert("Erreur", "Impossible de supprimer ce client.");
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const [selectedCrmSubId, setSelectedCrmSubId] = useState('');
-
-  const handleSubscribeCrm = (customerId, planId) => {
-    if (!planId) {
-      Alert.alert("Erreur", "Veuillez sélectionner un forfait d'abonnement.");
-      return;
-    }
-    const updatedCust = db.subscribeCustomer(customerId, planId);
-    if (updatedCust) {
-      if (onShowSuccess) {
-        onShowSuccess(`Abonnement souscrit pour ${updatedCust.prenom} ${updatedCust.nom} !`);
-      } else {
-        Alert.alert("Succès", `Abonnement souscrit avec succès pour ${updatedCust.prenom} ${updatedCust.nom} !`);
-      }
-      setSelectedCrmSubId('');
-      setSelectedClient({ ...updatedCust });
-    }
-  };
-
-  const handleUnsubscribeCrm = (customerId) => {
-    Alert.alert(
-      "Confirmation",
-      "Êtes-vous sûr de vouloir résilier cet abonnement ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Résilier",
-          style: "destructive",
-          onPress: () => {
-            const updatedCust = db.unsubscribeCustomer(customerId);
-            if (updatedCust) {
-              if (onShowSuccess) {
-                onShowSuccess("Abonnement résilié avec succès !");
-              } else {
-                Alert.alert("Succès", "Abonnement résilié avec succès !");
-              }
-              setSelectedClient({ ...updatedCust });
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  // Order Submission
-
-
-  const getStatusColor = (statut) => {
+  const getStatusColor = useCallback((statut) => {
     switch (statut) {
       case 'en_attente_validation':
       case 'attente_validation':
@@ -951,14 +331,219 @@ export default function GestionScreen({
       default:
         return { bg: '#fff3e0', text: '#e65100', label: 'En attente' };
     }
+  }, []);
+
+  // Compteurs des filtres mémoïsés
+  const counts = useMemo(() => {
+    let actives = 0;
+    let urgentes = 0;
+    let retards = 0;
+    const now = new Date();
+
+    (orders || []).forEach(o => {
+      const isActive = o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule';
+      if (!isActive) return;
+      actives++;
+      if (o.niveau_urgence === 'Express') urgentes++;
+      if (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < now)) {
+        retards++;
+      }
+    });
+
+    return { actives, urgentes, retards };
+  }, [orders]);
+
+  // Liste filtrée des commandes mémoïsée
+  const filteredOrders = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const now = new Date();
+
+    return (orders || []).filter(o => {
+      const client = customerMap.get(o.customer_id);
+      const clientName = client ? `${client.prenom} ${client.nom}`.toLowerCase() : '';
+      const ticketNo = (o.ticket_numero || '').toLowerCase();
+      const orderId = (o.id || '').toLowerCase();
+
+      if (query && !clientName.includes(query) && !ticketNo.includes(query) && !orderId.includes(query)) {
+        return false;
+      }
+
+      const isActive = o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule';
+
+      // Filtre contextuel depuis le Dashboard
+      if (gestionFilter === 'en_cours') return isActive;
+      if (gestionFilter === 'pretes') {
+        return isActive && (o.statut === 'pret' || o.statut === 'a_recuperer' || o.statut === 'a_livrer');
+      }
+      if (gestionFilter === 'retards') {
+        return isActive && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < now));
+      }
+
+      // Filtre local par puces
+      if (statusFilter === 'actives') return isActive;
+      if (statusFilter === 'urgentes') return isActive && o.niveau_urgence === 'Express';
+      if (statusFilter === 'retard') {
+        return isActive && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < now));
+      }
+
+      return isActive;
+    });
+  }, [orders, customerMap, searchQuery, gestionFilter, statusFilter]);
+
+  // Moteur de transition de statut
+  const handleNextStatus = async (order, targetStatus, updateSelected = false) => {
+    if (!order) return;
+    const nextStatus = targetStatus;
+    const isFinal = nextStatus === 'livre' || nextStatus === 'restitue';
+
+    const total = Number(order.prix_total !== undefined ? order.prix_total : (order.total || 0));
+    const avance = Number(order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0));
+    const remainingToPay = Math.max(0, total - avance);
+    const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
+
+    // Verrou financier avant le lavage ou statut ultérieur
+    const requiresLavageOrBeyond = [
+      'en_cours_lavage',
+      'en_cours_repassage',
+      'pret',
+      'a_livrer',
+      'a_recuperer',
+      'en_cours_livraison',
+      'livre',
+      'restitue'
+    ].includes(nextStatus);
+
+    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
+      setPaymentOrder(order);
+      setPaymentNextStatus(nextStatus);
+      setPaymentModalVisible(true);
+      return false;
+    }
+
+    const performUpdate = async () => {
+      try {
+        await db.updateOrderStatus(order.id, nextStatus);
+        if (updateSelected) {
+          const updated = (db.getOrders ? db.getOrders() : []).find(o => o.id === order.id);
+          if (updated && setSelectedOrder) setSelectedOrder(updated);
+        }
+      } catch (e) {
+        Alert.alert("Erreur", "Impossible de mettre à jour le statut.");
+        throw e;
+      }
+    };
+
+    if (isFinal) {
+      if (showOrderDetails) {
+        setShowOrderDetails(false);
+        if (setSelectedOrder) setSelectedOrder(null);
+      }
+      await new Promise(resolve => setTimeout(resolve, 800));
+      await triggerFinalStatusAnimation(order.id, nextStatus, performUpdate);
+    } else {
+      await performUpdate();
+    }
   };
 
-  const formatPrice = (price) => {
-    return (price || 0).toLocaleString('fr-FR') + ' FCFA';
+  // Validation d'une commande saisie par un livreur
+  const handleValidateOrder = async (order) => {
+    if (!order) return;
+    try {
+      let validatedOrder;
+      if (typeof db.validateOrderByCashier === 'function') {
+        validatedOrder = await db.validateOrderByCashier(order.id);
+      } else {
+        await db.updateOrderStatus(order.id, 'en_attente');
+      }
+
+      const freshOrder = (db.getOrders ? db.getOrders() : []).find(o => o.id === order.id) || validatedOrder || order;
+      const targetCustomer = (db.getCustomers ? db.getCustomers() : []).find(c => c.id === freshOrder.customer_id);
+      if (targetCustomer) {
+        sendOrderCreatedWhatsAppNotification(freshOrder, targetCustomer);
+      }
+
+      if (selectedOrder && selectedOrder.id === order.id && setSelectedOrder) {
+        const updated = (db.getOrders ? db.getOrders() : []).find(o => o.id === order.id);
+        if (updated) setSelectedOrder(updated);
+      }
+      if (onShowSuccess) {
+        onShowSuccess("Commande validée avec succès par la caisse !");
+      }
+    } catch (e) {
+      console.error("Error validating order by cashier:", e);
+      Alert.alert("Erreur", e.message || "Impossible de valider la commande.");
+    }
   };
 
+  // Confirmation de paiement du solde
+  const handleConfirmPayment = async (order, paymentMethod, momoRef, momoOp) => {
+    const total = Number(order.prix_total !== undefined ? order.prix_total : (order.total || 0));
+    const avance = Number(order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0));
+    const soldeRestant = Math.max(0, total - avance);
+    const targetStatus = paymentNextStatus || 'en_cours_lavage';
+    const isFinal = targetStatus === 'livre' || targetStatus === 'restitue';
+
+    const performUpdate = async () => {
+      try {
+        await db.deliverOrderWithPayment(
+          order.id,
+          soldeRestant,
+          paymentMethod,
+          targetStatus,
+          paymentMethod === 'Mobile Money' ? momoRef : null,
+          paymentMethod === 'Mobile Money' ? momoOp : null
+        );
+        if (onShowSuccess) {
+          onShowSuccess(
+            targetStatus === 'en_cours_lavage'
+              ? "Solde réglé. Commande transmise au lavage !"
+              : "Paiement enregistré et commande mise à jour."
+          );
+        }
+      } catch (e) {
+        console.error("Error validating payment:", e);
+        Alert.alert("Erreur", e.message || "Impossible de valider le règlement.");
+      }
+    };
+
+    setPaymentModalVisible(false);
+    if (showOrderDetails) {
+      setShowOrderDetails(false);
+      if (setSelectedOrder) setSelectedOrder(null);
+    }
+
+    if (isFinal) {
+      await triggerFinalStatusAnimation(order.id, targetStatus, performUpdate);
+    } else {
+      await performUpdate();
+    }
+  };
+
+  // Annulation de commande
+  const handleConfirmCancelOrder = (order, reason) => {
+    setCancelModalVisible(false);
+
+    const performCancel = async () => {
+      try {
+        await db.cancelOrder(order.id, reason);
+        if (onShowSuccess) {
+          onShowSuccess("Commande annulée avec succès.");
+        }
+        if (showOrderDetails) {
+          setShowOrderDetails(false);
+          if (setSelectedOrder) setSelectedOrder(null);
+        }
+      } catch (e) {
+        Alert.alert("Erreur", "Impossible d'annuler cette commande.");
+      }
+    };
+
+    triggerFinalStatusAnimation(order.id, 'annule', performCancel);
+  };
+
+  // Génération du code HTML du ticket thermique
   const generateInvoiceHtml = (order) => {
-    const client = customers.find(c => c.id === order.customer_id) || { prenom: 'Client', nom: 'Inconnu' };
+    const client = customerMap.get(order.customer_id) || { prenom: 'Client', nom: 'Inconnu' };
     const dateStr = order.created_at ? new Date(order.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
     const displayTicketId = getDisplayTicketId(order);
 
@@ -966,23 +551,19 @@ export default function GestionScreen({
       <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px;">
         <div style="flex: 1.8; text-align: left;">
           <div style="font-weight: bold; color: #000;">${art.article}</div>
-          <div style="font-size: 11px; color: #666; text-transform: uppercase;">${art.service.replace(/_/g, ' ')}</div>
+          <div style="font-size: 11px; color: #666; text-transform: uppercase;">${(art.service || '').replace(/_/g, ' ')}</div>
         </div>
         <div style="width: 40px; text-align: center;">x${art.quantite || art.quantity}</div>
-        <div style="width: 100px; text-align: right; font-weight: bold;">${formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</div>
+        <div style="width: 100px; text-align: right; font-weight: bold;">${formatPrice((art.prix || art.price || 0) * (art.quantite || art.quantity || 1))}</div>
       </div>
     `).join('');
 
     const isExpress = order.niveau_urgence === 'Express';
-    const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
+    const expressMarkupItem = (catalog || []).find(c => c.id === 'setting_express_markup');
     const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
 
     const itemsList = order.items || order.articles || [];
     let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
-    if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
-      const catalogItem = db.getCatalog().find(c => c.article === order.type_article && c.service === order.type_service);
-      itemsSum = catalogItem ? catalogItem.prix : 1500;
-    }
 
     const netPrice = Number(order.prix_total !== undefined ? order.prix_total : (order.total || 0));
     const fraisLivraison = Number(order.frais_livraison || order.frais_transport || order.delivery_fee || 0);
@@ -999,50 +580,9 @@ export default function GestionScreen({
     if (!discountAmount && displayBrut > (netPrice - fraisLivraison - fraisRecuperation)) {
       discountAmount = Math.max(0, displayBrut - (netPrice - fraisLivraison - fraisRecuperation));
     }
-    const hasDiscount = discountAmount > 0;
-
-    const rewardDiscount = Number(order.applied_reward_discount || order.reward_discount || 0);
-    const rewardTitle = order.applied_reward_title;
-    const hasReward = rewardDiscount > 0 || !!rewardTitle;
 
     const avance = Number(order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0));
     const reste = Math.max(0, netPrice - avance);
-
-    const expressHtml = isExpress ? `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #d97706;">
-        <div style="font-weight: bold;">MAJORATION EXPRESS (+${expressMarkup}%)</div>
-        <div style="font-weight: bold;">Inclus</div>
-      </div>
-    ` : '';
-
-    const remiseHtml = hasDiscount ? `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #ff3b30;">
-        <div style="font-weight: bold;">REMISE${discountPercent > 0 ? ` (${discountPercent}%)` : ''}</div>
-        <div style="font-weight: bold;">-${formatPrice(discountAmount)}</div>
-      </div>
-    ` : '';
-
-    const rewardHtml = hasReward ? `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #10b981;">
-        <div style="font-weight: bold;">RECOMPENSE (${rewardTitle || 'Fidélité'})</div>
-        <div style="font-weight: bold;">-${formatPrice(rewardDiscount)}</div>
-      </div>
-    ` : '';
-
-    const distanceKmLiv = order.distance_km || null;
-    const livraisonHtml = fraisLivraison > 0 ? `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #3b82f6;">
-        <div style="font-weight: bold;">LIVRAISON${distanceKmLiv ? ` (${distanceKmLiv} km)` : ''}</div>
-        <div style="font-weight: bold;">+${formatPrice(fraisLivraison)}</div>
-      </div>
-    ` : '';
-
-    const recuperationHtml = fraisRecuperation > 0 ? `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; color: #3b82f6;">
-        <div style="font-weight: bold;">RECUPERATION</div>
-        <div style="font-weight: bold;">+${formatPrice(fraisRecuperation)}</div>
-      </div>
-    ` : '';
 
     return `
       <html>
@@ -1050,103 +590,20 @@ export default function GestionScreen({
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
           <style>
             @media print {
-              @page {
-                size: auto;
-                margin: 0mm;
-              }
-              body {
-                padding: 12px !important;
-                margin: 0 !important;
-                background-color: #ffffff !important;
-              }
-              .no-print, button, input, select, textarea, [role="button"],
-              .invoiceDownloadBtn, .invoicePrintBtn, .invoiceCloseBtn {
-                display: none !important;
-                visibility: hidden !important;
-              }
+              body { padding: 12px !important; margin: 0 !important; }
+              .no-print { display: none !important; }
             }
-            body {
-              font-family: 'Courier New', Courier, monospace, sans-serif;
-              color: #000000;
-              margin: 0;
-              padding: 24px;
-              background-color: #ffffff;
-            }
-            .container {
-              max-width: 380px;
-              margin: 0 auto;
-              padding: 10px;
-            }
-            .brand {
-              font-size: 24px;
-              font-weight: 900;
-              text-align: center;
-              margin-bottom: 2px;
-              letter-spacing: 2px;
-            }
-            .brand-sub {
-              font-size: 10px;
-              font-weight: bold;
-              text-align: center;
-              margin-bottom: 8px;
-              color: #333;
-            }
-            .text-muted {
-              font-size: 11px;
-              text-align: center;
-              color: #555;
-              margin: 2px 0;
-            }
-            .divider {
-              border-top: 1px dashed #000;
-              margin: 12px 0;
-            }
-            .meta-row {
-              display: flex;
-              justify-content: space-between;
-              font-size: 13px;
-              margin-bottom: 4px;
-            }
-            .meta-label {
-              font-weight: bold;
-              color: #333;
-            }
-            .meta-value {
-              text-align: right;
-            }
-            .section-title {
-              font-size: 12px;
-              font-weight: bold;
-              margin-bottom: 10px;
-              text-align: center;
-              letter-spacing: 1px;
-            }
-            .total-row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 6px;
-              font-size: 14px;
-            }
-            .total-bold {
-              font-weight: 900;
-              font-size: 15px;
-            }
-            .footer-msg {
-              font-size: 12px;
-              font-weight: bold;
-              text-align: center;
-              margin-top: 20px;
-              margin-bottom: 12px;
-            }
-            .barcode {
-              border: 1px dashed #000;
-              padding: 8px;
-              text-align: center;
-              font-size: 15px;
-              font-weight: bold;
-              margin: 10px 0;
-              letter-spacing: 4px;
-            }
+            body { font-family: 'Courier New', monospace; color: #000; margin: 0; padding: 24px; }
+            .container { max-width: 380px; margin: 0 auto; }
+            .brand { font-size: 24px; font-weight: 900; text-align: center; letter-spacing: 2px; }
+            .brand-sub { font-size: 10px; font-weight: bold; text-align: center; margin-bottom: 8px; }
+            .text-muted { font-size: 11px; text-align: center; color: #555; margin: 2px 0; }
+            .divider { border-top: 1px dashed #000; margin: 12px 0; }
+            .meta-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+            .total-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
+            .total-bold { font-weight: 900; font-size: 15px; }
+            .footer-msg { font-size: 12px; font-weight: bold; text-align: center; margin-top: 20px; }
+            .barcode { border: 1px dashed #000; padding: 8px; text-align: center; font-size: 15px; font-weight: bold; margin: 10px 0; letter-spacing: 4px; }
           </style>
         </head>
         <body>
@@ -1155,82 +612,33 @@ export default function GestionScreen({
             <div class="brand-sub">LAVERIE & PRESSING PREMIUM</div>
             <div class="text-muted">Tél: +229 XX XX XX XX</div>
             <div class="text-muted">Cotonou, Bénin</div>
-            
             <div class="divider"></div>
-            
-            <div class="meta-row">
-              <div class="meta-label">Ticket N° :</div>
-              <div class="meta-value">${displayTicketId}</div>
-            </div>
-            <div class="meta-row">
-              <div class="meta-label">Code :</div>
-              <div class="meta-value">${order.identifiant_unique_marquage || order.id}</div>
-            </div>
-            <div class="meta-row">
-              <div class="meta-label">Date :</div>
-              <div class="meta-value">${dateStr}</div>
-            </div>
-            <div class="meta-row">
-              <div class="meta-label">Client :</div>
-              <div class="meta-value">${client.prenom} ${client.nom}</div>
-            </div>
-            <div class="meta-row">
-              <div class="meta-label">Règlement :</div>
-              <div class="meta-value">${order.mode_reglement || order.mode_paiement || 'Espèces'}</div>
-            </div>
-            ${order.operateur_momo ? `
-            <div class="meta-row">
-              <div class="meta-label">Opérateur MoMo :</div>
-              <div class="meta-value"><strong>${order.operateur_momo}</strong></div>
-            </div>` : ''}
-            ${(order.reference_momo || order.reference_paiement) ? `
-            <div class="meta-row">
-              <div class="meta-label">N° Réf. MoMo :</div>
-              <div class="meta-value"><strong>${order.reference_momo || order.reference_paiement}</strong></div>
-            </div>` : ''}
-            
+            <div class="meta-row"><div>Ticket N° :</div><div>${displayTicketId}</div></div>
+            <div class="meta-row"><div>Code :</div><div>${order.identifiant_unique_marquage || order.id}</div></div>
+            <div class="meta-row"><div>Date :</div><div>${dateStr}</div></div>
+            <div class="meta-row"><div>Client :</div><div>${client.prenom} ${client.nom}</div></div>
+            <div class="meta-row"><div>Règlement :</div><div>${order.mode_reglement || order.mode_paiement || 'Espèces'}</div></div>
             <div class="divider"></div>
-            
-            <div class="section-title">ARTICLES & SERVICES</div>
+            <div style="font-size: 12px; font-weight: bold; text-align: center; margin-bottom: 10px;">ARTICLES & SERVICES</div>
             ${articlesHtml}
-            
             <div class="divider"></div>
-            
-            <div class="total-row">
-              <div>TOTAL BRUT</div>
-              <div>${formatPrice(displayBrut)}</div>
-            </div>
-            ${expressHtml}
-            ${remiseHtml}
-            ${rewardHtml}
-            ${livraisonHtml}
-            ${recuperationHtml}
-            <div class="total-row total-bold">
-              <div>NET A PAYER</div>
-              <div>${formatPrice(netPrice)}</div>
-            </div>
-            <div class="total-row">
-              <div>AVANCE PAYEE</div>
-              <div>${formatPrice(avance)}</div>
-            </div>
-            <div class="total-row total-bold" style="color: ${reste > 0 ? '#ff3b30' : '#34c759'};">
-              <div>RESTE A PAYER</div>
-              <div>${formatPrice(reste)}</div>
-            </div>
-            
+            <div class="total-row"><div>TOTAL BRUT</div><div>${formatPrice(displayBrut)}</div></div>
+            ${discountAmount > 0 ? `<div class="total-row" style="color: #ff3b30;"><div>REMISE</div><div>-${formatPrice(discountAmount)}</div></div>` : ''}
+            ${fraisLivraison > 0 ? `<div class="total-row" style="color: #3b82f6;"><div>LIVRAISON</div><div>+${formatPrice(fraisLivraison)}</div></div>` : ''}
+            ${fraisRecuperation > 0 ? `<div class="total-row" style="color: #3b82f6;"><div>RECUPERATION</div><div>+${formatPrice(fraisRecuperation)}</div></div>` : ''}
+            <div class="total-row total-bold"><div>NET A PAYER</div><div>${formatPrice(netPrice)}</div></div>
+            <div class="total-row"><div>AVANCE PAYEE</div><div>${formatPrice(avance)}</div></div>
+            <div class="total-row total-bold" style="color: ${reste > 0 ? '#ff3b30' : '#34c759'};"><div>RESTE A PAYER</div><div>${formatPrice(reste)}</div></div>
             <div class="divider"></div>
-            
             <div class="footer-msg">MERCI DE VOTRE CONFIANCE !</div>
-            
             <div class="barcode">* ${order.identifiant_unique_marquage || order.id} *</div>
-            
-            <div class="text-muted" style="text-align: center;">Rejoignez Pressing Pro pour un service premium</div>
           </div>
         </body>
       </html>
     `;
   };
 
+  // Impression
   const handlePrintInvoice = async (order) => {
     if (!order) return;
     try {
@@ -1264,6 +672,7 @@ export default function GestionScreen({
     }
   };
 
+  // Téléchargement / Partage PDF
   const handleDownloadInvoice = async (order) => {
     if (!order) return;
     try {
@@ -1295,27 +704,7 @@ export default function GestionScreen({
           }
           return;
         }
-
-        // Fallback web: impression via iframe isolée sans les boutons
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-        const doc = iframe.contentWindow.document;
-        doc.open();
-        doc.write(html);
-        doc.close();
-        setTimeout(() => {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-          }, 1500);
-        }, 250);
+        await handlePrintInvoice(order);
         return;
       }
 
@@ -1331,67 +720,150 @@ export default function GestionScreen({
     }
   };
 
-  const handleSharePdf = handleDownloadInvoice;
+  // Enregistrement client rapide
+  const handleSaveCustomer = async (custData) => {
+    try {
+      let customerId;
+      if (editingCustomer) {
+        await db.updateCustomer(editingCustomer.id, custData);
+        customerId = editingCustomer.id;
+        if (onShowSuccess) onShowSuccess("Client mis à jour avec succès !");
+      } else {
+        const newCust = await db.addCustomer(custData);
+        customerId = newCust ? newCust.id : null;
+        if (onShowSuccess) onShowSuccess("Client créé avec succès !");
+      }
 
-  // Filters
-  const filteredOrders = orders.filter(o => {
-    const client = customers.find(c => c.id === o.customer_id);
-    const clientName = client ? `${client.prenom} ${client.nom}`.toLowerCase() : '';
-    const ticketNo = (o.ticket_numero || '').toLowerCase();
-    const orderId = (o.id || '').toLowerCase();
-    const query = searchQuery.toLowerCase();
-    const matchesQuery = clientName.includes(query) || ticketNo.includes(query) || orderId.includes(query);
-    if (!matchesQuery) return false;
+      if (custData.subscription_plan_id && customerId && typeof db.subscribeCustomer === 'function') {
+        try {
+          await db.subscribeCustomer(customerId, custData.subscription_plan_id);
+        } catch (subErr) {
+          console.warn("Auto-subscription error:", subErr);
+        }
+      }
 
-    // Helper: only active orders belong in the Management screen workflow
-    const isActive = o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule';
+      setShowCustomerModal(false);
+      setEditingCustomer(null);
 
-    // Filter by dashboard selected card (gestionFilter overrides local statusFilter)
-    if (gestionFilter === 'en_cours') {
-      return isActive;
+      if (wasEditingFromFiche) {
+        const origClient = (db.getCustomers ? db.getCustomers() : []).find(c => c.id === wasEditingFromFiche);
+        if (origClient) {
+          setSelectedClient(origClient);
+        }
+        setWasEditingFromFiche(null);
+      }
+    } catch (e) {
+      console.error("Error saving customer:", e);
+      Alert.alert("Erreur", "Impossible d'enregistrer le client.");
     }
-    if (gestionFilter === 'pretes') {
-      return isActive && (o.statut === 'pret' || o.statut === 'a_recuperer' || o.statut === 'a_livrer');
-    }
-    if (gestionFilter === 'retards') {
-      return isActive && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < new Date()));
+  };
+
+  const scrollPaddingBottom = useScrollPaddingBottom();
+
+  // Rendu mémoïsé d'une carte de commande dans FlatList
+  const renderOrderCard = useCallback(({ item }) => {
+    const client = customerMap.get(item.customer_id);
+    const animInfo = animatingOrderIds[item.id];
+
+    return (
+      <OrderCard
+        key={item.id}
+        item={item}
+        client={client}
+        isDarkMode={isDarkMode}
+        currentUser={currentUser}
+        animInfo={animInfo}
+        onSelectOrder={(ord) => {
+          if (setSelectedOrder) setSelectedOrder(ord);
+          setShowOrderDetails(true);
+        }}
+        onSelectClient={(cli) => setSelectedClient(cli)}
+        onShowInvoice={(ord) => {
+          setInvoiceOrder(ord);
+          setShowInvoiceModal(true);
+        }}
+        onCancelOrder={(ord) => {
+          setOrderToCancel(ord);
+          setCancelModalVisible(true);
+        }}
+        onEditOrder={(ord) => setEditingOrder(ord)}
+        onValidateOrder={handleValidateOrder}
+        onAdvanceStatus={(ord, target) => handleNextStatus(ord, target, false)}
+        formatPrice={formatPrice}
+        formatDate={formatDate}
+        getDisplayTicketId={getDisplayTicketId}
+        getItemsSummary={getItemsSummary}
+        getStatusColor={getStatusColor}
+      />
+    );
+  }, [
+    customerMap,
+    animatingOrderIds,
+    isDarkMode,
+    currentUser,
+    setSelectedOrder,
+    formatPrice,
+    formatDate,
+    getDisplayTicketId,
+    getItemsSummary,
+    getStatusColor
+  ]);
+
+  // Composant d'état vide
+  const renderEmptyState = () => {
+    let title = "Aucune commande active";
+    let subtitle = "Toutes les commandes courantes ont été traitées ou livrées.";
+    let icon = <Package size={40} color={isDarkMode ? '#3f3f46' : '#cbd5e1'} />;
+
+    if (searchQuery.trim().length > 0) {
+      title = "Aucun résultat trouvé";
+      subtitle = `Aucune commande ne correspond à « ${searchQuery} ».`;
+      icon = <Search size={40} color={isDarkMode ? '#3f3f46' : '#cbd5e1'} />;
+    } else if (statusFilter === 'urgentes') {
+      title = "Aucune commande urgente";
+      subtitle = "Il n'y a actuellement aucune commande express en attente.";
+      icon = <Sparkles size={40} color={isDarkMode ? '#3f3f46' : '#cbd5e1'} />;
+    } else if (statusFilter === 'retard') {
+      title = "Aucun retard constaté";
+      subtitle = "Toutes les commandes respectent les délais de retrait.";
+      icon = <Clock size={40} color={isDarkMode ? '#3f3f46' : '#cbd5e1'} />;
     }
 
-    // Apply 3-button local status filter
-    if (statusFilter === 'actives') {
-      return isActive;
-    }
-    if (statusFilter === 'urgentes') {
-      return isActive && o.niveau_urgence === 'Express';
-    }
-    if (statusFilter === 'retard') {
-      return isActive && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < new Date()));
-    }
+    const hasFilterActive = searchQuery.trim().length > 0 || statusFilter !== 'actives' || !!gestionFilter;
 
-    return isActive;
-  });
-
-  const filteredClients = customers.filter(c => {
-    const fullname = `${c.prenom} ${c.nom}`.toLowerCase();
-    const phone = (c.telephone || '').toLowerCase();
-    const query = searchQuery.toLowerCase();
-    return fullname.includes(query) || phone.includes(query);
-  });
-
-  const filteredCatalog = catalog.filter(c =>
-    c.categorie !== 'system_setting' && c.service !== 'system' &&
-    (!currentUser?.store_id || currentUser.store_id === 'all' || !c.store_id || c.store_id === 'all' || c.store_id === currentUser.store_id) &&
-    c.article.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    return (
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyIconCircle}>
+          {icon}
+        </View>
+        <Text style={styles.emptyTitle}>{title}</Text>
+        <Text style={styles.emptySubtitle}>{subtitle}</Text>
+        {hasFilterActive && (
+          <TouchableOpacity
+            style={styles.emptyResetBtn}
+            activeOpacity={0.8}
+            onPress={() => {
+              setSearchQuery('');
+              setStatusFilter('actives');
+              if (setGestionFilter) setGestionFilter(null);
+            }}
+          >
+            <RotateCcw size={14} color="#002cf7" style={{ marginRight: 6 }} />
+            <Text style={styles.emptyResetBtnText}>Réinitialiser les filtres</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {/* HEADER sobre et épuré conforme au reste de l'app */}
+      {/* HEADER DE GESTION */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Gestion</Text>
       </View>
 
-      {/* SÉLECTEUR D'ONGLETS (Commandes / Clients) AVEC GLISSEMENT LATÉRAL FLUIDE */}
+      {/* SÉLECTEUR D'ONGLETS (Commandes ⇄ Clients) AVEC GLISSEMENT FLUIDE */}
       <View style={styles.tabSelectorContainer}>
         <View
           style={styles.tabSelector}
@@ -1402,7 +874,6 @@ export default function GestionScreen({
             }
           }}
         >
-          {/* Pilule d'onglet coulissante avec animation spring fluide */}
           {tabBarWidth > 0 && (
             <Animated.View
               pointerEvents="none"
@@ -1451,7 +922,7 @@ export default function GestionScreen({
         </View>
       </View>
 
-      {/* CONTENEUR À GLISSEMENT LATÉRAL SYNCHRONISÉ (COMMANDES ⇄ CLIENTS) */}
+      {/* PAGER HORIZONTAL (VOLET 1 : COMMANDES | VOLET 2 : CLIENTS) */}
       <View
         style={styles.slidingContentOuter}
         onLayout={(e) => {
@@ -1477,555 +948,129 @@ export default function GestionScreen({
             },
           ]}
         >
-          {/* PANE 1: COMMANDES */}
+          {/* VOLET 1 : COMMANDES */}
           <View style={[styles.slidingPane, { width: pagerWidth }]}>
-            {/* BARRE DE RECHERCHE COMMANDES */}
-          <View style={styles.searchSection}>
-            <View style={styles.searchContainer}>
-              <Search size={16} color={isDarkMode ? '#71717a' : '#94a3b8'} style={styles.searchIcon} />
-              <TextInput
-                placeholder="Rechercher un ticket ou un client..."
-                placeholderTextColor={isDarkMode ? '#71717a' : '#a1a1aa'}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                style={styles.searchInput}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7} style={{ padding: 4 }}>
-                  <X size={14} color={isDarkMode ? '#71717a' : '#94a3b8'} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-          {/* FILTRES DE STATUT COMMANDES (puces épurées style HistoryScreen) */}
-          <View style={styles.statusFilterRow}>
-            <TouchableOpacity
-              onPress={() => { setStatusFilter('actives'); if (setGestionFilter) setGestionFilter(null); }}
-              style={[
-                styles.chip,
-                statusFilter === 'actives' && !gestionFilter && styles.chipActive
-              ]}
-              activeOpacity={0.8}
-            >
-              <Text style={[
-                styles.chipText,
-                statusFilter === 'actives' && !gestionFilter && styles.chipTextActive
-              ]}>
-                Actives ({orders.filter(o => o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule').length})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => { setStatusFilter('urgentes'); if (setGestionFilter) setGestionFilter(null); }}
-              style={[
-                styles.chip,
-                statusFilter === 'urgentes' && !gestionFilter && styles.chipActiveUrgent
-              ]}
-              activeOpacity={0.8}
-            >
-              <Text style={[
-                styles.chipText,
-                statusFilter === 'urgentes' && !gestionFilter && styles.chipTextActiveUrgent
-              ]}>
-                Urgentes ({orders.filter(o => o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule' && o.niveau_urgence === 'Express').length})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => { setStatusFilter('retard'); if (setGestionFilter) setGestionFilter(null); }}
-              style={[
-                styles.chip,
-                statusFilter === 'retard' && !gestionFilter && styles.chipActiveLate
-              ]}
-              activeOpacity={0.8}
-            >
-              <Text style={[
-                styles.chipText,
-                statusFilter === 'retard' && !gestionFilter && styles.chipTextActiveLate
-              ]}>
-                En retard ({orders.filter(o => o.statut !== 'livre' && o.statut !== 'restitue' && o.statut !== 'annule' && (o.est_en_retard || o.statut === 'retard' || (o.due_date && new Date(o.due_date) < new Date()))).length})
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* FILTER PILL depuis dashboard */}
-          {gestionFilter && gestionFilter !== 'clients' && (
-            <View style={styles.filterPillSection}>
-              <View style={styles.filterPill}>
-                <Text style={styles.filterPillText}>
-                  Filtre : {
-                    gestionFilter === 'en_cours' ? 'En Cours' :
-                      gestionFilter === 'pretes' ? 'Prêtes' :
-                        gestionFilter === 'retards' ? 'Retards / Urgences' : gestionFilter
-                  }
-                </Text>
-                <TouchableOpacity onPress={() => setGestionFilter(null)} style={styles.clearFilterBtn}>
-                  <Text style={styles.clearFilterText}>✕</Text>
-                </TouchableOpacity>
+            {/* BARRE DE RECHERCHE */}
+            <View style={styles.searchSection}>
+              <View style={styles.searchContainer}>
+                <Search size={16} color={isDarkMode ? '#71717a' : '#94a3b8'} style={styles.searchIcon} />
+                <TextInput
+                  placeholder="Rechercher un ticket ou un client..."
+                  placeholderTextColor={isDarkMode ? '#71717a' : '#a1a1aa'}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  style={styles.searchInput}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7} style={{ padding: 4 }}>
+                    <X size={14} color={isDarkMode ? '#71717a' : '#94a3b8'} />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
-          )}
 
-          {/* CONTENT LIST COMMANDES */}
-          <ScrollView
-            contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={['#002cf7']}
-                tintColor={isDarkMode ? '#ffffff' : '#002cf7'}
-              />
-            }
-          >
+            {/* FILTRES PAR PUCES */}
+            <View style={styles.statusFilterRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  setStatusFilter('actives');
+                  if (setGestionFilter) setGestionFilter(null);
+                }}
+                style={[
+                  styles.chip,
+                  statusFilter === 'actives' && !gestionFilter && styles.chipActive
+                ]}
+                activeOpacity={0.8}
+              >
+                <Text style={[
+                  styles.chipText,
+                  statusFilter === 'actives' && !gestionFilter && styles.chipTextActive
+                ]}>
+                  Actives ({counts.actives})
+                </Text>
+              </TouchableOpacity>
 
-        {/* SUBTAB 1 : ORDERS LIST */}
-        {filteredOrders.length === 0 ? (
-          <Text style={styles.noResultsText}>Aucune commande trouvée</Text>
-        ) : (
-            filteredOrders.map((item) => {
-              const status = getStatusColor(item.statut);
-              const client = customers.find(c => c.id === item.customer_id);
-              const animInfo = animatingOrderIds[item.id];
-              const isFinished = animInfo !== undefined;
-              const finishedStatus = typeof animInfo === 'object' ? animInfo.status : animInfo;
-              const animPhase = typeof animInfo === 'object' ? animInfo.phase : (isFinished ? 'exit' : 'idle');
-              return (
-                <MotiView
-                  key={item.id}
-                  animate={{
-                    opacity: animPhase === 'exit' ? 0 : 1,
-                    scale: animPhase === 'exit' ? 0.85 : 1,
-                    translateY: animPhase === 'exit' ? -12 : 0,
-                  }}
-                  transition={{
-                    type: 'timing',
-                    duration: animPhase === 'exit' ? 250 : 150,
-                  }}
-                  style={{ marginBottom: 14 }}
-                >
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => setSelectedOrder(item)}
-                    style={styles.orderCard}
-                  >
-                    {/* EN-TÊTE DE LA CARTE : CLIENT & STATUT / TICKET & PRIX */}
-                    <View style={styles.cardHeader}>
-                      <View style={styles.cardClientCol}>
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            if (client) setSelectedClient(client);
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.cardClientName} numberOfLines={1}>
-                            {client ? `${client.prenom} ${client.nom}` : 'Client Inconnu'}
-                          </Text>
-                        </TouchableOpacity>
-                        <Text style={styles.cardTicketNo}>
-                          Ticket {getDisplayTicketId(item)}
-                        </Text>
-                      </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setStatusFilter('urgentes');
+                  if (setGestionFilter) setGestionFilter(null);
+                }}
+                style={[
+                  styles.chip,
+                  statusFilter === 'urgentes' && !gestionFilter && styles.chipActiveUrgent
+                ]}
+                activeOpacity={0.8}
+              >
+                <Text style={[
+                  styles.chipText,
+                  statusFilter === 'urgentes' && !gestionFilter && styles.chipTextActiveUrgent
+                ]}>
+                  Urgentes ({counts.urgentes})
+                </Text>
+              </TouchableOpacity>
 
-                      <View style={styles.cardRightCol}>
-                        <AnimatedBadge
-                          status={item.statut}
-                          statusColor={status}
-                          isDarkMode={isDarkMode}
-                          size="sm"
-                        >
-                          {status.label}
-                        </AnimatedBadge>
-                        <Text style={styles.cardPrice}>{formatPrice(item.prix_total || item.total)}</Text>
-                      </View>
-                    </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setStatusFilter('retard');
+                  if (setGestionFilter) setGestionFilter(null);
+                }}
+                style={[
+                  styles.chip,
+                  statusFilter === 'retard' && !gestionFilter && styles.chipActiveLate
+                ]}
+                activeOpacity={0.8}
+              >
+                <Text style={[
+                  styles.chipText,
+                  statusFilter === 'retard' && !gestionFilter && styles.chipTextActiveLate
+                ]}>
+                  En retard ({counts.retards})
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-                      {/* ARTICLES LIST */}
-                      <View style={styles.cardExtraInfoRow}>
-                        <Shirt size={14} color={isDarkMode ? '#52525b' : '#94a3b8'} style={{ marginRight: 6 }} />
-                        <Text style={styles.cardExtraInfoText} numberOfLines={1}>
-                          {getItemsSummary(item.items || item.articles)}
-                        </Text>
-                      </View>
-
-                    {/* ADRESSE DE LIVRAISON CLIENT (ÉTAPE LIVRAISON) */}
-                    {(item.statut === 'pret' || item.statut === 'a_recuperer' || item.statut === 'a_livrer' || item.statut === 'livraison' || item.statut === 'en_cours_de_livraison') && (
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={(e) => {
-                          if (e && e.stopPropagation) e.stopPropagation();
-                          const addr = client?.adresse || item.adresse_livraison || item.adresse || '';
-                          if (!addr || addr.trim() === '') {
-                            Alert.alert('Adresse manquante', 'Aucune adresse de livraison renseignée pour ce client.');
-                            return;
-                          }
-                          const encoded = encodeURIComponent(addr.trim());
-                          Linking.openURL(`https://maps.google.com/?q=${encoded}`);
-                        }}
-                        style={{
-                          backgroundColor: isDarkMode ? 'rgba(3, 105, 161, 0.18)' : '#f0f9ff',
-                          borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#bae6fd',
-                          borderWidth: 1,
-                          borderRadius: 12,
-                          paddingHorizontal: 12,
-                          paddingVertical: 8,
-                          marginVertical: 6,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 8
-                        }}
-                      >
-                        <View style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 8,
-                          backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : '#e0f2fe',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          <MapPin size={15} color={isDarkMode ? '#38bdf8' : '#0284c7'} />
-                        </View>
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: isDarkMode ? '#38bdf8' : '#0284c7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                              📍 Adresse de Livraison (GPS)
-                            </Text>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? '#38bdf8' : '#0284c7' }}>
-                              Ouvrir Carte →
-                            </Text>
-                          </View>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#0f172a', marginTop: 1 }} numberOfLines={2}>
-                            {client?.adresse || item.adresse_livraison || item.adresse || 'Adresse non spécifiée (Appuyer pour carte)'}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    )}
-
-                    {client && client.active_subscription && (
-                      <View style={styles.cardSubscriptionGaugeContainer}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <Text style={styles.cardSubText}>Abonnement : {client.active_subscription.name}</Text>
-                          <Text style={styles.cardSubTextBold}>
-                            {client.active_subscription.remaining_clothes} / {client.active_subscription.total_clothes} vêt.
-                          </Text>
-                        </View>
-                        {(() => {
-                          const remaining = client.active_subscription.remaining_clothes;
-                          const total = client.active_subscription.total_clothes;
-                          const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                          return (
-                            <View style={styles.cardProgressBarBg}>
-                              <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
-                            </View>
-                          );
-                        })()}
-                      </View>
-                    )}
-
-                    {/* META ROW : date + paiement */}
-                    <View style={styles.cardMetaRow}>
-                      <View style={styles.metaBadge}>
-                        <Calendar size={10} color={isDarkMode ? '#52525b' : '#94a3b8'} style={{ marginRight: 4 }} />
-                        <Text style={styles.metaBadgeText}>Retrait : {formatDate(item.due_date || item.date_retrait_prevue)}</Text>
-                      </View>
-                      <View style={styles.metaBadge}>
-                        <CreditCard size={10} color={isDarkMode ? '#52525b' : '#94a3b8'} style={{ marginRight: 4 }} />
-                        <Text style={styles.metaBadgeText}>{item.mode_reglement || item.mode_paiement || 'Espèces'}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.cardDivider} />
-                    <View style={styles.cardFooterArea}>
-                      <View style={styles.cardFooterRow}>
-                        <TouchableOpacity
-                          onPress={(e) => handleShowInvoice(item, e)}
-                          style={styles.factureBtn}
-                          activeOpacity={0.7}
-                        >
-                          <Receipt size={13} color="#002cf7" style={{ marginRight: 4 }} />
-                          <Text style={styles.factureBtnText}>Facture</Text>
-                        </TouchableOpacity>
-                        {item.statut !== 'annule' && item.statut !== 'livre' && item.statut !== 'restitue' &&
-                          currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage' && (
-                            <TouchableOpacity
-                              onPress={(e) => { e.stopPropagation(); handleCancelOrder(item); }}
-                              style={[
-                                styles.factureBtn,
-                                {
-                                  marginLeft: 8,
-                                  backgroundColor: cancelBtnStyle.backgroundColor,
-                                  borderColor: cancelBtnStyle.borderColor
-                                }
-                              ]}
-                              activeOpacity={0.7}
-                            >
-                              <Ban size={13} color="#ef4444" style={{ marginRight: 4 }} />
-                              <Text style={[styles.factureBtnText, { color: '#ef4444' }]}>Annuler</Text>
-                            </TouchableOpacity>
-                          )}
-                      </View>
-
-                      {/* Next Status / Validation Button */}
-                      {(() => {
-                        const status = String(item.statut || '').trim().toLowerCase();
-
-                        if (status === 'en_attente_validation' || status === 'attente_validation' || (item.cree_par_livreur && !item.validee_par_caisse)) {
-                          const canValidate = currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage';
-                          return (
-                            <View style={{ gap: 8, marginTop: 6, marginHorizontal: 2 }}>
-                              {canValidate ? (
-                                <>
-                                  <TouchableOpacity
-                                    onPress={(e) => {
-                                      e.stopPropagation();
-                                      setEditingOrder(item);
-                                    }}
-                                    style={{
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.12)' : '#eff6ff',
-                                      borderColor: isDarkMode ? 'rgba(0, 44, 247, 0.35)' : '#bfdbfe',
-                                      borderWidth: 1.5,
-                                      borderRadius: 14,
-                                      paddingVertical: 10,
-                                      paddingHorizontal: 16,
-                                      gap: 8,
-                                    }}
-                                    activeOpacity={0.8}
-                                  >
-                                    <Edit3 size={15} color="#002cf7" strokeWidth={2.2} />
-                                    <Text style={{ color: '#002cf7', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>
-                                      MODIFIER LA COMMANDE
-                                    </Text>
-                                  </TouchableOpacity>
-
-                                  <TouchableOpacity
-                                    onPress={(e) => {
-                                      e.stopPropagation();
-                                      handleValidateOrder(item);
-                                    }}
-                                    style={{
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      backgroundColor: '#059669',
-                                      borderRadius: 14,
-                                      paddingVertical: 11,
-                                      paddingHorizontal: 16,
-                                      gap: 8,
-                                      shadowColor: '#059669',
-                                      shadowOffset: { width: 0, height: 3 },
-                                      shadowOpacity: 0.25,
-                                      shadowRadius: 8,
-                                      elevation: 4,
-                                    }}
-                                    activeOpacity={0.85}
-                                  >
-                                    <CheckCircle size={16} color="#ffffff" strokeWidth={2.5} />
-                                    <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.4 }}>
-                                      VALIDER LA COMMANDE
-                                    </Text>
-                                  </TouchableOpacity>
-                                </>
-                              ) : (
-                                <View style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  backgroundColor: isDarkMode ? 'rgba(139, 92, 246, 0.15)' : '#f5f3ff',
-                                  borderColor: isDarkMode ? 'rgba(139, 92, 246, 0.35)' : '#ddd6fe',
-                                  borderWidth: 1,
-                                  borderRadius: 12,
-                                  paddingVertical: 8,
-                                  paddingHorizontal: 12,
-                                  gap: 6,
-                                }}>
-                                  <Clock size={13} color="#7c3aed" />
-                                  <Text style={{ color: isDarkMode ? '#c4b5fd' : '#6d28d9', fontSize: 12, fontWeight: '700' }}>
-                                    En attente de validation par la caisse
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                          );
-                        }
-
-                        if (status === 'pret' || status === 'pret_a_livrer' || status === 'ready' || status === 'prêt') {
-                          const canLivrer = isTransitionAllowed('pret', 'a_livrer');
-                          const canRecuperer = isTransitionAllowed('pret', 'restitue') || isTransitionAllowed('pret', 'a_recuperer');
-
-                          return (
-                            <View style={{ gap: 8, marginTop: 6, marginHorizontal: 2 }}>
-                              {canLivrer && (
-                                <SlideActionButton
-                                  color="#4f46e5"
-                                  isDarkMode={isDarkMode}
-                                  disabled={!canLivrer}
-                                  height={42}
-                                  minLoadingDuration={250}
-                                  icon={<Truck size={16} color="#ffffff" />}
-                                  loadingText="Préparation livraison..."
-                                  completeLabel="Prêt pour livraison"
-                                  onComplete={() => handleNextStatus(item, false, 'a_livrer')}
-                                >
-                                  Lancer la livraison
-                                </SlideActionButton>
-                              )}
-                              {canRecuperer && (
-                                <SlideActionButton
-                                  color="#d97706"
-                                  isDarkMode={isDarkMode}
-                                  disabled={!canRecuperer}
-                                  height={42}
-                                  minLoadingDuration={250}
-                                  icon={<UserCheck size={16} color="#ffffff" />}
-                                  loadingText="Validation retrait..."
-                                  completeLabel="Remis au client"
-                                  onComplete={() => handleNextStatus(item, false, 'restitue')}
-                                >
-                                  Remettre au client
-                                </SlideActionButton>
-                              )}
-                            </View>
-                          );
-                        }
-
-                        let targetStatus = null;
-                        if (status === 'en_attente_validation' || status === 'attente_validation') targetStatus = 'en_attente';
-                        else if (status === 'attente' || status === 'en_attente' || status === 'pending') targetStatus = 'traitement';
-                        else if (status === 'traitement' || status === 'en_traitement' || status === 'processing' || status === 'in_treatment') targetStatus = 'en_cours_lavage';
-                        else if (status === 'lavage_cours' || status === 'en_cours_lavage' || status === 'washing' || status === 'lave' || status === 'lavé') targetStatus = 'en_cours_repassage';
-                        else if (status === 'repassage_cours' || status === 'en_cours_repassage' || status === 'ironing') targetStatus = 'pret';
-                        else if (status === 'pret' || status === 'prêt' || status === 'ready' || status === 'pret_a_livrer') targetStatus = 'a_livrer';
-                        else if (status === 'a_livrer') targetStatus = 'en_cours_livraison';
-                        else if (status === 'en_cours_livraison' || status === 'en_cours_de_livraison' || status === 'in_delivery' || status === 'delivering' || status === 'livraison') targetStatus = 'restitue';
-                        else if (status === 'a_recuperer') targetStatus = 'restitue';
-                        else if (status === 'retard' || status === 'en_retard' || status === 'late') targetStatus = 'traitement';
-                        else targetStatus = 'traitement';
-
-                        if (!targetStatus) return null;
-
-                        const canTransition = isTransitionAllowed(status, targetStatus);
-                        const nextStyle = getNextStatusStyle(item.statut);
-                        if (!nextStyle) return null;
-
-                        const isIntermediate = [
-                          'en_cours_lavage',
-                          'lavage_cours',
-                          'washing',
-                          'en_cours_repassage',
-                          'repassage_cours',
-                          'ironing',
-                          'en_cours_livraison',
-                          'en_cours_de_livraison',
-                          'in_delivery',
-                          'delivering',
-                          'livraison',
-                        ].includes(status);
-
-                        return (
-                          <View style={{ marginHorizontal: 2, marginTop: 6 }}>
-                            <SlideActionButton
-                              key={`btn-${item.id}`}
-                              state={isIntermediate ? 'indeterminate' : undefined}
-                              transitionsToIndeterminate={nextStyle.transitionsToIndeterminate}
-                              persistIntermediate={nextStyle.persistIntermediate}
-                              indeterminateText={nextStyle.indeterminateText}
-                              completionLabel={nextStyle.completionLabel}
-                              color={canTransition ? nextStyle.bg : '#94a3b8'}
-                              isDarkMode={isDarkMode}
-                              disabled={!canTransition}
-                              height={42}
-                              minLoadingDuration={250}
-                              icon={getNextStatusIcon(item.statut)}
-                              loadingText={nextStyle.loadingText}
-                              completeLabel={nextStyle.completeLabel}
-                              onComplete={() => handleNextStatus(item, false, targetStatus)}
-                              onHumanComplete={() => handleNextStatus(item, false, targetStatus)}
-                            >
-                              {nextStyle.label}
-                            </SlideActionButton>
-                          </View>
-                        );
-                      })()}
-
-                    </View>
-
-                    {/* OVERLAY FINISHED ANIMATION */}
-                    {isFinished && (
-                      <MotiView
-                        from={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ type: 'spring', damping: 12 }}
-                        style={[
-                          StyleSheet.absoluteFill,
-                          {
-                            backgroundColor: finishedStatus === 'annule' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(34, 197, 94, 0.95)',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            zIndex: 100,
-                            borderRadius: 24,
-                          }
-                        ]}
-                      >
-                        <MotiView
-                          from={{ scale: 0.5, rotate: '-45deg' }}
-                          animate={{ scale: 1, rotate: '0deg' }}
-                          transition={{ type: 'spring', damping: 10, delay: 100 }}
-                          style={{
-                            width: 56,
-                            height: 56,
-                            borderRadius: 28,
-                            backgroundColor: '#ffffff',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            shadowColor: 'transparent',
-                            shadowOffset: { width: 0, height: 0 },
-                            shadowOpacity: 0,
-                            shadowRadius: 0,
-                            elevation: 0,
-                          }}
-                        >
-                          <Check
-                            size={28}
-                            color={finishedStatus === 'annule' ? '#ef4444' : '#22c55e'}
-                            strokeWidth={3}
-                          />
-                        </MotiView>
-                        <MotiView
-                          from={{ opacity: 0, translateY: 10 }}
-                          animate={{ opacity: 1, translateY: 0 }}
-                          transition={{ type: 'timing', duration: 120, delay: 50 }}
-                        >
-                          <Text style={{
-                            color: '#ffffff',
-                            fontSize: 14,
-                            fontWeight: '800',
-                            marginTop: 10,
-                            letterSpacing: 0.5,
-                            textAlign: 'center',
-                          }}>
-                            {finishedStatus === 'annule' ? 'COMMANDE ANNULÉE' : 'COMMANDE TRAITÉE'}
-                          </Text>
-                        </MotiView>
-                      </MotiView>
-                    )}
+            {/* BADGE DE FILTRE CONTEXTUEL DU DASHBOARD */}
+            {gestionFilter && gestionFilter !== 'clients' && (
+              <View style={styles.filterPillSection}>
+                <View style={styles.filterPill}>
+                  <Text style={styles.filterPillText}>
+                    Filtre : {
+                      gestionFilter === 'en_cours' ? 'En Cours' :
+                        gestionFilter === 'pretes' ? 'Prêtes' :
+                          gestionFilter === 'retards' ? 'Retards / Urgences' : gestionFilter
+                    }
+                  </Text>
+                  <TouchableOpacity onPress={() => setGestionFilter(null)} style={styles.clearFilterBtn}>
+                    <Text style={styles.clearFilterText}>✕</Text>
                   </TouchableOpacity>
-                </MotiView>
-              );
-            })
-          )
-        }
+                </View>
+              </View>
+            )}
 
-      </ScrollView>
+            {/* LISTE VIRTUALISÉE DES COMMANDES */}
+            <FlatList
+              data={filteredOrders}
+              keyExtractor={(item) => String(item.id)}
+              renderItem={renderOrderCard}
+              contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPaddingBottom }]}
+              showsVerticalScrollIndicator={false}
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              removeClippedSubviews={Platform.OS !== 'web'}
+              ListEmptyComponent={renderEmptyState}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={['#002cf7']}
+                  tintColor={isDarkMode ? '#ffffff' : '#002cf7'}
+                />
+              }
+            />
           </View>
 
-          {/* PANE 2: CLIENTS */}
+          {/* VOLET 2 : CLIENTS */}
           <View style={[styles.slidingPane, { width: pagerWidth }]}>
             {hasMountedClients && (
               <ClientsScreen
@@ -2038,1152 +1083,96 @@ export default function GestionScreen({
         </Animated.View>
       </View>
 
-
-
-
-
-      {/* MODAL 1 : DETAIL COMMANDE (FULL SCREEN PAGE) */}
-      <MotiView
-        pointerEvents={showOrderDetails && selectedOrder !== null ? 'auto' : 'none'}
-        animate={{
-          opacity: showOrderDetails && selectedOrder !== null ? 1 : 0,
-          scale: showOrderDetails && selectedOrder !== null ? 1 : 0.96,
-          translateY: showOrderDetails && selectedOrder !== null ? 0 : 30,
+      {/* MODALE DE DÉTAIL COMMANDE PLEIN ÉCRAN */}
+      <OrderDetailModal
+        visible={showOrderDetails && selectedOrder !== null}
+        order={selectedOrder}
+        client={selectedOrder ? customerMap.get(selectedOrder.customer_id) : null}
+        isDarkMode={isDarkMode}
+        currentUser={currentUser}
+        catalog={catalog}
+        onClose={() => {
+          setShowOrderDetails(false);
+          if (setSelectedOrder) setSelectedOrder(null);
         }}
-        transition={{ type: 'spring', damping: 22, stiffness: 180, mass: 0.8 }}
-        style={[
-          StyleSheet.absoluteFill,
-          { zIndex: 9000, backgroundColor: isDarkMode ? '#000000' : '#ffffff' }
-        ]}
-      >
-        <View style={styles.fullPageContainer}>
-          <View style={styles.fullPageInnerWrapper}>
-            {/* HEADER BACK BUTTON */}
-            <View style={styles.fullPageHeader}>
-              <TouchableOpacity onPress={handleCloseOrderDetails} style={styles.backBtn} activeOpacity={0.7}>
-                <ArrowLeft size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-              </TouchableOpacity>
+        onSelectClient={(client) => setSelectedClient(client)}
+        onCancelOrder={(ord) => {
+          setOrderToCancel(ord);
+          setCancelModalVisible(true);
+        }}
+        onEditOrder={(ord) => setEditingOrder(ord)}
+        onValidateOrder={handleValidateOrder}
+        onAdvanceStatus={(ord, target) => handleNextStatus(ord, target, true)}
+        formatPrice={formatPrice}
+        formatDate={formatDate}
+        getDisplayTicketId={getDisplayTicketId}
+        getStatusColor={getStatusColor}
+      />
 
-              <Text style={styles.fullPageTitle} numberOfLines={1}>
-                {selectedOrder ? `Commande ${getDisplayTicketId(selectedOrder)}` : ''}
-              </Text>
-              <View style={{ width: 40 }} />
-            </View>
+      {/* MODALE D'ANNULATION */}
+      <CancelModal
+        isOpen={cancelModalVisible}
+        onClose={() => setCancelModalVisible(false)}
+        order={orderToCancel}
+        client={orderToCancel ? customerMap.get(orderToCancel.customer_id) : null}
+        isDarkMode={isDarkMode}
+        formatPrice={formatPrice}
+        getDisplayTicketId={getDisplayTicketId}
+        onConfirmCancel={handleConfirmCancelOrder}
+      />
 
-            {selectedOrder && (
-              <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={styles.fullPageScroll}
-                showsVerticalScrollIndicator={false}
-              >
-              {/* Infos Client */}
-              <View style={styles.detailSection}>
-                <Text style={styles.detailSectionTitle}>Client & Statut</Text>
-                <View style={styles.detailCard}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      const client = customers.find(c => c.id === selectedOrder.customer_id);
-                      if (client) {
-                        handleCloseOrderDetails();
-                        setSelectedClient(client);
-                      }
-                    }}
-                    activeOpacity={0.8}
-                    style={[styles.clientPillBtn, { marginBottom: 8 }]}
-                  >
-                    <User size={13} color="#002cf7" style={{ marginRight: 4 }} />
-                    <Text style={styles.clientPillBtnText}>
-                      {customers.find(c => c.id === selectedOrder.customer_id) ?
-                        `${customers.find(c => c.id === selectedOrder.customer_id).prenom} ${customers.find(c => c.id === selectedOrder.customer_id).nom}` :
-                        'Client inconnu'}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.detailTextMuted}>Téléphone : {customers.find(c => c.id === selectedOrder.customer_id)?.telephone || 'N/A'}</Text>
+      {/* MODALE DE PAIEMENT / RÈGLEMENT DU SOLDE */}
+      <PaymentModal
+        isOpen={paymentModalVisible}
+        onClose={() => setPaymentModalVisible(false)}
+        order={paymentOrder}
+        isDarkMode={isDarkMode}
+        formatPrice={formatPrice}
+        onConfirmPayment={handleConfirmPayment}
+      />
 
-                  <AnimatedBadge
-                    status={selectedOrder.statut}
-                    statusColor={getStatusColor(selectedOrder.statut)}
-                    isDarkMode={isDarkMode}
-                    size="md"
-                    style={{ alignSelf: 'flex-start', marginTop: 8 }}
-                  >
-                    {getStatusColor(selectedOrder.statut).label}
-                  </AnimatedBadge>
+      {/* MODALE DE FACTURE / REÇU THERMIQUE */}
+      <InvoiceModal
+        visible={showInvoiceModal && !!invoiceOrder}
+        onClose={() => {
+          setShowInvoiceModal(false);
+          setInvoiceOrder(null);
+        }}
+        order={invoiceOrder}
+        isDarkMode={isDarkMode}
+        customers={customers}
+        catalog={catalog}
+        formatPrice={formatPrice}
+        getDisplayTicketId={getDisplayTicketId}
+        onDownload={handleDownloadInvoice}
+        onPrint={handlePrintInvoice}
+      />
 
-                  {(() => {
-                    const client = customers.find(c => c.id === selectedOrder.customer_id);
-                    if (client && client.active_subscription) {
-                      const remaining = client.active_subscription.remaining_clothes;
-                      const total = client.active_subscription.total_clothes;
-                      const percentUsed = Math.max(0, Math.min(100, Math.round(((total - remaining) / total) * 100)));
-                      return (
-                        <View style={[styles.cardSubscriptionGaugeContainer, { marginTop: 12 }]}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <Text style={styles.cardSubText}>Abonnement : {client.active_subscription.name}</Text>
-                            <Text style={styles.cardSubTextBold}>{remaining} / {total} vêt.</Text>
-                          </View>
-                          <View style={styles.cardProgressBarBg}>
-                            <View style={[styles.cardProgressBarFill, { width: `${percentUsed}%` }]} />
-                          </View>
-                        </View>
-                      );
-                    }
-                    return null;
-                  })()}
-                </View>
-              </View>
-              {/* Articles */}
-              <View style={styles.detailSection}>
-                <Text style={styles.detailSectionTitle}>Détail des Articles</Text>
-                <View style={styles.detailCard}>
-                  {(selectedOrder.items || selectedOrder.articles || []).map((art, idx) => {
-                    const q = Number(art.quantite || art.quantity || art.qty || 1);
-                    let p = Number(art.prix || art.price || 0);
-                    if (p === 0 && db.getCatalog) {
-                      const cat = db.getCatalog().find(c => c.article === art.article && (c.service === art.service || c.service === 'lavage_simple'));
-                      if (cat) p = Number(cat.prix || 0);
-                    }
-                    const totalArtPrice = p * q;
-                    return (
-                      <View key={idx} style={styles.detailArticleRow}>
-                        <Text style={styles.detailArticleText}>
-                          {art.article} ({(art.service || '').replace(/_/g, ' ')}) x{q}
-                        </Text>
-                        <Text style={styles.detailArticlePrice}>
-                          {formatPrice(totalArtPrice)}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                  <View style={styles.detailDivider} />
-                  {(() => {
-                    const itemsList = selectedOrder.items || selectedOrder.articles || [];
-                    let itemsSum = itemsList.reduce((sum, art) => {
-                      const q = Number(art.quantite || art.quantity || art.qty || 1);
-                      let p = Number(art.prix || art.price || 0);
-                      if (p === 0 && db.getCatalog) {
-                        const cat = db.getCatalog().find(c => c.article === art.article && (c.service === art.service || c.service === 'lavage_simple'));
-                        if (cat) p = Number(cat.prix || 0);
-                      }
-                      return sum + (p * q);
-                    }, 0);
-
-                    if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
-                      const catalogItem = db.getCatalog().find(c => c.article === selectedOrder.type_article && c.service === selectedOrder.type_service);
-                      itemsSum = catalogItem ? Number(catalogItem.prix || 0) : 0;
-                    }
-
-                    const netPrice = Number(selectedOrder.prix_total !== undefined ? selectedOrder.prix_total : (selectedOrder.total || 0));
-                    const fraisLivraison = Number(selectedOrder.frais_livraison || selectedOrder.frais_transport || selectedOrder.delivery_fee || 0);
-                    const fraisRecuperation = Number(selectedOrder.frais_recuperation || selectedOrder.pickup_fee || 0);
-
-                    const isExpress = selectedOrder.niveau_urgence === 'Express';
-                    const displayBrut = Number(selectedOrder.prix_base_avant_remise) || (itemsSum > 0 ? itemsSum : Math.max(0, netPrice - fraisLivraison - fraisRecuperation));
-
-                    const discountPercent = Number(selectedOrder.remise_pourcentage || selectedOrder.remise || selectedOrder.discount || 0);
-                    let discountAmount = Number(selectedOrder.remise_montant || 0);
-                    if (!discountAmount && discountPercent > 0) {
-                      discountAmount = Math.round(displayBrut * (discountPercent / 100));
-                    }
-                    if (!discountAmount && displayBrut > (netPrice - fraisLivraison - fraisRecuperation)) {
-                      discountAmount = Math.max(0, displayBrut - (netPrice - fraisLivraison - fraisRecuperation));
-                    }
-                    const displayRemisePourcent = discountPercent || (displayBrut > 0 && discountAmount > 0 ? Math.round((discountAmount / displayBrut) * 100) : 0);
-                    const hasDiscount = discountAmount > 0;
-
-                    const rewardTitle = selectedOrder.applied_reward_title;
-                    const rewardDiscount = Number(selectedOrder.applied_reward_discount || selectedOrder.reward_discount || 0);
-
-                    const avance = Number(selectedOrder.avance_payee !== undefined ? selectedOrder.avance_payee : (selectedOrder.avance !== undefined ? selectedOrder.avance : 0));
-                    const reste = Math.max(0, netPrice - avance);
-
-                    const hasSubtotalDetails = hasDiscount || fraisLivraison > 0 || fraisRecuperation > 0 || rewardDiscount > 0 || isExpress;
-
-                    return (
-                      <>
-                        {hasSubtotalDetails && (
-                          <View style={styles.detailArticleRow}>
-                            <Text style={styles.detailLabelMuted}>Sous-total articles</Text>
-                            <Text style={styles.detailTextMuted}>{formatPrice(displayBrut)}</Text>
-                          </View>
-                        )}
-
-                        {hasDiscount && (
-                          <View style={styles.detailArticleRow}>
-                            <Text style={[styles.detailLabelMuted, { color: '#ef4444' }]}>
-                              Réduction en FCFA
-                            </Text>
-                            <Text style={[styles.detailTextMuted, { color: '#ef4444', fontWeight: '600' }]}>
-                              -{formatPrice(discountAmount)}
-                            </Text>
-                          </View>
-                        )}
-
-                        {(rewardDiscount > 0 || rewardTitle) && (
-                          <View style={styles.detailArticleRow}>
-                            <Text style={[styles.detailLabelMuted, { color: '#10b981', fontWeight: '600' }]}>
-                              Récompense ({rewardTitle || 'Fidélité'})
-                            </Text>
-                            <Text style={[styles.detailTextMuted, { color: '#10b981', fontWeight: '600' }]}>
-                              -{formatPrice(rewardDiscount)}
-                            </Text>
-                          </View>
-                        )}
-
-                        {fraisLivraison > 0 && (
-                          <View style={styles.detailArticleRow}>
-                            <Text style={[styles.detailLabelMuted, { color: '#3b82f6', fontWeight: '600' }]}>
-                              Frais de livraison
-                            </Text>
-                            <Text style={[styles.detailTextMuted, { color: '#3b82f6', fontWeight: '600' }]}>
-                              +{formatPrice(fraisLivraison)}
-                            </Text>
-                          </View>
-                        )}
-
-                        {fraisRecuperation > 0 && (
-                          <View style={styles.detailArticleRow}>
-                            <Text style={[styles.detailLabelMuted, { color: '#3b82f6', fontWeight: '600' }]}>
-                              Frais de récupération
-                            </Text>
-                            <Text style={[styles.detailTextMuted, { color: '#3b82f6', fontWeight: '600' }]}>
-                              +{formatPrice(fraisRecuperation)}
-                            </Text>
-                          </View>
-                        )}
-
-                        <View style={styles.detailArticleRow}>
-                          <Text style={styles.detailLabelBold}>Total</Text>
-                          <Text style={styles.detailPriceBold}>{formatPrice(netPrice)}</Text>
-                        </View>
-
-                        <View style={styles.detailArticleRow}>
-                          <Text style={styles.detailLabelMuted}>Payé (Avance)</Text>
-                          <Text style={[styles.detailTextMuted, { color: '#002cf7', fontWeight: '600' }]}>
-                            {formatPrice(avance)}
-                          </Text>
-                        </View>
-
-                        <View style={styles.detailArticleRow}>
-                          <Text style={[styles.detailLabelMuted, { fontWeight: '700', color: reste > 0 ? '#ef4444' : '#10b981' }]}>
-                            Reste à payer
-                          </Text>
-                          <Text style={[styles.detailTextMuted, { fontWeight: '700', color: reste > 0 ? '#ef4444' : '#10b981' }]}>
-                            {formatPrice(reste)}
-                          </Text>
-                        </View>
-                      </>
-                    );
-                  })()}
-                </View>
-              </View>
-
-              {/* Dates & Paiement */}
-              <View style={styles.detailSection}>
-                <Text style={styles.detailSectionTitle}>Détails Logistiques</Text>
-                <View style={styles.detailCard}>
-                  <Text style={styles.logisticsText}>
-                    Date retrait prévue : {selectedOrder.due_date ? new Date(selectedOrder.due_date).toLocaleDateString('fr-FR') : selectedOrder.date_retrait_prevue}
-                  </Text>
-                  <Text style={styles.logisticsText}>Mode de paiement : {selectedOrder.mode_reglement || selectedOrder.mode_paiement}</Text>
-                  {selectedOrder.operateur_momo ? (
-                    <Text style={[styles.logisticsText, { color: isDarkMode ? '#38bdf8' : '#002cf7', fontWeight: '600' }]}>
-                      Opérateur Mobile Money : {selectedOrder.operateur_momo}
-                    </Text>
-                  ) : null}
-                  {(selectedOrder.reference_momo || selectedOrder.reference_paiement) ? (
-                    <Text style={[styles.logisticsText, { color: isDarkMode ? '#38bdf8' : '#002cf7', fontWeight: '600' }]}>
-                      N° Référence MoMo : {selectedOrder.reference_momo || selectedOrder.reference_paiement}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-
-              {/* Cancel & Delete Buttons */}
-              {selectedOrder.statut !== 'annule' && selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' &&
-                currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage' && (
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 4, paddingHorizontal: 2 }}>
-                    <TouchableOpacity
-                      onPress={() => handleCancelOrder(selectedOrder)}
-                      activeOpacity={0.8}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 9999, paddingVertical: 10 }}
-                    >
-                      <Ban size={14} color="#f59e0b" style={{ marginRight: 6 }} />
-                      <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Annuler la commande</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-              {/* Action Button for changing status */}
-              <View style={{ paddingHorizontal: 2 }}>
-                {selectedOrder.statut !== 'livre' && selectedOrder.statut !== 'restitue' && selectedOrder.statut !== 'annule' && (() => {
-                  const status = String(selectedOrder.statut || '').trim().toLowerCase();
-
-                  if (status === 'en_attente_validation' || status === 'attente_validation' || (selectedOrder.cree_par_livreur && !selectedOrder.validee_par_caisse)) {
-                    const canValidate = currentUser && currentUser.role !== 'livreur' && currentUser.role !== 'agent_lavage_repassage';
-                    return (
-                      <View style={{ gap: 10, marginTop: 20, marginBottom: 20 }}>
-                        {canValidate ? (
-                          <>
-                            <TouchableOpacity
-                              onPress={() => setEditingOrder(selectedOrder)}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.12)' : '#eff6ff',
-                                borderColor: isDarkMode ? 'rgba(0, 44, 247, 0.35)' : '#bfdbfe',
-                                borderWidth: 1.5,
-                                borderRadius: 14,
-                                paddingVertical: 13,
-                                paddingHorizontal: 20,
-                                gap: 8,
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Edit3 size={17} color="#002cf7" strokeWidth={2.2} />
-                              <Text style={{ color: '#002cf7', fontSize: 14, fontWeight: '700', letterSpacing: 0.4 }}>
-                                MODIFIER LA COMMANDE
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              onPress={() => handleValidateOrder(selectedOrder)}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: '#059669',
-                                borderRadius: 14,
-                                paddingVertical: 14,
-                                paddingHorizontal: 20,
-                                gap: 8,
-                                shadowColor: '#059669',
-                                shadowOffset: { width: 0, height: 4 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 10,
-                                elevation: 5,
-                              }}
-                              activeOpacity={0.85}
-                            >
-                              <CheckCircle size={18} color="#ffffff" strokeWidth={2.5} />
-                              <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 }}>
-                                VALIDER LA COMMANDE
-                              </Text>
-                            </TouchableOpacity>
-                          </>
-                        ) : (
-                          <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: isDarkMode ? 'rgba(139, 92, 246, 0.15)' : '#f5f3ff',
-                            borderColor: isDarkMode ? 'rgba(139, 92, 246, 0.35)' : '#ddd6fe',
-                            borderWidth: 1,
-                            borderRadius: 14,
-                            paddingVertical: 12,
-                            paddingHorizontal: 16,
-                            gap: 8,
-                          }}>
-                            <Clock size={16} color="#7c3aed" />
-                            <Text style={{ color: isDarkMode ? '#c4b5fd' : '#6d28d9', fontSize: 13, fontWeight: '700', textAlign: 'center' }}>
-                              Cette commande créée par livreur doit être validée par la caisse.
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    );
-                  }
-
-                  // If status is 'pret', render two options (delivery / counter pickup)
-                  if (status === 'pret' || status === 'pret_a_livrer' || status === 'ready' || status === 'prêt') {
-                    const canLivrer = isTransitionAllowed('pret', 'a_livrer');
-                    const canRecuperer = isTransitionAllowed('pret', 'restitue') || isTransitionAllowed('pret', 'a_recuperer');
-
-                    return (
-                      <View style={{ gap: 10, marginTop: 20, marginBottom: 20 }}>
-                        {canLivrer && (
-                          <SlideActionButton
-                            color="#4f46e5"
-                            isDarkMode={isDarkMode}
-                            disabled={!canLivrer}
-                            height={46}
-                            minLoadingDuration={250}
-                            icon={<Truck size={17} color="#ffffff" />}
-                            loadingText="Préparation livraison..."
-                            completeLabel="Prêt pour livraison"
-                            onComplete={() => handleNextStatus(selectedOrder, true, 'a_livrer')}
-                          >
-                            Lancer la livraison
-                          </SlideActionButton>
-                        )}
-                        {canRecuperer && (
-                          <SlideActionButton
-                            color="#d97706"
-                            isDarkMode={isDarkMode}
-                            disabled={!canRecuperer}
-                            height={46}
-                            minLoadingDuration={250}
-                            icon={<UserCheck size={17} color="#ffffff" />}
-                            loadingText="Validation retrait..."
-                            completeLabel="Remis au client"
-                            onComplete={() => handleNextStatus(selectedOrder, true, 'restitue')}
-                          >
-                            Remettre au client
-                          </SlideActionButton>
-                        )}
-                      </View>
-                    );
-                  }
-
-                  let targetStatus = null;
-                  if (status === 'en_attente_validation' || status === 'attente_validation') targetStatus = 'en_attente';
-                  else if (status === 'attente' || status === 'en_attente' || status === 'pending') targetStatus = 'traitement';
-                  else if (status === 'traitement' || status === 'en_traitement' || status === 'processing' || status === 'in_treatment') targetStatus = 'en_cours_lavage';
-                  else if (status === 'lavage_cours' || status === 'en_cours_lavage' || status === 'washing' || status === 'lave' || status === 'lavé') targetStatus = 'en_cours_repassage';
-                  else if (status === 'repassage_cours' || status === 'en_cours_repassage' || status === 'ironing') targetStatus = 'pret';
-                  else if (status === 'pret' || status === 'prêt' || status === 'ready' || status === 'pret_a_livrer') targetStatus = 'a_livrer';
-                  else if (status === 'a_livrer') targetStatus = 'en_cours_livraison';
-                  else if (status === 'en_cours_livraison' || status === 'en_cours_de_livraison' || status === 'in_delivery' || status === 'delivering' || status === 'livraison') targetStatus = 'restitue';
-                  else if (status === 'a_recuperer') targetStatus = 'restitue';
-                  else if (status === 'retard' || status === 'en_retard' || status === 'late') targetStatus = 'traitement';
-                  else targetStatus = 'traitement';
-
-                  if (!targetStatus) return null;
-                  const canTransition = isTransitionAllowed(status, targetStatus);
-                  const nextStyle = getNextStatusStyle(selectedOrder.statut);
-                  if (!nextStyle) return null;
-
-                  const isIntermediate = [
-                    'en_cours_lavage',
-                    'lavage_cours',
-                    'washing',
-                    'en_cours_repassage',
-                    'repassage_cours',
-                    'ironing',
-                    'en_cours_livraison',
-                    'en_cours_de_livraison',
-                    'in_delivery',
-                    'delivering',
-                    'livraison',
-                  ].includes(status);
-
-                  return (
-                    <View style={{ marginTop: 20, marginBottom: 20 }}>
-                      <SlideActionButton
-                        key={`detail-btn-${selectedOrder.id}`}
-                        state={isIntermediate ? 'indeterminate' : undefined}
-                        transitionsToIndeterminate={nextStyle.transitionsToIndeterminate}
-                        persistIntermediate={nextStyle.persistIntermediate}
-                        indeterminateText={nextStyle.indeterminateText}
-                        completionLabel={nextStyle.completionLabel}
-                        color={canTransition ? nextStyle.bg : '#94a3b8'}
-                        isDarkMode={isDarkMode}
-                        disabled={!canTransition}
-                        height={46}
-                        minLoadingDuration={250}
-                        icon={getNextStatusIcon(selectedOrder.statut)}
-                        loadingText={nextStyle.loadingText}
-                        completeLabel={nextStyle.completeLabel}
-                        onComplete={() => handleNextStatus(selectedOrder, true, targetStatus)}
-                        onHumanComplete={() => handleNextStatus(selectedOrder, true, targetStatus)}
-                      >
-                        {nextStyle.label}
-                      </SlideActionButton>
-                    </View>
-                  );
-                })()}
-
-              </View>
-            </ScrollView>
-          )}
-          </View>
-        </View>
-      </MotiView>
-
-      {/* MODAL 3 : CRÉATION / MODIFICATION CLIENT (FULL SCREEN PAGE) */}
-      <RNModal
+      {/* MODALE CRÉATION / ÉDITION CLIENT RAPIDE */}
+      <CustomerCreateEditModal
         visible={showCustomerModal}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={handleCloseCustomerModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.fullPageContainer}
-        >
-          <View style={styles.fullPageInnerWrapper}>
-            {/* HEADER BACK BUTTON */}
-            <View style={styles.fullPageHeader}>
-              <TouchableOpacity onPress={handleCloseCustomerModal} style={styles.backBtn} activeOpacity={0.7}>
-                <ArrowLeft size={20} color={isDarkMode ? '#ffffff' : '#0f172a'} />
-              </TouchableOpacity>
+        editingCustomer={editingCustomer}
+        catalog={catalog}
+        isDarkMode={isDarkMode}
+        onClose={() => {
+          setShowCustomerModal(false);
+          setEditingCustomer(null);
+        }}
+        onSave={handleSaveCustomer}
+      />
 
-              <Text style={styles.fullPageTitle} numberOfLines={1}>
-                {editingCustomer ? "Modifier le Profil Client" : "Nouveau Profil Client"}
-              </Text>
-              <View style={{ width: 40 }} />
-            </View>
-
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.fullPageScroll} bounces={false}>
-            <View style={styles.compactInputRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.compactLabel}>Prénom</Text>
-                <TextInput
-                  placeholder="Prénom"
-                  placeholderTextColor="#a1a1aa"
-                  value={custPrenom}
-                  onChangeText={setCustPrenom}
-                  style={styles.compactInput}
-                />
-              </View>
-              <View style={{ width: 12 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.compactLabel}>Nom</Text>
-                <TextInput
-                  placeholder="Nom"
-                  placeholderTextColor="#a1a1aa"
-                  value={custNom}
-                  onChangeText={setCustNom}
-                  style={styles.compactInput}
-                />
-              </View>
-            </View>
-
-            <Text style={styles.compactLabel}>Téléphone</Text>
-            <TextInput
-              placeholder="Ex: +229 97 00 00 00"
-              placeholderTextColor="#a1a1aa"
-              keyboardType="phone-pad"
-              value={custTelephone}
-              onChangeText={setCustTelephone}
-              style={styles.compactInput}
-            />
-
-            <Text style={styles.compactLabel}>Adresse</Text>
-            <TextInput
-              placeholder="Ex: Cotonou, Haie Vive"
-              placeholderTextColor="#a1a1aa"
-              value={custAdresse}
-              onChangeText={setCustAdresse}
-              style={styles.compactInput}
-            />
-
-            <Text style={styles.compactLabel}>Préférence de pliage</Text>
-            <View style={styles.prefSelector}>
-              <TouchableOpacity
-                onPress={() => setCustPreferences('Plié')}
-                style={[styles.prefOption, custPreferences === 'Plié' && styles.prefOptionActive]}
-              >
-                <Text style={[styles.prefText, custPreferences === 'Plié' && styles.prefTextActive]}>Plié</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setCustPreferences('Cintre')}
-                style={[styles.prefOption, custPreferences === 'Cintre' && styles.prefOptionActive]}
-              >
-                <Text style={[styles.prefText, custPreferences === 'Cintre' && styles.prefTextActive]}>Sur Cintre</Text>
-              </TouchableOpacity>
-            </View>
-
-            {!editingCustomer && (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={styles.compactLabel}>Forfait d'abonnement (Facultatif)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => setCustSubscriptionPlanId("")}
-                    style={[
-                      styles.planChip,
-                      !custSubscriptionPlanId && styles.planChipActive
-                    ]}
-                  >
-                    <Text style={[styles.planChipText, !custSubscriptionPlanId && styles.planChipTextActive]}>
-                      Aucun
-                    </Text>
-                  </TouchableOpacity>
-                  {((catalog || []).filter(c => (c.categorie === 'abonnement' || c.service === 'abonnement') && c.is_active !== false && c.statut !== 'inactif')).map((p) => {
-                    const isSelected = custSubscriptionPlanId === p.id;
-                    return (
-                      <TouchableOpacity
-                        key={p.id}
-                        onPress={() => setCustSubscriptionPlanId(isSelected ? "" : p.id)}
-                        style={[styles.planChip, isSelected && styles.planChipActive]}
-                      >
-                        <Text style={[styles.planChipText, isSelected && styles.planChipTextActive]}>
-                          {p.article} ({(p.prix || 0).toLocaleString('fr-FR')} FCFA)
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-
-            <SlideActionButton
-              color="#002cf7"
-              isDarkMode={isDarkMode}
-              height={46}
-              minLoadingDuration={2000}
-              icon={editingCustomer ? <Check size={18} color="#ffffff" /> : <UserCheck size={18} color="#ffffff" />}
-              loadingText={editingCustomer ? "Modification du profil..." : "Création du profil..."}
-              completeLabel={editingCustomer ? "Profil modifié !" : "Client enregistré !"}
-              onComplete={handleSaveCustomer}
-              style={{ marginTop: 14 }}
-            >
-              {editingCustomer ? "Modifier le profil" : "Enregistrer le client"}
-            </SlideActionButton>
-          </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </RNModal>
-
-      {/* MODAL 4 : DETAIL CLIENT (FICHE CLIENT) */}
+      {/* FICHE CLIENT DÉTAILLÉE */}
       <ClientDetailModal
         visible={!!selectedClient}
         client={selectedClient}
         onClose={() => setSelectedClient(null)}
-        onEditClient={(client) => handleEditCustomer(client)}
+        onEditClient={(client) => {
+          setWasEditingFromFiche(client.id);
+          setEditingCustomer(client);
+          setShowCustomerModal(true);
+        }}
         onShowSuccess={onShowSuccess}
       />
-
-      {/* MODAL 5 : INVOICE / FACTURE (HEROUI POPUP DIALOG) */}
-      <Modal
-        visible={showInvoiceModal && !!invoiceOrder}
-        onClose={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
-        size="md"
-        isDarkMode={isDarkMode}
-      >
-        <Modal.Backdrop>
-          <Modal.Container size="md">
-            <Modal.Dialog style={{ maxHeight: '90%' }}>
-              <Modal.CloseTrigger onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }} />
-              {invoiceOrder && (() => {
-                const itemsList = invoiceOrder.items || invoiceOrder.articles || [];
-                let itemsSum = itemsList.reduce((sum, art) => sum + (Number(art.prix || art.price || 0) * Number(art.quantite || art.quantity || 1)), 0);
-                if (itemsSum === 0 && itemsList.length === 0 && db.getCatalog) {
-                  const catalogItem = db.getCatalog().find(c => c.article === invoiceOrder.type_article && c.service === invoiceOrder.type_service);
-                  itemsSum = catalogItem ? Number(catalogItem.prix || 0) : 0;
-                }
-                const isExpress = invoiceOrder.niveau_urgence === 'Express';
-                const expressMarkupItem = db.getCatalog ? db.getCatalog().find(c => c.id === 'setting_express_markup') : null;
-                const expressMarkup = expressMarkupItem ? Number(expressMarkupItem.prix) : 50;
-
-                const netPrice = Number(invoiceOrder.prix_total !== undefined ? invoiceOrder.prix_total : (invoiceOrder.total || 0));
-                const fraisLivraison = Number(invoiceOrder.frais_livraison || invoiceOrder.frais_transport || invoiceOrder.delivery_fee || 0);
-                const fraisRecuperation = Number(invoiceOrder.frais_recuperation || invoiceOrder.pickup_fee || 0);
-
-                const calculatedBrut = isExpress ? Math.round(itemsSum * (1 + expressMarkup / 100)) : itemsSum;
-                const displayBrut = Number(invoiceOrder.prix_base_avant_remise) || (calculatedBrut > 0 ? calculatedBrut : Math.max(0, netPrice - fraisLivraison - fraisRecuperation));
-
-                const discountPercent = Number(invoiceOrder.remise_pourcentage || invoiceOrder.remise || invoiceOrder.discount || 0);
-                let discountAmount = Number(invoiceOrder.remise_montant || 0);
-                if (!discountAmount && discountPercent > 0) {
-                  discountAmount = Math.round(displayBrut * (discountPercent / 100));
-                }
-                if (!discountAmount && displayBrut > (netPrice - fraisLivraison - fraisRecuperation)) {
-                  discountAmount = Math.max(0, displayBrut - (netPrice - fraisLivraison - fraisRecuperation));
-                }
-                const hasDiscount = discountAmount > 0;
-                const avance = Number(invoiceOrder.avance_payee !== undefined ? invoiceOrder.avance_payee : (invoiceOrder.avance || 0));
-                const reste = Math.max(0, netPrice - avance);
-
-                return (
-                  <>
-                    <Modal.Header layout="row" className="no-print" dataSet={{ print: 'no' }}>
-                      <Modal.Icon variant="primary">
-                        <Receipt size={20} color="#002cf7" />
-                      </Modal.Icon>
-                      <View style={{ flex: 1 }}>
-                        <Modal.Heading>Facture Client</Modal.Heading>
-                        <Modal.Description>
-                          Ticket {getDisplayTicketId(invoiceOrder)}
-                        </Modal.Description>
-                      </View>
-                    </Modal.Header>
-
-                    <Modal.Body scrollable={false} style={{ flexShrink: 1, paddingVertical: 4 }}>
-                      <ScrollView contentContainerStyle={styles.tpeScroll} showsVerticalScrollIndicator={false}>
-                        {/* TPE Thermal Receipt Wrapper */}
-                        <View style={styles.tpeReceiptContainer}>
-                          {/* Receipt Header */}
-                          <Text style={styles.tpeBrand}>Pressing Pro</Text>
-                          <Text style={styles.tpeBrandSub}>LAVERIE & PRESSING PREMIUM</Text>
-                          <Text style={styles.tpeTextMuted}>Tél: +229 XX XX XX XX</Text>
-                          <Text style={styles.tpeTextMuted}>Cotonou, Bénin</Text>
-
-                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                          {/* Receipt Metadata */}
-                          <View style={styles.tpeMetaRow}>
-                            <Text style={styles.tpeMetaLabel}>Ticket N° :</Text>
-                            <Text style={styles.tpeMetaVal}>{getDisplayTicketId(invoiceOrder)}</Text>
-                          </View>
-                          <View style={styles.tpeMetaRow}>
-                            <Text style={styles.tpeMetaLabel}>Code :</Text>
-                            <Text style={styles.tpeMetaVal}>{invoiceOrder.identifiant_unique_marquage || invoiceOrder.id}</Text>
-                          </View>
-                          <View style={styles.tpeMetaRow}>
-                            <Text style={styles.tpeMetaLabel}>Date :</Text>
-                            <Text style={styles.tpeMetaVal}>
-                              {invoiceOrder.created_at ? new Date(invoiceOrder.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
-                            </Text>
-                          </View>
-                          <View style={styles.tpeMetaRow}>
-                            <Text style={styles.tpeMetaLabel}>Client :</Text>
-                            <Text style={styles.tpeMetaVal}>
-                              {(() => {
-                                const c = customers.find(cust => cust.id === invoiceOrder.customer_id);
-                                return c ? `${c.prenom} ${c.nom}` : 'Client Inconnu';
-                              })()}
-                            </Text>
-                          </View>
-                          <View style={styles.tpeMetaRow}>
-                            <Text style={styles.tpeMetaLabel}>Règlement :</Text>
-                            <Text style={styles.tpeMetaVal}>{invoiceOrder.mode_reglement || invoiceOrder.mode_paiement || 'Espèces'}</Text>
-                          </View>
-                          {invoiceOrder.operateur_momo ? (
-                            <View style={styles.tpeMetaRow}>
-                              <Text style={styles.tpeMetaLabel}>Opérateur MoMo :</Text>
-                              <Text style={[styles.tpeMetaVal, { fontWeight: '700', color: '#002cf7' }]}>{invoiceOrder.operateur_momo}</Text>
-                            </View>
-                          ) : null}
-                          {(invoiceOrder.reference_momo || invoiceOrder.reference_paiement) ? (
-                            <View style={styles.tpeMetaRow}>
-                              <Text style={styles.tpeMetaLabel}>N° Réf. MoMo :</Text>
-                              <Text style={[styles.tpeMetaVal, { fontWeight: '700' }]}>{invoiceOrder.reference_momo || invoiceOrder.reference_paiement}</Text>
-                            </View>
-                          ) : null}
-
-                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                          {/* Items list */}
-                          <Text style={styles.tpeSectionTitle}>ARTICLES & SERVICES</Text>
-                          {(invoiceOrder.items || invoiceOrder.articles || []).map((art, idx) => (
-                            <View key={idx} style={styles.tpeItemRow}>
-                              <View style={{ flex: 1.8 }}>
-                                <Text style={styles.tpeItemName}>{art.article}</Text>
-                                <Text style={styles.tpeItemService}>{art.service.replace(/_/g, ' ')}</Text>
-                              </View>
-                              <Text style={styles.tpeItemQty}>x{art.quantite || art.quantity}</Text>
-                              <Text style={styles.tpeItemPrice}>{formatPrice((art.prix || art.price) * (art.quantite || art.quantity))}</Text>
-                            </View>
-                          ))}
-
-                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                          {/* Billing Details */}
-                          <View style={styles.tpeTotalRow}>
-                            <Text style={styles.tpeTotalLabel}>TOTAL BRUT</Text>
-                            <Text style={styles.tpeTotalVal}>
-                              {formatPrice(displayBrut)}
-                            </Text>
-                          </View>
-
-                          {hasDiscount && (
-                            <View style={styles.tpeTotalRow}>
-                              <Text style={[styles.tpeTotalLabel, { color: '#ef4444' }]}>
-                                REMISE EN FCFA
-                              </Text>
-                              <Text style={[styles.tpeTotalVal, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
-                            </View>
-                          )}
-
-                          {fraisLivraison > 0 && (
-                            <View style={styles.tpeTotalRow}>
-                              <Text style={[styles.tpeTotalLabel, { color: '#3b82f6' }]}>
-                                LIVRAISON{invoiceOrder.distance_km ? ` (${invoiceOrder.distance_km} km)` : ''}
-                              </Text>
-                              <Text style={[styles.tpeTotalVal, { color: '#3b82f6' }]}>+{formatPrice(fraisLivraison)}</Text>
-                            </View>
-                          )}
-
-                          {fraisRecuperation > 0 && (
-                            <View style={styles.tpeTotalRow}>
-                              <Text style={[styles.tpeTotalLabel, { color: '#3b82f6' }]}>
-                                RECUPERATION
-                              </Text>
-                              <Text style={[styles.tpeTotalVal, { color: '#3b82f6' }]}>+{formatPrice(fraisRecuperation)}</Text>
-                            </View>
-                          )}
-
-                          <View style={styles.tpeTotalRow}>
-                            <Text style={styles.tpeTotalLabelBold}>NET A PAYER</Text>
-                            <Text style={styles.tpeTotalValBold}>{formatPrice(netPrice)}</Text>
-                          </View>
-
-                          <View style={styles.tpeTotalRow}>
-                            <Text style={styles.tpeTotalLabel}>AVANCE PAYEE</Text>
-                            <Text style={styles.tpeTotalVal}>{formatPrice(avance)}</Text>
-                          </View>
-
-                          <View style={styles.tpeTotalRow}>
-                            <Text style={styles.tpeTotalLabelBold}>RESTE A PAYER</Text>
-                            <Text style={[styles.tpeTotalValBold, { color: reste > 0 ? '#ef4444' : '#10b981' }]}>
-                              {formatPrice(reste)}
-                            </Text>
-                          </View>
-
-                          <Text style={styles.tpeDashedDivider}>- - - - - - - - - - - - - - - -</Text>
-
-                          {/* Footer & Barcode placeholder */}
-                          <Text style={styles.tpeFooterMessage}>MERCI DE VOTRE CONFIANCE !</Text>
-
-                          <View style={{ height: 16 }} />
-                        </View>
-
-                        {/* Print/Download controls */}
-                        <View className="no-print" dataSet={{ print: 'no' }} style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-                          <TouchableOpacity
-                            className="no-print"
-                            dataSet={{ print: 'no' }}
-                            accessibilityRole="button"
-                            onPress={() => handleSharePdf(invoiceOrder)}
-                            style={styles.invoiceDownloadBtn}
-                            activeOpacity={0.8}
-                          >
-                            <Download size={14} color="#002cf7" style={{ marginRight: 6 }} />
-                            <Text style={styles.invoiceDownloadBtnText}>Télécharger</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            className="no-print"
-                            dataSet={{ print: 'no' }}
-                            accessibilityRole="button"
-                            onPress={() => handlePrintInvoice(invoiceOrder)}
-                            style={styles.invoicePrintBtn}
-                            activeOpacity={0.8}
-                          >
-                            <Printer size={14} color="#ffffff" style={{ marginRight: 6 }} />
-                            <Text style={styles.invoicePrintBtnText}>Imprimer</Text>
-                          </TouchableOpacity>
-                        </View>
-
-                        <TouchableOpacity
-                          className="no-print"
-                          dataSet={{ print: 'no' }}
-                          accessibilityRole="button"
-                          onPress={() => { setShowInvoiceModal(false); setInvoiceOrder(null); }}
-                          style={[styles.invoiceCloseBtn, { marginTop: 12 }]}
-                        >
-                          <Text style={styles.invoiceCloseBtnText}>Fermer</Text>
-                        </TouchableOpacity>
-                      </ScrollView>
-                    </Modal.Body>
-                  </>
-                );
-              })()}
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
-      {/* MODAL : MOTIF D'ANNULATION (HEROUI MODAL) */}
-      <Modal
-        isOpen={cancelModalVisible}
-        onClose={() => setCancelModalVisible(false)}
-        size="sm"
-        isDarkMode={isDarkMode}
-      >
-        <Modal.Backdrop>
-          <Modal.Container size="sm">
-            <Modal.Dialog>
-              <Modal.CloseTrigger />
-              <Modal.Header layout="row">
-                <Modal.Icon variant="danger">
-                  <Ban size={20} color="#ef4444" />
-                </Modal.Icon>
-                <View style={{ flex: 1 }}>
-                  <Modal.Heading>Annuler la commande</Modal.Heading>
-                  <Modal.Description numberOfLines={1}>
-                    {orderToCancel ? `Ticket ${getDisplayTicketId(orderToCancel)}` : 'Commande'}
-                  </Modal.Description>
-                </View>
-              </Modal.Header>
-
-              <Modal.Body>
-                {orderToCancel && (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc',
-                      borderRadius: 12,
-                      paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      marginBottom: 14,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
-                    }}
-                  >
-                    <View style={{ flex: 1, marginRight: 10 }}>
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          fontSize: 13,
-                          fontWeight: '700',
-                          color: isDarkMode ? '#ffffff' : '#09090b',
-                        }}
-                      >
-                        {(() => {
-                          const c = customers?.find ? customers.find(cust => cust.id === orderToCancel.customer_id) : null;
-                          return c ? `${c.prenom} ${c.nom}` : (orderToCancel.client_nom || 'Client');
-                        })()}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: isDarkMode ? '#a1a1aa' : '#64748b',
-                          marginTop: 2,
-                        }}
-                      >
-                        Ticket {getDisplayTicketId(orderToCancel)}
-                      </Text>
-                    </View>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: '700',
-                        color: isDarkMode ? '#f87171' : '#dc2626',
-                      }}
-                    >
-                      {formatPrice(orderToCancel.prix_total !== undefined ? orderToCancel.prix_total : (orderToCancel.total || 0))}
-                    </Text>
-                  </View>
-                )}
-
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: '500',
-                    color: isDarkMode ? '#d4d4d8' : '#475569',
-                    marginBottom: 8,
-                    lineHeight: 18,
-                  }}
-                >
-                  Veuillez spécifier le motif d'annulation de cette commande :
-                </Text>
-
-                <TextInput
-                  style={{
-                    width: '100%',
-                    minHeight: 88,
-                    textAlignVertical: 'top',
-                    padding: 12,
-                    fontSize: 13.5,
-                    lineHeight: 19,
-                    borderWidth: 1.5,
-                    borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#3f3f46' : '#cbd5e1'),
-                    borderRadius: 14,
-                    backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
-                    color: isDarkMode ? '#ffffff' : '#09090b',
-                    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                  }}
-                  placeholder="Ex: Erreur de saisie, client absent, doublon..."
-                  placeholderTextColor={isDarkMode ? '#71717a' : '#94a3b8'}
-                  multiline={true}
-                  numberOfLines={3}
-                  value={cancelReason}
-                  onChangeText={(text) => {
-                    setCancelReason(text);
-                    if (cancelReasonError) setCancelReasonError('');
-                  }}
-                />
-                {cancelReasonError ? (
-                  <Text style={{ color: '#ef4444', fontSize: 11.5, marginTop: 6, fontWeight: '600' }}>
-                    {cancelReasonError}
-                  </Text>
-                ) : null}
-              </Modal.Body>
-
-              <Modal.Footer>
-                <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
-                  Retour
-                </Modal.Button>
-                <Modal.Button variant="danger" onPress={handleConfirmCancelOrder} style={{ flex: 1 }}>
-                  Confirmer
-                </Modal.Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
-
-      {/* MODAL 5 : CONFIRMATION DU PAIEMENT DE LA COMMANDE (HEROUI MODAL) */}
-      <Modal
-        isOpen={paymentModalVisible}
-        onClose={() => setPaymentModalVisible(false)}
-        size="md"
-        isDarkMode={isDarkMode}
-      >
-        <Modal.Backdrop>
-          <Modal.Container size="md">
-            <Modal.Dialog>
-              <Modal.CloseTrigger />
-              <Modal.Header layout="row">
-                <Modal.Icon variant="success">
-                  <CreditCard size={20} color="#10b981" />
-                </Modal.Icon>
-                <View style={{ flex: 1 }}>
-                  <Modal.Heading>Confirmation du Règlement</Modal.Heading>
-                  <Modal.Description numberOfLines={1}>
-                    {paymentOrder ? `Commande ${paymentOrder.ticket_numero || paymentOrder.id}` : 'Règlement solde'}
-                  </Modal.Description>
-                </View>
-              </Modal.Header>
-
-              {paymentOrder && (() => {
-                const total = paymentOrder.prix_total || 0;
-                const avance = paymentOrder.avance_payee || 0;
-                const solde = total - avance;
-
-                return (
-                  <>
-                    <Modal.Body scrollable={false}>
-                      {/* Financial Summary */}
-                      <View style={{ backgroundColor: isDarkMode ? '#121212' : '#f8fafc', padding: 14, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: isDarkMode ? '#27272a' : '#e2e8f0' }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <Text style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Total Commande</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#ffffff' : '#09090b' }}>{formatPrice(total)}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <Text style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Acompte déjà payé</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#16a34a' }}>{formatPrice(avance)}</Text>
-                        </View>
-                        <View style={{ height: 1, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0', marginVertical: 8 }} />
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>Solde restant à régler</Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#ef4444' }}>{formatPrice(solde)}</Text>
-                        </View>
-                      </View>
-
-                      {/* Payment Method Selector */}
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
-                        Mode de règlement du solde
-                      </Text>
-                      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-                        <TouchableOpacity
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            setPaymentMethod('Espèces');
-                            setMomoRefError('');
-                          }}
-                          style={{
-                            flex: 1,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            paddingVertical: 12,
-                            borderRadius: 9999,
-                            borderWidth: 1.5,
-                            borderColor: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
-                            backgroundColor: paymentMethod === 'Espèces' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent'
-                          }}
-                        >
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#94a3b8' : '#64748b') }}>
-                            Espèces (Cash)
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          activeOpacity={0.8}
-                          onPress={() => setPaymentMethod('Mobile Money')}
-                          style={{
-                            flex: 1,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            paddingVertical: 12,
-                            borderRadius: 9999,
-                            borderWidth: 1.5,
-                            borderColor: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
-                            backgroundColor: paymentMethod === 'Mobile Money' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent'
-                          }}
-                        >
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#94a3b8' : '#64748b') }}>
-                            Mobile Money
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Reference Input for Mobile Money */}
-                      {paymentMethod === 'Mobile Money' && (
-                        <View style={{ marginBottom: 14 }}>
-                          {/* Opérateur Mobile Money */}
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
-                            Opérateur Réseau <Text style={{ color: '#ef4444' }}>*</Text>
-                          </Text>
-                          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                            {['MTN', 'MOOV', 'CELTIS'].map((op) => (
-                              <TouchableOpacity
-                                key={op}
-                                onPress={() => setMomoOperator(op)}
-                                activeOpacity={0.8}
-                                style={{
-                                  flex: 1,
-                                  paddingVertical: 10,
-                                  borderRadius: 9999,
-                                  borderWidth: momoOperator === op ? 2 : 1.5,
-                                  borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
-                                  backgroundColor: momoOperator === op
-                                    ? (op === 'MTN' ? '#FFCC00' : op === 'MOOV' ? '#0057A8' : '#E30613')
-                                    : (isDarkMode ? '#18181b' : '#f8fafc'),
-                                  alignItems: 'center'
-                                }}
-                              >
-                                <Text style={{
-                                  fontWeight: '800',
-                                  fontSize: 12,
-                                  color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : (isDarkMode ? '#94a3b8' : '#64748b')
-                                }}>{op}</Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
-                            Numéro de Référence <Text style={{ color: '#ef4444' }}>*</Text>
-                          </Text>
-                          <TextInput
-                            value={momoRefNumber}
-                            onChangeText={(text) => {
-                              const val = text.replace(/\D/g, '').slice(0, 15);
-                              setMomoRefNumber(val);
-                              if (val.trim()) setMomoRefError('');
-                            }}
-                            placeholder="8 à 15 chiffres (ex: 12345678)"
-                            placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
-                            keyboardType="numeric"
-                            maxLength={15}
-                            style={{
-                              borderWidth: 1,
-                              borderColor: momoRefError ? '#ef4444' : (isDarkMode ? '#27272a' : '#d4d4d8'),
-                              borderRadius: 10,
-                              paddingHorizontal: 12,
-                              paddingVertical: 10,
-                              fontSize: 13,
-                              color: isDarkMode ? '#f8fafc' : '#09090b',
-                              backgroundColor: isDarkMode ? '#09090b' : '#ffffff'
-                            }}
-                          />
-                          {momoRefError ? (
-                            <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>{momoRefError}</Text>
-                          ) : null}
-                        </View>
-                      )}
-                    </Modal.Body>
-
-                    <Modal.Footer>
-                      <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
-                        Annuler
-                      </Modal.Button>
-                      <Modal.Button variant="success" onPress={handleConfirmPaymentAndComplete} style={{ flex: 1 }}>
-                        Confirmer
-                      </Modal.Button>
-                    </Modal.Footer>
-                  </>
-                );
-              })()}
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
 
       {/* MODAL MODIFICATION DE COMMANDE AVANT VALIDATION */}
       {editingOrder && (
@@ -3196,7 +1185,7 @@ export default function GestionScreen({
             if (onShowSuccess) onShowSuccess(msg);
             if (selectedOrder && selectedOrder.id === editingOrder.id) {
               const fresh = (db.getOrders ? db.getOrders() : []).find(o => o.id === editingOrder.id);
-              if (fresh) setSelectedOrder(fresh);
+              if (fresh && setSelectedOrder) setSelectedOrder(fresh);
             }
             setEditingOrder(null);
           }}
@@ -3206,2086 +1195,221 @@ export default function GestionScreen({
   );
 }
 
-const baseStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  absoluteModalContainer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-  },
-  // Header
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 52 : 24,
-    paddingBottom: 8,
-    backgroundColor: '#ffffff',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#09090b',
-    letterSpacing: -0.5,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
-  },
-  // Sélecteur d'onglets (Commandes / Clients / Catalogue)
-  tabSelectorContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    backgroundColor: '#ffffff',
-  },
-  tabSelector: {
-    position: 'relative',
-    flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 9999,
-    padding: 3,
-  },
-  slidingTabPill: {
-    position: 'absolute',
-    top: 3,
-    bottom: 3,
-    left: 3,
-    backgroundColor: '#ffffff',
-    borderRadius: 9999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-    zIndex: 1,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 9999,
-    zIndex: 2,
-  },
-  tabButtonActive: {
-    backgroundColor: 'transparent',
-  },
-  tabButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  tabButtonTextActive: {
-    color: '#002cf7',
-    fontWeight: '700',
-  },
-  slidingContentOuter: {
-    flex: 1,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  slidingContentTrack: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  slidingPane: {
-    height: '100%',
-  },
-  // Search section
-  searchSection: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 14,
-    height: 46,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#09090b',
-    fontWeight: '500',
-    height: '100%',
-  },
-  // Status filter chips
-  statusFilterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    gap: 8,
-    backgroundColor: '#ffffff',
-  },
-  chip: {
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: 9999,
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  chipActive: {
-    backgroundColor: 'rgba(0, 44, 247, 0.08)',
-    borderColor: '#002cf7',
-  },
-  chipActiveUrgent: {
-    backgroundColor: 'rgba(225, 29, 72, 0.08)',
-    borderColor: '#e11d48',
-  },
-  chipActiveLate: {
-    backgroundColor: 'rgba(217, 119, 6, 0.08)',
-    borderColor: '#d97706',
-  },
-  chipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  chipTextActive: {
-    color: '#002cf7',
-    fontWeight: '700',
-  },
-  chipTextActiveUrgent: {
-    color: '#e11d48',
-    fontWeight: '700',
-  },
-  chipTextActiveLate: {
-    color: '#d97706',
-    fontWeight: '700',
-  },
-  filterPillSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-  },
-  filterPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 44, 247, 0.08)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
-    gap: 8,
-  },
-  filterPillText: {
-    fontSize: 12,
-    color: '#002cf7',
-    fontWeight: '600',
-  },
-  clearFilterBtn: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#002cf7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  clearFilterText: {
-    fontSize: 8,
-    color: '#ffffff',
-    fontWeight: '800',
-  },
-  fabContainer: {
-    position: 'absolute',
-    bottom: 95,
-    right: 20,
-    zIndex: 100,
-  },
-  fab: {
-    backgroundColor: '#002cf7',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#002cf7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 110,
-  },
-  noResultsText: {
-    fontSize: 13,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 30,
-    fontWeight: '500',
-  },
-  // Order Card clean
-  orderCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 22,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  cardClientCol: {
-    flex: 1,
-    marginRight: 10,
-  },
-  cardClientName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#09090b',
-  },
-  cardTicketNo: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  cardRightCol: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  cardPrice: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#09090b',
-  },
-  cardDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 6,
-  },
-  clientCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#f0f4f8',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 0,
-  },
-  catalogCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  catalogArticle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  catalogService: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 3,
-    fontWeight: '500',
-  },
-  catalogPrice: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  modalView: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
-  },
-  modalHeaderClose: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.03)',
-    backgroundColor: '#ffffff',
-  },
-  modalTitleLarge: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#09090b',
-  },
-  modalScroll: {
-    padding: 20,
-  },
-  detailSection: {
-    marginBottom: 16,
-  },
-  detailSectionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  detailCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  detailTextLarge: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  detailArticleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  detailArticleText: {
-    fontSize: 13,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  detailArticlePrice: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#09090b',
-  },
-  detailDivider: {
-    height: 1,
-    backgroundColor: '#e2e8f0',
-    marginVertical: 12,
-  },
-  detailLabelBold: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  detailPriceBold: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2563eb',
-  },
-  detailLabelMuted: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  detailTextMuted: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  logisticsText: {
-    fontSize: 13,
-    color: '#475569',
-    paddingVertical: 3,
-    fontWeight: '500',
-  },
-  statusChangeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 9999,
-    paddingVertical: 14,
-    marginTop: 24,
-    marginBottom: 20,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  statusChangeBtnSide: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 9999,
-    paddingVertical: 14,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  statusChangeBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-    marginTop: 14,
-    marginBottom: 6,
-  },
-  selectMargin: {
-    marginBottom: 12,
-  },
-  catalogScrollRow: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  catalogBadge: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 9999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginRight: 8,
-    alignItems: 'center',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-  },
-  catalogBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  catalogBadgeService: {
-    fontSize: 9,
-    color: '#64748b',
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  catalogBadgePrice: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginTop: 4,
-  },
-  selectedContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-  },
-  selectedTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  selectedRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  selectedRowName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  selectedRowService: {
-    fontSize: 10,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  quantityControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  qtyBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  qtyBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  qtyText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  formInput: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 14,
-    height: 48,
-    paddingHorizontal: 16,
-    fontSize: 14,
-    color: '#09090b',
-    fontWeight: '500',
-    marginBottom: 14,
-  },
-  submitOrderBtn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 9999,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 30,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-  },
-  submitOrderBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // Compact Bottom-Sheet Client Modal Styles
-  compactModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    padding: 16,
-  },
-  popupModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    padding: 16,
-  },
-  compactModalView: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 20,
-    width: '100%',
-    maxWidth: 380,
-    maxHeight: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: '#e4e4e7',
-    overflow: 'hidden',
-  },
-  compactModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  compactModalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  compactModalScroll: {
-    paddingBottom: 24,
-  },
-  compactInputRow: {
-    flexDirection: 'row',
-    marginBottom: 10,
-  },
-  compactLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 6,
-  },
-  compactInput: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    height: 44,
-    paddingHorizontal: 14,
-    fontSize: 13,
-    color: '#09090b',
-    fontWeight: '500',
-    marginBottom: 12,
-  },
-  prefSelector: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 9999,
-    padding: 3,
-    marginBottom: 16,
-  },
-  prefOption: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 9999,
-  },
-  prefOptionActive: {
-    backgroundColor: '#ffffff',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  prefText: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  prefTextActive: {
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  compactSubmitBtn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 9999,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 10,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-  },
-  compactSubmitBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  // Fiche Client Detail styles
-  clientProfileName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  clientProfilePhone: {
-    fontSize: 13,
-    color: '#475569',
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  clientProfileAddress: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  clientProfilePreferences: {
-    fontSize: 12,
-    color: '#2563eb',
-    marginTop: 6,
-    fontWeight: '600',
-  },
-  clientActionRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
-  },
-  clientEditBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: '#dbeafe',
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 9999,
-  },
-  clientEditBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#2563eb',
-  },
-  clientDeleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: '#ffe4e6',
-    backgroundColor: '#fff1f2',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 9999,
-  },
-  clientDeleteBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#f43f5e',
-  },
-  orderHistoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-  },
-  orderHistoryNo: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  orderHistoryDate: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 3,
-    fontWeight: '500',
-  },
-  orderHistoryTotal: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  categoryTabsRow: {
-    flexDirection: 'row',
-    marginVertical: 8,
-    gap: 8,
-  },
-  categoryTabBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
-    backgroundColor: '#f1f5f9',
-  },
-  categoryTabBtnActive: {
-    backgroundColor: '#002cf7',
-  },
-  categoryTabBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  categoryTabBtnTextActive: {
-    color: '#ffffff',
-  },
-  formArticlesList: {
-    marginVertical: 8,
-    gap: 8,
-  },
-  formArticleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 12,
-  },
-  formArticleName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  formArticleMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  miniServiceTag: {
-    backgroundColor: 'rgba(0, 44, 247, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 44, 247, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 9999,
-  },
-  miniServiceTagText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#002cf7',
-  },
-  formArticlePrice: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  formArticleAddBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 44, 247, 0.06)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 44, 247, 0.1)',
-  },
-  formArticleAddBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#002cf7',
-  },
-  formArticleQtyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  formQtyBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#002cf7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  formQtyBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  formQtyText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  paymentMethodRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginVertical: 8,
-  },
-  paymentMethodBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 9999,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-  },
-  paymentMethodBtnActive: {
-    borderColor: '#002cf7',
-    backgroundColor: 'rgba(0, 44, 247, 0.05)',
-  },
-  paymentMethodBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  paymentMethodBtnTextActive: {
-    color: '#002cf7',
-    fontWeight: '600',
-  },
-  formPresetsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
-    marginBottom: 14,
-  },
-  formPresetBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 9999,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-  },
-  formPresetBtnActive: {
-    borderColor: '#002cf7',
-    backgroundColor: 'rgba(0, 44, 247, 0.05)',
-  },
-  formPresetBtnText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  formPresetBtnTextActive: {
-    color: '#002cf7',
-    fontWeight: '600',
-  },
-  receiptPreviewCard: {
-    backgroundColor: 'rgba(0, 44, 247, 0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 44, 247, 0.1)',
-    borderRadius: 16,
-    padding: 16,
-    marginVertical: 14,
-  },
-  receiptRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  receiptRowLabel: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  receiptRowLabelBold: {
-    fontSize: 13,
-    color: '#09090b',
-    fontWeight: '600',
-  },
-  receiptRowVal: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  receiptRowValBold: {
-    fontSize: 13,
-    color: '#09090b',
-    fontWeight: '600',
-  },
-  receiptRowValTotal: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  receiptDivider: {
-    height: 1,
-    backgroundColor: 'rgba(0, 44, 247, 0.1)',
-    marginVertical: 8,
-  },
-  // Header styles
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 8,
-    backgroundColor: '#ffffff',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#09090b',
-    letterSpacing: -0.5,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
-  },
-  // Top Actions styles
-  topActionsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 0,
-    paddingBottom: 12,
-    gap: 12,
-    backgroundColor: '#ffffff',
-  },
-  topActionBtnBlue: {
-    flex: 1.1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#002cf7',
-    borderRadius: 9999,
-    height: 40,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  topActionBtnTextBlue: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  topActionBtnWhite: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    borderColor: '#002cf7',
-    borderWidth: 1.5,
-    borderRadius: 9999,
-    height: 40,
-  },
-  topActionBtnTextWhite: {
-    color: '#002cf7',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  // 3-Button Filter styles
-  statusFilterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    gap: 8,
-    backgroundColor: '#ffffff',
-  },
-  statusFilterBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 36,
-    borderRadius: 9999,
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-  },
-  statusFilterBtnActive: {
-    backgroundColor: '#09090b',
-    borderColor: '#09090b',
-  },
-  statusFilterText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  statusFilterTextActive: {
-    color: '#ffffff',
-  },
-  // Order card style updates & invoice button styles
-  urgencyRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 14,
-  },
-  urgencyBtn: {
-    flex: 1,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 9999,
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-  },
-  urgencyBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  formRowInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  receiptSectionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  receiptRowLabelMuted: {
-    fontSize: 11,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  receiptRowValMuted: {
-    fontSize: 11,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  cardExtraInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  cardExtraInfoText: {
-    fontSize: 11,
-    color: '#475569',
-    fontWeight: '600',
-    flex: 1,
-  },
-  cardMetaRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 10,
-    paddingHorizontal: 4,
-  },
-  metaBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 9999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  metaBadgeText: {
-    fontSize: 9,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  metaBadgeUrgent: {
-    borderColor: '#ffe4e6',
-    backgroundColor: '#fff1f2',
-  },
-  metaBadgeUrgentText: {
-    color: '#e11d48',
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: '#f1f5f9',
-    marginVertical: 12,
-  },
-  cardFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  factureBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 44, 247, 0.05)',
-    borderWidth: 1.2,
-    borderColor: 'rgba(0, 44, 247, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
-  },
-  factureBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#002cf7',
-  },
-  nextStatusBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#002cf7',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
-    marginLeft: 8,
-  },
-  nextStatusBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  // Invoice Modal specific styles
-  invoiceHeaderArea: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  popupModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  popupModalView: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 16,
-    width: '95%',
-    maxWidth: 370,
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: '#e4e4e7',
-    overflow: 'hidden',
-  },
-  cardFooterArea: {
-    paddingTop: 8,
-    gap: 8,
-  },
-  cardNextStatusBlockBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 9999,
-    marginTop: 10,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  cardNextStatusBlockBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: 0.3,
-  },
-  tpeScroll: {
-    paddingBottom: 10,
-  },
-  tpeReceiptContainer: {
-    backgroundColor: '#fafaf9',
-    borderWidth: 1,
-    borderColor: '#e7e5e4',
-    padding: 14,
-    borderRadius: 12,
-  },
-  tpeBrand: {
-    fontSize: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-    color: '#1c1917',
-    letterSpacing: 1.5,
-  },
-  tpeBrandSub: {
-    fontSize: 8,
-    fontWeight: '700',
-    textAlign: 'center',
-    color: '#78716c',
-    letterSpacing: 0.8,
-    marginTop: 2,
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  tpeTextMuted: {
-    fontSize: 10,
-    color: '#78716c',
-    textAlign: 'center',
-    lineHeight: 14,
-  },
-  tpeTextMutedCentred: {
-    fontSize: 9,
-    color: '#a8a29e',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  tpeDashedDivider: {
-    fontSize: 12,
-    color: '#d6d3d1',
-    textAlign: 'center',
-    letterSpacing: 2,
-    marginVertical: 10,
-  },
-  tpeMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 2,
-  },
-  tpeMetaLabel: {
-    fontSize: 11,
-    color: '#78716c',
-    fontWeight: '500',
-  },
-  tpeMetaVal: {
-    fontSize: 11,
-    color: '#1c1917',
-    fontWeight: '600',
-  },
-  tpeSectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#44403c',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  tpeItemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  tpeItemName: {
-    fontSize: 12,
-    color: '#1c1917',
-    fontWeight: '600',
-  },
-  tpeItemService: {
-    fontSize: 9,
-    color: '#78716c',
-    textTransform: 'uppercase',
-  },
-  tpeItemQty: {
-    fontSize: 11,
-    color: '#44403c',
-    fontWeight: '500',
-    marginHorizontal: 8,
-  },
-  tpeItemPrice: {
-    fontSize: 11,
-    color: '#1c1917',
-    fontWeight: '600',
-  },
-  tpeTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 3,
-  },
-  tpeTotalLabel: {
-    fontSize: 11,
-    color: '#44403c',
-    fontWeight: '500',
-  },
-  tpeTotalVal: {
-    fontSize: 11,
-    color: '#1c1917',
-    fontWeight: '600',
-  },
-  tpeTotalLabelBold: {
-    fontSize: 11,
-    color: '#1c1917',
-    fontWeight: '700',
-  },
-  tpeTotalValBold: {
-    fontSize: 11,
-    color: '#1c1917',
-    fontWeight: '700',
-  },
-  tpeFooterMessage: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#44403c',
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 10,
-    letterSpacing: 0.5,
-  },
-  barcodeContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#a8a29e',
-    paddingVertical: 10,
-    marginVertical: 6,
-    borderRadius: 4,
-  },
-  barcodeText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#1c1917',
-    letterSpacing: 2,
-  },
-  invoiceBrand: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#002cf7',
-    letterSpacing: 2,
-  },
-  invoiceMuted: {
-    fontSize: 11,
-    color: '#71717a',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  invoiceDetailsCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 16,
-  },
-  invoiceInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 3,
-  },
-  invoiceInfoLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  invoiceInfoVal: {
-    fontSize: 12,
-    color: '#09090b',
-    fontWeight: '600',
-  },
-  invoiceInfoValBold: {
-    fontSize: 12,
-    color: '#09090b',
-    fontWeight: '700',
-  },
-  invoiceDivider: {
-    height: 1,
-    backgroundColor: '#e2e8f0',
-    marginVertical: 10,
-  },
-  invoiceItemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  invoiceItemName: {
-    fontSize: 12,
-    color: '#09090b',
-    fontWeight: '600',
-  },
-  invoiceItemService: {
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  invoiceItemQty: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  invoiceItemPrice: {
-    fontSize: 12,
-    color: '#09090b',
-    fontWeight: '600',
-  },
-  invoiceTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  invoiceTotalLabel: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  invoiceTotalLabelBold: {
-    fontSize: 13,
-    color: '#09090b',
-    fontWeight: '600',
-  },
-  invoiceTotalLabelMuted: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  invoiceTotalVal: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  invoiceTotalValBold: {
-    fontSize: 13,
-    color: '#09090b',
-    fontWeight: '600',
-  },
-  invoiceTotalValMuted: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  invoiceFooterArea: {
-    alignItems: 'center',
-    marginVertical: 16,
-    paddingHorizontal: 10,
-  },
-  invoiceFooterText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  invoiceFooterSubtext: {
-    fontSize: 9,
-    color: '#71717a',
-    textAlign: 'center',
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  invoiceCloseBtn: {
-    backgroundColor: '#09090b',
-    borderRadius: 9999,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  invoiceCloseBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  fixedArticleContainer: {
-    height: 310,
-    backgroundColor: '#f8fafc',
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    padding: 10,
-    marginVertical: 12,
-  },
-  clothingCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
-    borderRadius: 18,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.75)',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  clothingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  clothingName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#09090b',
-  },
-  clothingAddBtn: {
-    backgroundColor: 'rgba(0, 44, 247, 0.06)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
-  },
-  clothingAddBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#002cf7',
-  },
-  clothingCloseBtn: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
-  },
-  clothingCloseBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  servicesContainer: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 8,
-    gap: 8,
-  },
-  serviceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  serviceLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#475569',
-  },
-  servicePrice: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#002cf7',
-    marginTop: 2,
-  },
-  serviceAddBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 44, 247, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 44, 247, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 9999,
-  },
-  serviceAddBtnText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#002cf7',
-  },
-  serviceQtyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  serviceQtyBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#002cf7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  serviceQtyBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    lineHeight: 14,
-  },
-  serviceQtyText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#09090b',
-    minWidth: 16,
-    textAlign: 'center',
-  },
-  invoiceDownloadBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#eff6ff',
-    borderWidth: 1.5,
-    borderColor: '#bfdbfe',
-    borderRadius: 9999,
-    paddingVertical: 12,
-  },
-  invoiceDownloadBtnText: {
-    color: '#002cf7',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  invoicePrintBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#002cf7',
-    borderRadius: 9999,
-    paddingVertical: 12,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  invoicePrintBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  fullPageContainer: {
-    flex: 1,
-    width: '100%',
-    height: Platform.OS === 'web' ? '100vh' : '100%',
-    backgroundColor: Platform.OS === 'web' ? '#0c0c10' : '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  fullPageInnerWrapper: {
-    ...(Platform.OS === 'web' ? {} : { flex: 1 }),
-    width: Platform.OS === 'web' ? 393 : '100%',
-    height: Platform.OS === 'web' ? 852 : '100%',
-    maxWidth: '100vw',
-    maxHeight: '100vh',
-    backgroundColor: '#ffffff',
-    paddingTop: Platform.OS === 'ios' ? 48 : 24,
-    overflow: 'hidden',
-  },
-  fullPageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullPageTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
-    textAlign: 'center',
-    flex: 1,
-  },
-  fullPageScroll: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  premiumSubscriptionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.02)',
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-    marginBottom: 16,
-    zIndex: 10,
-  },
-  subscriptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingBottom: 8,
-    marginBottom: 10,
-  },
-  subscriptionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#09090b',
-  },
-  subActiveBadge: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 9999,
-  },
-  subActiveBadgeText: {
-    fontSize: 9,
-    color: '#15803d',
-    fontWeight: '700',
-  },
-  subPlanName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#002cf7',
-  },
-  subPlanBalance: {
-    fontSize: 11,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#002cf7',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 10,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  subDatesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 8,
-    marginTop: 4,
-  },
-  subDateText: {
-    fontSize: 10,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  unsubscribeBtn: {
-    backgroundColor: '#fff1f2',
-    borderWidth: 1,
-    borderColor: '#ffe4e6',
-    borderRadius: 9999,
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  unsubscribeBtnText: {
-    fontSize: 12,
-    color: '#ef4444',
-    fontWeight: '600',
-  },
-  subscribeBtn: {
-    backgroundColor: '#002cf7',
-    borderRadius: 9999,
-    height: 40,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  subscribeBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  cardSubscriptionGaugeContainer: {
-    marginTop: 8,
-    backgroundColor: 'rgba(0, 44, 247, 0.03)',
-    padding: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 44, 247, 0.08)',
-  },
-  cardSubText: {
-    fontSize: 10,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  cardSubTextBold: {
-    fontSize: 10,
-    color: '#002cf7',
-    fontWeight: '700',
-  },
-  cardProgressBarBg: {
-    height: 6,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  cardProgressBarFill: {
-    height: '100%',
-    backgroundColor: '#002cf7',
-    borderRadius: 3,
-  },
-  clientPillBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#eff6ff',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 44, 247, 0.08)',
-    borderRadius: 9999,
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
-    alignSelf: 'flex-start',
-  },
-  clientPillBtnText: {
-    color: '#002cf7',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  planChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 9999,
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  planChipActive: {
-    backgroundColor: 'rgba(0, 44, 247, 0.08)',
-    borderColor: '#002cf7',
-  },
-  planChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  planChipTextActive: {
-    color: '#002cf7',
-    fontWeight: '700',
-  },
-  modalInput: {
-    backgroundColor: '#ffffff',
-    borderColor: '#cbd5e1',
-    color: '#09090b',
-  },
-});
-
-function getStyles(isDarkMode) {
-  if (!isDarkMode) return baseStyles;
-
-  const overrides = {
-    planChip: { backgroundColor: '#18181b', borderColor: '#27272a' },
-    planChipActive: { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8' },
-    planChipText: { color: '#d4d4d8' },
-    planChipTextActive: { color: '#38bdf8', fontWeight: '700' },
-    fullPageContainer: { backgroundColor: Platform.OS === 'web' ? '#0c0c10' : '#000000' },
-    fullPageInnerWrapper: { backgroundColor: '#000000' },
-    fullPageHeader: { backgroundColor: '#09090b', borderBottomColor: '#1f2937' },
-    backBtn: { backgroundColor: '#121212', borderColor: '#27272a' },
-    fullPageTitle: { color: '#ffffff' },
-    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
-    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
-    container: { backgroundColor: '#000000' },
-    header: { backgroundColor: '#000000' },
-    headerTitle: { color: '#ffffff' },
-    tabSelectorContainer: { backgroundColor: '#000000' },
-    tabSelector: { backgroundColor: '#18181b' },
-    slidingTabPill: { backgroundColor: '#27272a', shadowColor: '#000', shadowOpacity: 0.4 },
-    tabButtonActive: { backgroundColor: 'transparent' },
-    tabButtonText: { color: '#71717a' },
-    tabButtonTextActive: { color: '#38bdf8' },
-    statusFilterRow: { backgroundColor: '#000000' },
-    chip: { backgroundColor: '#18181b', borderColor: '#27272a' },
-    chipText: { color: '#a1a1aa' },
-    searchSection: { backgroundColor: '#000000' },
-    searchContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
-    searchInput: { color: '#ffffff' },
-    filterPillSection: { backgroundColor: '#000000' },
-    filterPill: { backgroundColor: 'rgba(56, 189, 248, 0.1)' },
-    filterPillText: { color: '#38bdf8' },
-    orderCard: { backgroundColor: '#121212', borderColor: '#27272a' },
-    cardClientName: { color: '#ffffff' },
-    cardTicketNo: { color: '#a1a1aa' },
-    cardPrice: { color: '#ffffff' },
-    cardExtraInfoText: { color: '#d4d4d8' },
-    cardExtraInfoRow: { backgroundColor: '#09090b', borderColor: '#27272a' },
-    metaBadge: { backgroundColor: '#27272a', borderColor: '#3f3f46' },
-    metaBadgeText: { color: '#d4d4d8' },
-    cardDivider: { backgroundColor: '#27272a' },
-    divider: { backgroundColor: '#27272a' },
-    factureBtn: { backgroundColor: 'rgba(0, 44, 247, 0.1)', borderColor: '#002cf7' },
-    factureBtnText: { color: '#38bdf8' },
-    cardProgressContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
-    cardProgressLabel: { color: '#d4d4d8' },
-    cardProgressValue: { color: '#38bdf8' },
-    cardProgressBarBg: { backgroundColor: '#27272a' },
-    tabSelector: { backgroundColor: 'rgba(255, 255, 255, 0.05)' },
-    tabButtonActive: { backgroundColor: '#18181b' },
-    tabButtonTextActive: { color: '#ffffff' },
-    tabButtonTextInactive: { color: '#71717a' },
-    card: { backgroundColor: '#121212', borderColor: '#27272a' },
-    cardTitle: { color: '#ffffff' },
-    cardSubtitle: { color: '#a1a1aa' },
-    cardFooter: { borderTopColor: '#27272a' },
-    totalAmount: { color: '#ffffff' },
-    sectionTitle: { color: '#a1a1aa' },
-    actionButton: { backgroundColor: '#121212', borderColor: '#27272a' },
-    actionText: { color: '#ffffff' },
-    modalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
-    modalContent: { backgroundColor: '#121212', borderColor: '#27272a' },
-    modalTitle: { color: '#ffffff' },
-    modalLabel: { color: '#d4d4d8' },
-    modalInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
-    infoRow: { borderBottomColor: '#27272a' },
-    infoLabel: { color: '#a1a1aa' },
-    infoValue: { color: '#ffffff' },
-    clientPillBtn: { backgroundColor: 'rgba(0, 44, 247, 0.15)', borderColor: '#002cf7' },
-    clientPillBtnText: { color: '#38bdf8' },
-    emptyStateContainer: { backgroundColor: '#121212', borderColor: '#27272a' },
-    emptyStateText: { color: '#a1a1aa' },
-
-    // Clients tab list overrides
-    clientCard: { backgroundColor: '#121212', borderColor: '#27272a' },
-    clientName: { color: '#ffffff' },
-    clientTel: { color: '#d4d4d8' },
-    clientFooter: { borderTopColor: '#27272a' },
-    clientMetaText: { color: '#a1a1aa' },
-
-    // Catalog overrides
-    serviceCard: { backgroundColor: '#121212', borderColor: '#27272a' },
-    serviceName: { color: '#ffffff' },
-    serviceDesc: { color: '#d4d4d8' },
-    servicePrice: { color: '#ffffff' },
-    catalogHeader: { backgroundColor: '#000000' },
-
-    // Bottom Sheet Order modal list row overrides
-    premiumDetailsOrderRowClickable: { backgroundColor: '#121212', borderColor: '#27272a' },
-    detailsListContainer: { backgroundColor: '#09090b', borderColor: '#27272a' },
-
-    // Modal popup views overrides (New client form, invoice details, order details)
-    compactModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
-    compactModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
-    compactModalTitle: { color: '#ffffff' },
-    compactLabel: { color: '#d4d4d8' },
-    compactInput: { backgroundColor: '#09090b', borderColor: '#27272a', color: '#ffffff' },
-    prefSelector: { backgroundColor: '#09090b' },
-    prefOptionActive: { backgroundColor: '#18181b' },
-    prefText: { color: '#d4d4d8' },
-    prefTextActive: { color: '#ffffff' },
-
-    popupModalOverlay: { backgroundColor: 'rgba(0, 0, 0, 0.65)' },
-    popupModalView: { backgroundColor: '#121212', borderColor: '#27272a', borderWidth: 1 },
-
-    detailSectionTitle: { color: '#d4d4d8' },
-    detailCard: { backgroundColor: '#09090b', borderColor: '#27272a', borderWidth: 1 },
-    detailTextMuted: { color: '#d4d4d8' },
-    detailArticleText: { color: '#d4d4d8' },
-    detailArticlePrice: { color: '#ffffff' },
-    detailLabelBold: { color: '#ffffff' },
-    detailLabelMuted: { color: '#a1a1aa' },
-    detailPriceBold: { color: '#38bdf8' },
-    logisticsText: { color: '#d4d4d8' },
-    detailDivider: { backgroundColor: '#27272a' },
-
-    // Client detailed profile fiche inside popup
-    clientProfileName: { color: '#ffffff' },
-    clientProfilePhone: { color: '#d4d4d8' },
-    clientProfileAddress: { color: '#a1a1aa' },
-    clientProfilePreferences: { color: '#38bdf8' },
-    clientEditBtn: { backgroundColor: 'rgba(56, 189, 248, 0.1)', borderColor: '#38bdf8' },
-    clientEditBtnText: { color: '#38bdf8' },
-    clientDeleteBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#f43f5e' },
-    clientDeleteBtnText: { color: '#f87171' },
-    premiumSubscriptionCard: { backgroundColor: '#09090b', borderColor: '#27272a' },
-    subscriptionTitle: { color: '#ffffff' },
-    subActiveBadge: { backgroundColor: 'rgba(74, 222, 128, 0.1)' },
-    subActiveBadgeText: { color: '#4ade80' },
-    subPlanName: { color: '#38bdf8' },
-    subPlanBalance: { color: '#d4d4d8' },
-    progressBarBg: { backgroundColor: '#27272a' },
-    progressText: { color: '#d4d4d8' },
-    subDateText: { color: '#a1a1aa' },
-    unsubscribeBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#ef4444' },
-    unsubscribeBtnText: { color: '#f87171' },
-
-    // Client detailed profile order history cards overrides
-    orderHistoryItem: { backgroundColor: '#09090b', borderColor: '#27272a' },
-    orderHistoryNo: { color: '#ffffff' },
-    orderHistoryDate: { color: '#d4d4d8' },
-    orderHistoryTotal: { color: '#ffffff' },
-  };
-
-  const merged = {};
-  Object.keys(baseStyles).forEach(key => {
-    merged[key] = StyleSheet.flatten(baseStyles[key]);
+const getStyles = (isDarkMode) => {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: isDarkMode ? '#000000' : '#f8fafc',
+    },
+    header: {
+      paddingHorizontal: 20,
+      paddingTop: Platform.OS === 'ios' ? 44 : 16,
+      paddingBottom: 8,
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: '800',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
+      letterSpacing: -0.5,
+    },
+    tabSelectorContainer: {
+      paddingHorizontal: 16,
+      marginBottom: 10,
+    },
+    tabSelector: {
+      flexDirection: 'row',
+      backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+      borderRadius: 14,
+      padding: 3,
+      position: 'relative',
+    },
+    slidingTabPill: {
+      position: 'absolute',
+      top: 3,
+      left: 3,
+      bottom: 3,
+      backgroundColor: isDarkMode ? '#27272a' : '#ffffff',
+      borderRadius: 11,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    tabButton: {
+      flex: 1,
+      paddingVertical: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1,
+    },
+    tabButtonText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
+    },
+    tabButtonTextActive: {
+      color: isDarkMode ? '#ffffff' : '#002cf7',
+      fontWeight: '700',
+    },
+    slidingContentOuter: {
+      flex: 1,
+      overflow: 'hidden',
+    },
+    slidingContentTrack: {
+      flex: 1,
+      flexDirection: 'row',
+    },
+    slidingPane: {
+      flex: 1,
+    },
+    searchSection: {
+      paddingHorizontal: 16,
+      marginBottom: 10,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      height: 44,
+    },
+    searchIcon: {
+      marginRight: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 13.5,
+      color: isDarkMode ? '#ffffff' : '#0f172a',
+      paddingVertical: 0,
+      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+    },
+    statusFilterRow: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      gap: 8,
+      marginBottom: 10,
+    },
+    chip: {
+      flex: 1,
+      paddingVertical: 7,
+      paddingHorizontal: 6,
+      borderRadius: 9999,
+      backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    chipActive: {
+      backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0, 44, 247, 0.08)',
+      borderColor: isDarkMode ? '#38bdf8' : '#002cf7',
+    },
+    chipActiveUrgent: {
+      backgroundColor: isDarkMode ? 'rgba(244, 63, 94, 0.15)' : 'rgba(225, 29, 72, 0.08)',
+      borderColor: isDarkMode ? '#f43f5e' : '#e11d48',
+    },
+    chipActiveLate: {
+      backgroundColor: isDarkMode ? 'rgba(251, 191, 36, 0.15)' : 'rgba(217, 119, 6, 0.08)',
+      borderColor: isDarkMode ? '#fbbf24' : '#d97706',
+    },
+    chipText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
+    },
+    chipTextActive: {
+      color: isDarkMode ? '#38bdf8' : '#002cf7',
+      fontWeight: '700',
+    },
+    chipTextActiveUrgent: {
+      color: isDarkMode ? '#f87171' : '#e11d48',
+      fontWeight: '700',
+    },
+    chipTextActiveLate: {
+      color: isDarkMode ? '#fbbf24' : '#d97706',
+      fontWeight: '700',
+    },
+    filterPillSection: {
+      paddingHorizontal: 16,
+      marginBottom: 10,
+    },
+    filterPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.2)' : '#e0e7ff',
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 9999,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#002cf7' : '#c7d2fe',
+    },
+    filterPillText: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: isDarkMode ? '#38bdf8' : '#002cf7',
+      marginRight: 8,
+    },
+    clearFilterBtn: {
+      padding: 2,
+    },
+    clearFilterText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: isDarkMode ? '#38bdf8' : '#002cf7',
+    },
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingTop: 4,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 60,
+      paddingHorizontal: 24,
+    },
+    emptyIconCircle: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+    emptyTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
+      marginBottom: 6,
+      textAlign: 'center',
+    },
+    emptySubtitle: {
+      fontSize: 13,
+      color: isDarkMode ? '#a1a1aa' : '#64748b',
+      textAlign: 'center',
+      lineHeight: 18,
+      maxWidth: 280,
+    },
+    emptyResetBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 18,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 9999,
+      backgroundColor: isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#eff6ff',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(0, 44, 247, 0.35)' : '#bfdbfe',
+    },
+    emptyResetBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDarkMode ? '#38bdf8' : '#002cf7',
+    },
   });
-  Object.keys(overrides).forEach(key => {
-    merged[key] = { ...merged[key], ...overrides[key] };
-  });
-  return merged;
 };

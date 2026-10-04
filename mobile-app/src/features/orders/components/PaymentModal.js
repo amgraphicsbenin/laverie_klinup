@@ -1,78 +1,35 @@
 /**
  * @file PaymentModal.js
- * @description Composant modal de confirmation de règlement final pour une commande.
- * Permet de sélectionner le mode de paiement (Espèces, Mobile Money) et de saisir la référence si Mobile Money.
+ * @description Modale moderne HeroUI pour le règlement du solde restant dû (Espèces ou Mobile Money).
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Modal, 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet 
-} from 'react-native';
-import { SmoothScrollView as ScrollView } from '../../../components/SmoothScroll';
-import { X } from 'lucide-react-native';
-import SafeBlurView from '../../../components/SafeBlurView';
-const BlurView = SafeBlurView;
-import { MotiView } from '../../../components/SafeView';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { CreditCard } from 'lucide-react-native';
+import { Modal } from '../../../components/ui/modal';
 
-/**
- * Composant de confirmation du paiement final.
- * 
- * @param {Object} props - Propriétés du composant.
- * @param {Boolean} props.visible - Contrôle la visibilité de la modale.
- * @param {Function} props.onClose - Rappel de fermeture de la modale.
- * @param {Object} props.order - La commande concernée.
- * @param {Boolean} props.isDarkMode - Thème sombre actif.
- * @param {Function} props.formatPrice - Fonction utilitaire pour formater la devise.
- * @param {Function} props.onConfirm - Callback appelé lors de la validation du paiement avec (method, ref).
- * @param {Object} props.styles - Styles hérités du parent.
- */
 export default function PaymentModal({
-  visible,
+  isOpen,
   onClose,
   order,
-  isDarkMode,
+  isDarkMode = false,
   formatPrice,
-  onConfirm,
-  styles
+  onConfirmPayment
 }) {
   const [paymentMethod, setPaymentMethod] = useState('Espèces');
   const [momoRefNumber, setMomoRefNumber] = useState('');
   const [momoRefError, setMomoRefError] = useState('');
   const [momoOperator, setMomoOperator] = useState('MTN');
-  const baseBorderColor = isDarkMode ? '#27272a' : '#cbd5e1';
-  const baseBg = 'transparent';
-  const activeBg = isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff';
-  const baseTextColor = isDarkMode ? '#a1a1aa' : '#64748b';
-  const activeColor = '#002cf7';
 
-  const cashBorder = paymentMethod === 'Espèces' ? activeColor : baseBorderColor;
-  const cashBg = paymentMethod === 'Espèces' ? activeBg : baseBg;
-  const cashColor = paymentMethod === 'Espèces' ? activeColor : baseTextColor;
-
-  const momoBorder = paymentMethod === 'Mobile Money' ? activeColor : baseBorderColor;
-  const momoBg = paymentMethod === 'Mobile Money' ? activeBg : baseBg;
-  const momoColor = paymentMethod === 'Mobile Money' ? activeColor : baseTextColor;
-
-  const momoInputBorder = momoRefError ? '#ef4444' : baseBorderColor;
-
-  // Réinitialise les états locaux à l'ouverture de la modale
   useEffect(() => {
-    if (visible) {
+    if (isOpen) {
       setPaymentMethod('Espèces');
       setMomoRefNumber('');
       setMomoRefError('');
       setMomoOperator('MTN');
     }
-  }, [visible]);
+  }, [isOpen]);
 
-  /**
-   * Valide les champs et lance la confirmation du paiement.
-   */
   const handleConfirm = () => {
     if (paymentMethod === 'Mobile Money') {
       const ref = momoRefNumber.trim();
@@ -85,154 +42,166 @@ export default function PaymentModal({
         return;
       }
     }
-    onConfirm(paymentMethod, momoRefNumber.trim(), momoOperator);
+
+    if (onConfirmPayment && order) {
+      onConfirmPayment(
+        order,
+        paymentMethod,
+        paymentMethod === 'Mobile Money' ? momoRefNumber.trim() : null,
+        paymentMethod === 'Mobile Money' ? momoOperator : null
+      );
+    }
   };
 
-  if (!visible || !order) return null;
+  if (!isOpen || !order) return null;
+
+  const total = Number(order.prix_total !== undefined ? order.prix_total : (order.total || 0));
+  const avance = Number(order.avance_payee !== undefined ? order.avance_payee : (order.avance || 0));
+  const solde = Math.max(0, total - avance);
+  const displayTicket = order.ticket_numero || order.id || '-';
 
   return (
-    <MotiView
-      pointerEvents={visible ? 'auto' : 'none'}
-      animate={{
-        opacity: visible ? 1 : 0
-      }}
-      transition={{ type: 'timing', duration: 120 }}
-      style={[
-        StyleSheet.absoluteFill,
-        { 
-          zIndex: 9999,
-          bottom: 0
-        }
-      ]}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="md"
+      isDarkMode={isDarkMode}
     >
-      <View style={styles.absoluteModalContainer || { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
-        <View style={styles.popupModalOverlay || { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.65)', padding: 16 }}>
-          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
-          <View style={[styles.popupModalView || { width: '100%', maxWidth: 380, backgroundColor: isDarkMode ? '#121212' : '#ffffff', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: isDarkMode ? '#27272a' : '#e4e4e7', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }, { maxHeight: '80%' }]}>
-            
-            {/* En-tête de la modale */}
-            <View style={styles.compactModalHeader || { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-              <View>
-                <Text style={styles.compactModalTitle || { fontSize: 16, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>
-                  Enregistrer le Règlement
-                </Text>
-                <Text style={{ fontSize: 11, color: '#3b82f6', fontWeight: '600', marginTop: 2 }}>
-                  Règlement du solde requis avant le lavage
-                </Text>
+      <Modal.Backdrop>
+        <Modal.Container size="md">
+          <Modal.Dialog>
+            <Modal.CloseTrigger />
+            <Modal.Header layout="row">
+              <Modal.Icon variant="success">
+                <CreditCard size={20} color="#10b981" />
+              </Modal.Icon>
+              <View style={{ flex: 1 }}>
+                <Modal.Heading>Confirmation du Règlement</Modal.Heading>
+                <Modal.Description numberOfLines={1}>
+                  Ticket {displayTicket}
+                </Modal.Description>
               </View>
-              <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-                <X size={20} color={isDarkMode ? '#94a3b8' : '#71717a'} />
-              </TouchableOpacity>
-            </View>
+            </Modal.Header>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Résumé financier */}
-              <View style={{ marginBottom: 15, padding: 12, backgroundColor: isDarkMode ? '#09090b' : '#f8fafc', borderRadius: 8 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={{ fontSize: 12, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Total Commande:</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155' }}>
-                    {formatPrice(order.prix_total || order.total || 0)}
+            <Modal.Body scrollable={false}>
+              {/* Financial Summary */}
+              <View style={[
+                styles.summaryBox,
+                {
+                  backgroundColor: isDarkMode ? '#121212' : '#f8fafc',
+                  borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
+                }
+              ]}>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
+                    Total Commande
+                  </Text>
+                  <Text style={[styles.summaryValue, { color: isDarkMode ? '#ffffff' : '#09090b' }]}>
+                    {formatPrice ? formatPrice(total) : `${total} FCFA`}
                   </Text>
                 </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={{ fontSize: 12, color: isDarkMode ? '#94a3b8' : '#64748b' }}>Avance déjà payée:</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#16a34a' }}>
-                    {formatPrice(order.avance_payee || order.avance || 0)}
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
+                    Acompte déjà payé
+                  </Text>
+                  <Text style={[styles.summaryValue, { color: '#16a34a' }]}>
+                    {formatPrice ? formatPrice(avance) : `${avance} FCFA`}
                   </Text>
                 </View>
-                <View style={{ height: 1, backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0', marginVertical: 6 }} />
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#f8fafc' : '#09090b' }}>Reste à payer:</Text>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#ef4444' }}>
-                    {formatPrice(order.reste || 0)}
+                <View style={[styles.divider, { backgroundColor: isDarkMode ? '#27272a' : '#e2e8f0' }]} />
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.totalLabel, { color: isDarkMode ? '#f8fafc' : '#09090b' }]}>
+                    Solde restant à régler
+                  </Text>
+                  <Text style={[styles.totalValue, { color: '#ef4444' }]}>
+                    {formatPrice ? formatPrice(solde) : `${solde} FCFA`}
                   </Text>
                 </View>
               </View>
 
-              {/* Sélection du mode de règlement */}
-              <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 10 }}>
-                Sélectionner le mode de règlement :
+              {/* Payment Method Selector */}
+              <Text style={[styles.fieldTitle, { color: isDarkMode ? '#d4d4d8' : '#334155' }]}>
+                Mode de règlement du solde
               </Text>
-              
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+              <View style={styles.methodRow}>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => {
                     setPaymentMethod('Espèces');
                     setMomoRefError('');
                   }}
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingVertical: 12,
-                    borderRadius: 9999,
-                    borderWidth: 1.5,
-                    borderColor: cashBorder,
-                    backgroundColor: cashBg
-                  }}
+                  style={[
+                    styles.methodBtn,
+                    {
+                      borderColor: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
+                      backgroundColor: paymentMethod === 'Espèces' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent',
+                    }
+                  ]}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: cashColor }}>
+                  <Text style={[
+                    styles.methodBtnText,
+                    { color: paymentMethod === 'Espèces' ? '#002cf7' : (isDarkMode ? '#94a3b8' : '#64748b') }
+                  ]}>
                     Espèces (Cash)
                   </Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => setPaymentMethod('Mobile Money')}
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingVertical: 12,
-                    borderRadius: 9999,
-                    borderWidth: 1.5,
-                    borderColor: momoBorder,
-                    backgroundColor: momoBg
-                  }}
+                  style={[
+                    styles.methodBtn,
+                    {
+                      borderColor: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#27272a' : '#d4d4d8'),
+                      backgroundColor: paymentMethod === 'Mobile Money' ? (isDarkMode ? 'rgba(0, 44, 247, 0.15)' : '#e0e7ff') : 'transparent',
+                    }
+                  ]}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: momoColor }}>
+                  <Text style={[
+                    styles.methodBtnText,
+                    { color: paymentMethod === 'Mobile Money' ? '#002cf7' : (isDarkMode ? '#94a3b8' : '#64748b') }
+                  ]}>
                     Mobile Money
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Champ optionnel Référence Mobile Money */}
+              {/* Mobile Money Details */}
               {paymentMethod === 'Mobile Money' && (
-                <View style={{ marginBottom: 18 }}>
-                  {/* Opérateur Mobile Money */}
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={[styles.fieldTitle, { color: isDarkMode ? '#d4d4d8' : '#334155' }]}>
                     Opérateur Réseau <Text style={{ color: '#ef4444' }}>*</Text>
                   </Text>
-                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                  <View style={styles.operatorRow}>
                     {['MTN', 'MOOV', 'CELTIS'].map((op) => (
                       <TouchableOpacity
                         key={op}
                         onPress={() => setMomoOperator(op)}
                         activeOpacity={0.8}
-                        style={{
-                          flex: 1,
-                          paddingVertical: 10,
-                          borderRadius: 9999,
-                          borderWidth: momoOperator === op ? 2 : 1.5,
-                          borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
-                          backgroundColor: momoOperator === op
-                            ? (op === 'MTN' ? '#FFCC00' : op === 'MOOV' ? '#0057A8' : '#E30613')
-                            : (isDarkMode ? '#18181b' : '#f8fafc'),
-                          alignItems: 'center'
-                        }}
+                        style={[
+                          styles.operatorBtn,
+                          {
+                            borderWidth: momoOperator === op ? 2 : 1.5,
+                            borderColor: momoOperator === op ? '#002cf7' : (isDarkMode ? '#3f3f46' : '#d4d4d8'),
+                            backgroundColor: momoOperator === op
+                              ? (op === 'MTN' ? '#FFCC00' : op === 'MOOV' ? '#0057A8' : '#E30613')
+                              : (isDarkMode ? '#18181b' : '#f8fafc'),
+                          }
+                        ]}
                       >
-                        <Text style={{
-                          fontWeight: '800',
-                          fontSize: 12,
-                          color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : (isDarkMode ? '#94a3b8' : '#64748b')
-                        }}>{op}</Text>
+                        <Text style={[
+                          styles.operatorBtnText,
+                          {
+                            color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : (isDarkMode ? '#94a3b8' : '#64748b')
+                          }
+                        ]}>
+                          {op}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
 
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#334155', marginBottom: 8 }}>
+                  <Text style={[styles.fieldTitle, { color: isDarkMode ? '#d4d4d8' : '#334155' }]}>
                     Numéro de Référence <Text style={{ color: '#ef4444' }}>*</Text>
                   </Text>
                   <TextInput
@@ -246,63 +215,116 @@ export default function PaymentModal({
                     placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
                     keyboardType="numeric"
                     maxLength={15}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: momoInputBorder,
-                      borderRadius: 12,
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      fontSize: 13,
-                      color: isDarkMode ? '#f8fafc' : '#09090b',
-                      backgroundColor: isDarkMode ? '#09090b' : '#ffffff'
-                    }}
+                    style={[
+                      styles.input,
+                      {
+                        borderColor: momoRefError ? '#ef4444' : (isDarkMode ? '#27272a' : '#d4d4d8'),
+                        color: isDarkMode ? '#f8fafc' : '#09090b',
+                        backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
+                      }
+                    ]}
                   />
                   {momoRefError ? (
-                    <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>{momoRefError}</Text>
+                    <Text style={styles.errorText}>{momoRefError}</Text>
                   ) : null}
                 </View>
               )}
+            </Modal.Body>
 
-              {/* Boutons de validation */}
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                <TouchableOpacity
-                  onPress={onClose}
-                  activeOpacity={0.8}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 12,
-                    borderRadius: 9999,
-                    borderWidth: 1.5,
-                    borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#d4d4d8' : '#64748b' }}>
-                    Annuler
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleConfirm}
-                  activeOpacity={0.8}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#16a34a',
-                    paddingVertical: 12,
-                    borderRadius: 9999,
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#ffffff' }}>
-                    Confirmer
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </View>
-    </MotiView>
+            <Modal.Footer>
+              <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
+                Annuler
+              </Modal.Button>
+              <Modal.Button variant="success" onPress={handleConfirm} style={{ flex: 1 }}>
+                Confirmer
+              </Modal.Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  summaryBox: {
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 13,
+  },
+  summaryValue: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    marginVertical: 8,
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  totalValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  fieldTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  methodRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  methodBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 9999,
+    borderWidth: 1.5,
+  },
+  methodBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  operatorRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  operatorBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 9999,
+    alignItems: 'center',
+  },
+  operatorBtnText: {
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+  },
+  errorText: {
+    fontSize: 11,
+    color: '#ef4444',
+    marginTop: 4,
+  },
+});

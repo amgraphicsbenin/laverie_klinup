@@ -1,57 +1,33 @@
 /**
  * @file CancelModal.js
- * @description Composant modal permettant de saisir et de valider le motif d'annulation d'une commande.
+ * @description Modale moderne HeroUI pour la saisie et la validation obligatoire du motif d'annulation d'une commande.
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Modal, 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet 
-} from 'react-native';
-import { X, Ban } from 'lucide-react-native';
-import SafeBlurView from '../../../components/SafeBlurView';
-const BlurView = SafeBlurView;
-import { MotiView } from '../../../components/SafeView';
+import { View, Text, TextInput, Platform, StyleSheet } from 'react-native';
+import { Ban } from 'lucide-react-native';
+import { Modal } from '../../../components/ui/modal';
 
-/**
- * Composant de modal d'annulation de commande.
- * 
- * @param {Object} props - Propriétés du composant.
- * @param {Boolean} props.visible - Contrôle la visibilité de la modale.
- * @param {Function} props.onClose - Rappel déclenché lors de la fermeture de la modale.
- * @param {Object} props.order - La commande que l'on souhaite annuler.
- * @param {Boolean} props.isDarkMode - Indicateur du thème actif.
- * @param {Function} props.onConfirm - Action à exécuter avec le motif validé.
- * @param {Object} props.styles - Styles partagés hérités du parent.
- */
-export default function CancelModal({ 
-  visible, 
-  onClose, 
-  order, 
-  isDarkMode, 
-  onConfirm, 
-  styles 
+export default function CancelModal({
+  isOpen,
+  onClose,
+  order,
+  client,
+  isDarkMode = false,
+  formatPrice,
+  getDisplayTicketId,
+  onConfirmCancel
 }) {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelReasonError, setCancelReasonError] = useState('');
 
-  // Réinitialise les champs locaux lorsque la modale s'ouvre ou se ferme
   useEffect(() => {
-    if (visible) {
+    if (isOpen) {
       setCancelReason('');
       setCancelReasonError('');
     }
-  }, [visible]);
+  }, [isOpen]);
 
-  /**
-   * Valide la saisie textuelle du motif d'annulation.
-   * @param {String} text - Le texte saisi.
-   * @returns {String|null} Message d'erreur en français ou null si valide.
-   */
   const validateCancelReason = (text) => {
     const trimmed = text.trim();
     if (!trimmed) {
@@ -64,96 +40,107 @@ export default function CancelModal({
     return null;
   };
 
-  /**
-   * Soumet le motif d'annulation au parent après validation.
-   */
   const handleConfirm = () => {
     const error = validateCancelReason(cancelReason);
     if (error) {
       setCancelReasonError(error);
       return;
     }
-    onConfirm(cancelReason.trim());
+    if (onConfirmCancel && order) {
+      onConfirmCancel(order, cancelReason.trim());
+    }
   };
 
-  if (!visible || !order) return null;
+  if (!isOpen || !order) return null;
 
-  const inputBorderColor = cancelReasonError ? '#ef4444' : (isDarkMode ? '#27272a' : '#e2e8f0');
+  const displayTicket = getDisplayTicketId ? getDisplayTicketId(order) : (order.ticket_numero || order.id);
+  const clientName = client ? `${client.prenom} ${client.nom}` : (order.client_nom || 'Client');
+  const totalPrice = formatPrice ? formatPrice(order.prix_total !== undefined ? order.prix_total : (order.total || 0)) : `${order.prix_total || order.total || 0} FCFA`;
+
   return (
-    <MotiView
-      pointerEvents={visible ? 'auto' : 'none'}
-      animate={{
-        opacity: visible ? 1 : 0
-      }}
-      transition={{ type: 'timing', duration: 120 }}
-      style={[
-        StyleSheet.absoluteFill,
-        { 
-          zIndex: 9999,
-          bottom: 0
-        }
-      ]}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="sm"
+      isDarkMode={isDarkMode}
     >
-      <View style={styles.absoluteModalContainer}>
-        <View style={styles.compactModalOverlay}>
-          <TouchableOpacity 
-            activeOpacity={1} 
-            style={StyleSheet.absoluteFill} 
-            onPress={onClose}
-          />
-          
-          <MotiView
-            from={{ opacity: 0, scale: 0.97, translateY: 10 }}
-            animate={{ opacity: 1, scale: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 150 }}
-            style={[styles.popupModalView, { width: '92%', maxWidth: 350, padding: 20 }]}
-          >
-            <View style={styles.compactModalHeader}>
-              <Text style={styles.compactModalTitle}>Annuler la commande</Text>
-              <TouchableOpacity onPress={onClose}>
-                <X size={20} color="#71717a" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ alignItems: 'center', marginVertical: 10 }}>
-              <View style={{ 
-                width: 48, 
-                height: 48, 
-                borderRadius: 24, 
-                backgroundColor: 'rgba(239, 68, 68, 0.1)', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                marginBottom: 12 
-              }}>
-                <Ban size={22} color="#ef4444" />
+      <Modal.Backdrop>
+        <Modal.Container size="sm">
+          <Modal.Dialog>
+            <Modal.CloseTrigger />
+            <Modal.Header layout="row">
+              <Modal.Icon variant="danger">
+                <Ban size={20} color="#ef4444" />
+              </Modal.Icon>
+              <View style={{ flex: 1 }}>
+                <Modal.Heading>Annuler la commande</Modal.Heading>
+                <Modal.Description numberOfLines={1}>
+                  Ticket {displayTicket}
+                </Modal.Description>
               </View>
-              <Text style={{ 
-                fontSize: 13, 
-                color: isDarkMode ? '#d4d4d8' : '#64748b', 
-                textAlign: 'center', 
-                paddingHorizontal: 10 
-              }}>
-                Veuillez spécifier le motif d'annulation de la commande {order ? (order.id || order.identifiant_unique_marquage || order.ticket_numero) : ''}.
-              </Text>
-            </View>
+            </Modal.Header>
 
-            <View style={{ marginVertical: 10 }}>
-              <TextInput
+            <Modal.Body>
+              {/* Récapitulatif de la commande ciblée */}
+              <View
                 style={[
-                  styles.modalInput,
+                  styles.summaryBox,
                   {
-                    height: 80,
-                    textAlignVertical: 'top',
-                    padding: 12,
-                    borderColor: inputBorderColor,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
-                    color: isDarkMode ? '#ffffff' : '#09090b',
+                    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc',
+                    borderColor: isDarkMode ? '#27272a' : '#e2e8f0',
                   }
                 ]}
-                placeholder="Ex: Erreur de saisie, client absent..."
-                placeholderTextColor={isDarkMode ? '#64748b' : '#a1a1aa'}
+              >
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.clientName,
+                      { color: isDarkMode ? '#ffffff' : '#09090b' }
+                    ]}
+                  >
+                    {clientName}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.ticketText,
+                      { color: isDarkMode ? '#a1a1aa' : '#64748b' }
+                    ]}
+                  >
+                    Ticket {displayTicket}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.priceText,
+                    { color: isDarkMode ? '#f87171' : '#dc2626' }
+                  ]}
+                >
+                  {totalPrice}
+                </Text>
+              </View>
+
+              <Text
+                style={[
+                  styles.instructionText,
+                  { color: isDarkMode ? '#d4d4d8' : '#475569' }
+                ]}
+              >
+                Veuillez spécifier le motif d'annulation de cette commande :
+              </Text>
+
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    borderColor: cancelReasonError ? '#ef4444' : (isDarkMode ? '#3f3f46' : '#cbd5e1'),
+                    backgroundColor: isDarkMode ? '#09090b' : '#ffffff',
+                    color: isDarkMode ? '#ffffff' : '#09090b',
+                    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                  }
+                ]}
+                placeholder="Ex: Erreur de saisie, client absent, doublon..."
+                placeholderTextColor={isDarkMode ? '#71717a' : '#94a3b8'}
                 multiline={true}
                 numberOfLines={3}
                 value={cancelReason}
@@ -162,49 +149,72 @@ export default function CancelModal({
                   if (cancelReasonError) setCancelReasonError('');
                 }}
               />
+
               {cancelReasonError ? (
-                <Text style={{ color: '#ef4444', fontSize: 10, marginTop: 6, fontWeight: '600' }}>
+                <Text style={styles.errorText}>
                   {cancelReasonError}
                 </Text>
               ) : null}
-            </View>
+            </Modal.Body>
 
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
-              <TouchableOpacity
-                onPress={onClose}
-                style={{
-                  flex: 1,
-                  backgroundColor: isDarkMode ? '#27272a' : '#f4f4f5',
-                  borderRadius: 9999,
-                  paddingVertical: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: isDarkMode ? '#d4d4d8' : '#27272a', fontWeight: '700', fontSize: 13 }}>
-                  Retour
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleConfirm}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#ef4444',
-                  borderRadius: 9999,
-                  paddingVertical: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>
-                  Confirmer
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </MotiView>
-        </View>
-      </View>
-    </MotiView>
+            <Modal.Footer>
+              <Modal.Button slot="close" variant="secondary" style={{ flex: 1 }}>
+                Retour
+              </Modal.Button>
+              <Modal.Button variant="danger" onPress={handleConfirm} style={{ flex: 1 }}>
+                Confirmer
+              </Modal.Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  summaryBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+  },
+  clientName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  ticketText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  priceText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  instructionText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+  input: {
+    width: '100%',
+    minHeight: 88,
+    textAlignVertical: 'top',
+    padding: 12,
+    fontSize: 13.5,
+    lineHeight: 19,
+    borderWidth: 1.5,
+    borderRadius: 14,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 11.5,
+    marginTop: 6,
+    fontWeight: '600',
+  },
+});
