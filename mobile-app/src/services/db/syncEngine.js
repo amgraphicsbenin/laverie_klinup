@@ -28,6 +28,7 @@ export function getIsUsingRemote() {
 }
 
 // --- PERSISTENCE HELPERS (ASYNCSTORAGE) ---
+let canRestorePersistedUser = Platform.OS === 'web';
 
 /**
  * Charge une clé de stockage locale ou retourne sa valeur par défaut si absente.
@@ -78,15 +79,18 @@ const INSTALL_TIME_KEY = 'klin_up_installation_time';
  * la session est immédiatement purgée pour forcer la connexion par email et code PIN.
  */
 async function verifyInstallSessionIntegrity() {
+  canRestorePersistedUser = Platform.OS === 'web';
   try {
     if (Platform.OS === 'web') return;
 
     if (!Application || typeof Application.getInstallationTimeAsync !== 'function') {
-      return;
+      throw new Error('API native de date d’installation indisponible.');
     }
 
     const installDate = await Application.getInstallationTimeAsync();
-    if (!installDate || typeof installDate.getTime !== 'function') return;
+    if (!installDate || typeof installDate.getTime !== 'function' || !Number.isFinite(installDate.getTime())) {
+      throw new Error('Date d’installation native invalide.');
+    }
 
     const currentInstallTime = installDate.getTime().toString();
     const storedInstallTime = await AsyncStorage.getItem(INSTALL_TIME_KEY);
@@ -111,8 +115,17 @@ async function verifyInstallSessionIntegrity() {
       memoryDb.current_user = null;
       await AsyncStorage.setItem(INSTALL_TIME_KEY, currentInstallTime);
     }
+
+    canRestorePersistedUser = true;
   } catch (err) {
     console.warn('[Auth Security] Erreur lors de la vérification de l\'intégrité de l\'installation :', err?.message || err);
+    memoryDb.current_user = null;
+    canRestorePersistedUser = false;
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    } catch (cleanupError) {
+      console.error('[Auth Security] Impossible de supprimer la session locale non vérifiée :', cleanupError);
+    }
   }
 }
 
@@ -125,7 +138,9 @@ export async function loadFromLocalStorage() {
     await verifyInstallSessionIntegrity();
 
     // 2. Chargement de l'utilisateur connecté s'il existe
-    const userRaw = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    const userRaw = canRestorePersistedUser
+      ? await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_USER)
+      : null;
     if (userRaw) {
       memoryDb.current_user = JSON.parse(userRaw);
     } else {
@@ -434,7 +449,9 @@ export async function initDb(isRetry = false) {
         memoryDb.pickup_zones = pickupRes.value.data;
       }
 
-      memoryDb.current_user = memoryDb.current_user ?? (await loadData(STORAGE_KEYS.CURRENT_USER, null));
+      if (canRestorePersistedUser) {
+        memoryDb.current_user = memoryDb.current_user ?? (await loadData(STORAGE_KEYS.CURRENT_USER, null));
+      }
       isUsingRemote = true;
 
       console.log("[DB Sync] ✅ Connecté à Supabase.");
