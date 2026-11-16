@@ -344,22 +344,32 @@ export default function CustomersTab({
       setModalFeedback({ type: 'error', text: 'Veuillez entrer un nombre de points valide.' });
       return;
     }
+    const cleanReason = (reasonInput || '').trim();
+    if (!cleanReason) {
+      if (customDelta !== null) {
+        setPointsDeltaInput(String(customDelta));
+      }
+      setModalFeedback({ type: 'error', text: 'Le motif de l\'ajustement est obligatoire avant validation.' });
+      return;
+    }
 
     try {
-      const updated = await db.adjustCustomerPoints(
+      await db.requestRewardPointAdjustment(
         selectedCrmCustomer.id,
         deltaVal,
-        reasonInput || 'Ajustement Admin CMS'
+        cleanReason
       );
-      if (updated) {
-        setSelectedCrmCustomer({ ...updated });
-        setModalFeedback({ type: 'success', text: `Solde mis à jour (${deltaVal >= 0 ? '+' : ''}${deltaVal} pts) !` });
-        setTimeout(() => {
-          handleCloseRewardModal();
-        }, 1200);
-      }
+      setModalFeedback({
+        type: 'success',
+        text: `Demande d'ajustement (${deltaVal >= 0 ? '+' : ''}${deltaVal} pts) créée et envoyée pour validation !`
+      });
+      setPointsDeltaInput('');
+      setReasonInput('');
+      setTimeout(() => {
+        handleCloseRewardModal();
+      }, 1400);
     } catch (err) {
-      setModalFeedback({ type: 'error', text: err.message || 'Échec de l\'ajustement des points.' });
+      setModalFeedback({ type: 'error', text: err.message || 'Échec de la demande d\'ajustement.' });
     }
   };
 
@@ -1360,6 +1370,45 @@ export default function CustomersTab({
                         </button>
                       </div>
 
+                      {(() => {
+                        const pendingAdjs = (db.getRewardPointAdjustments ? db.getRewardPointAdjustments() : [])
+                          .filter(a => a.customer_id === activeCustomer.id && a.status === 'pending');
+                        if (pendingAdjs.length === 0) return null;
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
+                            {pendingAdjs.map((adj) => (
+                              <div
+                                key={adj.id}
+                                style={{
+                                  padding: '0.75rem 0.9rem',
+                                  borderRadius: '12px',
+                                  background: 'rgba(245, 158, 11, 0.1)',
+                                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.25rem'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#b45309' }}>
+                                    ⏳ Ajustement en attente de validation
+                                  </span>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#d97706' }}>
+                                    {adj.points_delta > 0 ? `+${adj.points_delta}` : adj.points_delta} pts
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: 'var(--text-primary)' }}>
+                                  <strong>Motif :</strong> {adj.reason}
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                                  Demandé par {adj.requested_by_name || 'Agent'}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+
                       {/* Bons & Récompenses Débloqués */}
                       <div style={{
                         marginTop: '0.3rem',
@@ -1894,7 +1943,7 @@ export default function CustomersTab({
 
                       <div>
                         <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '6px' }}>
-                          Motif de l'ajustement (optionnel) :
+                          Motif de l&apos;ajustement <span style={{ color: '#ef4444' }}>*</span> :
                         </label>
                         <input
                           type="text"

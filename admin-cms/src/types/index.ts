@@ -246,6 +246,44 @@ export interface SupportTicket {
   updated_at?: string;
 }
 
+export interface RewardPointAdjustment {
+  id: string;
+  customer_id: string;
+  customer_name?: string;
+  store_id?: string;
+  points_delta: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requested_by_id?: string;
+  requested_by_name?: string;
+  requested_by_role?: string;
+  validated_by_id?: string;
+  validated_by_name?: string;
+  validated_by_role?: string;
+  rejection_reason?: string;
+  created_at?: string;
+  validated_at?: string;
+}
+
+export interface Expense {
+  id: string;
+  store_id: string;
+  category: string;
+  label: string;
+  description?: string;
+  amount: number;
+  payment_method: string;
+  expense_date: string;
+  status: 'validee' | 'en_attente' | 'rejetee';
+  reference?: string;
+  created_by_id?: string;
+  created_by_name?: string;
+  created_by_role?: string;
+  source?: 'app' | 'admin';
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface MemoryStore {
   stores: Store[];
   selected_store_id: string;
@@ -256,6 +294,8 @@ export interface MemoryStore {
   logs: ActivityLog[];
   catalog: CatalogItem[];
   rewards?: RewardItem[];
+  reward_point_adjustments?: RewardPointAdjustment[];
+  expenses?: Expense[];
   delivery_zones?: DeliveryZone[];
   pickup_zones?: PickupZone[];
   support_tickets?: SupportTicket[];

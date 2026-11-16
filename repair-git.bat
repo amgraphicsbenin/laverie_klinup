@@ -1,15 +1,23 @@
 @echo off
-:: repair-git.bat - Répare le fichier .git/index corrompu du projet KLIN UP
-:: Double-cliquer pour réparer manuellement si l'erreur git index persiste
+:: repair-git.bat - Repare le fichier .git/index corrompu du projet KLIN UP
+:: Double-cliquer pour reparer manuellement si l'erreur git index persiste
 
-set REPO=%~dp0
-set GIT_EXE=C:\Users\ANDRE\AppData\Local\Programs\Git\cmd\git.exe
-set INDEX=%REPO%.git\index
-set BACKUP=%REPO%.git\index.backup
+set "REPO=%~dp0"
+set "INDEX=%REPO%.git\index"
+set "BACKUP=%REPO%.git\index.backup"
+
+where git >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    set "GIT_CMD=git"
+) else if exist "C:\Program Files\Git\cmd\git.exe" (
+    set "GIT_CMD=C:\Program Files\Git\cmd\git.exe"
+) else (
+    set "GIT_CMD="
+)
 
 echo [KLIN UP] Verification de l'index Git...
 
-:: Vérifier si l'index est corrompu (0 octet)
+:: Verifier si l'index est corrompu (0 octet)
 for /f "tokens=*" %%f in ('powershell -NoProfile -Command "(Get-Item '%INDEX%' -ErrorAction SilentlyContinue).Length"') do set SIZE=%%f
 
 if "%SIZE%"=="0" (
@@ -27,8 +35,10 @@ if "%SIZE%"=="0" (
     
     :: Sinon reconstruire depuis HEAD
     del /f "%INDEX%" 2>nul
-    "%GIT_EXE%" -C "%REPO%" reset HEAD .
-    echo [REPAIR] Index reconstruit depuis HEAD
+    if defined GIT_CMD (
+        "%GIT_CMD%" -C "%REPO%" reset HEAD .
+        echo [REPAIR] Index reconstruit depuis HEAD
+    )
 ) else (
     echo [OK] Index sain - Taille: %SIZE% bytes
     :: Mettre a jour le backup

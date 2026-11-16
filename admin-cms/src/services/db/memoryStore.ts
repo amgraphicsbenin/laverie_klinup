@@ -21,6 +21,8 @@ export const memoryDb: MemoryStore = {
   catalog: [],
   roles: [],
   rewards: [],
+  reward_point_adjustments: [],
+  expenses: [],
   delivery_zones: [],
   pickup_zones: [],
   support_tickets: [],

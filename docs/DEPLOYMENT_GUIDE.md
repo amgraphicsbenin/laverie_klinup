@@ -1,6 +1,6 @@
 # 🚀 Guide Complet d'Architecture et de Déploiement Multi-Environnements
 
-Ce guide détaille le fonctionnement, la configuration et la gestion opérationnelle de l'architecture multi-environnements mise en place pour la plateforme **KLIN UP** (Application Mobile, Admin CMS et bases de données Supabase).
+Ce guide détaille le fonctionnement, la configuration et la gestion opérationnelle de l'architecture multi-environnements mise en place pour la plateforme **KLIN UP** (Application Mobile Native Android Kotlin / Jetpack Compose, Admin CMS et bases de données Supabase).
 
 ---
 
@@ -67,25 +67,27 @@ Dans chaque environnement, ajoutez les secrets correspondants :
 |---|---|---|
 | `SUPABASE_URL` | `https://ryjwrjzggfwglfmyovhk.supabase.co` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
 | `SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5andyanpnZ2Z3Z2xmbXlvdmhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NDE4NDcsImV4cCI6MjEwNTExNzg0N30.SuL0HAWzX2EmISFgf01wt5huArlRw5Dcd4fayMpVt8c` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjbnF3cWtqbmxzcmJkYm11a3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzA1NzEsImV4cCI6MjA5Njg0NjU3MX0.8RdoITBg_AXDqN2DxuZlarrF_sx-ya1DCSyS-FLy0mo` |
-| `EXPO_PUBLIC_SUPABASE_URL` | `https://ryjwrjzggfwglfmyovhk.supabase.co` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | *(Même clé anon que ci-dessus)* | *(Même clé anon que ci-dessus)* |
 | `VITE_SUPABASE_URL` | `https://ryjwrjzggfwglfmyovhk.supabase.co` | `https://ucnqwqkjnlsrbdbmukvz.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | *(Même clé anon que ci-dessus)* | *(Même clé anon que ci-dessus)* |
-| `FIREBASE_APP_ID` | `1:735467305399:android:170a40ff0cb9af8069032` (Test) | *(ID app Firebase Prod si configuré)* |
+| `FIREBASE_APP_ID` | `1:735467305399:android:170a40fff0cb9af8069032` (Test) | *(ID app Firebase Prod si configuré)* |
 | `FIREBASE_SERVICE_ACCOUNT` | *(Contenu JSON clé privée service account Firebase)* | *(Contenu JSON clé privée)* |
 
 ---
 
-## 📱 4. Coexistence des Applications sur Smartphone
+## 📱 4. Application Mobile Native Android (`android-app/`)
 
-Grâce au fichier [`mobile-app/app.config.js`](../mobile-app/app.config.js), le nom de l'application et l'identifiant de package Android changent automatiquement selon la branche et l'environnement :
+L'application mobile est une application Android native construite avec **Kotlin** et **Jetpack Compose**.
+Le fichier de configuration Firebase se trouve dans [`android-app/app/google-services.json`](../android-app/app/google-services.json).
 
-* **`KLIN UP (Test)`** (`com.klinup.laverie.test`)
-* **`KLIN UP (Bêta)`** (`com.klinup.laverie.beta`)
-* **`KLIN UP`** (`com.klinup.laverie`)
+Pour compiler l'APK Release/Debug en local :
+```bash
+cd android-app
+.\gradlew.bat assembleRelease
+```
+L'APK se trouve ensuite dans `android-app/app/build/outputs/apk/release/app-release.apk`.
 
 > [!TIP]
-> **Avantage majeur** : Les livreurs, gérants et développeurs peuvent installer **simultanément** la version de test et la version officielle de production sur le même téléphone Android sans conflit ni désinstallation.
+> **Avantage majeur** : Les livreurs, gérants et développeurs bénéficient des performances natives Android avec l'UI moderne Jetpack Compose et la réactivité du SDK Kotlin Supabase.
 
 ---
 
@@ -105,7 +107,7 @@ git merge feature/ma-fonctionnalite
 git push origin test
 ```
 * **Résultat automatique** :
-  - GitHub Actions compile l'APK `klinup-test-vX.X.X-bY.apk` connecté à `klinup-test`.
+  - GitHub Actions compile l'APK native `klinup-test-v1.0.0-bY.apk` connecté à `klinup-test`.
   - GitHub Actions compile l'Admin CMS Test avec le bandeau d'alerte jaune.
 
 ### 3. Promotion en Staging (Bêta)
@@ -116,7 +118,7 @@ git merge test
 git push origin staging
 ```
 * **Résultat automatique** :
-  - GitHub Actions compile l'APK `klinup-staging-vX.X.X-bY.apk` connecté à `klinup-staging`.
+  - GitHub Actions compile l'APK native `klinup-staging-v1.0.0-bY.apk` connecté à `klinup-staging`.
   - La direction et les livreurs bêta-testeurs testent sur le terrain.
 
 ### 4. Mise en Production Finale
@@ -128,7 +130,7 @@ git push origin production
 ```
 * **Résultat automatique** :
   - L'audit de sécurité SQL automatique (`production-guardrails.yml`) s'exécute et vérifie qu'aucune commande destructive (`TRUNCATE`, `DROP TABLE`, `DROP COLUMN`) n'est présente.
-  - Si l'audit passe, compilation de l'APK Release `klinup-production-vX.X.X-bY.apk` et build CMS officiel.
+  - Si l'audit passe, compilation Gradle de l'APK Release `klinup-production-v1.0.0-bY.apk` et build CMS officiel.
 
 ---
 
@@ -138,5 +140,3 @@ git push origin production
 2. **Linter SQL Automatisé** : Le script [`scripts/check-sql-safety.js`](../scripts/check-sql-safety.js) bloque automatiquement tout commit ou PR vers `production` s'il détecte des commandes destructrices.
 3. **Soft Deletes Actifs** : Les commandes et clients utilisent `deleted_at`. Une suppression par un utilisateur ne détruit rien physiquement sur le disque et peut être restaurée immédiatement.
 4. **Étanchéité des Seeds** : Le fichier [`supabase/seed_test.sql`](../supabase/seed_test.sql) est strictement réservé au projet de test et ignoré par les pipelines de production.
-
-

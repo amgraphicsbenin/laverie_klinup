@@ -4,7 +4,11 @@ import {
   initDb,
   refreshStaff,
   refreshStores,
-  testConnection
+  testConnection,
+  lookupStaffForLogin,
+  authenticateStaffPin,
+  loadAuthenticatedBusinessData,
+  wipeSensitiveMemoryData
 } from './db/syncEngine';
 
 /**
@@ -29,6 +33,10 @@ export const db = {
   refreshStaff,
   refreshStores,
   testConnection,
+  lookupStaffForLogin,
+  authenticateStaffPin,
+  loadAuthenticatedBusinessData,
+  wipeSensitiveMemoryData,
 };
 
 export { hydrateOrder } from './db/dbEngine';

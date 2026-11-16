@@ -1,7 +1,39 @@
 import { DEFAULT_ROLES } from './seeds.js';
 import { memoryDb, listeners, notifyListeners } from './memoryStore.ts';
-import { performMutation, saveSession, removeSession } from './syncEngine.ts';
-import { Staff, Customer, Order, CatalogItem, ActivityLog, Store, Role, OrderStatus } from '../../types/index.ts';
+import { performMutation, saveSession, wipeSensitiveMemoryData } from './syncEngine.ts';
+import { supabase } from '../supabaseClient.js';
+import { Staff, Customer, Order, CatalogItem, ActivityLog, Store, Role, OrderStatus, RewardPointAdjustment } from '../../types/index.ts';
+import {
+  saveAuthenticatedSession,
+  clearAuthenticatedSession,
+  stripSensitiveUserFields,
+  hashPinSha256,
+  generateSecureRandomPin
+} from '../../utils/securityUtils.js';
+
+function assertAuthenticated(): Staff {
+  const u = memoryDb.current_user;
+  if (!u) {
+    throw new Error('Action refusée : session non authentifiée.');
+  }
+  return u;
+}
+
+function assertStaffAdmin(): Staff {
+  const u = assertAuthenticated();
+  if (u.role !== 'super_admin' && !u.permissions?.can_manage_staff) {
+    throw new Error('Action refusée : droits d’administration du personnel requis.');
+  }
+  return u;
+}
+
+function assertSuperAdmin(): Staff {
+  const u = assertAuthenticated();
+  if (u.role !== 'super_admin') {
+    throw new Error('Action refusée : réservée au Super Administrateur.');
+  }
+  return u;
+}
 
 export { memoryDb, listeners, notifyListeners };
 
@@ -484,6 +516,7 @@ export const dbEngine = {
   getCurrentUser: (): Staff | null => memoryDb.current_user ? { ...memoryDb.current_user } : null,
   getRoles: () => memoryDb.roles || [],
   saveRole: (roleData: any): any => {
+    assertStaffAdmin();
     if (!memoryDb.roles) {
       memoryDb.roles = [];
     }
@@ -506,7 +539,14 @@ export const dbEngine = {
       memoryDb.roles[existingIdx] = savedRole;
       dbEngine.logAction('MODIFICATION_ROLE', `Rôle mis à jour : ${savedRole.label}`);
     } else {
-      const key = roleData.key || (roleData.label ? roleData.label.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'role_' + Date.now());
+      const baseSlug = (roleData.label || 'role')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '') || 'role';
+      const hasCollision = memoryDb.roles.some((r: any) => r.id === baseSlug || r.key === baseSlug);
+      const key = roleData.key || (hasCollision ? `${baseSlug}_${Date.now().toString(36)}` : baseSlug);
       savedRole = {
         id: roleData.id || key,
         key: key,
@@ -552,6 +592,7 @@ export const dbEngine = {
   },
 
   deleteRole: (roleId: string): boolean => {
+    assertStaffAdmin();
     if (!memoryDb.roles) return false;
     const idx = memoryDb.roles.findIndex((r: any) => r.id === roleId || r.key === roleId);
     if (idx === -1) return false;
@@ -846,18 +887,20 @@ export const dbEngine = {
   // ── Session/preference setters ──
 
   setCurrentUser: (user: Staff | null): void => {
-    memoryDb.current_user = user;
-    if (user) {
-      saveSession('klin_up_current_user', user);
-      if (user.role !== 'super_admin') {
-        const userStore = user.store_id || (user as any).laverie_id || (user as any).laverie || 'store_central';
+    const sanitized = stripSensitiveUserFields(user);
+    memoryDb.current_user = sanitized;
+    if (sanitized) {
+      saveAuthenticatedSession(sanitized, { locked: false, issuedAt: Date.now() });
+      if (sanitized.role !== 'super_admin') {
+        const userStore = sanitized.store_id || (sanitized as any).laverie_id || (sanitized as any).laverie || 'store_central';
         memoryDb.selected_store_id = userStore;
         saveSession('klin_up_selected_store', userStore);
       }
-      dbEngine.logAction('CONNEXION', `Connexion de ${user.prenom} ${user.nom} (${user.role})`);
+      dbEngine.logAction('CONNEXION', `Connexion de ${sanitized.prenom} ${sanitized.nom} (${sanitized.role})`);
     } else {
-      removeSession('klin_up_current_user');
+      clearAuthenticatedSession();
       dbEngine.logAction('DECONNEXION', `Déconnexion de l'utilisateur`);
+      wipeSensitiveMemoryData();
     }
     notifyListeners();
   },
@@ -913,6 +956,7 @@ export const dbEngine = {
   // ── Stores ──
 
   addStore: async (storeData: Partial<Store>): Promise<Store> => {
+    assertSuperAdmin();
     const newStore: Store = {
       id: 'store_' + Math.random().toString(36).substr(2, 9),
       nom: storeData.nom || 'Nouveau Point',
@@ -933,6 +977,7 @@ export const dbEngine = {
   },
 
   updateStore: async (storeId: string, updatedFields: Partial<Store>): Promise<Store | undefined> => {
+    assertSuperAdmin();
     const store = memoryDb.stores.find(s => s.id === storeId);
     if (!store) return;
     const updateData: Partial<Store> = { ...updatedFields };
@@ -945,6 +990,7 @@ export const dbEngine = {
   },
 
   deleteStore: async (storeId: string): Promise<boolean> => {
+    assertSuperAdmin();
     const idx = memoryDb.stores.findIndex(s => s.id === storeId);
     if (idx === -1) return false;
     const store = memoryDb.stores[idx];
@@ -958,6 +1004,11 @@ export const dbEngine = {
   // ── Staff ──
 
   addStaff: async (staffData: Partial<Staff>): Promise<Staff> => {
+    assertStaffAdmin();
+    const rawPin = (staffData.code_pin && /^\d{6}$/.test(String(staffData.code_pin).trim()))
+      ? String(staffData.code_pin).trim()
+      : generateSecureRandomPin();
+    const hashedPin = await hashPinSha256(rawPin);
     const newStaff: Staff = {
       id: 'u_' + Math.random().toString(36).substr(2, 9),
       nom: staffData.nom || '',
@@ -965,7 +1016,7 @@ export const dbEngine = {
       role: staffData.role || 'agent_accueil',
       email: staffData.email ? staffData.email.trim().toLowerCase() : '',
       telephone: staffData.telephone || '',
-      code_pin: staffData.code_pin || '000000',
+      code_pin: hashedPin,
       statut: staffData.statut || 'actif',
       store_id: staffData.store_id || 'all',
       permissions: staffData.permissions || {
@@ -987,17 +1038,27 @@ export const dbEngine = {
   },
 
   updateStaff: async (staffId: string, updatedFields: Partial<Staff>): Promise<Staff | undefined> => {
+    assertStaffAdmin();
     const member = memoryDb.staff.find(s => s.id === staffId);
     if (!member) return;
 
     const updateData: Partial<Staff> = { ...updatedFields };
     delete updateData.id;
+    if (updateData.code_pin !== undefined) {
+      const clean = String(updateData.code_pin || '').trim();
+      if (/^\d{6}$/.test(clean)) {
+        updateData.code_pin = await hashPinSha256(clean);
+      } else if (!clean.startsWith('sha256:') && !clean.startsWith('$2a$') && !clean.startsWith('$2b$')) {
+        delete updateData.code_pin;
+      }
+    }
 
     await performMutation('update', 'staff', staffId, updateData);
     Object.assign(member, updateData);
     if (memoryDb.current_user?.id === staffId) {
-      memoryDb.current_user = { ...memoryDb.current_user, ...updateData };
-      saveSession('klin_up_current_user', memoryDb.current_user);
+      const sanitizedMe = stripSensitiveUserFields({ ...memoryDb.current_user, ...updateData }) as Staff;
+      memoryDb.current_user = sanitizedMe;
+      saveAuthenticatedSession(sanitizedMe, { locked: false });
     }
     dbEngine.logAction('MODIFICATION_PERSONNEL', `Membre mis à jour : ${member.prenom} ${member.nom}`);
     notifyListeners();
@@ -1005,13 +1066,21 @@ export const dbEngine = {
   },
 
   resetStaffPin: async (staffId: string, newPin?: string): Promise<string> => {
-    const pin = newPin || Math.floor(100000 + Math.random() * 900000).toString();
-    await dbEngine.updateStaff(staffId, { code_pin: pin });
+    assertStaffAdmin();
+    const pin = (newPin && /^\d{6}$/.test(String(newPin).trim()))
+      ? String(newPin).trim()
+      : generateSecureRandomPin();
+    const hashedPin = await hashPinSha256(pin);
+    await dbEngine.updateStaff(staffId, { code_pin: hashedPin });
     dbEngine.logAction('RESET_PIN_PERSONNEL', `Code PIN réinitialisé pour l'utilisateur ID: ${staffId}`);
     return pin;
   },
 
   deleteStaff: async (staffId: string): Promise<boolean> => {
+    assertStaffAdmin();
+    if (memoryDb.current_user?.id === staffId) {
+      throw new Error('Vous ne pouvez pas supprimer votre propre compte connecté.');
+    }
     const idx = memoryDb.staff.findIndex(s => s.id === staffId);
     if (idx === -1) return false;
     const member = memoryDb.staff[idx];
@@ -1123,6 +1192,10 @@ export const dbEngine = {
   },
 
   adjustCustomerPoints: async (customerId: string, pointsDelta: number, reason?: string): Promise<Customer | undefined> => {
+    const cleanReason = (reason || '').trim();
+    if (!cleanReason) {
+      throw new Error("Le motif de l'ajustement est obligatoire.");
+    }
     const customer = memoryDb.customers.find(c => c.id === customerId);
     if (!customer) return;
 
@@ -1135,10 +1208,405 @@ export const dbEngine = {
     const actionText = pointsDelta >= 0 ? `+${pointsDelta} pts` : `${pointsDelta} pts`;
     dbEngine.logAction(
       'AJUSTEMENT_POINTS_FIDELITE',
-      `Points de fidélité ajustés pour ${customer.prenom} ${customer.nom} (${actionText}, NOUVEAU SOLDE: ${newPts} pts). Motif: ${reason || 'Ajustement Admin'}`
+      `Points de fidélité ajustés pour ${customer.prenom} ${customer.nom} (${actionText}, NOUVEAU SOLDE: ${newPts} pts). Motif: ${cleanReason}`
     );
     notifyListeners();
     return customer;
+  },
+
+  getRewardPointAdjustments: (): RewardPointAdjustment[] => {
+    return [...(memoryDb.reward_point_adjustments || [])].sort(
+      (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    );
+  },
+
+  getExpenses: (): any[] => {
+    return [...(memoryDb.expenses || [])].sort((a, b) => {
+      const dateDiff = new Date(b.expense_date || b.created_at || 0).getTime() - new Date(a.expense_date || a.created_at || 0).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+  },
+
+  createExpense: async (payload: {
+    store_id?: string;
+    category: string;
+    label: string;
+    description?: string;
+    amount: number;
+    payment_method?: string;
+    expense_date?: string;
+    reference?: string;
+    status?: 'validee' | 'en_attente' | 'rejetee';
+  }) => {
+    const cleanLabel = String(payload?.label || '').trim();
+    const numericAmount = Number(payload?.amount || 0);
+    if (!cleanLabel) throw new Error('Le libellé de la dépense est obligatoire.');
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      throw new Error('Le montant de la dépense doit être strictement supérieur à 0.');
+    }
+
+    const user = memoryDb.current_user;
+    const storeId =
+      payload?.store_id && payload.store_id !== 'all'
+        ? payload.store_id
+        : user?.store_id && user.store_id !== 'all'
+          ? user.store_id
+          : 'store_central';
+    const nowIso = new Date().toISOString();
+    const todayDate = nowIso.slice(0, 10);
+    const expId = `exp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const newExpense = {
+      id: expId,
+      store_id: storeId,
+      category: String(payload?.category || 'autres').trim() || 'autres',
+      label: cleanLabel,
+      description: String(payload?.description || '').trim() || null,
+      amount: numericAmount,
+      payment_method: String(payload?.payment_method || 'especes').trim() || 'especes',
+      expense_date: payload?.expense_date || todayDate,
+      status: payload?.status || 'validee',
+      reference: String(payload?.reference || '').trim() || null,
+      created_by_id: user?.id || 'admin',
+      created_by_name: user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : 'Administrateur',
+      created_by_role: user?.role || 'super_admin',
+      source: 'admin' as const,
+      created_at: nowIso,
+      updated_at: nowIso
+    };
+
+    await performMutation('insert', 'expenses', expId, newExpense);
+    if (!memoryDb.expenses) memoryDb.expenses = [];
+    memoryDb.expenses.unshift(newExpense as any);
+    dbEngine.logAction(
+      'CREATION_DEPENSE',
+      `Dépense "${cleanLabel}" (${newExpense.category}) : ${Math.round(numericAmount)} FCFA [${newExpense.payment_method}]`
+    );
+    notifyListeners();
+    return newExpense;
+  },
+
+  updateExpense: async (expenseId: string, patch: Record<string, any>) => {
+    const cleanPatch = {
+      ...patch,
+      updated_at: new Date().toISOString()
+    };
+    await performMutation('update', 'expenses', expenseId, cleanPatch);
+    const list = memoryDb.expenses || [];
+    const idx = list.findIndex((e: any) => e.id === expenseId);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...cleanPatch };
+    }
+    dbEngine.logAction('MODIFICATION_DEPENSE', `Dépense ${expenseId} mise à jour`);
+    notifyListeners();
+    return idx !== -1 ? list[idx] : cleanPatch;
+  },
+
+  deleteExpense: async (expenseId: string, reason: string) => {
+    const cleanReason = String(reason || '').trim();
+    if (!cleanReason) {
+      throw new Error('Un motif de suppression est obligatoire.');
+    }
+    const existing = (memoryDb.expenses || []).find((e: any) => e.id === expenseId);
+    const targetLabel = existing?.label || expenseId;
+    await performMutation('delete', 'expenses', expenseId);
+    memoryDb.expenses = (memoryDb.expenses || []).filter((e: any) => e.id !== expenseId);
+    dbEngine.logAction(
+      'SUPPRESSION_DEPENSE',
+      `Dépense "${targetLabel}" (${expenseId}) supprimée — Motif : ${cleanReason}`
+    );
+    notifyListeners();
+  },
+
+  uploadExpenseReceipt: async (expenseId: string, file: File) => {
+    assertAuthenticated();
+    if (!file) throw new Error('Aucun fichier sélectionné.');
+
+    const displayName = file.name || `facture_${Date.now()}`;
+    const detectedMime = String(file.type || '').toLowerCase().trim();
+    const extFromName = displayName.split('.').pop()?.toLowerCase() || '';
+    let resolvedMime = '';
+    if (detectedMime.startsWith('image/')) resolvedMime = detectedMime;
+    else if (detectedMime === 'application/pdf') resolvedMime = 'application/pdf';
+    else if (extFromName === 'pdf') resolvedMime = 'application/pdf';
+    else if (['jpg', 'jpeg'].includes(extFromName)) resolvedMime = 'image/jpeg';
+    else if (extFromName === 'png') resolvedMime = 'image/png';
+    else if (extFromName === 'webp') resolvedMime = 'image/webp';
+    else if (extFromName === 'heic') resolvedMime = 'image/heic';
+    else if (extFromName === 'heif') resolvedMime = 'image/heif';
+
+    if (!resolvedMime) {
+      throw new Error('Format non supporté. Veuillez choisir une image (JPG, PNG, WEBP) ou un fichier PDF.');
+    }
+    if (file.size <= 0) {
+      throw new Error('Le fichier sélectionné est vide.');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error('Le fichier dépasse la limite de 10 Mo.');
+    }
+
+    const fileExt =
+      resolvedMime === 'application/pdf'
+        ? 'pdf'
+        : resolvedMime === 'image/png'
+          ? 'png'
+          : resolvedMime === 'image/webp'
+            ? 'webp'
+            : resolvedMime === 'image/heic'
+              ? 'heic'
+              : resolvedMime === 'image/heif'
+                ? 'heif'
+                : 'jpg';
+    const safeBase = displayName
+      .replace(/\.[^.]+$/, '')
+      .replace(/[^A-Za-z0-9_-]/g, '_')
+      .slice(0, 40) || 'facture';
+    const storagePath = `${expenseId}/${Date.now()}_${safeBase}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('expense-receipts')
+      .upload(storagePath, file, {
+        contentType: resolvedMime,
+        upsert: true
+      });
+
+    if (uploadError) {
+      if (String(uploadError.message || '').toLowerCase().includes('bucket not found')) {
+        throw new Error("Bucket de stockage 'expense-receipts' introuvable. Exécutez la migration SQL schema_expense_receipt.sql.");
+      }
+      throw new Error(uploadError.message || 'Échec du téléversement de la facture.');
+    }
+
+    const { data: urlData } = supabase.storage.from('expense-receipts').getPublicUrl(storagePath);
+    const publicUrl = urlData?.publicUrl || '';
+    if (!publicUrl) {
+      throw new Error("Impossible d'obtenir l'URL publique du justificatif.");
+    }
+
+    const patch = {
+      receipt_url: publicUrl,
+      receipt_name: displayName,
+      receipt_mime_type: resolvedMime,
+      updated_at: new Date().toISOString()
+    };
+
+    await performMutation('update', 'expenses', expenseId, patch);
+    const list = memoryDb.expenses || [];
+    const idx = list.findIndex((e: any) => e.id === expenseId);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...patch };
+    }
+    const label = idx !== -1 ? list[idx].label : expenseId;
+    dbEngine.logAction(
+      'TELEVERSEMENT_FACTURE_DEPENSE',
+      `Facture "${displayName}" (${resolvedMime}) jointe à la dépense "${label}" (${expenseId})`
+    );
+    notifyListeners();
+    return idx !== -1 ? list[idx] : { id: expenseId, ...patch };
+  },
+
+  deleteExpenseReceipt: async (expenseId: string) => {
+    assertAuthenticated();
+    const patch = {
+      receipt_url: null,
+      receipt_name: null,
+      receipt_mime_type: null,
+      updated_at: new Date().toISOString()
+    };
+    await performMutation('update', 'expenses', expenseId, patch);
+    const list = memoryDb.expenses || [];
+    const idx = list.findIndex((e: any) => e.id === expenseId);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...patch };
+    }
+    const label = idx !== -1 ? list[idx].label : expenseId;
+    dbEngine.logAction(
+      'SUPPRESSION_FACTURE_DEPENSE',
+      `Facture retirée de la dépense "${label}" (${expenseId})`
+    );
+    notifyListeners();
+    return idx !== -1 ? list[idx] : { id: expenseId, ...patch };
+  },
+
+  requestRewardPointAdjustment: async (
+    customerId: string,
+    pointsDelta: number,
+    reason: string
+  ): Promise<RewardPointAdjustment> => {
+    const cleanReason = (reason || '').trim();
+    if (!cleanReason) {
+      throw new Error("Le motif de l'ajustement est obligatoire.");
+    }
+    if (!pointsDelta || Number.isNaN(pointsDelta) || pointsDelta === 0) {
+      throw new Error("Veuillez saisir une variation de points non nulle.");
+    }
+    const customer = memoryDb.customers.find(c => c.id === customerId);
+    if (!customer) {
+      throw new Error("Client introuvable.");
+    }
+
+    const user = memoryDb.current_user;
+    const storeId = customer.store_id || (user?.store_id && user.store_id !== 'all' ? user.store_id : 'store_central');
+    const adjId = `rwd_adj_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const nowIso = new Date().toISOString();
+
+    const newAdj: RewardPointAdjustment = {
+      id: adjId,
+      customer_id: customer.id,
+      customer_name: `${customer.prenom || ''} ${customer.nom || ''}`.trim() || 'Client',
+      store_id: storeId,
+      points_delta: pointsDelta,
+      reason: cleanReason,
+      status: 'pending',
+      requested_by_id: user?.id || 'admin',
+      requested_by_name: user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : 'Administrateur',
+      requested_by_role: user?.role || 'super_admin',
+      created_at: nowIso
+    };
+
+    try {
+      await performMutation('insert', 'reward_point_adjustments', adjId, newAdj);
+    } catch (err: any) {
+      const msg = String(err?.message || '').toLowerCase();
+      if (msg.includes('reward_point_adjustments') || msg.includes('pgrst205') || msg.includes('schema cache') || msg.includes('does not exist')) {
+        await performMutation('insert', 'activity_logs', adjId, {
+          id: adjId,
+          user_id: user?.id || 'admin',
+          user_name: newAdj.requested_by_name,
+          action: 'REWARD_ADJ_REQ',
+          details: JSON.stringify(newAdj),
+          timestamp: nowIso
+        });
+      } else {
+        throw err;
+      }
+    }
+    if (!memoryDb.reward_point_adjustments) memoryDb.reward_point_adjustments = [];
+    memoryDb.reward_point_adjustments.unshift(newAdj);
+
+    const sign = pointsDelta > 0 ? `+${pointsDelta}` : `${pointsDelta}`;
+    dbEngine.logAction(
+      'DEMANDE_AJUSTEMENT_POINTS',
+      `Demande d'ajustement (${sign} pts) pour ${newAdj.customer_name} en attente de validation — Motif : ${cleanReason}`
+    );
+    notifyListeners();
+    return newAdj;
+  },
+
+  validateRewardPointAdjustment: async (
+    adjustmentId: string,
+    action: 'approve' | 'reject',
+    rejectionReason?: string
+  ): Promise<RewardPointAdjustment> => {
+    const user = memoryDb.current_user;
+    const role = String(user?.role || '').toLowerCase();
+    const allowedRoles = ['super_admin', 'manager', 'gestionnaire', 'gestionnaire_laverie'];
+    if (!user || !allowedRoles.includes(role)) {
+      throw new Error("Action refusée : seuls le Super Administrateur et le Gestionnaire de laverie peuvent valider cet ajustement.");
+    }
+
+    const list = memoryDb.reward_point_adjustments || [];
+    const idx = list.findIndex(a => a.id === adjustmentId);
+    if (idx === -1) throw new Error("Demande d'ajustement introuvable.");
+    const adj = list[idx];
+    if (adj.status !== 'pending') {
+      throw new Error("Cette demande d'ajustement a déjà été traitée.");
+    }
+
+    if (role !== 'super_admin' && user.store_id && user.store_id !== 'all' && adj.store_id && user.store_id !== adj.store_id) {
+      throw new Error("Action refusée : vous ne pouvez valider que les demandes de votre point de laverie.");
+    }
+
+    const nowIso = new Date().toISOString();
+    const validatorName = `${user.prenom || ''} ${user.nom || ''}`.trim() || user.email || 'Admin';
+    const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+    const patch: Partial<RewardPointAdjustment> = {
+      status: nextStatus,
+      validated_by_id: user.id,
+      validated_by_name: validatorName,
+      validated_by_role: user.role,
+      validated_at: nowIso,
+      ...(action === 'reject' && rejectionReason ? { rejection_reason: rejectionReason.trim() } : {})
+    };
+
+    try {
+      await performMutation('update', 'reward_point_adjustments', adjustmentId, patch);
+    } catch (err: any) {
+      const msg = String(err?.message || '').toLowerCase();
+      if (msg.includes('reward_point_adjustments') || msg.includes('pgrst205') || msg.includes('schema cache') || msg.includes('does not exist')) {
+        const decId = `dec_${adjustmentId}_${Date.now()}`;
+        await performMutation('insert', 'activity_logs', decId, {
+          id: decId,
+          user_id: user.id,
+          user_name: validatorName,
+          action: 'REWARD_ADJ_DECISION',
+          details: JSON.stringify({ id: adjustmentId, ...patch }),
+          timestamp: nowIso
+        });
+      } else {
+        throw err;
+      }
+    }
+    const updatedAdj: RewardPointAdjustment = { ...adj, ...patch };
+    list[idx] = updatedAdj;
+
+    const sign = adj.points_delta > 0 ? `+${adj.points_delta}` : `${adj.points_delta}`;
+    const customer = memoryDb.customers.find(c => c.id === adj.customer_id);
+    const targetStoreId = adj.store_id || customer?.store_id || 'store_central';
+
+    if (action === 'approve') {
+      let newPts = Math.max(0, adj.points_delta);
+      if (customer) {
+        newPts = Math.max(0, (customer.points_fidelite || 0) + adj.points_delta);
+        await performMutation('update', 'customers', customer.id, { points_fidelite: newPts });
+        customer.points_fidelite = newPts;
+      }
+
+      dbEngine.logAction(
+        'VALIDATION_AJUSTEMENT_POINTS',
+        `Ajustement validé (${sign} pts → ${newPts} pts) pour ${adj.customer_name || adj.customer_id} par ${validatorName} — Motif : ${adj.reason}`
+      );
+
+      // Notification aux appareils des utilisateurs du point de laverie concerné
+      if (supabase) {
+        const notifId = `notif_rwd_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const notifPayload = {
+          id: notifId,
+          order_id: adj.id,
+          store_id: targetStoreId,
+          type_action: 'REWARD_ADJUSTMENT_APPROVED',
+          titre: '🎁 Ajustement de points validé',
+          message: `${adj.customer_name || 'Client'} (${sign} pts → ${newPts} pts). Validé par ${validatorName}. Motif : ${adj.reason}`,
+          metadata: {
+            customer_id: adj.customer_id,
+            adjustment_id: adj.id,
+            points_delta: adj.points_delta,
+            new_points: newPts
+          }
+        };
+        try {
+          await supabase.from('order_notifications').insert(notifPayload);
+          await supabase.functions.invoke('send-push-notification', {
+            body: {
+              type: 'INSERT',
+              table: 'order_notifications',
+              record: notifPayload
+            }
+          });
+        } catch (pushErr) {
+          console.warn('[KLIN UP DB] Notification point de laverie partielle:', pushErr);
+        }
+      }
+    } else {
+      dbEngine.logAction(
+        'REJET_AJUSTEMENT_POINTS',
+        `Ajustement refusé (${sign} pts) pour ${adj.customer_name || adj.customer_id} par ${validatorName}${rejectionReason ? ` — Raison : ${rejectionReason}` : ''}`
+      );
+    }
+
+    notifyListeners();
+    return updatedAdj;
   },
 
   redeemCustomerReward: async (customerId: string, rewardId: string, rewardTitle: string, pointsCost: number): Promise<Customer | undefined> => {

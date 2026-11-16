@@ -73,20 +73,15 @@ Les deux applications partagent la même base de données Supabase Cloud en temp
 
 ```
 KLIN UP WEB APP/
-├── mobile-app/                     # Application mobile (Caisse & Atelier)
-│   ├── src/
-│   │   ├── components/
-│   │   │   └── MobileView.jsx      # Interface principale (~5500 lignes)
-│   │   ├── services/
-│   │   │   ├── db.js               # Moteur de données (1330 lignes)
-│   │   │   └── supabaseClient.js   # Client Supabase configuré
-│   │   ├── utils/                  # Données utilitaires (pays, etc.)
-│   │   ├── assets/                 # Logos, images
-│   │   ├── index.css               # Système de design (~1200 lignes)
-│   │   └── main.jsx                # Point d'entrée React
-│   └── android/                    # Projet Android natif (Capacitor)
-│       └── app/src/main/java/com/klinup/laverie/
-│           └── AndroidPrintPlugin.java  # Plugin d'impression custom
+├── android-app/                    # Application mobile native (Kotlin & Jetpack Compose)
+│   ├── app/
+│   │   ├── src/main/java/com/klinup/app/
+│   │   │   ├── MainActivity.kt     # Activité principale
+│   │   │   ├── ui/                 # Screens Compose & Navigation (Dashboard, Login, Order, etc.)
+│   │   │   └── data/               # Models, Remote Supabase Client
+│   │   └── build.gradle.kts
+│   ├── build.gradle.kts
+│   └── gradlew.bat                 # Wrapper Gradle Windows
 │
 ├── admin-cms/                      # Interface Administration (CMS)
 │   ├── src/
@@ -277,21 +272,15 @@ Si un employé oublie son PIN :
 
 ## 6. Application Mobile — Caisse & Atelier
 
-### Lancement
+### Lancement & Compilation
 
 ```bash
-cd mobile-app
-npm install
-npm run dev          # Mode développement (localhost:5173)
-npm run build        # Build production
+cd android-app
+.\gradlew.bat assembleDebug   # Générer l'APK Debug
+.\gradlew.bat assembleRelease # Générer l'APK Release
 ```
 
-Pour générer l'APK Android :
-
-```bash
-npx cap sync android
-npx cap open android   # Ouvre Android Studio
-```
+L'application peut être directement ouverte et exécutée dans **Android Studio**.
 
 ### Interface & Navigation
 
@@ -721,11 +710,9 @@ VITE_SUPABASE_ANON_KEY=<votre_cle_anon>
 ### Commandes de développement
 
 ```bash
-# Application Mobile
-cd mobile-app
-npm install
-npm run dev       # Démarrer le serveur de développement (port 5173)
-npm run build     # Build production vers dist/
+# Application Mobile Native Android (Kotlin & Jetpack Compose)
+cd android-app
+.\gradlew.bat assembleDebug   # Compilation APK Debug
 
 # Interface Administration
 cd admin-cms
@@ -737,11 +724,8 @@ npm run build     # Build production vers dist/
 ### Build Android (APK)
 
 ```bash
-cd mobile-app
-npm run build             # 1. Build du frontend
-npx cap sync android      # 2. Synchronisation avec le projet Android natif
-npx cap open android      # 3. Ouvrir Android Studio
-# Dans Android Studio : Build > Generate Signed Bundle/APK
+cd android-app
+.\gradlew.bat assembleRelease # Génération de l'APK Release
 ```
 
 ### Initialisation de la base de données

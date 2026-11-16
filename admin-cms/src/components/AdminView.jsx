@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../services/db';
 import OrderFormModal from '../features/orders/components/OrderFormModal';
+import ValidationsTab from '../features/validations/components/ValidationsTab';
+import ExpensesTab from '../features/expenses/components/ExpensesTab';
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -50,6 +52,8 @@ import {
   Calendar
 } from 'lucide-react';
 import CustomSelect from './CustomSelect';
+import MomoOperatorSelector from './MomoOperatorSelector';
+import logoBrand from '../assets/logo_brand.png';
 import { validatePhoneNumber, normalizePhoneNumber } from '../utils/phoneUtils';
 
 import DashboardTab from '../features/dashboard/components/DashboardTab';
@@ -193,9 +197,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const [selectedCrmSubId, setSelectedCrmSubId] = useState('');
 
   // États pour les Paramètres Système (Délais et Majoration)
-  const [inputExpressHours, setInputExpressHours] = useState('');
-  const [inputNormalHours, setInputNormalHours] = useState('');
-  const [inputExpressMarkup, setInputExpressMarkup] = useState('');
+  const [inputExpressHours, setInputExpressHours] = useState('6');
+  const [inputNormalHours, setInputNormalHours] = useState('48');
+  const [inputExpressMarkup, setInputExpressMarkup] = useState('50');
 
   useEffect(() => {
     if (catalog.length > 0) {
@@ -460,7 +464,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
       can_access_mobile: true,
       can_create_orders_mobile: isSuperAdmin || isManager || isAccueil,
       can_manage_delivery_mobile: isSuperAdmin || isLivreur,
-      can_manage_workshop_mobile: isSuperAdmin || isAtelier
+      can_manage_workshop_mobile: isSuperAdmin || isAtelier,
+      can_manage_customers_mobile: isSuperAdmin || isManager || isAccueil,
+      can_manage_expenses_mobile: isSuperAdmin || isManager
     };
   };
 
@@ -2346,6 +2352,12 @@ export default function AdminView({ activeTab, onManageStaff }) {
           let text = '';
           if (nextStatus === 'pret') {
             text = `Bonjour ${customer.prenom} ${customer.nom}, votre commande ${order.identifiant_unique_marquage} est prête chez Pressing Pro ! Vous pouvez passer la récupérer ou contacter le service client pour la livraison. Merci pour votre confiance !`;
+          } else if (nextStatus === 'a_livrer') {
+            const remaining = Math.max(0, Number(order.prix_total || order.total || 0) - Number(order.avance_payee || order.avance || 0));
+            text = `Bonjour ${customer.prenom} ${customer.nom},\n\nBonne nouvelle ! Votre commande ${order.identifiant_unique_marquage} (${order.type_article || 'Linge'}) est désormais prête pour la livraison chez Pressing Pro.\nTotal: ${Number(order.prix_total || order.total || 0).toLocaleString()} FCFA\nAvance payée: ${Number(order.avance_payee || order.avance || 0).toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\n\nNotre livreur vous contactera très bientôt. Merci pour votre confiance !`;
+          } else if (nextStatus === 'a_recuperer') {
+            const remaining = Math.max(0, Number(order.prix_total || order.total || 0) - Number(order.avance_payee || order.avance || 0));
+            text = `Bonjour ${customer.prenom} ${customer.nom},\n\nBonne nouvelle ! Votre commande ${order.identifiant_unique_marquage} (${order.type_article || 'Linge'}) est désormais prête et disponible pour retrait sur place chez Pressing Pro.\nTotal: ${Number(order.prix_total || order.total || 0).toLocaleString()} FCFA\nAvance payée: ${Number(order.avance_payee || order.avance || 0).toLocaleString()} FCFA\nReste à payer: ${remaining.toLocaleString()} FCFA\n\nVous pouvez passer la récupérer à votre convenance. Merci pour votre confiance !`;
           } else if (nextStatus === 'restitue') {
             const isDelivery = order.subscription_details?.type_livraison === 'livraison' || order.mode_reglement === 'livraison';
             const actionLabel = isDelivery ? 'livrée' : 'récupérée';
@@ -2712,6 +2724,20 @@ export default function AdminView({ activeTab, onManageStaff }) {
           inputNormalHours={inputNormalHours}
           setInputNormalHours={setInputNormalHours}
         />
+      )}
+
+      {/* ========================================================
+         ONGLET : VALIDATIONS POINTS REWARD
+         ======================================================== */}
+      {activeTab === 'validations' && (
+        <ValidationsTab currentUser={currentUser} stores={stores} />
+      )}
+
+      {/* ========================================================
+         ONGLET : DÉPENSES DE LA LAVERIE
+         ======================================================== */}
+      {activeTab === 'expenses' && (
+        <ExpensesTab currentUser={currentUser} stores={stores} />
       )}
 
       {/* ========================================================
@@ -4261,32 +4287,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 {delivPaymentMethod === 'mobile_money' && (
                   <div className="form-group">
                     <label>Opérateur Réseau <span style={{ color: '#ef4444' }}>*</span></label>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                      {['MTN', 'MOOV', 'CELTIS'].map((op) => (
-                        <button
-                          key={op}
-                          type="button"
-                          onClick={() => setMomoOperator(op)}
-                          style={{
-                            flex: 1,
-                            padding: '7px 0',
-                            borderRadius: '8px',
-                            border: momoOperator === op ? '2px solid var(--primary)' : '1.5px solid var(--border-color)',
-                            background: momoOperator === op
-                              ? (op === 'MTN' ? 'linear-gradient(135deg, #FFCC00, #FFA500)'
-                                : op === 'MOOV' ? 'linear-gradient(135deg, #0057A8, #003F7F)'
-                                : 'linear-gradient(135deg, #E30613, #B50010)')
-                              : 'var(--bg-app)',
-                            color: momoOperator === op ? (op === 'MTN' ? '#1a1a1a' : '#ffffff') : 'var(--text-secondary)',
-                            fontWeight: 700,
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          {op}
-                        </button>
-                      ))}
+                    <div style={{ marginBottom: '10px' }}>
+                      <MomoOperatorSelector value={momoOperator} onChange={setMomoOperator} compact />
                     </div>
 
                     <label>Numéro de Référence <span style={{ color: '#ef4444' }}>*</span></label>
@@ -4432,6 +4434,11 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 }}>
                   {/* ---- EN-TÊTE DYNAMIQUE ---- */}
                   <div style={{ textAlign: 'center', paddingBottom: '16px', marginBottom: '16px', borderBottom: '2px dashed #cccccc' }}>
+                    <img
+                      src={logoBrand}
+                      alt="Logo Laverie"
+                      style={{ height: effW >= 140 ? '54px' : '44px', objectFit: 'contain', margin: '0 auto 8px', display: 'block' }}
+                    />
                     <h1 style={{ margin: 0, fontSize: effW >= 140 ? '22px' : '18px', fontWeight: 600, color: '#000000', letterSpacing: '1px', whiteSpace: 'pre-line' }}>
                       {sysSettings.receipt_header || 'Pressing Pro - Laverie & Pressing Premium'}
                     </h1>
@@ -4455,12 +4462,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   {/* ---- DÉTAILS ---- */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', fontSize: '12px', paddingBottom: '14px', marginBottom: '14px', borderBottom: '1px solid #e5e5e5' }}>
                     <div><span style={{ fontWeight: '700' }}>Client :</span> {customers.find(c => c.id === createdOrder.customer_id)?.prenom} {customers.find(c => c.id === createdOrder.customer_id)?.nom}</div>
-                    <div>
-                      <span style={{ fontWeight: '700' }}>Linge :</span>{' '}
-                      <span style={{ color: '#f59e0b', fontWeight: '600' }}>{createdOrder.type_article} ({serviceLabels[createdOrder.type_service] || createdOrder.type_service})</span>
-                    </div>
+                    <div><span style={{ fontWeight: '700' }}>Statut :</span> {createdOrder.statut === 'restitue' ? 'Livré/Retiré' : (createdOrder.statut === 'annule' ? 'Annulée' : createdOrder.statut)}</div>
                     <div><span style={{ fontWeight: '700' }}>Urgence :</span> {createdOrder.niveau_urgence}</div>
-                    <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement === 'mobile_money' || createdOrder.mode_reglement === 'Mobile Money' ? 'Mobile Money' : createdOrder.mode_reglement === 'especes' ? 'Espèces' : createdOrder.mode_reglement}</div>
+                    <div><span style={{ fontWeight: '700' }}>Mode règlement :</span> {createdOrder.mode_reglement === 'mobile_money' || createdOrder.mode_reglement === 'Mobile Money' ? 'Mobile Money' : createdOrder.mode_reglement === 'especes' ? 'Espèce' : createdOrder.mode_reglement}</div>
                     {(createdOrder.mode_reglement === 'mobile_money' || createdOrder.mode_reglement === 'Mobile Money' || createdOrder.reference_momo || createdOrder.reference_paiement || createdOrder.operateur_momo) && (
                       <>
                         {createdOrder.operateur_momo && (
@@ -4472,7 +4476,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                       </>
                     )}
                     <div><span style={{ fontWeight: '700' }}>Dépôt :</span> {formatDateTime(createdOrder.created_at)}</div>
-                    <div><span style={{ fontWeight: '700' }}>Échéance :</span> {formatDateTime(createdOrder.due_date)}</div>
+                    <div><span style={{ fontWeight: '700' }}>Date de livraison/Retrait :</span> {formatDateTime(createdOrder.statut === 'restitue' ? (createdOrder.solde_paid_at || createdOrder.updated_at || createdOrder.due_date) : createdOrder.due_date)}</div>
                     {createdOrder.acompte_paid_at && (
                       <div><span style={{ fontWeight: '700' }}>Règlement Acompte :</span> {formatDateTime(createdOrder.acompte_paid_at)}</div>
                     )}
@@ -4664,11 +4668,11 @@ export default function AdminView({ activeTab, onManageStaff }) {
                                 <style>
                                   @page {
                                     size: ${pFormat === 'A4' ? 'A4 portrait' : pFormat === 'A5' ? 'A5 portrait' : `${pWidth}mm auto`};
-                                    margin: ${pMargin || 3}mm;
+                                    margin: ${pFormat === 'A4' || pFormat === 'A5' ? Math.max(Number(pMargin) || 12, 12) : Math.max(Number(pMargin) || 6, 6)}mm;
                                   }
                                   body {
                                     margin: 0;
-                                    padding: 0;
+                                    padding: 8px 10px;
                                     font-family: Arial, sans-serif;
                                     background: #ffffff;
                                     color: #000000;
@@ -4709,8 +4713,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
                         const element = document.getElementById('receipt-print-area-admin');
                         if (element && window.html2pdf) {
                           const jsPdfFormat = pFormat === 'A4' ? 'a4' : pFormat === 'A5' ? 'a5' : (pHeight > 0 ? [pWidth, pHeight] : [pWidth, 200]);
+                          const safePdfMarginMm = pFormat === 'A4' || pFormat === 'A5' ? Math.max(Number(pMargin) || 12, 12) : Math.max(Number(pMargin) || 6, 6);
                           const opt = {
-                            margin: (pMargin || 5) / 25.4,
+                            margin: safePdfMarginMm,
                             filename: `Facture_${createdOrder.id || createdOrder.identifiant_unique_marquage}.pdf`,
                             image: { type: 'jpeg', quality: 0.98 },
                             html2canvas: { scale: 2, useCORS: true, logging: false },

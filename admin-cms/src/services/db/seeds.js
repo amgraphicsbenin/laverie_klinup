@@ -30,7 +30,9 @@ export const DEFAULT_ROLES = [
       can_access_mobile: true,
       can_create_orders_mobile: true,
       can_manage_delivery_mobile: true,
-      can_manage_workshop_mobile: true
+      can_manage_workshop_mobile: true,
+      can_manage_customers_mobile: true,
+      can_manage_expenses_mobile: true
     }
   },
   {
@@ -52,7 +54,9 @@ export const DEFAULT_ROLES = [
       can_access_mobile: true,
       can_create_orders_mobile: true,
       can_manage_delivery_mobile: false,
-      can_manage_workshop_mobile: false
+      can_manage_workshop_mobile: false,
+      can_manage_customers_mobile: true,
+      can_manage_expenses_mobile: true
     }
   },
   {
@@ -74,7 +78,9 @@ export const DEFAULT_ROLES = [
       can_access_mobile: true,
       can_create_orders_mobile: false,
       can_manage_delivery_mobile: false,
-      can_manage_workshop_mobile: false
+      can_manage_workshop_mobile: false,
+      can_manage_customers_mobile: false,
+      can_manage_expenses_mobile: false
     }
   },
   {
@@ -96,7 +102,9 @@ export const DEFAULT_ROLES = [
       can_access_mobile: true,
       can_create_orders_mobile: true,
       can_manage_delivery_mobile: false,
-      can_manage_workshop_mobile: false
+      can_manage_workshop_mobile: false,
+      can_manage_customers_mobile: true,
+      can_manage_expenses_mobile: false
     }
   },
   {
@@ -118,7 +126,9 @@ export const DEFAULT_ROLES = [
       can_access_mobile: true,
       can_create_orders_mobile: false,
       can_manage_delivery_mobile: true,
-      can_manage_workshop_mobile: false
+      can_manage_workshop_mobile: false,
+      can_manage_customers_mobile: false,
+      can_manage_expenses_mobile: false
     }
   },
   {
@@ -140,7 +150,9 @@ export const DEFAULT_ROLES = [
       can_access_mobile: true,
       can_create_orders_mobile: false,
       can_manage_delivery_mobile: false,
-      can_manage_workshop_mobile: true
+      can_manage_workshop_mobile: true,
+      can_manage_customers_mobile: false,
+      can_manage_expenses_mobile: false
     }
   }
 ];

@@ -37,12 +37,14 @@ import {
   Layers,
   Settings,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Smartphone
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import MultiSearchInput from '../../../components/ui/MultiSearchInput';
 import { IconUser, IconMail, IconPhone, IconShieldCheck, IconFileText, IconTag } from '@tabler/icons-react';
 import { db } from '../../../services/db';
+import { supabase } from '../../../services/supabaseClient';
 import StatefulButton from '../../../components/ui/StatefulButton';
 
 const STAFF_SEARCH_TYPES = [
@@ -162,6 +164,24 @@ const PERMISSIONS_CONFIG = [
     description: 'Mise à jour des étapes de traitement textile en atelier',
     icon: Sliders,
     color: '#8b5cf6'
+  },
+  {
+    key: 'can_manage_customers_mobile',
+    category: 'mobile',
+    categoryLabel: 'Habilitations Application Mobile Terrain',
+    title: 'Gestion des clients App',
+    description: 'Consulter, créer, modifier les clients et gérer la fidélité sur l\'app mobile',
+    icon: Users,
+    color: '#0284c7'
+  },
+  {
+    key: 'can_manage_expenses_mobile',
+    category: 'mobile',
+    categoryLabel: 'Habilitations Application Mobile Terrain',
+    title: 'Gestion des dépenses App',
+    description: 'Consulter, enregistrer, modifier et supprimer les dépenses sur l\'app mobile',
+    icon: Tag,
+    color: '#dc2626'
   }
 ];
 
@@ -240,6 +260,42 @@ export default function StaffTab({
   const [editingPin, setEditingPin] = useState('');
   const [visiblePins, setVisiblePins] = useState({});
   const [copiedPinId, setCopiedPinId] = useState(null);
+
+  // Modale d'informations détaillées de l'utilisateur & appareil
+  const [detailUser, setDetailUser] = useState(null);
+  const [detailLiveStaff, setDetailLiveStaff] = useState(null);
+  const [detailDevices, setDetailDevices] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const handleOpenUserDetailModal = async (member) => {
+    if (!member) return;
+    setDetailUser(member);
+    setDetailLiveStaff(null);
+    setDetailDevices([]);
+    if (!supabase || !member.id) return;
+    setDetailLoading(true);
+    try {
+      const [staffRes, logsRes] = await Promise.all([
+        supabase.from('staff').select('*').eq('id', member.id).maybeSingle(),
+        supabase
+          .from('activity_logs')
+          .select('id, action, details, timestamp')
+          .eq('user_id', member.id)
+          .order('timestamp', { ascending: false })
+          .limit(80)
+      ]);
+      if (staffRes?.data) {
+        setDetailLiveStaff(staffRes.data);
+      }
+      if (Array.isArray(logsRes?.data)) {
+        setDetailDevices(logsRes.data);
+      }
+    } catch (err) {
+      console.warn('[StaffTab] Erreur chargement détails utilisateur/appareil:', err);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   // États pour "Configuration des Rôles"
   const [rolesList, setRolesList] = useState(() => db.getRoles ? db.getRoles() : []);
@@ -457,10 +513,15 @@ export default function StaffTab({
     setVisiblePins(prev => ({ ...prev, [staffId]: !prev[staffId] }));
   };
 
+  const isHashedPin = (pin) => {
+    const p = String(pin || '').trim();
+    return p.startsWith('sha256:') || p.startsWith('$2a$') || p.startsWith('$2b$') || /^[0-9a-f]{64}$/i.test(p);
+  };
+
   const handleOpenEditUserModal = (staffMember) => {
     setSelectedStaffId(staffMember.id);
     setEditingStaffMember(staffMember);
-    setEditingPin(staffMember.code_pin || '000000');
+    setEditingPin(isHashedPin(staffMember.code_pin) ? '' : (staffMember.code_pin || ''));
     setShowEditUserModal(true);
   };
 
@@ -537,31 +598,37 @@ export default function StaffTab({
   };
 
   const handleCreateNewRoleSubmit = (e) => {
-    e.preventDefault();
-    if (!newRoleLabel) return;
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const cleanLabel = (newRoleLabel || '').trim();
+    if (!cleanLabel) return;
 
-    const newRole = db.saveRole({
-      label: newRoleLabel.trim(),
-      shortLabel: newRoleShortLabel.trim() || newRoleLabel.trim(),
-      color: newRoleColor,
-      description: newRoleDesc.trim(),
-      isSystem: false,
-      permissions: {
-        can_access_mobile: true,
-        can_create_orders_mobile: true
+    try {
+      const newRole = db.saveRole({
+        label: cleanLabel,
+        shortLabel: (newRoleShortLabel || '').trim() || cleanLabel,
+        color: newRoleColor,
+        description: (newRoleDesc || '').trim(),
+        isSystem: false,
+        permissions: {
+          can_access_mobile: true,
+          can_create_orders_mobile: true
+        }
+      });
+
+      const updatedRoles = db.getRoles ? [...db.getRoles()] : [];
+      setRolesList(updatedRoles);
+      setShowNewRoleModal(false);
+      setNewRoleLabel('');
+      setNewRoleShortLabel('');
+      setNewRoleColor('#2563eb');
+      setNewRoleDesc('');
+
+      if (newRole) {
+        openEditRole(newRole);
       }
-    });
-
-    const updatedRoles = db.getRoles ? db.getRoles() : [];
-    setRolesList(updatedRoles);
-    setShowNewRoleModal(false);
-    setNewRoleLabel('');
-    setNewRoleShortLabel('');
-    setNewRoleColor('#2563eb');
-    setNewRoleDesc('');
-
-    if (newRole) {
-      openEditRole(newRole);
+    } catch (err) {
+      console.error('[StaffTab] Erreur création rôle:', err);
+      alert(err?.message || 'Impossible de créer le rôle.');
     }
   };
 
@@ -861,14 +928,17 @@ export default function StaffTab({
                       return (
                         <tr
                           key={s.id}
+                          onClick={() => handleOpenUserDetailModal(s)}
+                          title="Cliquer pour afficher les informations de l'utilisateur et de son appareil"
                           style={{
                             borderBottom: '1px solid var(--border-color)',
                             background: isSelected ? 'rgba(0, 44, 247, 0.03)' : 'transparent',
                             opacity: isSuspended ? 0.75 : 1,
-                            transition: 'all 0.15s ease'
+                            transition: 'all 0.15s ease',
+                            cursor: 'pointer'
                           }}
                         >
-                          <td style={{ textAlign: 'center', padding: '0.75rem' }}>
+                          <td style={{ textAlign: 'center', padding: '0.75rem' }} onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               style={{ cursor: 'pointer', scale: '1.1' }}
@@ -969,16 +1039,23 @@ export default function StaffTab({
 
                           {/* Code PIN */}
                           <td style={{ padding: '0.75rem' }}>
+                            {(() => {
+                              const pinIsHashed = isHashedPin(s.code_pin);
+                              const canReveal = isSuperAdmin && !pinIsHashed && Boolean(s.code_pin);
+                              return (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: (isSuperAdmin && isPinVisible) ? '2px' : '3px', color: 'var(--text-primary)' }}>
-                                {(isSuperAdmin && isPinVisible) ? (s.code_pin || '000000') : '••••••'}
+                              <span style={{ fontSize: pinIsHashed ? '0.72rem' : '0.85rem', fontWeight: 800, fontFamily: pinIsHashed ? 'inherit' : 'monospace', letterSpacing: pinIsHashed ? '0.2px' : ((canReveal && isPinVisible) ? '2px' : '3px'), color: pinIsHashed ? 'var(--success)' : 'var(--text-primary)' }}>
+                                {pinIsHashed ? '🔒 Chiffré' : ((canReveal && isPinVisible) ? s.code_pin : '••••••')}
                               </span>
 
-                              {isSuperAdmin && (
+                              {canReveal && (
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => togglePinVisibility(s.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      togglePinVisibility(s.id);
+                                    }}
                                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex' }}
                                     title={isPinVisible ? "Masquer le PIN" : "Afficher le PIN"}
                                   >
@@ -987,7 +1064,10 @@ export default function StaffTab({
 
                                   <button
                                     type="button"
-                                    onClick={() => handleCopyPin(s.code_pin || '000000', s.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCopyPin(s.code_pin, s.id);
+                                    }}
                                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: isPinCopied ? 'var(--success)' : 'var(--text-muted)', padding: '2px', display: 'flex' }}
                                     title="Copier le code PIN"
                                   >
@@ -1002,13 +1082,16 @@ export default function StaffTab({
                                 </span>
                               )}
                             </div>
+                              );
+                            })()}
                           </td>
 
                           {/* Statut (Toggle Switch) */}
-                          <td style={{ padding: '0.75rem' }}>
+                          <td style={{ padding: '0.75rem' }} onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
-                              onClick={async () => {
+                              onClick={async (e) => {
+                                e.stopPropagation();
                                 const newStatut = isSuspended ? 'actif' : 'suspendu';
                                 let motif = '';
 
@@ -1059,13 +1142,16 @@ export default function StaffTab({
                           </td>
 
                           {/* Actions */}
-                          <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                          <td style={{ padding: '0.75rem', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                             <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
                               <button
                                 type="button"
                                 className="btn btn-outline"
                                 style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                                onClick={() => handleOpenEditUserModal(s)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditUserModal(s);
+                                }}
                               >
                                 <Edit3 size={14} /> Éditer
                               </button>
@@ -1074,7 +1160,10 @@ export default function StaffTab({
                                 type="button"
                                 className="btn btn-outline"
                                 style={{ padding: '0.35rem 0.55rem', fontSize: '0.74rem', borderRadius: '8px', color: 'var(--danger)', borderColor: 'rgba(220, 38, 38, 0.25)' }}
-                                onClick={() => handleDeleteStaff(s.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteStaff(s.id);
+                                }}
                                 title="Supprimer ce membre"
                               >
                                 <Trash2 size={14} />
@@ -2000,7 +2089,7 @@ export default function StaffTab({
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button type="button" className="btn btn-outline" onClick={() => setShowNewRoleModal(false)}>Annuler</button>
-                <StatefulButton type="submit" variant="primary" style={{ padding: '0.6rem 1.25rem', fontWeight: 700 }} loadingText="Création...">Créer le Rôle</StatefulButton>
+                <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 1.25rem', fontWeight: 700, borderRadius: '10px' }}>Créer le Rôle</button>
               </div>
             </form>
           </div>
@@ -2752,6 +2841,466 @@ export default function StaffTab({
             </form>
           </div>
         </div>,
+        document.body
+      )}
+
+      {detailUser && createPortal(
+        (() => {
+          const mergedUser = { ...detailUser, ...(detailLiveStaff || {}) };
+          const dPrenom = mergedUser.prenom || mergedUser.firstName || '';
+          const dNom = mergedUser.nom || mergedUser.lastName || '';
+          const dInitiales = `${dPrenom.charAt(0)}${dNom.charAt(0)}`.toUpperCase() || 'U';
+          const dRoleMeta = getRoleMeta(mergedUser.role);
+          const dSuspended = (mergedUser.statut || 'actif').toLowerCase() !== 'actif';
+          const formatDateTime = (val) => {
+            if (!val) return 'Non renseigné';
+            const d = new Date(val);
+            if (Number.isNaN(d.getTime())) return String(val);
+            return d.toLocaleString('fr-FR', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            });
+          };
+          const targetStoreId = mergedUser.store_id || mergedUser.laverie_id || mergedUser.store_code || mergedUser.laverie;
+          const foundStore = storesList.find(st =>
+            st.id === targetStoreId ||
+            st.code === targetStoreId ||
+            (st.nom && targetStoreId && st.nom.toLowerCase() === String(targetStoreId).toLowerCase())
+          );
+          const storeLabel = foundStore
+            ? `${foundStore.nom}${foundStore.code ? ` (${foundStore.code})` : ''}`
+            : (targetStoreId === 'all' || mergedUser.role === 'super_admin'
+                ? 'Tous les points (Accès Global)'
+                : (mergedUser.store_name || mergedUser.laverie_nom || mergedUser.boutique || targetStoreId || 'Non rattaché'));
+
+          const parseDeviceLogDetails = (details) => {
+            if (!details || typeof details !== 'string') return {};
+            const map = {};
+            details.split('|').forEach(part => {
+              const idx = part.indexOf(':');
+              if (idx > 0) {
+                const k = part.slice(0, idx).trim().toLowerCase();
+                const v = part.slice(idx + 1).trim();
+                if (k.startsWith('appareil')) map.name = v;
+                else if (k.startsWith('mod')) map.model = v;
+                else if (k.startsWith('android')) map.androidVersion = v;
+                else if (k.startsWith('app')) map.appVersion = v;
+                else if (k === 'id') map.deviceId = v;
+              }
+            });
+            return map;
+          };
+
+          const deviceSessionLogs = (detailDevices || []).filter(log => log.action === 'DEVICE_SESSION');
+          const deviceHistoryMap = new Map();
+          deviceSessionLogs.forEach(log => {
+            const parsed = parseDeviceLogDetails(log.details);
+            const key = parsed.deviceId || `${parsed.name || ''}_${parsed.model || ''}`;
+            if (!key) return;
+            const existing = deviceHistoryMap.get(key);
+            if (!existing) {
+              deviceHistoryMap.set(key, {
+                ...parsed,
+                lastUsedAt: log.timestamp,
+                count: 1
+              });
+            } else {
+              existing.count += 1;
+            }
+          });
+          if (deviceHistoryMap.size === 0 && (mergedUser.active_device_name || mergedUser.active_device_id)) {
+            deviceHistoryMap.set(mergedUser.active_device_id || mergedUser.active_device_name, {
+              name: mergedUser.active_device_name || 'Appareil Android',
+              model: mergedUser.active_device_model || mergedUser.active_device_name || 'Non renseigné',
+              androidVersion: mergedUser.active_android_version || 'Non renseigné',
+              appVersion: mergedUser.active_app_version || 'Non renseigné',
+              deviceId: mergedUser.active_device_id || null,
+              lastUsedAt: mergedUser.active_session_at,
+              count: 1
+            });
+          }
+          const deviceHistory = Array.from(deviceHistoryMap.values());
+          const latestParsedDevice = deviceHistory.find(d => d.deviceId && d.deviceId === mergedUser.active_device_id) || deviceHistory[0] || {};
+
+          const resolvedDeviceName = mergedUser.active_device_name || latestParsedDevice.name || 'Non renseigné';
+          const resolvedDeviceModel = mergedUser.active_device_model || latestParsedDevice.model || (mergedUser.active_device_name || 'Non renseigné');
+          const resolvedAndroidVersion = mergedUser.active_android_version || latestParsedDevice.androidVersion || 'Non renseigné';
+          const resolvedAppVersion = mergedUser.active_app_version || latestParsedDevice.appVersion || 'Non renseigné';
+
+          const connectionActions = new Set(['DEVICE_SESSION', 'LOGIN_SUCCESS', 'BIOMETRIC_UNLOCK', 'APP_LOGIN', 'PIN_UNLOCK', 'CONNEXION', 'LOGIN']);
+          const connectionLogs = (detailDevices || []).filter(l => connectionActions.has(String(l.action || '').toUpperCase()));
+          const lastConnectionLog = connectionLogs[0] || null;
+          const lastConnectionAt = mergedUser.active_session_at || lastConnectionLog?.timestamp || null;
+          const lastActivityLog = (detailDevices || [])[0] || null;
+          const visibleConnectionLogs = connectionLogs.slice(0, 20);
+
+          return (
+            <div
+              onClick={() => setDetailUser(null)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(15, 23, 42, 0.55)',
+                backdropFilter: 'blur(6px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10000,
+                padding: '1.5rem'
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: 'var(--bg-card)',
+                  borderRadius: '20px',
+                  border: '1px solid var(--border-color)',
+                  width: '100%',
+                  maxWidth: '720px',
+                  maxHeight: '90vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  boxShadow: '0 24px 64px rgba(0,0,0,0.22)'
+                }}
+              >
+                {/* Header */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '1.25rem 1.5rem',
+                  borderBottom: '1px solid var(--border-color)',
+                  background: 'var(--bg-app)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <div style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '14px',
+                      background: dRoleMeta.color,
+                      color: '#ffffff',
+                      fontSize: '1rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {dInitiales}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {dPrenom} {dNom}
+                        </h3>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '0.18rem 0.5rem',
+                          borderRadius: '6px',
+                          background: dRoleMeta.bg,
+                          border: `1px solid ${dRoleMeta.color}35`,
+                          color: dRoleMeta.color,
+                          fontWeight: 700
+                        }}>
+                          {dRoleMeta.label}
+                        </span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '0.18rem 0.5rem',
+                          borderRadius: '999px',
+                          background: dSuspended ? 'rgba(220, 38, 38, 0.1)' : 'rgba(22, 163, 74, 0.1)',
+                          color: dSuspended ? 'var(--danger)' : 'var(--success)',
+                          fontWeight: 700
+                        }}>
+                          {dSuspended ? 'Suspendu' : 'Actif'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                        {mergedUser.email || 'Email non renseigné'}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDetailUser(null)}
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '10px',
+                      width: '34px',
+                      height: '34px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary)'
+                    }}
+                    title="Fermer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+                  {/* Informations utilisateur */}
+                  <div style={{
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '14px',
+                    padding: '1rem',
+                    background: 'var(--bg-app)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.75rem', fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      <User size={15} color="var(--primary)" /> Informations de l'utilisateur
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.7rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Identifiant (ID)</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace', wordBreak: 'break-all' }}>{mergedUser.id}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Téléphone</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{mergedUser.telephone || 'Non renseigné'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Point de laverie</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{storeLabel}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Créé le</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{formatDateTime(mergedUser.created_at)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Information de l'appareil */}
+                  <div style={{
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '14px',
+                    padding: '1rem',
+                    background: 'var(--bg-app)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        <Smartphone size={15} color="var(--primary)" /> Information de l'appareil
+                      </div>
+                      {detailLoading && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <RefreshCw size={12} /> Actualisation...
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Nom de l'appareil</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {resolvedDeviceName}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Modèle</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {resolvedDeviceModel}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Version Android</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {resolvedAndroidVersion}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Version de l'app installée</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {resolvedAppVersion}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Dernière connexion</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {formatDateTime(lastConnectionAt)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>Dernière utilisation de l'app</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {lastActivityLog ? formatDateTime(lastActivityLog.timestamp) : 'Aucune activité récente'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Historique des appareils utilisés */}
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 800, marginBottom: '0.45rem' }}>
+                        Historique des appareils utilisés ({deviceHistory.length})
+                      </div>
+                      {deviceHistory.length === 0 ? (
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          Aucun appareil enregistré dans l'historique pour cet utilisateur.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                          {deviceHistory.map((dev, idx) => {
+                            const isCurrentDevice = dev.deviceId && mergedUser.active_device_id && dev.deviceId === mergedUser.active_device_id;
+                            return (
+                              <div
+                                key={dev.deviceId || idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '0.6rem',
+                                  padding: '0.6rem 0.75rem',
+                                  borderRadius: '10px',
+                                  background: 'var(--bg-card)',
+                                  border: isCurrentDevice ? '1px solid rgba(22, 163, 74, 0.35)' : '1px solid var(--border-color)'
+                                }}
+                              >
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                      {dev.name || dev.model || 'Appareil Android'}
+                                    </span>
+                                    {dev.model && dev.model !== dev.name && (
+                                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                        ({dev.model})
+                                      </span>
+                                    )}
+                                    {isCurrentDevice && (
+                                      <span style={{
+                                        fontSize: '0.62rem',
+                                        padding: '0.1rem 0.4rem',
+                                        borderRadius: '999px',
+                                        background: 'rgba(22, 163, 74, 0.1)',
+                                        color: 'var(--success)',
+                                        fontWeight: 700
+                                      }}>
+                                        Appareil actuel
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: '0.69rem', color: 'var(--text-muted)', marginTop: '0.18rem' }}>
+                                    {dev.androidVersion || 'Android N/A'} • App {dev.appVersion || 'N/A'} • Dernière utilisation : {formatDateTime(dev.lastUsedAt)}
+                                    {dev.count > 1 ? ` • ${dev.count} connexions` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Historique de connexion de l'app */}
+                  <div style={{
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '14px',
+                    padding: '1rem',
+                    background: 'var(--bg-app)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        <ShieldCheck size={15} color="var(--primary)" /> Historique de connexion de l'app
+                      </div>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        {visibleConnectionLogs.length} connexion{visibleConnectionLogs.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    {visibleConnectionLogs.length === 0 ? (
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        Aucune connexion enregistrée pour cet utilisateur.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '220px', overflowY: 'auto' }}>
+                        {visibleConnectionLogs.map((log, idx) => {
+                          const actionCode = String(log.action || '').toUpperCase();
+                          const parsedDev = actionCode === 'DEVICE_SESSION' ? parseDeviceLogDetails(log.details) : null;
+                          const displayDetails = parsedDev
+                            ? `Session ouverte sur ${parsedDev.name || parsedDev.model || 'Appareil Android'} (${parsedDev.androidVersion || 'Android'})`
+                            : (log.details || 'Connexion validée');
+                          const actionLabel = actionCode === 'DEVICE_SESSION'
+                            ? 'Session appareil'
+                            : actionCode === 'BIOMETRIC_UNLOCK'
+                              ? 'Déverrouillage biométrique'
+                              : actionCode === 'LOGIN_SUCCESS' || actionCode === 'APP_LOGIN' || actionCode === 'LOGIN' || actionCode === 'CONNEXION'
+                                ? 'Connexion par code PIN'
+                                : (log.action || 'Connexion');
+
+                          return (
+                            <div
+                              key={log.id || idx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                justifyContent: 'space-between',
+                                gap: '0.65rem',
+                                padding: '0.5rem 0.7rem',
+                                borderRadius: '10px',
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--border-color)'
+                              }}
+                            >
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                  {actionLabel}
+                                </div>
+                                <div style={{ fontSize: '0.69rem', color: 'var(--text-secondary)', marginTop: '0.12rem', wordBreak: 'break-word' }}>
+                                  {displayDetails}
+                                </div>
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                {formatDateTime(log.timestamp)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.95rem 1.5rem',
+                  borderTop: '1px solid var(--border-color)',
+                  background: 'var(--bg-app)'
+                }}>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => {
+                      const target = mergedUser;
+                      setDetailUser(null);
+                      handleOpenEditUserModal(target);
+                    }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem' }}
+                  >
+                    <Edit3 size={14} /> Éditer cet utilisateur
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setDetailUser(null)}
+                    style={{ fontSize: '0.8rem', padding: '0.5rem 1.25rem', borderRadius: '10px' }}
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })(),
         document.body
       )}
 

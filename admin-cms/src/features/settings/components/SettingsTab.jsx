@@ -616,7 +616,7 @@ export default function SettingsTab({
         reward_catalog: rewardCatalog
       });
     }
-    if (typeof handleSaveSettings === 'function') {
+    if (activeSubTab === 'delays' && typeof handleSaveSettings === 'function') {
       try {
         handleSaveSettings(e);
       } catch (err) {
@@ -1967,7 +1967,6 @@ export default function SettingsTab({
 
             <button
               type="submit"
-              onClick={handleSubmitForm}
               className="btn btn-primary"
               style={{
                 padding: '0.75rem 2.2rem',

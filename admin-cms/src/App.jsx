@@ -8,8 +8,13 @@ import logoDark from './assets/logo_dark.png';
 import TablerIcon from './components/icons/tablerIcons';
 import {
   getPinLockoutState,
-  recordFailedPinAttempt,
-  clearPinLockout,
+  lockAuthenticatedSession,
+  clearAuthenticatedSession,
+  touchSessionActivity,
+  getAutoLockMinutes,
+  setAutoLockMinutes,
+  AUTO_LOCK_OPTIONS,
+  friendlyErrorMessage,
   PIN_SECURITY_CONFIG
 } from './utils/securityUtils';
 import {
@@ -58,8 +63,12 @@ function App() {
 
   // Authentication states
   const [selectedLoginUser, setSelectedLoginUser] = useState(null);
+  const [isSessionLocked, setIsSessionLocked] = useState(false);
+  const [autoLockMinutes, setAutoLockMinutesState] = useState(() => getAutoLockMinutes());
   const [pinCode, setPinCode] = useState('');
   const [pinError, setPinError] = useState(false);
+  const [loginError, setLoginError] = useState(null);
+  const [isLookingUpEmail, setIsLookingUpEmail] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [pinLockoutState, setPinLockoutState] = useState({
     isLocked: false,
@@ -122,30 +131,61 @@ function App() {
     setIsDarkMode(prev => !prev);
   };
 
-  // SEC-08: Inactivity Timeout - Verrouillage automatique après 15 minutes d'inactivité
+  const lockCurrentSession = (reasonMessage = null) => {
+    const active = db.getCurrentUser() || currentUser;
+    if (!active) return;
+    const locked = lockAuthenticatedSession(active);
+    try { db.logAction?.('VERROUILLAGE_SESSION', `Session verrouillée (${active.prenom || ''} ${active.nom || ''})`); } catch (_) {}
+    db.wipeSensitiveMemoryData?.();
+    setSelectedLoginUser(locked || active);
+    setIsSessionLocked(true);
+    setPinCode('');
+    setPinError(false);
+    setLoginError(reasonMessage);
+    setCurrentUser(null);
+  };
+
+  // SEC-08: Auto-Lock unifié (inactivité + mise en arrière-plan de l'onglet, parité Android SecurityManager)
   useEffect(() => {
     if (!currentUser) return;
-    const TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+    const timeoutMs = (autoLockMinutes || 15) * 60 * 1000;
     let timer = null;
+    let hiddenAt = 0;
 
     const resetTimer = () => {
+      touchSessionActivity();
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        console.warn('[SÉCURITÉ] Session verrouillée après 15 minutes d inactivité');
-        setCurrentUser(null);
-        localStorage.removeItem('klinup_current_user');
-      }, TIMEOUT_MS);
+        console.warn(`[SÉCURITÉ] Session verrouillée après ${autoLockMinutes} min d'inactivité`);
+        lockCurrentSession(`Session verrouillée après ${autoLockMinutes} min d'inactivité. Saisissez votre PIN.`);
+      }, timeoutMs);
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        hiddenAt = Date.now();
+      } else if (hiddenAt > 0) {
+        const elapsed = Date.now() - hiddenAt;
+        hiddenAt = 0;
+        if (elapsed >= timeoutMs) {
+          lockCurrentSession(`Session verrouillée après ${autoLockMinutes} min d'absence.`);
+          return;
+        }
+        resetTimer();
+      }
     };
 
     const events = ['mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
     events.forEach(evt => window.addEventListener(evt, resetTimer, { passive: true }));
+    document.addEventListener('visibilitychange', handleVisibility);
     resetTimer();
 
     return () => {
       if (timer) clearTimeout(timer);
       events.forEach(evt => window.removeEventListener(evt, resetTimer));
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [currentUser]);
+  }, [currentUser, autoLockMinutes]);
 
   // Notifications states & helper functions
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -413,10 +453,14 @@ function App() {
       setSelectedStoreIdState(db.getSelectedStoreId());
     });
 
-    // Load all data from Supabase
+    // Load all data from Supabase (or restore locked session cleanly)
     db.init()
-      .then(() => {
+      .then((res) => {
         setCurrentUser(db.getCurrentUser());
+        if (res?.isLocked && res?.lockedUser) {
+          setSelectedLoginUser(res.lockedUser);
+          setIsSessionLocked(true);
+        }
         setStaffList(db.getAllStaff ? db.getAllStaff() : db.getStaff());
         setDbIsRemote(db.isRemote());
         setSelectedStoreIdState(db.getSelectedStoreId());
@@ -424,8 +468,7 @@ function App() {
       })
       .catch(err => {
         console.error('[App] Initialisation échouée:', err);
-        setInitError(err?.message || 'Impossible de joindre le serveur Supabase.');
-        // Still show data from defaults even on error
+        setInitError(friendlyErrorMessage(err, 'Impossible de joindre le serveur Supabase.'));
         setCurrentUser(db.getCurrentUser());
         setStaffList(db.getAllStaff ? db.getAllStaff() : db.getStaff());
         setDbIsRemote(db.isRemote());
@@ -438,30 +481,19 @@ function App() {
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
-    if (!loginEmail) return;
-
-    const currentStaff = db.getAllStaff ? db.getAllStaff() : db.getStaff();
-    let matchedUser = currentStaff.find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
-
-    if (!matchedUser) {
-      try {
-        await db.refreshStaff();
-        const refreshedStaff = db.getAllStaff ? db.getAllStaff() : db.getStaff();
-        matchedUser = refreshedStaff.find(s => s.email && s.email.toLowerCase() === loginEmail.trim().toLowerCase());
-      } catch (err) {
-        console.warn("Failed to refresh staff on login:", err);
-      }
-    }
-
-    if (matchedUser) {
-      if (matchedUser.statut === 'suspendu') {
-        alert("Votre compte a été suspendu par un administrateur.");
-        return;
-      }
+    if (!loginEmail || isLookingUpEmail) return;
+    setLoginError(null);
+    setIsLookingUpEmail(true);
+    try {
+      const matchedUser = await db.lookupStaffForLogin(loginEmail);
       setSelectedLoginUser(matchedUser);
+      setIsSessionLocked(false);
       setPinCode('');
-    } else {
-      alert("Aucun employé trouvé avec cette adresse email.");
+      setPinError(false);
+    } catch (err) {
+      setLoginError(friendlyErrorMessage(err, 'Aucun employé actif trouvé avec cette adresse email.'));
+    } finally {
+      setIsLookingUpEmail(false);
     }
   };
 
@@ -474,32 +506,6 @@ function App() {
     setShowResetPinModal(false);
     setResetEmail('');
   };
-
-  // Auto-logout after 15 minutes of inactivity (Session Timeout)
-  useEffect(() => {
-    if (!currentUser) return;
-    let inactivityTimer;
-
-    const resetTimer = () => {
-      clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(() => {
-        db.setCurrentUser(null);
-        alert("Session expirée suite à 15 minutes d'inactivité. Veuillez vous reconnecter.");
-      }, 15 * 60 * 1000);
-    };
-
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keydown', resetTimer);
-    window.addEventListener('click', resetTimer);
-    resetTimer();
-
-    return () => {
-      clearTimeout(inactivityTimer);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keydown', resetTimer);
-      window.removeEventListener('click', resetTimer);
-    };
-  }, [currentUser]);
 
   // Global Keyboard Shortcuts (ESC: Close Dialogs)
   useEffect(() => {
@@ -540,52 +546,28 @@ function App() {
     return () => clearInterval(timer);
   }, [pinLockoutState.isLocked, selectedLoginUser]);
 
-  const verifyPinCode = (code) => {
+  const verifyPinCode = async (code) => {
     if (pinError || isUnlocking || pinLockoutState.isLocked || !selectedLoginUser) return;
-    const userKey = selectedLoginUser?.id || selectedLoginUser?.email;
-
-    if (selectedLoginUser.code_pin === code) {
-      // Authentification réussie : réinitialiser le compteur de tentatives
-      clearPinLockout(userKey);
+    setIsUnlocking(true);
+    setLoginError(null);
+    try {
+      const { user, weakPinWarning } = await db.authenticateStaffPin(selectedLoginUser, code);
       setPinLockoutState({ isLocked: false, remainingSeconds: 0, failedAttempts: 0, totalFailures: 0 });
-      setIsUnlocking(true);
-
-      if (code === '000000') {
-        alert("Sécurité : Vous êtes connecté avec le PIN par défaut (000000). Pensez à réinitialiser votre PIN.");
+      setCurrentUser(user);
+      setSelectedLoginUser(null);
+      setIsSessionLocked(false);
+      setPinCode('');
+      setIsUnlocking(false);
+      if (weakPinWarning) {
+        alert("Sécurité : Votre code PIN est trop simple ou par défaut. Pensez à le modifier rapidement.");
       }
-      setTimeout(() => {
-        db.setCurrentUser(selectedLoginUser);
-        setSelectedLoginUser(null);
-        setPinCode('');
-        setIsUnlocking(false);
-      }, 300);
-    } else {
-      // Code PIN erroné : enregistrement et calcul du verrouillage progressif
-      const lockoutResult = recordFailedPinAttempt(userKey);
-      setPinLockoutState(lockoutResult);
+    } catch (err) {
+      setIsUnlocking(false);
+      if (err?.lockoutState) {
+        setPinLockoutState(err.lockoutState);
+      }
       setPinError(true);
-
-      // Journalisation de sécurité
-      if (lockoutResult.isLocked) {
-        try {
-          db.logAction?.(
-            'BLOCAGE_SECURITE_PIN',
-            `Compte ${selectedLoginUser.prenom} ${selectedLoginUser.nom} (${selectedLoginUser.email}) bloqué temporairement pour ${lockoutResult.remainingSeconds}s après ${lockoutResult.failedAttempts} tentatives consécutives incorrectes.`
-          );
-        } catch (logErr) {
-          console.warn('[SECURITY GUARD] Échec logAction:', logErr);
-        }
-      } else if (lockoutResult.failedAttempts >= PIN_SECURITY_CONFIG.WARNING_THRESHOLD) {
-        try {
-          db.logAction?.(
-            'ALERTE_PIN_INCORRECT',
-            `Alerte sécurité : ${lockoutResult.failedAttempts}/5 tentatives échouées pour ${selectedLoginUser.prenom} ${selectedLoginUser.nom} (${selectedLoginUser.email}).`
-          );
-        } catch (logErr) {
-          console.warn('[SECURITY GUARD] Échec logAction:', logErr);
-        }
-      }
-
+      setLoginError(friendlyErrorMessage(err, 'Code PIN incorrect'));
       setTimeout(() => {
         setPinCode('');
         setPinError(false);
@@ -1111,12 +1093,15 @@ function App() {
                         required
                         placeholder="prenom.nom@pressingpro.com"
                         value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value.trimStart())}
+                        onChange={(e) => {
+                          setLoginEmail(e.target.value.trimStart());
+                          if (loginError) setLoginError(null);
+                        }}
                         style={{
                           width: '100%',
                           padding: '0.85rem 1rem 0.85rem 2.6rem',
                           borderRadius: '12px',
-                          border: '1.5px solid #e2e8f0',
+                          border: loginError ? '1.5px solid #ef4444' : '1.5px solid #e2e8f0',
                           background: '#f8fafc',
                           color: '#0f172a',
                           fontSize: '0.9rem',
@@ -1130,7 +1115,7 @@ function App() {
                           e.target.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.12)';
                         }}
                         onBlur={(e) => {
-                          e.target.style.borderColor = '#e2e8f0';
+                          e.target.style.borderColor = loginError ? '#ef4444' : '#e2e8f0';
                           e.target.style.background = '#f8fafc';
                           e.target.style.boxShadow = 'none';
                         }}
@@ -1138,17 +1123,36 @@ function App() {
                     </div>
                   </div>
 
+                  {loginError && (
+                    <div style={{
+                      width: '100%',
+                      background: '#fff1f2',
+                      border: '1px solid #fecdd3',
+                      borderRadius: '10px',
+                      padding: '0.6rem 0.8rem',
+                      marginBottom: '1rem',
+                      color: '#be123c',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      textAlign: 'left',
+                      boxSizing: 'border-box'
+                    }}>
+                      {loginError}
+                    </div>
+                  )}
+
                   <button
                     type="submit"
+                    disabled={isLookingUpEmail}
                     style={{
                       width: '100%',
-                      background: '#2563eb',
+                      background: isLookingUpEmail ? '#94a3b8' : '#2563eb',
                       color: '#ffffff',
                       padding: '0.85rem',
                       borderRadius: '12px',
                       fontWeight: 700,
                       fontSize: '0.92rem',
-                      cursor: 'pointer',
+                      cursor: isLookingUpEmail ? 'wait' : 'pointer',
                       border: 'none',
                       boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
                       display: 'flex',
@@ -1157,11 +1161,11 @@ function App() {
                       gap: '0.5rem',
                       transition: 'all 0.15s ease'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#1d4ed8'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = '#2563eb'}
+                    onMouseEnter={(e) => { if (!isLookingUpEmail) e.currentTarget.style.background = '#1d4ed8'; }}
+                    onMouseLeave={(e) => { if (!isLookingUpEmail) e.currentTarget.style.background = '#2563eb'; }}
                   >
-                    <span>Continuer vers le code PIN</span>
-                    <IconArrowRight size={18} stroke={2} />
+                    <span>{isLookingUpEmail ? 'Vérification...' : 'Continuer vers le code PIN'}</span>
+                    {!isLookingUpEmail && <IconArrowRight size={18} stroke={2} />}
                   </button>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '1.25rem', fontSize: '0.78rem' }}>
@@ -1185,31 +1189,55 @@ function App() {
               ) : (
                 /* ── ÉTAPE 2 : SAISIE CODE PIN (STYLE IMAGE : 6 BOÎTES) ── */
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  {/* Bouton Changer de compte */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedLoginUser(null)}
-                    style={{
-                      alignSelf: 'flex-start',
-                      background: 'none',
-                      border: 'none',
-                      color: '#64748b',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      padding: 0,
-                      marginBottom: '1.25rem',
-                      transition: 'color 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = '#0f172a'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
-                  >
-                    <IconArrowLeft size={15} stroke={2} />
-                    <span>Changer de compte</span>
-                  </button>
+                  {/* Bouton Changer de compte + Badge Session Verrouillée */}
+                  <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearAuthenticatedSession();
+                        setIsSessionLocked(false);
+                        setSelectedLoginUser(null);
+                        setLoginError(null);
+                        setPinCode('');
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#64748b',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: 0,
+                        transition: 'color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#0f172a'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
+                    >
+                      <IconArrowLeft size={15} stroke={2} />
+                      <span>Changer de compte</span>
+                    </button>
+
+                    {isSessionLocked && (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        color: '#1d4ed8',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        padding: '3px 9px',
+                        borderRadius: '9999px'
+                      }}>
+                        <IconLock size={12} stroke={2.2} />
+                        Session verrouillée
+                      </span>
+                    )}
+                  </div>
 
                   {/* Logo Officiel Pressing Pro en noir pur sans fond sombre */}
                   <div style={{
@@ -1347,9 +1375,9 @@ function App() {
                       )}
 
                       {/* Message d'erreur de PIN */}
-                      {pinError && (
-                        <div style={{ color: '#ef4444', fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.5rem', animation: 'fadeIn 0.15s ease' }}>
-                          Code PIN incorrect
+                      {(pinError || loginError) && (
+                        <div style={{ color: '#ef4444', fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.6rem', textAlign: 'center', animation: 'fadeIn 0.15s ease' }}>
+                          {loginError || 'Code PIN incorrect'}
                         </div>
                       )}
 
@@ -1793,6 +1821,30 @@ function App() {
             </div>
           </div>
         )}
+
+        {customDialog && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(4px)',
+            zIndex: 1000000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem'
+          }}>
+            <div className="card modal-dialog-card" onClick={(e) => e.stopPropagation()} style={{
+              width: '100%', maxWidth: '380px', background: '#ffffff', padding: '1.5rem',
+              display: 'flex', flexDirection: 'column', gap: '1rem', borderRadius: '20px',
+              boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25)', color: '#0f172a'
+            }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>{customDialog.title}</h3>
+              <p style={{ color: '#475569', fontSize: '0.88rem', lineHeight: 1.5, margin: 0, whiteSpace: 'pre-wrap' }}>{customDialog.message}</p>
+              <button
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '0.6rem 1rem', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700 }}
+                onClick={() => { customDialog.resolve?.(true); setCustomDialog(null); }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1889,6 +1941,37 @@ function App() {
                 data-tooltip="Catalogue Tarifs">
                 <div className="sidebar-nav-icon"><MIcon name="price_change" size={19} /></div>
                 <span className="sidebar-nav-label">Catalogue Tarifs</span>
+              </li>
+
+              <li className={`sidebar-nav-item${adminMenu === 'expenses' ? ' active' : ''}`}
+                onClick={() => selectMenu('expenses')}
+                data-tooltip="Dépenses Laverie">
+                <div className="sidebar-nav-icon"><MIcon name="receipt_long" size={19} /></div>
+                <span className="sidebar-nav-label">Dépenses</span>
+              </li>
+
+              <li className={`sidebar-nav-item${adminMenu === 'validations' ? ' active' : ''}`}
+                onClick={() => selectMenu('validations')}
+                data-tooltip="Validations Reward">
+                <div className="sidebar-nav-icon"><MIcon name="verified_user" size={19} /></div>
+                <span className="sidebar-nav-label">Validations</span>
+                {(() => {
+                  const adjs = db.getRewardPointAdjustments ? db.getRewardPointAdjustments() : [];
+                  const pending = adjs.filter(a => a.status === 'pending' && (isSuperAdmin || !currentUser?.store_id || currentUser.store_id === 'all' || a.store_id === currentUser.store_id)).length;
+                  return pending > 0 ? (
+                    <span style={{
+                      marginLeft: 'auto',
+                      background: '#f59e0b',
+                      color: '#fff',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      padding: '0.1rem 0.45rem',
+                      borderRadius: '999px'
+                    }}>
+                      {pending}
+                    </span>
+                  ) : null;
+                })()}
               </li>
 
               {isSuperAdmin && (
@@ -2023,6 +2106,13 @@ function App() {
                 <span className="sidebar-nav-label">Aide & Support</span>
               </li>
 
+              <li className="sidebar-nav-item"
+                onClick={() => lockCurrentSession('Session verrouillée manuellement.')}
+                data-tooltip="Verrouiller la session">
+                <div className="sidebar-nav-icon"><MIcon name="lock" size={19} /></div>
+                <span className="sidebar-nav-label">Verrouiller</span>
+              </li>
+
               <li className="sidebar-nav-item sidebar-nav-logout"
                 onClick={() => setShowLogoutConfirm(true)}
                 data-tooltip="Déconnexion">
@@ -2065,6 +2155,8 @@ function App() {
               {hasAdminAccess && adminMenu === 'orders_management' && "Gestion des Commandes"}
               {hasAdminAccess && adminMenu === 'crm_management' && "Clients CRM"}
               {hasAdminAccess && adminMenu === 'catalog' && "Catalogue Tarifs"}
+              {hasAdminAccess && adminMenu === 'expenses' && "Dépenses de la Laverie"}
+              {hasAdminAccess && adminMenu === 'validations' && "Validations Points Reward"}
               {hasAdminAccess && adminMenu === 'laundry_points' && "Points de Laverie"}
               {hasAdminAccess && (adminMenu === 'staff_management' || adminMenu === 'staff_users') && "Gestion Utilisateurs"}
               {hasAdminAccess && adminMenu === 'staff_roles' && "Configuration des Rôles"}

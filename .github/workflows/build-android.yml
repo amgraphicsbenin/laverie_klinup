@@ -1,4 +1,4 @@
-name: Build Android APK (Multi-Environment)
+name: Build Native Android APK (Kotlin & Jetpack Compose)
 
 on:
   push:
@@ -29,7 +29,7 @@ on:
 
 jobs:
   build:
-    name: Build Android APK (${{ github.ref_name }})
+    name: Build Android Native APK (${{ github.ref_name }})
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -47,7 +47,6 @@ jobs:
           FIREBASE_APP_ID_PROD_SECRET: ${{ secrets.FIREBASE_APP_ID_PROD }}
           FIREBASE_SERVICE_ACCOUNT_SECRET: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          # Priorité à l'input manuel si workflow_dispatch, sinon détection via la branche git
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TARGET_ENV="${{ github.event.inputs.target_env }}"
           elif [ "${{ github.ref_name }}" = "test" ]; then
@@ -62,7 +61,6 @@ jobs:
           echo "TARGET_ENV=${TARGET_ENV}" >> $GITHUB_OUTPUT
           echo "🎯 Environnement sélectionné : ${TARGET_ENV}"
 
-          # Détection et configuration Firebase App Distribution
           if [ "${TARGET_ENV}" = "production" ]; then
             TARGET_FIREBASE_APP_ID="${FIREBASE_APP_ID_PROD_SECRET:-1:735467305399:android:43c1e315d66b4c56069032}"
           elif [ "${TARGET_ENV}" = "staging" ] && [ -n "${FIREBASE_APP_ID_STAGING_SECRET}" ]; then
@@ -82,20 +80,11 @@ jobs:
             echo "ℹ️ Firebase App Distribution non configuré pour ${TARGET_ENV} (étape ignorée)"
           fi
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-          cache-dependency-path: mobile-app/package-lock.json
-
-      - name: Configure Versioning & Dynamic Environment
-        working-directory: mobile-app
+      - name: Configure Versioning & Environment
         run: |
-          VERSION_NAME=$(node -p "require('./app.json').expo.version")
+          VERSION_NAME="1.0.0"
           BUILD_NUMBER=${{ github.run_number }}
           ENV_LABEL="${{ env.APP_ENV }}"
-          
           APK_FILE_NAME="klinup-${ENV_LABEL}-v${VERSION_NAME}-b${BUILD_NUMBER}.apk"
           
           echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
@@ -103,43 +92,6 @@ jobs:
           echo "APK_NAME=${APK_FILE_NAME}" >> $GITHUB_ENV
           
           echo "🏗️ Building KLIN UP [${ENV_LABEL}] v${VERSION_NAME} (Build #${BUILD_NUMBER})"
-          
-          # Met à jour versionCode dans app.json
-          node -e "
-            const fs = require('fs');
-            const app = JSON.parse(fs.readFileSync('./app.json', 'utf8'));
-            app.expo.android = app.expo.android || {};
-            app.expo.android.versionCode = ${BUILD_NUMBER};
-            fs.writeFileSync('./app.json', JSON.stringify(app, null, 2));
-          "
-
-      - name: Install dependencies
-        working-directory: mobile-app
-        run: npm ci --prefer-offline
-
-      - name: Cache Expo prebuild
-        uses: actions/cache@v4
-        with:
-          path: |
-            mobile-app/android
-            !mobile-app/android/app/build
-          key: expo-prebuild-${{ env.APP_ENV }}-${{ hashFiles('mobile-app/package-lock.json', 'mobile-app/app.json', 'mobile-app/app.config.js', 'mobile-app/assets/**', 'mobile-app/scripts/fix-android-icons.js') }}
-          restore-keys: |
-            expo-prebuild-${{ env.APP_ENV }}-
-            expo-prebuild-
-
-      - name: Expo prebuild (Generate Native Layer for ${{ env.APP_ENV }})
-        working-directory: mobile-app
-        env:
-          APP_ENV: ${{ env.APP_ENV }}
-          EXPO_PUBLIC_APP_ENV: ${{ env.APP_ENV }}
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
-        run: npx expo prebuild --platform android --no-install --clean
-
-      - name: Normalize Android Icons to PNG for Firebase App Distribution
-        working-directory: mobile-app
-        run: node scripts/fix-android-icons.js
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -156,42 +108,22 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('mobile-app/android/gradle/wrapper/gradle-wrapper.properties', 'mobile-app/android/build.gradle', 'mobile-app/android/app/build.gradle') }}
+          key: gradle-${{ hashFiles('android-app/gradle/wrapper/gradle-wrapper.properties', 'android-app/build.gradle.kts', 'android-app/app/build.gradle.kts') }}
           restore-keys: |
             gradle-
 
-      - name: Optimize Gradle configuration
-        working-directory: mobile-app/android
-        run: |
-          cat >> gradle.properties << 'EOF'
-
-          # === KLIN UP Build Optimizations ===
-          reactNativeArchitectures=arm64-v8a
-          org.gradle.parallel=true
-          org.gradle.caching=true
-          org.gradle.configureondemand=true
-          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError
-          android.enableJetifier=false
-          EOF
-
       - name: Make Gradle wrapper executable
-        run: chmod +x mobile-app/android/gradlew
+        run: chmod +x android-app/gradlew
 
       - name: Build Release APK
-        working-directory: mobile-app/android
-        env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m"
-          APP_ENV: ${{ env.APP_ENV }}
-          EXPO_PUBLIC_APP_ENV: ${{ env.APP_ENV }}
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+        working-directory: android-app
         run: ./gradlew assembleRelease --no-daemon --build-cache --parallel -x lint -x test
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APK_NAME }}
-          path: mobile-app/android/app/build/outputs/apk/release/app-release.apk
+          path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
@@ -203,11 +135,10 @@ jobs:
           appId: ${{ env.FIREBASE_APP_ID }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           groups: testers
-          file: mobile-app/android/app/build/outputs/apk/release/app-release.apk
+          file: android-app/app/build/outputs/apk/release/app-release.apk
           releaseNotes: |
-            🚀 KLIN UP (${{ env.APP_ENV }})
+            🚀 KLIN UP (${{ env.APP_ENV }}) - Android Native (Kotlin & Jetpack Compose)
             Version: ${{ env.VERSION_NAME }} (Build #${{ env.BUILD_NUMBER }})
             Environnement: ${{ env.APP_ENV }}
             Branche: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
-

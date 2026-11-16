@@ -1,6 +1,20 @@
+import {
+  clearAuthenticatedSession,
+  clearPinLockout,
+  friendlyErrorMessage,
+  getPinLockoutState,
+  isValidEmail,
+  isValidPinFormat,
+  isWeakPin,
+  PIN_SECURITY_CONFIG,
+  recordFailedPinAttempt,
+  restoreAuthenticatedSession,
+  stripSensitiveUserFields,
+  verifyPinHash
+} from '../../utils/securityUtils.js';
 import { supabase } from '../supabaseClient.js';
+import { dbEngine, hydrateOrder, startOrderStateCron } from './dbEngine';
 import { memoryDb, notifyListeners } from './memoryStore';
-import { hydrateOrder, startOrderStateCron } from './dbEngine';
 
 let isUsingRemote = false;
 export function getIsUsingRemote(): boolean { return isUsingRemote; }
@@ -30,8 +44,8 @@ function loadSession(key: string, defaultVal: any): any {
 const STRIP_FROM_ALL = ['est_en_retard'];
 const STRIP_BY_TABLE: Record<string, string[]> = {
   orders: ['remise_pourcentage', 'remise_montant', 'prix_base_avant_remise',
-           'motif_annulation', 'solde_paid_at',
-           'reference_paiement', 'reference_momo', 'acompte_paid_at', 'is_subscription_order'],
+    'motif_annulation', 'solde_paid_at',
+    'reference_paiement', 'reference_momo', 'acompte_paid_at', 'is_subscription_order'],
   catalog: ['sku', 'prix_urgent', 'is_active'],
   customers: ['coordonnees_livraison', 'rewards', 'latitude', 'longitude', 'quartier', 'ville'],
   activity_logs: ['store_id'],
@@ -113,9 +127,9 @@ export async function performMutation(
       currentErrMsg.includes('schema cache')
     ) {
       const match = currentErrMsg.match(/Could not find the '([^']+)' column/i)
-                  || currentErrMsg.match(/column "([^"]+)"/i)
-                  || currentErrMsg.match(/column '([^']+)'/i)
-                  || currentErrMsg.match(/column ([a-z0-9_]+)/i);
+        || currentErrMsg.match(/column "([^"]+)"/i)
+        || currentErrMsg.match(/column '([^']+)'/i)
+        || currentErrMsg.match(/column ([a-z0-9_]+)/i);
       const missingCol = match?.[1];
 
       if (missingCol) {
@@ -124,9 +138,9 @@ export async function performMutation(
         console.warn(`[KLIN UP DB] ⚠️ Colonne '${missingCol}' absente du schéma Supabase — retrait (essai ${attempt}).`);
       } else {
         const optionalCols = ['ville', 'responsable_id', 'responsable_nom', 'created_by_id', 'created_by_name',
-                              'push_token', 'push_token_updated_at', 'motif_annulation', 'solde_paid_at',
-                              'reference_paiement', 'reference_momo', 'acompte_paid_at', 'operateur_momo',
-                              'cree_par_livreur', 'validee_par_caisse', 'created_by_role', 'validated_by_id', 'validated_by_name', 'validated_at'];
+          'push_token', 'push_token_updated_at', 'motif_annulation', 'solde_paid_at',
+          'reference_paiement', 'reference_momo', 'acompte_paid_at', 'operateur_momo',
+          'cree_par_livreur', 'validee_par_caisse', 'created_by_role', 'validated_by_id', 'validated_by_name', 'validated_at'];
         for (const col of optionalCols) {
           knownMissingCols.add(`${table}:${col}`);
           delete retriedData[col];
@@ -171,27 +185,36 @@ export async function performMutation(
   throw new Error(`[KLIN UP DB] Supabase a rejeté l'opération sur '${table}' : ${errMsg} (code: ${errCode})`);
 }
 
-// ─── Database initialization — Supabase-only ──────────────────────────────
+// ─── Database initialization & Authenticated Data Isolation ────────────────
 
-export async function initDb(): Promise<void> {
-  memoryDb.selected_store_id = loadSession('klin_up_selected_store', 'all');
-  memoryDb.current_user = loadSession('klin_up_current_user', null);
-  const storedSettings = loadSession('klin_up_settings', null);
-  if (storedSettings) {
-    memoryDb.settings = { ...memoryDb.settings, ...storedSettings };
+let hasLoadedBusinessData = false;
+
+export function wipeSensitiveMemoryData(): void {
+  hasLoadedBusinessData = false;
+  memoryDb.staff = [];
+  memoryDb.customers = [];
+  memoryDb.orders = [];
+  memoryDb.logs = [];
+  memoryDb.pin_reset_requests = [];
+  memoryDb.reward_point_adjustments = [];
+  memoryDb.expenses = [];
+  memoryDb.support_tickets = [];
+  if (activeRealtimeChannel && supabase) {
+    try { supabase.removeChannel(activeRealtimeChannel); } catch (_) { }
+    activeRealtimeChannel = null;
   }
+}
 
-  if (!supabase) {
-    console.error('[KLIN UP DB] ❌ Supabase non configuré. Vérifiez les variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.');
-    isUsingRemote = false;
-    startOrderStateCron();
-    notifyListeners();
-    return;
-  }
-
+export async function loadAuthenticatedBusinessData(): Promise<void> {
+  if (!supabase || !memoryDb.current_user) return;
   try {
+    const isSuperAdmin = memoryDb.current_user.role === 'super_admin';
     const [staffRes, custRes, ordRes, logRes, catRes, reqRes, storeRes, rewardRes] = await Promise.all([
-      supabase.from('staff').select('*'),
+      supabase.from('staff').select(
+        isSuperAdmin
+          ? '*'
+          : 'id,nom,prenom,email,role,user_picture,statut,telephone,store_id,permissions,created_at'
+      ),
       supabase.from('customers').select('*'),
       supabase.from('orders').select('*'),
       supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(200),
@@ -205,16 +228,23 @@ export async function initDb(): Promise<void> {
     if (staffRes.error) throw new Error(`Erreur chargement staff : ${staffRes.error.message}`);
 
     isUsingRemote = true;
-    console.log('[KLIN UP DB] 🟢 Connecté à Supabase — mode données réelles activé.');
+    hasLoadedBusinessData = true;
+    console.log('[KLIN UP DB] 🟢 Données métier chargées après authentification.');
 
-    memoryDb.staff = (staffRes.data || []).filter(Boolean);
+    memoryDb.staff = (staffRes.data || []).filter(Boolean).map((s: any) =>
+      isSuperAdmin ? s : stripSensitiveUserFields(s)
+    );
 
     if (memoryDb.current_user) {
-      const stillValid = memoryDb.staff.some(s => s.id === memoryDb.current_user?.id);
-      if (!stillValid) {
+      const matched = memoryDb.staff.find(s => s.id === memoryDb.current_user?.id);
+      if (!matched || matched.statut === 'suspendu') {
         memoryDb.current_user = null;
-        removeSession('klin_up_current_user');
+        clearAuthenticatedSession();
+        wipeSensitiveMemoryData();
+        notifyListeners();
+        return;
       }
+      memoryDb.current_user = stripSensitiveUserFields(matched);
     }
 
     if (!custRes.error) memoryDb.customers = custRes.data || [];
@@ -295,6 +325,60 @@ export async function initDb(): Promise<void> {
     }
 
     try {
+      let tableAdjs: any[] = [];
+      try {
+        const { data: adjData, error: adjErr } = await supabase
+          .from('reward_point_adjustments')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!adjErr && adjData) {
+          tableAdjs = adjData;
+        }
+      } catch (_) { }
+
+      let logAdjs: any[] = [];
+      try {
+        const { data: adjLogs, error: logAdjErr } = await supabase
+          .from('activity_logs')
+          .select('*')
+          .in('action', ['REWARD_ADJ_REQ', 'REWARD_ADJ_DECISION'])
+          .order('timestamp', { ascending: true });
+        if (!logAdjErr && adjLogs) {
+          logAdjs = adjLogs;
+        }
+      } catch (_) { }
+
+      const mergedMap = new Map<string, any>();
+      logAdjs.forEach((l: any) => {
+        if (l.action === 'REWARD_ADJ_REQ' && l.details) {
+          try {
+            const parsed = JSON.parse(l.details);
+            if (parsed?.id) mergedMap.set(parsed.id, parsed);
+          } catch (_) { }
+        }
+      });
+      logAdjs.forEach((l: any) => {
+        if (l.action === 'REWARD_ADJ_DECISION' && l.details) {
+          try {
+            const dec = JSON.parse(l.details);
+            if (dec?.id && mergedMap.has(dec.id)) {
+              mergedMap.set(dec.id, { ...mergedMap.get(dec.id), ...dec });
+            }
+          } catch (_) { }
+        }
+      });
+      tableAdjs.forEach((row: any) => {
+        const prev = mergedMap.get(row.id);
+        mergedMap.set(row.id, prev && row.status === 'pending' && prev.status !== 'pending' ? prev : row);
+      });
+      memoryDb.reward_point_adjustments = Array.from(mergedMap.values()).sort(
+        (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+    } catch (e) {
+      // Fallback silencieux
+    }
+
+    try {
       const { data: pData, error: pErr } = await supabase.from('pickup_zones').select('*').order('min_km', { ascending: true });
       if (!pErr && pData) {
         memoryDb.pickup_zones = pData;
@@ -307,6 +391,19 @@ export async function initDb(): Promise<void> {
       const { data: tData, error: tErr } = await supabase.from('support_tickets').select('*').order('created_at', { ascending: false });
       if (!tErr && tData) {
         memoryDb.support_tickets = tData;
+      }
+    } catch (e) {
+      // Ignorer si la table n'existe pas encore
+    }
+
+    try {
+      const { data: expData, error: expErr } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('expense_date', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (!expErr && expData) {
+        memoryDb.expenses = expData;
       }
     } catch (e) {
       // Ignorer si la table n'existe pas encore
@@ -343,12 +440,241 @@ export async function initDb(): Promise<void> {
   }
 }
 
-export async function refreshStaff(): Promise<void> {
-  if (!supabase) return;
+export async function initDb(): Promise<{ lockedUser: any | null; isLocked: boolean }> {
+  memoryDb.selected_store_id = loadSession('klin_up_selected_store', 'all');
+  const storedSettings = loadSession('klin_up_settings', null);
+  if (storedSettings) {
+    memoryDb.settings = { ...memoryDb.settings, ...storedSettings };
+  }
+
+  // Restauration sécurisée de la session signée (TTL 12h + Auto-Lock)
+  const restored = restoreAuthenticatedSession();
+  memoryDb.current_user = (!restored.locked && restored.user) ? restored.user : null;
+
+  if (!supabase) {
+    console.error('[KLIN UP DB] ❌ Supabase non configuré. Vérifiez les variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.');
+    isUsingRemote = false;
+    notifyListeners();
+    return { lockedUser: restored.locked ? restored.user : null, isLocked: restored.locked };
+  }
+
   try {
-    const { data, error } = await supabase.from('staff').select('*');
+    // Vérification légère de connectivité sans télécharger les tables sensibles avant login
+    const { data: storeData, error: storeErr } = await supabase
+      .from('stores')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (storeErr) {
+      throw new Error(friendlyErrorMessage(storeErr, 'Impossible de joindre le serveur Supabase.'));
+    }
+
+    isUsingRemote = true;
+    memoryDb.stores = storeData || [];
+
+    if (memoryDb.current_user && !restored.locked) {
+      await loadAuthenticatedBusinessData();
+    } else {
+      wipeSensitiveMemoryData();
+      notifyListeners();
+    }
+
+    return {
+      lockedUser: restored.locked ? restored.user : null,
+      isLocked: restored.locked
+    };
+  } catch (err: any) {
+    console.error('[KLIN UP DB] ❌ Initialisation Supabase échouée :', err.message);
+    isUsingRemote = false;
+    notifyListeners();
+    throw new Error(friendlyErrorMessage(err, 'Impossible de joindre le serveur Supabase.'));
+  }
+}
+
+/**
+ * Étape 1 Auth : Recherche ciblée par email (sans jamais exposer `code_pin`)
+ */
+export async function lookupStaffForLogin(email: string): Promise<any> {
+  if (!supabase) {
+    throw new Error('Serveur Supabase non initialisé.');
+  }
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!isValidEmail(cleanEmail)) {
+    throw new Error('Veuillez entrer une adresse email valide.');
+  }
+
+  // 1. Priorité à la RPC SECURITY DEFINER (ne retourne jamais code_pin)
+  try {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('lookup_staff_login', { p_email: cleanEmail });
+    if (!rpcErr && Array.isArray(rpcData) && rpcData.length > 0) {
+      const candidate = stripSensitiveUserFields(rpcData[0]);
+      if (candidate?.statut === 'suspendu') {
+        throw new Error('Votre compte a été suspendu par un administrateur.');
+      }
+      return candidate;
+    }
+  } catch (e: any) {
+    if (e?.message?.includes('suspendu')) throw e;
+  }
+
+  // 2. Repli ciblé sur `staff` (projection explicite sans `code_pin`)
+  const { data, error } = await supabase
+    .from('staff')
+    .select('id,nom,prenom,email,role,user_picture,statut,telephone,store_id,permissions,created_at')
+    .ilike('email', cleanEmail)
+    .limit(5);
+
+  if (error) {
+    throw new Error(friendlyErrorMessage(error, 'Erreur lors de la vérification du compte.'));
+  }
+
+  const matched = (data || []).find(
+    (s: any) => s?.email && s.email.trim().toLowerCase() === cleanEmail
+  );
+
+  if (!matched) {
+    throw new Error('Aucun employé trouvé avec cette adresse email.');
+  }
+  if (matched.statut === 'suspendu' || matched.statut === 'inactif') {
+    throw new Error('Votre compte a été suspendu par un administrateur.');
+  }
+
+  return stripSensitiveUserFields(matched);
+}
+
+/**
+ * Étape 2 Auth : Vérification atomique du PIN (RPC serveur ou temps constant + anti-bruteforce)
+ */
+export async function authenticateStaffPin(
+  user: any,
+  pin: string
+): Promise<{ user: any; weakPinWarning: boolean }> {
+  if (!supabase) {
+    throw new Error('Serveur Supabase non initialisé.');
+  }
+  const cleanPin = String(pin || '').trim();
+  if (!isValidPinFormat(cleanPin)) {
+    throw new Error('Le code PIN doit comporter exactement 6 chiffres.');
+  }
+  const accountKey = user?.id || user?.email;
+  const lockState = getPinLockoutState(accountKey);
+  if (lockState.isLocked) {
+    const err: any = new Error(`Compte temporairement bloqué. Réessayez dans ${lockState.remainingSeconds}s.`);
+    err.lockoutState = lockState;
+    throw err;
+  }
+
+  // 1. Tentative via RPC serveur `authenticate_staff_pin`
+  try {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('authenticate_staff_pin', {
+      p_staff_id: user.id,
+      p_pin: cleanPin
+    });
+
+    if (!rpcErr && rpcRes && typeof rpcRes === 'object') {
+      if (rpcRes.authenticated) {
+        clearPinLockout(accountKey);
+        const verifiedUser = stripSensitiveUserFields(rpcRes.user || user);
+        dbEngine.setCurrentUser(verifiedUser);
+        await loadAuthenticatedBusinessData();
+        return { user: verifiedUser, weakPinWarning: isWeakPin(cleanPin) };
+      }
+
+      if (rpcRes.error_code === 'ACCOUNT_LOCKED') {
+        const lockRes = recordFailedPinAttempt(accountKey);
+        try {
+          dbEngine.logAction?.('BLOCAGE_SECURITE_PIN', `Verrouillage serveur après échecs PIN (${user.prenom || ''} ${user.nom || ''})`);
+        } catch (_) { }
+        const err: any = new Error(rpcRes.message || 'Compte temporairement verrouillé.');
+        err.lockoutState = { ...lockRes, isLocked: true, remainingSeconds: rpcRes.remaining_seconds || 900 };
+        throw err;
+      }
+
+      if (rpcRes.error_code === 'PIN_NOT_CONFIGURED') {
+        throw new Error('Aucun code PIN n’est configuré pour ce compte. Contactez l’administrateur.');
+      }
+
+      if (rpcRes.error_code === 'INVALID_PIN') {
+        const lockRes = recordFailedPinAttempt(accountKey);
+        try {
+          dbEngine.logAction?.(
+            lockRes.isLocked ? 'BLOCAGE_SECURITE_PIN' : 'ALERTE_PIN_INCORRECT',
+            `Échec PIN pour ${user.prenom || ''} ${user.nom || ''} (${user.email || ''})`
+          );
+        } catch (_) { }
+        const err: any = new Error('Code PIN incorrect');
+        err.lockoutState = lockRes;
+        throw err;
+      }
+    }
+  } catch (e: any) {
+    if (e?.lockoutState || e?.message?.includes('configuré')) throw e;
+    // Sinon RPC non encore déployée -> repli ci-dessous
+  }
+
+  // 2. Repli ciblé en temps constant (sans téléchargement massif ni PIN par défaut "000000")
+  const { data: freshRows, error: fetchErr } = await supabase
+    .from('staff')
+    .select('id,nom,prenom,email,role,user_picture,statut,telephone,store_id,permissions,code_pin')
+    .eq('id', user.id)
+    .limit(1);
+
+  if (fetchErr) {
+    throw new Error(friendlyErrorMessage(fetchErr, 'Impossible de vérifier votre identité.'));
+  }
+
+  const freshStaff = freshRows?.[0];
+  if (!freshStaff || freshStaff.statut === 'suspendu' || freshStaff.statut === 'inactif') {
+    throw new Error('Ce compte est introuvable ou suspendu.');
+  }
+
+  const cleanStored = String(freshStaff.code_pin || '').trim();
+  if (cleanStored.length < 4) {
+    throw new Error('Aucun code PIN sécurisé n’est configuré pour ce compte.');
+  }
+
+  const pinOk = await verifyPinHash(cleanPin, cleanStored, freshStaff.id);
+  if (pinOk) {
+    clearPinLockout(accountKey);
+    const sanitized = stripSensitiveUserFields(freshStaff);
+    dbEngine.setCurrentUser(sanitized);
+    await loadAuthenticatedBusinessData();
+    return { user: sanitized, weakPinWarning: isWeakPin(cleanPin) };
+  }
+
+  const lockRes = recordFailedPinAttempt(accountKey);
+  if (lockRes.isLocked) {
+    try {
+      dbEngine.logAction?.(
+        'BLOCAGE_SECURITE_PIN',
+        `Compte ${freshStaff.prenom} ${freshStaff.nom} (${freshStaff.email}) bloqué temporairement pour ${lockRes.remainingSeconds}s après ${lockRes.failedAttempts} tentatives.`
+      );
+    } catch (_) { }
+  } else if (lockRes.failedAttempts >= PIN_SECURITY_CONFIG.WARNING_THRESHOLD) {
+    try {
+      dbEngine.logAction?.(
+        'ALERTE_PIN_INCORRECT',
+        `Alerte sécurité : ${lockRes.failedAttempts}/5 tentatives échouées pour ${freshStaff.prenom} ${freshStaff.nom} (${freshStaff.email}).`
+      );
+    } catch (_) { }
+  }
+
+  const err: any = new Error('Code PIN incorrect');
+  err.lockoutState = lockRes;
+  throw err;
+}
+
+export async function refreshStaff(): Promise<void> {
+  if (!supabase || !memoryDb.current_user) return;
+  try {
+    const isSuperAdmin = memoryDb.current_user.role === 'super_admin';
+    const { data, error } = await supabase
+      .from('staff')
+      .select(isSuperAdmin ? '*' : 'id,nom,prenom,email,role,user_picture,statut,telephone,store_id,permissions,created_at');
     if (!error && data) {
-      memoryDb.staff = data.filter(Boolean);
+      memoryDb.staff = data.filter(Boolean).map((s: any) =>
+        isSuperAdmin ? s : stripSensitiveUserFields(s)
+      );
       notifyListeners();
     } else if (error) {
       console.error('[KLIN UP DB] Erreur refresh staff :', error.message);
@@ -378,10 +704,10 @@ let activeRealtimeChannel: any = null;
 export function setupRealtime(): void {
   if (!supabase) return;
   if (activeRealtimeChannel) {
-    try { supabase.removeChannel(activeRealtimeChannel); } catch (e) {}
+    try { supabase.removeChannel(activeRealtimeChannel); } catch (e) { }
   }
 
-  const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores', 'roles'];
+  const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores', 'roles', 'reward_point_adjustments', 'expenses'];
   let channel = supabase.channel('admin_global_realtime');
 
   tables.forEach(table => {
@@ -397,6 +723,13 @@ export function setupRealtime(): void {
       else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
       else if (table === 'stores') targetList = memoryDb.stores;
       else if (table === 'roles') targetList = memoryDb.roles;
+      else if (table === 'reward_point_adjustments') {
+        if (!memoryDb.reward_point_adjustments) memoryDb.reward_point_adjustments = [];
+        targetList = memoryDb.reward_point_adjustments;
+      } else if (table === 'expenses') {
+        if (!memoryDb.expenses) memoryDb.expenses = [];
+        targetList = memoryDb.expenses;
+      }
 
       const formatRow = (r: any) => {
         if (table === 'orders') return hydrateOrder(r);
@@ -414,8 +747,28 @@ export function setupRealtime(): void {
         const exists = targetList.some(x => x.id === newRow.id);
         if (!exists) {
           const rowToAdd = formatRow(newRow);
-          if (table === 'activity_logs') targetList.unshift(rowToAdd);
-          else targetList.push(rowToAdd);
+          if (table === 'activity_logs') {
+            targetList.unshift(rowToAdd);
+            if (!memoryDb.reward_point_adjustments) memoryDb.reward_point_adjustments = [];
+            if (newRow.action === 'REWARD_ADJ_REQ' && newRow.details) {
+              try {
+                const parsed = JSON.parse(newRow.details);
+                if (parsed?.id && !memoryDb.reward_point_adjustments.some(a => a.id === parsed.id)) {
+                  memoryDb.reward_point_adjustments.unshift(parsed);
+                }
+              } catch (_) { }
+            } else if (newRow.action === 'REWARD_ADJ_DECISION' && newRow.details) {
+              try {
+                const dec = JSON.parse(newRow.details);
+                const idx = memoryDb.reward_point_adjustments.findIndex(a => a.id === dec?.id);
+                if (idx !== -1) {
+                  memoryDb.reward_point_adjustments[idx] = { ...memoryDb.reward_point_adjustments[idx], ...dec };
+                }
+              } catch (_) { }
+            }
+          } else {
+            targetList.push(rowToAdd);
+          }
         }
       } else if (eventType === 'UPDATE') {
         const idx = targetList.findIndex(x => x.id === newRow.id);
@@ -494,7 +847,7 @@ export function sanitizeCatalogIds(): void {
       used.add(nextSeq);
       console.log(`[KLIN UP DB] 🔄 ID catalogue anormal corrigé : ${oldId} -> ${newId} (${c.article})`);
       if (supabase && isUsingRemote) {
-        supabase.from('catalog').update({ id: newId }).eq('id', oldId).catch(() => {});
+        supabase.from('catalog').update({ id: newId }).eq('id', oldId).catch(() => { });
       }
     }
   });
