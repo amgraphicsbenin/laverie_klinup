@@ -35,5 +35,19 @@ db.json
 .chalk/context/
 .chalk/skills/*.enabled
 
-# Android local SDK config
+# Android local SDK & Gradle cache/artifacts
 **/local.properties
+.gradle/
+**/.gradle/
+.kotlin/
+**/.kotlin/
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Local design & scratch files
+*.figcraft
+Home page.png
