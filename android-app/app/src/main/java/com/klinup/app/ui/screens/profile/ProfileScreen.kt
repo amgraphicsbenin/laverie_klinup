@@ -489,8 +489,95 @@ fun ProfileScreen(onLogout: () -> Unit) {
                     }
                 }
 
-                item(key = "logout") {
+                item(key = "app_update") {
                     Entrance(4) {
+                        Surface(
+                            shape = RoundedCornerShape(22.dp),
+                            color = p.card,
+                            border = BorderStroke(1.dp, p.border),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(22.dp))
+                                .bouncyClickable(pressedScale = 0.98f, role = Role.Button) {
+                                    if (isCheckingUpdate) return@bouncyClickable
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    isCheckingUpdate = true
+                                    updateStatusMessage = null
+                                    scope.launch {
+                                        when (val res = AppUpdateManager.checkForUpdate()) {
+                                            is UpdateCheckResult.UpdateAvailable -> {
+                                                availableUpdate = res.info
+                                                updateDownloadError = null
+                                                updateStatusMessage = "Nouvelle version v${res.info.versionName} disponible"
+                                            }
+                                            is UpdateCheckResult.UpToDate -> {
+                                                updateStatusMessage = "Application à jour (v${BuildConfig.VERSION_NAME})"
+                                            }
+                                            is UpdateCheckResult.Error -> {
+                                                updateStatusMessage = res.message
+                                            }
+                                        }
+                                        isCheckingUpdate = false
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(BrandSoft),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isCheckingUpdate) {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = BrandText
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = TablerIcons.Refresh,
+                                            contentDescription = null,
+                                            tint = BrandText,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = "Rechercher les mises à jour",
+                                        color = p.ink,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = when {
+                                            isCheckingUpdate -> "Vérification des mises à jour..."
+                                            updateStatusMessage != null -> updateStatusMessage!!
+                                            else -> "Version installée : v${BuildConfig.VERSION_NAME}"
+                                        },
+                                        color = p.muted,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Icon(
+                                    imageVector = TablerIcons.ChevronRight,
+                                    contentDescription = null,
+                                    tint = p.muted,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item(key = "logout") {
+                    Entrance(5) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -537,90 +624,6 @@ fun ProfileScreen(onLogout: () -> Unit) {
                                     Text("Déconnexion", color = Danger, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 }
                             }
-                        }
-                    }
-                }
-                item(key = "app_update") {
-                    Surface(
-                        shape = RoundedCornerShape(22.dp),
-                        color = p.card,
-                        border = BorderStroke(1.dp, p.border),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(22.dp))
-                            .bouncyClickable(pressedScale = 0.98f, role = Role.Button) {
-                                if (isCheckingUpdate) return@bouncyClickable
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                isCheckingUpdate = true
-                                updateStatusMessage = null
-                                scope.launch {
-                                    when (val res = AppUpdateManager.checkForUpdate()) {
-                                        is UpdateCheckResult.UpdateAvailable -> {
-                                            availableUpdate = res.info
-                                            updateDownloadError = null
-                                            updateStatusMessage = "Nouvelle version v${res.info.versionName} disponible"
-                                        }
-                                        is UpdateCheckResult.UpToDate -> {
-                                            updateStatusMessage = "Application à jour (v${BuildConfig.VERSION_NAME})"
-                                        }
-                                        is UpdateCheckResult.Error -> {
-                                            updateStatusMessage = res.message
-                                        }
-                                    }
-                                    isCheckingUpdate = false
-                                }
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(BrandSoft),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isCheckingUpdate) {
-                                    androidx.compose.material3.CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                        color = BrandText
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = TablerIcons.Refresh,
-                                        contentDescription = null,
-                                        tint = BrandText,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(
-                                    text = "Rechercher les mises à jour",
-                                    color = p.ink,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = when {
-                                        isCheckingUpdate -> "Vérification des mises à jour..."
-                                        updateStatusMessage != null -> updateStatusMessage!!
-                                        else -> "Version installée : v${BuildConfig.VERSION_NAME}"
-                                    },
-                                    color = p.muted,
-                                    fontSize = 12.sp
-                                )
-                            }
-                            Icon(
-                                imageVector = TablerIcons.ChevronRight,
-                                contentDescription = null,
-                                tint = p.muted,
-                                modifier = Modifier.size(18.dp)
-                            )
                         }
                     }
                 }
