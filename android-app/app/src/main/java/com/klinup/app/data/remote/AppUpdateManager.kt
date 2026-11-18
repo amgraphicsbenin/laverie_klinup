@@ -36,13 +36,25 @@ object AppUpdateManager {
     private const val STORAGE_BUCKET = "klinup-apps.firebasestorage.app"
     private const val PROJECT_ID = "klinup-apps"
 
-    private val storageManifestUrls = listOf(
-        "https://firebasestorage.googleapis.com/v0/b/$STORAGE_BUCKET/o/app-updates%2Flatest.json?alt=media",
-        "https://firebasestorage.googleapis.com/v0/b/$STORAGE_BUCKET/o/updates%2Flatest.json?alt=media"
-    )
+    private val normalizedEnv: String
+        get() = when (BuildConfig.APP_ENV.lowercase()) {
+            "production", "prod" -> "production"
+            "staging", "beta" -> "staging"
+            else -> "test"
+        }
 
-    private const val FIRESTORE_DOC_URL =
-        "https://firestore.googleapis.com/v1/projects/$PROJECT_ID/databases/(default)/documents/app_updates/android"
+    private val storageManifestUrls: List<String>
+        get() = listOf(
+            "https://firebasestorage.googleapis.com/v0/b/$STORAGE_BUCKET/o/app-updates%2F$normalizedEnv%2Flatest.json?alt=media",
+            "https://firebasestorage.googleapis.com/v0/b/$STORAGE_BUCKET/o/app-updates%2Flatest.json?alt=media",
+            "https://firebasestorage.googleapis.com/v0/b/$STORAGE_BUCKET/o/updates%2Flatest.json?alt=media"
+        )
+
+    private val firestoreDocUrls: List<String>
+        get() = listOf(
+            "https://firestore.googleapis.com/v1/projects/$PROJECT_ID/databases/(default)/documents/app_updates/android_$normalizedEnv",
+            "https://firestore.googleapis.com/v1/projects/$PROJECT_ID/databases/(default)/documents/app_updates/android"
+        )
 
     suspend fun checkForUpdate(): UpdateCheckResult = withContext(Dispatchers.IO) {
         var sawNetworkError = false
@@ -63,18 +75,16 @@ object AppUpdateManager {
         }
 
         // 2. Repli via le document de configuration distant
-        val docJson = runCatching { fetchJson(FIRESTORE_DOC_URL) }.getOrElse {
-            sawNetworkError = true
-            null
-        }
-        if (docJson != null) {
-            val info = parseFirestoreDocument(docJson)
-            if (info != null) {
-                return@withContext if (info.versionCode > BuildConfig.VERSION_CODE && info.apkUrl.isNotBlank()) {
-                    UpdateCheckResult.UpdateAvailable(info)
-                } else {
-                    UpdateCheckResult.UpToDate
-                }
+        for (docUrl in firestoreDocUrls) {
+            val docJson = runCatching { fetchJson(docUrl) }.getOrElse {
+                sawNetworkError = true
+                null
+            } ?: continue
+            val info = parseFirestoreDocument(docJson) ?: continue
+            return@withContext if (info.versionCode > BuildConfig.VERSION_CODE && info.apkUrl.isNotBlank()) {
+                UpdateCheckResult.UpdateAvailable(info)
+            } else {
+                UpdateCheckResult.UpToDate
             }
         }
 

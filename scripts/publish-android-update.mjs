@@ -86,8 +86,9 @@ async function uploadToStorage(token, objectName, buffer, contentType) {
   return `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(objectName)}?alt=media${dlToken}`;
 }
 
-async function updateFirestoreDoc(token, manifest) {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/app_updates/android`;
+async function updateFirestoreDoc(token, manifest, envName) {
+  const docId = envName ? `android_${envName}` : 'android';
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/app_updates/${docId}`;
   const res = await fetch(url, {
     method: 'PATCH',
     headers: {
@@ -106,18 +107,23 @@ async function updateFirestoreDoc(token, manifest) {
   });
   if (!res.ok) {
     const err = await res.text();
-    console.warn(`⚠️ Firestore app_updates/android non mis à jour (${res.status}) : ${err}`);
+    console.warn(`⚠️ Firestore app_updates/${docId} non mis à jour (${res.status}) : ${err}`);
   } else {
-    console.log('✅ Document Firestore app_updates/android mis à jour.');
+    console.log(`✅ Document Firestore app_updates/${docId} mis à jour.`);
   }
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   const saPath = args.serviceAccount || process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (!saPath || !fs.existsSync(saPath)) {
-    console.error('❌ Aucun fichier Service Account Firebase trouvé.');
-    console.error('   Définissez FIREBASE_SERVICE_ACCOUNT=C:\\chemin\\service-account.json puis relancez.');
+  let serviceAccount = null;
+  if (rawJson && rawJson.trim().startsWith('{')) {
+    serviceAccount = JSON.parse(rawJson);
+  } else if (saPath && fs.existsSync(saPath)) {
+    serviceAccount = JSON.parse(fs.readFileSync(saPath, 'utf8'));
+  } else {
+    console.error('❌ Aucun Service Account Firebase trouvé (FIREBASE_SERVICE_ACCOUNT_JSON ou FIREBASE_SERVICE_ACCOUNT).');
     process.exit(1);
   }
 
@@ -128,16 +134,16 @@ async function main() {
     process.exit(1);
   }
 
+  const envName = (args.env || process.env.APP_ENV || 'test').toLowerCase();
   const apkPath = path.resolve(args.apk || DEFAULT_APK);
   if (!fs.existsSync(apkPath)) {
     console.error(`❌ APK introuvable : ${apkPath}`);
     process.exit(1);
   }
 
-  const serviceAccount = JSON.parse(fs.readFileSync(saPath, 'utf8'));
   const token = await getAccessToken(serviceAccount);
 
-  const apkObject = `app-updates/klinup-${versionName}.apk`;
+  const apkObject = `app-updates/${envName}/klinup-${envName}-v${versionName}-b${versionCode}.apk`;
   console.log(`⬆️ Upload APK (${apkPath}) -> gs://${BUCKET}/${apkObject}...`);
   const apkUrl = await uploadToStorage(
     token,
@@ -154,16 +160,17 @@ async function main() {
     mandatory: args.mandatory === 'true'
   };
 
-  console.log(`⬆️ Upload manifeste -> gs://${BUCKET}/app-updates/latest.json...`);
+  const manifestObject = `app-updates/${envName}/latest.json`;
+  console.log(`⬆️ Upload manifeste -> gs://${BUCKET}/${manifestObject}...`);
   await uploadToStorage(
     token,
-    'app-updates/latest.json',
+    manifestObject,
     Buffer.from(JSON.stringify(manifest, null, 2)),
     'application/json'
   );
 
   fs.writeFileSync(path.resolve('android-app/latest.json'), JSON.stringify(manifest, null, 2) + '\n');
-  await updateFirestoreDoc(token, manifest);
+  await updateFirestoreDoc(token, manifest, envName);
 
   console.log('🎉 Mise à jour publiée avec succès :', manifest);
 }

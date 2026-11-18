@@ -142,3 +142,15 @@ jobs:
             Environnement: ${{ env.APP_ENV }}
             Branche: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
+
+      - name: Publish OTA Update Manifest to Firebase Storage & Firestore
+        if: ${{ env.HAS_FIREBASE == 'true' }}
+        continue-on-error: true
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          node scripts/publish-android-update.mjs \
+            --env="${{ env.APP_ENV }}" \
+            --versionCode="${{ env.BUILD_NUMBER }}" \
+            --versionName="${{ env.VERSION_NAME }}" \
+            --notes="Mise à jour (${{ env.APP_ENV }}) - Build #${{ env.BUILD_NUMBER }}"

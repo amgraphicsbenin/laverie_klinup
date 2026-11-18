@@ -230,6 +230,7 @@ fun ProfileScreen(onLogout: () -> Unit) {
     var isDownloadingUpdate by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableIntStateOf(0) }
     var updateDownloadError by remember { mutableStateOf<String?>(null) }
+    var downloadedApkFile by remember { mutableStateOf<File?>(null) }
     var pendingInstallApk by remember { mutableStateOf<File?>(null) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -507,17 +508,32 @@ fun ProfileScreen(onLogout: () -> Unit) {
                                         when (val res = AppUpdateManager.checkForUpdate()) {
                                             is UpdateCheckResult.UpdateAvailable -> {
                                                 availableUpdate = res.info
+                                                downloadedApkFile = null
                                                 updateDownloadError = null
+                                                isDownloadingUpdate = true
+                                                downloadProgress = 0
                                                 updateStatusMessage = "Nouvelle version v${res.info.versionName} disponible"
+                                                isCheckingUpdate = false
+                                                val dl = AppUpdateManager.downloadApk(context, res.info.apkUrl) { pct ->
+                                                    downloadProgress = pct
+                                                }
+                                                isDownloadingUpdate = false
+                                                dl.onSuccess { file ->
+                                                    downloadedApkFile = file
+                                                    updateStatusMessage = "Mise à jour v${res.info.versionName} prête à installer"
+                                                }.onFailure { err ->
+                                                    updateDownloadError = err.message ?: "Échec du téléchargement de la mise à jour."
+                                                }
                                             }
                                             is UpdateCheckResult.UpToDate -> {
                                                 updateStatusMessage = "Application à jour (v${BuildConfig.VERSION_NAME})"
+                                                isCheckingUpdate = false
                                             }
                                             is UpdateCheckResult.Error -> {
                                                 updateStatusMessage = res.message
+                                                isCheckingUpdate = false
                                             }
                                         }
-                                        isCheckingUpdate = false
                                     }
                                 }
                         ) {
@@ -1164,7 +1180,11 @@ fun ProfileScreen(onLogout: () -> Unit) {
             icon = { Icon(TablerIcons.Refresh, null, tint = BrandText) },
             title = {
                 Text(
-                    text = "Mise à jour disponible",
+                    text = when {
+                        isDownloadingUpdate -> "Téléchargement de la mise à jour"
+                        downloadedApkFile != null -> "Mise à jour prête"
+                        else -> "Mise à jour disponible"
+                    },
                     color = p.ink,
                     fontWeight = FontWeight.Bold
                 )
@@ -1172,7 +1192,11 @@ fun ProfileScreen(onLogout: () -> Unit) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Une nouvelle version (v${info.versionName}) est prête à être installée.",
+                        text = when {
+                            isDownloadingUpdate -> "Téléchargement de la version v${info.versionName} en cours…"
+                            downloadedApkFile != null -> "La version v${info.versionName} a été téléchargée. Voulez-vous l'installer maintenant ?"
+                            else -> "Une nouvelle version (v${info.versionName}) est disponible."
+                        },
                         color = p.ink,
                         fontSize = 14.sp
                     )
@@ -1192,7 +1216,7 @@ fun ProfileScreen(onLogout: () -> Unit) {
                                 trackColor = p.chip
                             )
                             Text(
-                                text = "Téléchargement en cours… $downloadProgress%",
+                                text = "Progression : $downloadProgress%",
                                 color = p.muted,
                                 fontSize = 12.sp
                             )
@@ -1212,6 +1236,17 @@ fun ProfileScreen(onLogout: () -> Unit) {
                     enabled = !isDownloadingUpdate,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        val readyFile = downloadedApkFile
+                        if (readyFile != null && readyFile.exists()) {
+                            val launched = AppUpdateManager.installApk(context, readyFile)
+                            if (launched) {
+                                availableUpdate = null
+                            } else {
+                                pendingInstallApk = readyFile
+                                updateDownloadError = "Autorisez l'installation d'applications pour finaliser la mise à jour."
+                            }
+                            return@TextButton
+                        }
                         isDownloadingUpdate = true
                         downloadProgress = 0
                         updateDownloadError = null
@@ -1221,13 +1256,7 @@ fun ProfileScreen(onLogout: () -> Unit) {
                             }
                             isDownloadingUpdate = false
                             dl.onSuccess { file ->
-                                val launched = AppUpdateManager.installApk(context, file)
-                                if (launched) {
-                                    availableUpdate = null
-                                } else {
-                                    pendingInstallApk = file
-                                    updateDownloadError = "Autorisez l'installation d'applications pour finaliser la mise à jour."
-                                }
+                                downloadedApkFile = file
                             }.onFailure { err ->
                                 updateDownloadError = err.message ?: "Échec du téléchargement de la mise à jour."
                             }
@@ -1235,7 +1264,11 @@ fun ProfileScreen(onLogout: () -> Unit) {
                     }
                 ) {
                     Text(
-                        text = if (isDownloadingUpdate) "Téléchargement…" else "Mettre à jour",
+                        text = when {
+                            isDownloadingUpdate -> "Téléchargement…"
+                            downloadedApkFile != null -> "Installer la mise à jour"
+                            else -> "Réessayer"
+                        },
                         color = if (isDownloadingUpdate) p.muted else BrandText,
                         fontWeight = FontWeight.Bold
                     )
