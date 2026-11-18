@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -564,7 +565,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     Spacer(modifier = Modifier.height(22.dp))
 
                     // 6-digit PIN OTP boxes backed by hidden BasicTextField
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 304.dp)
+                    ) {
                         BasicTextField(
                             value = pinText,
                             onValueChange = { raw ->
@@ -589,9 +595,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         )
 
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
+                                .fillMaxWidth()
                                 .alpha(if (isPinLocked) 0.5f else 1f)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
@@ -609,8 +616,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 val isCurrent = index == pinText.length && !isVerifyingPin && !isPinLocked
                                 Surface(
                                     modifier = Modifier
-                                        .width(44.dp)
-                                        .height(52.dp),
+                                        .weight(1f)
+                                        .height(50.dp),
                                     shape = RoundedCornerShape(14.dp),
                                     color = PinBoxBg,
                                     border = BorderStroke(

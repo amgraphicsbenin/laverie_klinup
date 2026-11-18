@@ -58,6 +58,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.klinup.app.data.local.KlinUpNotificationManager
+import com.klinup.app.data.local.NotificationCategory
 import com.klinup.app.data.local.SecurityManager
 import com.klinup.app.data.repository.KlinUpRepository
 import com.klinup.app.ui.components.BottomNavBar
@@ -293,14 +294,42 @@ fun AppNavigation() {
         ) {
             overlayAlert?.let { alert ->
                 val colors = MaterialTheme.klinUpColors
+                val (accentColor, categoryIcon, categoryLabel) = when (alert.category) {
+                    NotificationCategory.NEW_ORDER -> Triple(
+                        Color(0xFF0D2FE8),
+                        TablerIcons.ShoppingBagPlus,
+                        "Nouvelle commande"
+                    )
+                    NotificationCategory.READY -> Triple(
+                        Color(0xFF16A34A),
+                        TablerIcons.CircleCheck,
+                        "Commande prête"
+                    )
+                    NotificationCategory.LATE -> Triple(
+                        Color(0xFFDC2626),
+                        TablerIcons.ClockExclamation,
+                        "Retard / Urgent"
+                    )
+                    NotificationCategory.VALIDATION -> Triple(
+                        Color(0xFFD97706),
+                        TablerIcons.ShieldCheck,
+                        "Validation"
+                    )
+                    NotificationCategory.INFO -> Triple(
+                        Color(0xFF0284C7),
+                        TablerIcons.InfoCircle,
+                        "Information"
+                    )
+                }
+
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
                     color = colors.cardBg,
-                    shadowElevation = 0.dp,
-                    border = BorderStroke(1.dp, colors.brandBlue.copy(alpha = 0.45f)),
+                    shadowElevation = 14.dp,
+                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(22.dp))
                         .bouncyClickable(pressedScale = 0.98f, role = Role.Button) {
                             KlinUpNotificationManager.markAsRead(alert.id)
                             KlinUpNotificationManager.dismissOverlayAlert()
@@ -313,50 +342,105 @@ fun AppNavigation() {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment = Alignment.Top,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(colors.softBlueBg),
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(accentColor.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = TablerIcons.Bell,
+                                imageVector = categoryIcon,
                                 contentDescription = null,
-                                tint = colors.brandText,
-                                modifier = Modifier.size(18.dp)
+                                tint = accentColor,
+                                modifier = Modifier.size(21.dp)
                             )
                         }
-                        Column(modifier = Modifier.weight(1f)) {
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(999.dp),
+                                        color = accentColor.copy(alpha = 0.12f)
+                                    ) {
+                                        Text(
+                                            text = categoryLabel,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = accentColor,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "À l'instant",
+                                        fontSize = 10.sp,
+                                        color = colors.inkMuted,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(colors.altPageBg)
+                                        .bouncyClickable(pressedScale = 0.9f, role = Role.Button) {
+                                            KlinUpNotificationManager.dismissOverlayAlert()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = TablerIcons.X,
+                                        contentDescription = "Fermer",
+                                        tint = colors.inkMuted,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                            }
+
                             Text(
                                 text = alert.title,
-                                fontSize = 13.sp,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.inkPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Text(
-                                text = alert.message,
-                                fontSize = 11.sp,
-                                color = colors.inkSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(
-                            onClick = { KlinUpNotificationManager.dismissOverlayAlert() },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = TablerIcons.X,
-                                contentDescription = "Fermer",
-                                tint = colors.inkMuted,
-                                modifier = Modifier.size(16.dp)
-                            )
+
+                            if (alert.message.isNotBlank()) {
+                                Text(
+                                    text = alert.message,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp,
+                                    color = colors.inkSecondary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            if (!alert.orderId.isNullOrBlank()) {
+                                Text(
+                                    text = "Appuyer pour ouvrir la commande →",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = accentColor,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
                         }
                     }
                 }
