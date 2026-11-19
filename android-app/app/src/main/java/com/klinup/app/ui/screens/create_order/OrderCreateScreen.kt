@@ -125,7 +125,8 @@ private val SUBSCRIPTION_PAYMENT_OPTION = PaymentOption("abonnement", "Abonnemen
 
 private val PAYMENT_OPTIONS = listOf(
     PaymentOption("especes", "Espèce"),
-    PaymentOption("mobile_money", "Mobile Money")
+    PaymentOption("mobile_money", "Mobile Money"),
+    SUBSCRIPTION_PAYMENT_OPTION
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -158,6 +159,9 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
     var paymentOption by remember { mutableStateOf(PAYMENT_OPTIONS.first()) }
     var momoOperator by remember { mutableStateOf("MTN") }
     var paymentDropdownExpanded by remember { mutableStateOf(false) }
+    var suggestedSubPlan by remember { mutableStateOf<CatalogItem?>(null) }
+    var isSubscribingInline by remember { mutableStateOf(false) }
+    var inlineSubFeedback by remember { mutableStateOf<String?>(null) }
 
     var isSubmitting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -240,7 +244,15 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
         }
     }
 
+    LaunchedEffect(customers, selectedCustomer?.id) {
+        val currentId = selectedCustomer?.id ?: return@LaunchedEffect
+        customers.firstOrNull { it.id == currentId }?.let { fresh ->
+            selectedCustomer = fresh
+        }
+    }
+
     LaunchedEffect(selectedCustomer?.id) {
+        inlineSubFeedback = null
         val coords = selectedCustomer?.resolvedLatLng
         if (coords != null) {
             orderClientLat = coords.first.toString()
@@ -270,14 +282,16 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
         }
     }
 
-    val expressFee = if (urgency == "Express") {
+    val isSubscriptionPayment = paymentOption.key == "abonnement"
+    val effectiveItemsTotal = if (isSubscriptionPayment) 0.0 else itemsTotal
+    val expressFee = if (urgency == "Express" && !isSubscriptionPayment) {
         kotlin.math.round(itemsTotal * (appSettings.expressMarkup / 100.0))
     } else {
         0.0
     }
     val deliveryFee = deliveryCalc?.fee ?: 0.0
     val pickupFee = pickupCalc?.fee ?: 0.0
-    val grossTotal = itemsTotal + expressFee + deliveryFee + pickupFee
+    val grossTotal = effectiveItemsTotal + expressFee + deliveryFee + pickupFee
     val reductionAmount = reductionText.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0
     val netTotal = (grossTotal - reductionAmount).coerceAtLeast(0.0)
     val advanceAmount = advanceText.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0
@@ -1145,6 +1159,195 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                                 )
                             }
 
+                            if (isSubscriptionPayment) {
+                                val cust = selectedCustomer
+                                val activeSub = cust?.activeSubscription
+                                val colors = MaterialTheme.klinUpColors
+
+                                if (cust == null) {
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = colors.softAmberBg,
+                                        border = BorderStroke(1.dp, colors.amberText.copy(alpha = 0.35f))
+                                    ) {
+                                        Text(
+                                            text = "Sélectionnez d'abord un client en haut du formulaire pour vérifier son abonnement ou lui en souscrire un.",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = colors.amberText,
+                                            lineHeight = 17.sp,
+                                            modifier = Modifier.padding(12.dp)
+                                        )
+                                    }
+                                } else if (activeSub != null) {
+                                    val hasEnough = activeSub.remainingClothes >= totalCount
+                                    val afterCount = (activeSub.remainingClothes - totalCount).coerceAtLeast(0)
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = if (hasEnough) colors.softSkyBg else colors.softRedBg,
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (hasEnough) colors.softSkyBorder else colors.softRedBorder
+                                        )
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "Abonnement : ${activeSub.name}",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = InkPrimary
+                                                )
+                                                Text(
+                                                    text = "${activeSub.remainingClothes} / ${activeSub.totalClothes} restants",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (hasEnough) colors.skyText else colors.redText
+                                                )
+                                            }
+                                            Text(
+                                                text = if (hasEnough) {
+                                                    "-$totalCount vêtement(s) déduit(s) • Solde après commande : $afterCount vêtement(s)"
+                                                } else {
+                                                    "Solde insuffisant : $totalCount vêtement(s) demandé(s) pour ${activeSub.remainingClothes} restant(s)."
+                                                },
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = if (hasEnough) InkSecondary else colors.redText
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    // Client sans abonnement : suggestion directe de souscription
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = colors.softAmberBg,
+                                        border = BorderStroke(1.dp, colors.amberText.copy(alpha = 0.35f))
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(14.dp),
+                                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Text(
+                                                text = "${cust.fullName} n'a pas d'abonnement actif",
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = InkPrimary
+                                            )
+                                            Text(
+                                                text = "Souscrivez un forfait ci-dessous pour régler cette commande par abonnement :",
+                                                fontSize = 12.sp,
+                                                color = InkSecondary,
+                                                lineHeight = 16.sp
+                                            )
+
+                                            if (subscriptionPlans.isEmpty()) {
+                                                Text(
+                                                    text = "Aucun forfait d'abonnement disponible dans le catalogue.",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = colors.redText
+                                                )
+                                            } else {
+                                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    items(subscriptionPlans, key = { it.id }) { plan ->
+                                                        val selectedPlan = suggestedSubPlan?.id == plan.id
+                                                        val clothesHint = plan.nombreVetements?.let { " • $it vêt." } ?: ""
+                                                        Surface(
+                                                            onClick = { suggestedSubPlan = plan },
+                                                            shape = RoundedCornerShape(14.dp),
+                                                            color = if (selectedPlan) BrandBlue else CardWhite,
+                                                            border = BorderStroke(
+                                                                1.dp,
+                                                                if (selectedPlan) BrandBlue else InnerBorder
+                                                            )
+                                                        ) {
+                                                            Column(
+                                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = plan.article,
+                                                                    fontSize = 12.5.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = if (selectedPlan) Color.White else InkPrimary
+                                                                )
+                                                                Text(
+                                                                    text = "${KlinUpRepository.formatFcfa(plan.prix)}$clothesHint",
+                                                                    fontSize = 11.sp,
+                                                                    color = if (selectedPlan) Color.White.copy(alpha = 0.88f) else InkMuted
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                Button(
+                                                    onClick = {
+                                                        val planToSubscribe = suggestedSubPlan ?: subscriptionPlans.firstOrNull()
+                                                        if (planToSubscribe == null || isSubscribingInline) return@Button
+                                                        isSubscribingInline = true
+                                                        inlineSubFeedback = null
+                                                        scope.launch {
+                                                            val subRes = KlinUpRepository.subscribeCustomer(cust.id, planToSubscribe)
+                                                            isSubscribingInline = false
+                                                            subRes.onSuccess { newSub ->
+                                                                selectedCustomer = cust.copy(activeSubscription = newSub)
+                                                                suggestedSubPlan = null
+                                                                inlineSubFeedback = "Abonnement ${newSub.name} activé (${newSub.remainingClothes} vêtements) !"
+                                                            }.onFailure { err ->
+                                                                inlineSubFeedback = err.message ?: "Erreur lors de la souscription."
+                                                            }
+                                                        }
+                                                    },
+                                                    enabled = !isSubscribingInline && (suggestedSubPlan != null || subscriptionPlans.isNotEmpty()),
+                                                    shape = RoundedCornerShape(50),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(42.dp)
+                                                ) {
+                                                    if (isSubscribingInline) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(16.dp),
+                                                            color = Color.White,
+                                                            strokeWidth = 2.dp
+                                                        )
+                                                    } else {
+                                                        val targetPlan = suggestedSubPlan ?: subscriptionPlans.first()
+                                                        Text(
+                                                            text = "Souscrire ${targetPlan.article} (${KlinUpRepository.formatFcfa(targetPlan.prix)})",
+                                                            fontSize = 12.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color.White
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            if (!inlineSubFeedback.isNullOrBlank()) {
+                                                Text(
+                                                    text = inlineSubFeedback!!,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = colors.redText
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             // Réduction (Montant FCFA)
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
@@ -1191,11 +1394,21 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
 
                             SummaryLine(
                                 label = "Total Articles ($totalCount)",
-                                value = KlinUpRepository.formatFcfa(itemsTotal),
+                                value = if (isSubscriptionPayment) "Inclus (Abonnement)" else KlinUpRepository.formatFcfa(itemsTotal),
                                 labelColor = InkSecondary,
-                                valueColor = InkPrimary,
+                                valueColor = if (isSubscriptionPayment) GreenSuccess else InkPrimary,
                                 bold = false
                             )
+
+                            if (isSubscriptionPayment) {
+                                SummaryLine(
+                                    label = "Vêtements déduits",
+                                    value = "- $totalCount vêtement(s)",
+                                    labelColor = InkSecondary,
+                                    valueColor = BrandText,
+                                    bold = false
+                                )
+                            }
 
                             if (urgency == "Express" || expressFee > 0.0) {
                                 SummaryLine(
@@ -1328,6 +1541,17 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                                 if (selectedCustomer == null) {
                                     errorMessage = "Veuillez sélectionner un client."
                                     return@Button
+                                }
+                                if (isSubscriptionPayment) {
+                                    val sub = selectedCustomer?.activeSubscription
+                                    if (sub == null) {
+                                        errorMessage = "Ce client ne possède pas d'abonnement actif. Veuillez lui souscrire un forfait ou changer de mode de règlement."
+                                        return@Button
+                                    }
+                                    if (sub.remainingClothes < totalCount) {
+                                        errorMessage = "Solde d'abonnement insuffisant (${sub.remainingClothes} vêtement(s) restant(s) pour $totalCount demandé(s))."
+                                        return@Button
+                                    }
                                 }
                                 if ((homeDelivery || homePickup) && !hasValidOrderLocation) {
                                     errorMessage = "Veuillez renseigner les coordonnées GPS (latitude et longitude) du client pour calculer les frais de livraison/récupération."

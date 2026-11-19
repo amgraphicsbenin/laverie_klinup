@@ -27,6 +27,7 @@ import com.klinup.app.data.models.Order
 import com.klinup.app.data.models.OrderItem
 import com.klinup.app.data.models.RewardPointAdjustment
 import com.klinup.app.data.models.Store
+import com.klinup.app.data.models.SubscriptionDetails
 import com.klinup.app.data.models.User
 import com.klinup.app.data.remote.SupabaseClientProvider
 import io.github.jan.supabase.postgrest.from
@@ -197,6 +198,7 @@ private data class NewOrderPayload(
     @SerialName("due_date") val dueDate: String,
     val items: List<OrderItem>,
     @SerialName("is_subscription_order") val isSubscriptionOrder: Boolean = false,
+    @SerialName("subscription_details") val subscriptionDetails: SubscriptionDetails? = null,
     @SerialName("created_by_id") val createdById: String? = null,
     @SerialName("created_by_name") val createdByName: String? = null,
     @SerialName("store_id") val storeId: String? = null
@@ -1188,9 +1190,34 @@ object KlinUpRepository {
                 }
             }
 
-            val itemsTotal = selectedItems.sumOf { it.prix * it.quantite }
+            val isSubOrder = modeReglement.equals("abonnement", ignoreCase = true)
+            val totalClothesCount = selectedItems.sumOf { it.quantite }.coerceAtLeast(0)
+            val activeSub = resolvedCustomer.activeSubscription
+            if (isSubOrder) {
+                if (activeSub == null) {
+                    throw IllegalStateException("Ce client ne possède pas d'abonnement actif. Veuillez lui souscrire un forfait.")
+                }
+                if (activeSub.remainingClothes < totalClothesCount) {
+                    throw IllegalStateException(
+                        "Solde d'abonnement insuffisant (${activeSub.remainingClothes} vêtement(s) restant(s) pour $totalClothesCount demandé(s))."
+                    )
+                }
+            }
+
+            val itemsTotal = if (isSubOrder) 0.0 else selectedItems.sumOf { it.prix * it.quantite }
             val grossTotal = itemsTotal + expressFee.coerceAtLeast(0.0) + deliveryFee.coerceAtLeast(0.0) + pickupFee.coerceAtLeast(0.0)
             val total = (grossTotal - reduction).coerceAtLeast(0.0)
+            val effectiveAdvance = if (isSubOrder && total <= 0.0) 0.0 else avancePayee.coerceAtLeast(0.0)
+            val subDetails = if (isSubOrder && activeSub != null) {
+                SubscriptionDetails(
+                    planName = activeSub.name,
+                    vetementsUtilises = totalClothesCount,
+                    vetementsInclus = activeSub.totalClothes,
+                    usedClothes = totalClothesCount,
+                    totalClothes = activeSub.totalClothes
+                )
+            } else null
+
             val dueHours = if (niveauUrgence.equals("Express", ignoreCase = true)) 24L else 48L
             val nowInstant = Instant.now()
             val createdIso = nowInstant.toString()
@@ -1215,13 +1242,14 @@ object KlinUpRepository {
                 typeService = selectedItems.firstOrNull()?.service ?: "lavage_simple",
                 niveauUrgence = niveauUrgence,
                 modeReglement = modeReglement,
-                avancePayee = avancePayee,
+                avancePayee = effectiveAdvance,
                 prixTotal = total,
                 identifiantUniqueMarquage = nextSeqId,
                 createdAt = createdIso,
                 dueDate = dueIso,
                 items = selectedItems,
-                isSubscriptionOrder = false,
+                isSubscriptionOrder = isSubOrder,
+                subscriptionDetails = subDetails,
                 createdById = user.id,
                 createdByName = user.fullName,
                 storeId = storeId
@@ -1246,9 +1274,25 @@ object KlinUpRepository {
                 _deliveryOrderIds.value = _deliveryOrderIds.value + insertedOrderId
             }
 
+            // Déduire le nombre de vêtements de l'abonnement actif si paiement par abonnement
+            if (isSubOrder && activeSub != null && totalClothesCount > 0) {
+                val updatedSub = activeSub.copy(
+                    remainingClothes = (activeSub.remainingClothes - totalClothesCount).coerceAtLeast(0),
+                    clothesWashed = (activeSub.clothesWashed ?: 0) + totalClothesCount
+                )
+                runCatching {
+                    client.from("customers").update(CustomerSubscriptionPatch(activeSubscription = updatedSub)) {
+                        filter { eq("id", resolvedCustomer.id) }
+                    }
+                    _customers.value = _customers.value.map { c ->
+                        if (c.id == resolvedCustomer.id) c.copy(activeSubscription = updatedSub) else c
+                    }
+                }
+            }
+
             // Update customer fidelity points & unpaid balance (aligned with admin-cms)
-            val unpaid = (total - avancePayee).coerceAtLeast(0.0)
-            val earnedPts = floor(avancePayee / 1000.0).toInt().coerceAtLeast(0)
+            val unpaid = (total - effectiveAdvance).coerceAtLeast(0.0)
+            val earnedPts = floor(effectiveAdvance / 1000.0).toInt().coerceAtLeast(0)
             if (unpaid > 0.0 || earnedPts > 0) {
                 runCatching {
                     client.from("customers").update(
@@ -1279,6 +1323,7 @@ object KlinUpRepository {
                 dueDate = orderPayload.dueDate,
                 items = orderPayload.items,
                 isSubscriptionOrder = orderPayload.isSubscriptionOrder,
+                subscriptionDetails = orderPayload.subscriptionDetails,
                 createdById = orderPayload.createdById,
                 createdByName = orderPayload.createdByName,
                 storeId = orderPayload.storeId,
