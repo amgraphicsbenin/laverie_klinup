@@ -227,9 +227,11 @@ private data class ActiveOrderItem(
 fun DashboardScreen(
     userName: String = "User name",
     onNavigateToGestion: () -> Unit = {},
+    onNavigateToClients: () -> Unit = {},
     onNavigateToCreate: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onOrderClick: (String) -> Unit = {},
+    onCustomerClick: (String) -> Unit = {},
     onKpiClick: (String) -> Unit = {},
     onRevenueChartClick: () -> Unit = {}
 ) {
@@ -499,7 +501,7 @@ fun DashboardScreen(
         customers
             .filter { selectedStoreId == "all" || selectedStoreId == "GLOBAL" || it.storeId == null || it.storeId == selectedStoreId }
             .sortedByDescending { it.pointsFidelite }
-            .take(6)
+            .take(5)
             .map { cust ->
                 val tier = KlinUpRepository.fidelityTier(cust.pointsFidelite)
                 BestClientItem(
@@ -726,8 +728,22 @@ fun DashboardScreen(
                                 BestClientCard(
                                     client = client,
                                     rank = index + 1,
+                                    onClick = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onCustomerClick(client.id)
+                                    },
                                     modifier = Modifier.animateItem()
                                 )
+                            }
+                            if (currentUser?.canManageCustomersMobile != false) {
+                                item(key = "see_more_clients", contentType = "see_more_clients") {
+                                    SeeMoreClientsCard(
+                                        onClick = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onNavigateToClients()
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -1675,6 +1691,7 @@ private fun OrderSummaryCard(
 private fun BestClientCard(
     client: BestClientItem,
     rank: Int = 1,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isDark = MaterialTheme.klinUpColors.isDark
@@ -1720,7 +1737,11 @@ private fun BestClientCard(
     val ordersLabel = "${client.ordersCount} ${if (client.ordersCount <= 1) "commande" else "commandes"}"
 
     Surface(
-        modifier = modifier.width(248.dp),
+        modifier = modifier
+            .width(248.dp)
+            .height(172.dp)
+            .clip(RoundedCornerShape(26.dp))
+            .bouncyClickable(pressedScale = 0.97f, role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(26.dp),
         color = tierCardBg,
         border = BorderStroke(
@@ -1874,6 +1895,74 @@ private fun BestClientCard(
                             )
                     )
                 }
+            }
+        }
+    }
+}
+
+// ─── See More Clients Card ────────────────────────────────────────────────────
+@Composable
+private fun SeeMoreClientsCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.klinUpColors
+    Surface(
+        modifier = modifier
+            .width(156.dp)
+            .height(172.dp)
+            .clip(RoundedCornerShape(26.dp))
+            .bouncyClickable(pressedScale = 0.97f, role = Role.Button, onClick = onClick),
+        shape = RoundedCornerShape(26.dp),
+        color = colors.softBlueBg,
+        border = BorderStroke(1.dp, colors.softBlueBorder),
+        shadowElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(BrandBlue.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = TablerIcons.Users,
+                    contentDescription = null,
+                    tint = colors.brandText,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Voir plus",
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.brandText
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Tous les clients",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.inkSecondary
+                )
+                Icon(
+                    imageVector = TablerIcons.ArrowRight,
+                    contentDescription = null,
+                    tint = colors.brandText,
+                    modifier = Modifier.size(13.dp)
+                )
             }
         }
     }

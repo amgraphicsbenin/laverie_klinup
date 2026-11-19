@@ -202,10 +202,24 @@ fun GestionScreen(
     }
 
     var activeTab by rememberSaveable { mutableStateOf(GestionTab.COMMANDES) }
+    val pendingGestionTab by KlinUpRepository.pendingGestionTab.collectAsState()
     LaunchedEffect(allowedTabs) {
         if (allowedTabs.none { it.first == activeTab }) {
             activeTab = GestionTab.COMMANDES
         }
+    }
+    LaunchedEffect(pendingGestionTab, allowedTabs) {
+        val target = pendingGestionTab ?: return@LaunchedEffect
+        val resolvedTab = when (target) {
+            "CLIENTS" -> if (canManageCustomers) GestionTab.CLIENTS else null
+            "DEPENSES" -> if (canManageExpenses) GestionTab.DEPENSES else null
+            "COMMANDES" -> GestionTab.COMMANDES
+            else -> null
+        }
+        if (resolvedTab != null) {
+            activeTab = resolvedTab
+        }
+        KlinUpRepository.consumeGestionTab()
     }
     var quickFilter by rememberSaveable { mutableStateOf(OrderQuickFilter.ACTIVES) }
     var customerFilter by rememberSaveable { mutableStateOf(CustomerQuickFilter.TOUS) }

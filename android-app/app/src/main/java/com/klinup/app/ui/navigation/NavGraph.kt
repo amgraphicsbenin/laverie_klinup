@@ -175,10 +175,17 @@ fun AppNavigation() {
             composable(Screen.Accueil.route) {
                 DashboardScreen(
                     onNavigateToGestion = { navController.navigateToBottomTab(Screen.Gestion.route) },
+                    onNavigateToClients = {
+                        KlinUpRepository.requestGestionTab("CLIENTS")
+                        navController.navigateToBottomTab(Screen.Gestion.route)
+                    },
                     onNavigateToCreate = { navController.navigateToBottomTab(Screen.CreerCommande.route) },
                     onProfileClick = { navController.navigateToBottomTab(Screen.Profil.route) },
                     onOrderClick = { orderId ->
                         navController.navigate(Screen.OrderDetail.createRoute(orderId))
+                    },
+                    onCustomerClick = { customerId ->
+                        navController.navigate(Screen.CustomerDetail.createRoute(customerId))
                     },
                     onKpiClick = { kpiType ->
                         navController.navigate(Screen.KpiDetail.createRoute(kpiType))

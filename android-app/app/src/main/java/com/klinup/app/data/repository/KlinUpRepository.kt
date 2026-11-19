@@ -332,6 +332,17 @@ object KlinUpRepository {
     private val _multiDeviceLogoutNotice = MutableStateFlow<String?>(null)
     val multiDeviceLogoutNotice: StateFlow<String?> = _multiDeviceLogoutNotice.asStateFlow()
 
+    private val _pendingGestionTab = MutableStateFlow<String?>(null)
+    val pendingGestionTab: StateFlow<String?> = _pendingGestionTab.asStateFlow()
+
+    fun requestGestionTab(tab: String) {
+        _pendingGestionTab.value = tab
+    }
+
+    fun consumeGestionTab() {
+        _pendingGestionTab.value = null
+    }
+
     fun clearMultiDeviceLogoutNotice() {
         _multiDeviceLogoutNotice.value = null
     }
