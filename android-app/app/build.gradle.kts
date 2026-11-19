@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -41,6 +43,13 @@ android {
 
     signingConfigs {
         val sharedTestKeystore = file("klinup-debug.keystore")
+        val localKeystorePropsFile = rootProject.file("keystore.properties")
+        val localKeystoreProps = Properties().apply {
+            if (localKeystorePropsFile.exists()) {
+                localKeystorePropsFile.inputStream().use { load(it) }
+            }
+        }
+
         getByName("debug") {
             if (sharedTestKeystore.exists()) {
                 storeFile = sharedTestKeystore
@@ -51,25 +60,41 @@ android {
         }
         create("release") {
             val envKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
-            val envKeystore = envKeystorePath?.let { file(it) }?.takeIf { it.exists() }
+                ?: localKeystoreProps.getProperty("storeFile")
+            val envKeystore = envKeystorePath?.let { path ->
+                val direct = file(path)
+                if (direct.exists()) direct else rootProject.file(path)
+            }?.takeIf { it.exists() }
+
             if (envKeystore != null) {
                 storeFile = envKeystore
-                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: ""
-                keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: ""
-                keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: ""
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                    ?: localKeystoreProps.getProperty("storePassword")
+                    ?: ""
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                    ?: localKeystoreProps.getProperty("keyAlias")
+                    ?: ""
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+                    ?: localKeystoreProps.getProperty("keyPassword")
+                    ?: ""
             } else {
-                // Clé persistante partagée (identique en local et sur chaque run GitHub Actions)
-                // afin de permettre les mises à jour directes in-app sans désinstallation.
+                // Fallback si aucun keystore release n'est configuré (env vars ou keystore.properties)
                 storeFile = sharedTestKeystore
                 storePassword = "android"
                 keyAlias = "androiddebugkey"
                 keyPassword = "android"
             }
+            // Schémas de signature modernes Android (v1 + v2 + v3 + v4) pour intégrité maximale
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
         }
     }
 
     buildTypes {
         release {
+            isDebuggable = false
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(

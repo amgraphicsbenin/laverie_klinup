@@ -592,8 +592,23 @@ object KlinUpRepository {
             if (matched == null) {
                 throw IllegalArgumentException("Aucun compte actif trouvé pour cet email.")
             }
+            // Si la RPC ne renvoie pas user_picture, tente un fallback léger sur la table staff
+            val resolvedAvatar = matched.avatar?.takeIf { it.isNotBlank() } ?: runCatching {
+                client.from("staff")
+                    .select {
+                        filter { eq("id", matched.id) }
+                    }
+                    .decodeList<User>()
+                    .firstOrNull()
+                    ?.avatar
+                    ?.takeIf { it.isNotBlank() }
+            }.getOrNull()
+
+            if (!resolvedAvatar.isNullOrBlank()) {
+                runCatching { AppPreferences.syncAvatarFromRemote(matched.id, resolvedAvatar) }
+            }
             // Ne jamais exposer le code PIN à la couche UI
-            matched.copy(codePin = null)
+            matched.copy(codePin = null, avatar = resolvedAvatar ?: matched.avatar)
         }
     }
 
@@ -2153,7 +2168,7 @@ object KlinUpRepository {
         return runCatching {
             val instant = Instant.parse(iso)
             val zdt = instant.atZone(ZoneId.systemDefault())
-            DateTimeFormatter.ofPattern("dd/MM/yyyy  -  HH : mm").format(zdt)
+            DateTimeFormatter.ofPattern("dd/MM/yyyy - HH:mm").format(zdt)
         }.getOrElse { iso.take(16).replace("T", " - ") }
     }
 

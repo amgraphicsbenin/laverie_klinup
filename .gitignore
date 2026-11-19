@@ -37,6 +37,9 @@ db.json
 
 # Android local SDK & Gradle cache/artifacts
 **/local.properties
+**/keystore.properties
+*.jks
+**/release.keystore
 .gradle/
 **/.gradle/
 .kotlin/

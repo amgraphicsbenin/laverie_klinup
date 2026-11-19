@@ -369,21 +369,44 @@ fun ProfileScreen(onLogout: () -> Unit) {
         label = "profile_menu_nav"
     ) { page ->
         if (page == null) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().background(p.page),
-                contentPadding = PaddingValues(
-                    top = statusTop + 12.dp,
-                    bottom = 32.dp + LocalBottomBarPadding.current,
-                    start = 20.dp,
-                    end = 20.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(p.page)
             ) {
-                item(key = "title") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(p.page)
+                        .padding(
+                            top = statusTop + 12.dp,
+                            bottom = 12.dp,
+                            start = 20.dp,
+                            end = 20.dp
+                        )
+                ) {
                     Entrance(0) {
-                        Text("Mon profil", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = p.ink)
+                        Text(
+                            text = "Mon profil",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = p.ink
+                        )
                     }
                 }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(
+                        top = 6.dp,
+                        bottom = 32.dp + LocalBottomBarPadding.current,
+                        start = 20.dp,
+                        end = 20.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
 
                 // ── Carte identité ──────────────────────────────────────────────
                 item(key = "identity") {
@@ -677,6 +700,7 @@ fun ProfileScreen(onLogout: () -> Unit) {
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
+            }
             }
         } else {
             LazyColumn(

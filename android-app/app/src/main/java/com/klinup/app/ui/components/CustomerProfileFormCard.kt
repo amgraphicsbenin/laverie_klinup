@@ -91,10 +91,23 @@ fun CustomerProfileFormCard(
     onSubPlanChange: (CatalogItem?) -> Unit = {}
 ) {
     val haptics = LocalHapticFeedback.current
-    var indicatifExpanded by remember { mutableStateOf(false) }
+    var showCountryPicker by remember { mutableStateOf(false) }
+    val selectedCountry = remember(indicatif) { CountryDialCodes.findByDisplayOrCode(indicatif) }
     var storeDropdownExpanded by remember { mutableStateOf(false) }
     var deliveryEstimateText by remember { mutableStateOf<String?>(null) }
     var showMapPicker by remember { mutableStateOf(false) }
+
+    if (showCountryPicker) {
+        CountryCodePickerDialog(
+            selectedCountry = selectedCountry,
+            onSelect = { country ->
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onIndicatifChange(country.displayValue)
+                showCountryPicker = false
+            },
+            onDismiss = { showCountryPicker = false }
+        )
+    }
 
     if (showMapPicker) {
         val activeStore = selectedStore ?: stores.firstOrNull()
@@ -211,44 +224,35 @@ fun CustomerProfileFormCard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box {
-                        Surface(
-                            onClick = { indicatifExpanded = true },
-                            shape = RoundedCornerShape(16.dp),
-                            color = CardWhite,
-                            border = BorderStroke(1.dp, InnerBorder),
-                            modifier = Modifier.height(56.dp)
+                    Surface(
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showCountryPicker = true
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        color = CardWhite,
+                        border = BorderStroke(1.dp, InnerBorder),
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(indicatif, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = InkPrimary)
-                                Icon(TablerIcons.ChevronDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                        KlinUpDropdownMenu(
-                            expanded = indicatifExpanded,
-                            onDismissRequest = { indicatifExpanded = false }
-                        ) {
-                            listOf("🇧🇯 +229", "🇹🇬 +228", "🇨🇮 +225", "🇸🇳 +221", "🇫🇷 +33").forEach { code ->
-                                KlinUpDropdownItem(
-                                    text = code,
-                                    selected = indicatif == code,
-                                    onClick = {
-                                        onIndicatifChange(code)
-                                        indicatifExpanded = false
-                                    }
-                                )
-                            }
+                            Text(
+                                text = selectedCountry.displayValue,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = InkPrimary
+                            )
+                            Icon(TablerIcons.ChevronDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(18.dp))
                         }
                     }
 
                     OutlinedTextField(
                         value = phone,
                         onValueChange = onPhoneChange,
-                        placeholder = { Text("Ex: 0197979797", fontSize = 14.sp, color = Color(0xFF94A3B8)) },
+                        placeholder = { Text(selectedCountry.placeholder, fontSize = 14.sp, color = Color(0xFF94A3B8)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         shape = RoundedCornerShape(16.dp),

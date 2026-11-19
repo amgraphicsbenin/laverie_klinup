@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -326,71 +327,76 @@ fun NotificationBottomSheet(
             }
 
             // ── Liste des notifications ───────────────────────────────────────
-            if (displayedNotifications.isEmpty()) {
-                val isUnreadEmpty = selectedFilter == NotificationFilter.UNREAD && notifications.isNotEmpty()
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = colors.cardBg,
-                    border = BorderStroke(1.dp, colors.border),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 38.dp, horizontal = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateContentSize(animationSpec = tween(180))
+            ) {
+                if (displayedNotifications.isEmpty()) {
+                    val isUnreadEmpty = selectedFilter == NotificationFilter.UNREAD && notifications.isNotEmpty()
+                    Surface(
+                        shape = RoundedCornerShape(22.dp),
+                        color = colors.cardBg,
+                        border = BorderStroke(1.dp, colors.border),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Box(
+                        Column(
                             modifier = Modifier
-                                .size(54.dp)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(if (isUnreadEmpty) colors.softGreenBg else colors.chipBg),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .padding(vertical = 38.dp, horizontal = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(
-                                imageVector = if (isUnreadEmpty) TablerIcons.Checks else TablerIcons.BellOff,
-                                contentDescription = null,
-                                tint = if (isUnreadEmpty) colors.greenText else colors.inkMuted,
-                                modifier = Modifier.size(26.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(if (isUnreadEmpty) colors.softGreenBg else colors.chipBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isUnreadEmpty) TablerIcons.CircleCheck else TablerIcons.BellOff,
+                                    contentDescription = null,
+                                    tint = if (isUnreadEmpty) colors.greenText else colors.inkMuted,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                            Text(
+                                text = if (isUnreadEmpty) "Aucune alerte non lue" else "Aucune notification",
+                                fontSize = 15.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.inkPrimary
+                            )
+                            Text(
+                                text = if (isUnreadEmpty) {
+                                    "Vous avez consulté toutes vos notifications."
+                                } else {
+                                    "Toutes les commandes et alertes sont à jour."
+                                },
+                                fontSize = 12.5.sp,
+                                color = colors.inkMuted,
+                                textAlign = TextAlign.Center
                             )
                         }
-                        Text(
-                            text = if (isUnreadEmpty) "Aucune alerte non lue" else "Aucune notification",
-                            fontSize = 15.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.inkPrimary
-                        )
-                        Text(
-                            text = if (isUnreadEmpty) {
-                                "Vous avez consulté toutes vos notifications."
-                            } else {
-                                "Toutes les commandes et alertes sont à jour."
-                            },
-                            fontSize = 12.5.sp,
-                            color = colors.inkMuted,
-                            textAlign = TextAlign.Center
-                        )
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 460.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 4.dp)
-                ) {
-                    items(displayedNotifications, key = { it.id }) { notif ->
-                        SwipeableNotificationCard(
-                            notif = notif,
-                            onMarkAsRead = {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                KlinUpNotificationManager.markAsRead(notif.id)
-                            },
-                            onClick = { onNotificationClick(notif) },
-                            modifier = Modifier.animateItem()
-                        )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 460.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 4.dp)
+                    ) {
+                        items(displayedNotifications, key = { it.id }) { notif ->
+                            SwipeableNotificationCard(
+                                notif = notif,
+                                onMarkAsRead = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    KlinUpNotificationManager.markAsRead(notif.id)
+                                },
+                                onClick = { onNotificationClick(notif) }
+                            )
+                        }
                     }
                 }
             }
@@ -407,7 +413,7 @@ private fun NotificationFilterBar(
 ) {
     val colors = MaterialTheme.klinUpColors
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(999.dp),
         color = colors.chipBg,
         modifier = Modifier
             .fillMaxWidth()
@@ -449,18 +455,28 @@ private fun FilterTabItem(
 ) {
     val colors = MaterialTheme.klinUpColors
     val containerColor by animateColorAsState(
-        targetValue = if (selected) colors.cardBg else Color.Transparent,
+        targetValue = if (selected) colors.cardBg else colors.cardBg.copy(alpha = 0f),
         animationSpec = tween(160),
         label = "notif_tab_bg"
     )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) colors.border else colors.border.copy(alpha = 0f),
+        animationSpec = tween(160),
+        label = "notif_tab_border"
+    )
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(999.dp),
         color = containerColor,
-        border = if (selected) BorderStroke(1.dp, colors.border) else null,
+        border = BorderStroke(1.dp, borderColor),
         modifier = modifier
             .fillMaxHeight()
-            .clip(RoundedCornerShape(10.dp))
-            .bouncyClickable(pressedScale = 0.98f, role = Role.Tab, onClick = onClick)
+            .clip(RoundedCornerShape(999.dp))
+            .bouncyClickable(
+                pressedScale = 0.98f,
+                role = Role.Tab,
+                showIndication = false,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -533,7 +549,7 @@ private fun SwipeableNotificationCard(
                 targetValue = if (direction != SwipeToDismissBoxValue.Settled) {
                     colors.softGreenBg
                 } else {
-                    Color.Transparent
+                    colors.softGreenBg.copy(alpha = 0f)
                 },
                 animationSpec = tween(180),
                 label = "notif_swipe_bg"
@@ -556,7 +572,7 @@ private fun SwipeableNotificationCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = TablerIcons.Checks,
+                            imageVector = TablerIcons.CircleCheck,
                             contentDescription = null,
                             tint = colors.greenText,
                             modifier = Modifier.size(18.dp)
@@ -753,7 +769,7 @@ private fun NotificationRowCard(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
-                                        imageVector = TablerIcons.Checks,
+                                        imageVector = TablerIcons.CircleCheck,
                                         contentDescription = "Lue",
                                         tint = colors.inkMuted,
                                         modifier = Modifier.size(13.dp)

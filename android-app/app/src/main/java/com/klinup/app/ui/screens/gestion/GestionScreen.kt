@@ -4,6 +4,7 @@ import com.klinup.app.ui.components.TablerIcons
 
 import com.klinup.app.ui.components.CustomerProfileFormCard
 import com.klinup.app.ui.components.LocalBottomBarPadding
+import com.klinup.app.ui.components.OrderInvoiceDialog
 import com.klinup.app.ui.components.OrderPaymentSettlementDialog
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -185,6 +186,7 @@ fun GestionScreen(
     val orders by KlinUpRepository.orders.collectAsState()
     val customers by KlinUpRepository.customers.collectAsState()
     val expenses by KlinUpRepository.expenses.collectAsState()
+    val stores by KlinUpRepository.stores.collectAsState()
     val selectedStoreId by KlinUpRepository.selectedStoreId.collectAsState()
     val currentUser by KlinUpRepository.currentUser.collectAsState()
     val isLoading by KlinUpRepository.isLoading.collectAsState()
@@ -222,6 +224,7 @@ fun GestionScreen(
     var isSettlingPayment by remember { mutableStateOf(false) }
 
     val customerMap = remember(customers) { customers.associateBy { it.id } }
+    val storeMap = remember(stores) { stores.associateBy { it.id } }
     val nowInstant = remember(orders) { Instant.now() }
 
     val storeOrders = remember(orders, selectedStoreId) {
@@ -1366,62 +1369,13 @@ fun GestionScreen(
 
     // ── Invoice / Facture Modal ───────────────────────────────────────────────
     invoiceOrder?.let { order ->
-        val clientName = order.customerId?.let { customerMap[it]?.fullName } ?: "Client Passage"
-        val remaining = (order.prixTotal - order.avancePayee).coerceAtLeast(0.0)
-        AlertDialog(
-            onDismissRequest = { invoiceOrder = null },
-            title = {
-                Text(
-                    text = "Facture ${order.ticketLabel}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Client : $clientName", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    Text("Statut : ${KlinUpRepository.orderStatusLabel(order.statut)}", fontSize = 13.sp, color = InkSecondary)
-                    Text("Mode : ${order.modeReglement}", fontSize = 13.sp, color = InkSecondary)
-                    HorizontalDivider()
-                    val itemsList = order.items.orEmpty()
-                    if (itemsList.isNotEmpty()) {
-                        itemsList.forEach { it ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("${it.article} x${it.quantite}", fontSize = 13.sp)
-                                Text(KlinUpRepository.formatFcfa(it.prix * it.quantite), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                            }
-                        }
-                    } else {
-                        Text(order.typeArticle, fontSize = 13.sp)
-                    }
-                    HorizontalDivider()
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Total :", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text(KlinUpRepository.formatFcfa(order.prixTotal), fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = BrandText)
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Avance payée :", fontSize = 13.sp, color = InkSecondary)
-                        Text(KlinUpRepository.formatFcfa(order.avancePayee), fontSize = 13.sp)
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Reste à payer :", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        Text(
-                            KlinUpRepository.formatFcfa(remaining),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = if (remaining > 0.0) CancelRed else MaterialTheme.klinUpColors.greenText
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { invoiceOrder = null }) {
-                    Text("Fermer", fontWeight = FontWeight.Bold, color = BrandText)
-                }
-            }
+        val customer = order.customerId?.let { customerMap[it] }
+        val storeName = order.storeId?.let { storeMap[it]?.nom }
+        OrderInvoiceDialog(
+            order = order,
+            customer = customer,
+            storeName = storeName,
+            onDismiss = { invoiceOrder = null }
         )
     }
 

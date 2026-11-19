@@ -2,14 +2,19 @@ package com.klinup.app.ui.screens.login
 
 import com.klinup.app.ui.components.TablerIcons
 
+import android.graphics.BitmapFactory
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +57,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -62,7 +68,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -71,12 +80,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.klinup.app.data.local.AppPreferences
 import com.klinup.app.data.local.SecurityManager
 import com.klinup.app.data.models.User
 import com.klinup.app.data.repository.KlinUpRepository
 import com.klinup.app.ui.theme.klinUpColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val LoginBlue       = Color(0xFF1D5CE8)
 private val LoginTitleBlue: Color @Composable get() = if (MaterialTheme.klinUpColors.isDark) MaterialTheme.klinUpColors.brandText else LoginBlue
@@ -448,6 +460,18 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 val initials = remember(user) { userInitials(user) }
                 val roleLabel = remember(user.role) { formatUserRole(user.role) }
                 val isPinLocked = lockoutSeconds > 0L
+                val avatarVersion by AppPreferences.avatarVersion.collectAsState()
+                val avatar by produceState<ImageBitmap?>(null, user.id, avatarVersion) {
+                    value = withContext(Dispatchers.IO) {
+                        val f = AppPreferences.avatarFile(user.id)
+                        if (f.exists()) BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() else null
+                    }
+                }
+                LaunchedEffect(user.id, user.avatar) {
+                    if (!user.avatar.isNullOrBlank()) {
+                        AppPreferences.syncAvatarFromRemote(user.id, user.avatar)
+                    }
+                }
 
                 Column(
                     modifier = Modifier
@@ -511,15 +535,38 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         modifier = Modifier
                             .size(76.dp)
                             .clip(CircleShape)
-                            .background(LoginBlue),
+                            .background(LoginBlue)
+                            .border(2.dp, LoginBlue.copy(alpha = 0.25f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = initials,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        AnimatedContent(
+                            targetState = avatar,
+                            transitionSpec = {
+                                fadeIn(tween(220)) togetherWith fadeOut(tween(150))
+                            },
+                            label = "login_avatar"
+                        ) { bmp ->
+                            if (bmp != null) {
+                                Image(
+                                    bitmap = bmp,
+                                    contentDescription = user.fullName,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = initials,
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

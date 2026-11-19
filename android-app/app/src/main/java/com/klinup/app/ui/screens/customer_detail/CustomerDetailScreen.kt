@@ -1131,13 +1131,9 @@ fun CustomerDetailScreen(
     if (showEditDialog) {
         val storesList by KlinUpRepository.stores.collectAsState()
         val initialCoords = customer.resolvedLatLng
-        val initialIndicatif = when (customer.indicatif?.replace("+", "")?.trim()) {
-            "228" -> "🇹🇬 +228"
-            "225" -> "🇨🇮 +225"
-            "221" -> "🇸🇳 +221"
-            "33" -> "🇫🇷 +33"
-            else -> "🇧🇯 +229"
-        }
+        val initialIndicatif = com.klinup.app.ui.components.CountryDialCodes
+            .findByDisplayOrCode(customer.indicatif)
+            .displayValue
 
         var nom by remember(customer.id) { mutableStateOf(customer.nom) }
         var prenom by remember(customer.id) { mutableStateOf(customer.prenom ?: "") }
