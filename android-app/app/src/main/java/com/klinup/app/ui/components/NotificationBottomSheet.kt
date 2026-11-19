@@ -10,9 +10,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,33 +26,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AlarmOff
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.DoneAll
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material.icons.outlined.NotificationsNone
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.ShoppingBasket
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -63,6 +56,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,6 +68,8 @@ import com.klinup.app.data.local.KlinUpNotificationManager
 import com.klinup.app.data.local.NotificationCategory
 import com.klinup.app.data.repository.KlinUpRepository
 import com.klinup.app.ui.theme.klinUpColors
+
+private enum class NotificationFilter { ALL, UNREAD }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,13 +87,37 @@ fun NotificationBottomSheet(
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedFilter by remember { mutableStateOf(NotificationFilter.ALL) }
+
+    val displayedNotifications = remember(notifications, selectedFilter) {
+        when (selectedFilter) {
+            NotificationFilter.ALL -> notifications
+            NotificationFilter.UNREAD -> notifications.filter { !it.isRead }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = colors.cardBg,
+        containerColor = colors.pageBg,
         contentColor = colors.inkPrimary,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(colors.border)
+                )
+            }
+        }
     ) {
         val view = LocalView.current
         SideEffect {
@@ -110,84 +130,134 @@ fun NotificationBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp)
+                .padding(horizontal = 18.dp)
+                .padding(bottom = 26.dp)
         ) {
-            // ── En-tête du panneau ────────────────────────────────────────────
+            // ── En-tête du centre de notifications ───────────────────────────
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "Notifications",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.inkPrimary
-                    )
-                    if (unreadCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(colors.brandBlue)
-                                .padding(horizontal = 9.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "$unreadCount",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(colors.softBlueBg),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = TablerIcons.Bell,
+                            contentDescription = null,
+                            tint = colors.brandText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = "Notifications",
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = colors.inkPrimary
+                        )
+                        Text(
+                            text = when {
+                                unreadCount == 0 -> "Tout est à jour"
+                                unreadCount == 1 -> "1 alerte non lue"
+                                else -> "$unreadCount alertes non lues"
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (unreadCount > 0) colors.brandText else colors.inkMuted
+                        )
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     if (unreadCount > 0) {
-                        TextButton(onClick = onMarkAllRead) {
-                            Icon(
-                                imageVector = TablerIcons.Checks,
-                                contentDescription = null,
-                                tint = colors.brandText,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Tout lire",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = colors.brandText
-                            )
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = colors.softBlueBg,
+                            border = BorderStroke(1.dp, colors.softBlueBorder),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .bouncyClickable(pressedScale = 0.96f, role = Role.Button) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onMarkAllRead()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = TablerIcons.Checks,
+                                    contentDescription = null,
+                                    tint = colors.brandText,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "Tout lire",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.brandText
+                                )
+                            }
                         }
                     }
-                    IconButton(onClick = onRefresh) {
-                        Icon(
-                            imageVector = TablerIcons.Refresh,
-                            contentDescription = "Actualiser",
-                            tint = colors.inkSecondary
-                        )
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = colors.cardBg,
+                        border = BorderStroke(1.dp, colors.border),
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .bouncyClickable(pressedScale = 0.94f, role = Role.Button) {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onRefresh()
+                            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = TablerIcons.Refresh,
+                                contentDescription = "Actualiser",
+                                tint = colors.inkSecondary,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
                     }
                 }
             }
 
-            if (unreadCount > 0) {
-                Text(
-                    text = "Glissez une alerte non lue vers la gauche ou la droite pour la marquer comme lue.",
-                    fontSize = 11.5.sp,
-                    color = colors.inkMuted,
-                    modifier = Modifier.padding(top = 2.dp)
+            // ── Sélecteur de filtre (Toutes / Non lues) ──────────────────────
+            if (notifications.isNotEmpty()) {
+                NotificationFilterBar(
+                    selected = selectedFilter,
+                    totalCount = notifications.size,
+                    unreadCount = unreadCount,
+                    onSelect = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        selectedFilter = it
+                    }
                 )
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             // ── Bannière d'autorisation Android (si non accordée) ─────────────
             if (!hasSystemPermission) {
-                Spacer(modifier = Modifier.height(10.dp))
                 Surface(
-                    shape = RoundedCornerShape(26.dp),
+                    shape = RoundedCornerShape(18.dp),
                     color = colors.softBlueBg,
                     border = BorderStroke(1.dp, colors.softBlueBorder),
                     modifier = Modifier.fillMaxWidth()
@@ -195,14 +265,14 @@ fun NotificationBottomSheet(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(11.dp))
                                 .background(colors.brandBlue.copy(alpha = 0.14f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -210,25 +280,26 @@ fun NotificationBottomSheet(
                                 imageVector = TablerIcons.Bell,
                                 contentDescription = null,
                                 tint = colors.brandText,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                text = "Activer les notifications",
+                                text = "Activer les alertes système",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.inkPrimary
                             )
                             Text(
-                                text = "Recevez les alertes en superposition Android même hors de l'app.",
-                                fontSize = 11.sp,
+                                text = "Recevez les notifications même hors de l'app.",
+                                fontSize = 11.5.sp,
                                 color = colors.inkMuted,
                                 lineHeight = 15.sp
                             )
                         }
                         Button(
                             onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                     onRequestPermission()
                                 } else {
@@ -238,12 +309,12 @@ fun NotificationBottomSheet(
                                     runCatching { context.startActivity(intent) }
                                 }
                             },
-                            shape = RoundedCornerShape(50),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = colors.brandBlue),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
                         ) {
                             Text(
-                                text = "Autoriser",
+                                text = "Activer",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -251,41 +322,54 @@ fun NotificationBottomSheet(
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
             // ── Liste des notifications ───────────────────────────────────────
-            if (notifications.isEmpty()) {
+            if (displayedNotifications.isEmpty()) {
+                val isUnreadEmpty = selectedFilter == NotificationFilter.UNREAD && notifications.isNotEmpty()
                 Surface(
-                    shape = RoundedCornerShape(26.dp),
-                    color = colors.cardSubtleBg,
+                    shape = RoundedCornerShape(22.dp),
+                    color = colors.cardBg,
                     border = BorderStroke(1.dp, colors.border),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 36.dp, horizontal = 20.dp),
+                            .padding(vertical = 38.dp, horizontal = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(
-                            imageVector = TablerIcons.BellOff,
-                            contentDescription = null,
-                            tint = colors.inkMuted,
-                            modifier = Modifier.size(34.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(if (isUnreadEmpty) colors.softGreenBg else colors.chipBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isUnreadEmpty) TablerIcons.Checks else TablerIcons.BellOff,
+                                contentDescription = null,
+                                tint = if (isUnreadEmpty) colors.greenText else colors.inkMuted,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
                         Text(
-                            text = "Aucune notification",
-                            fontSize = 15.sp,
+                            text = if (isUnreadEmpty) "Aucune alerte non lue" else "Aucune notification",
+                            fontSize = 15.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = colors.inkPrimary
                         )
                         Text(
-                            text = "Toutes les commandes et alertes sont à jour.",
-                            fontSize = 12.sp,
-                            color = colors.inkMuted
+                            text = if (isUnreadEmpty) {
+                                "Vous avez consulté toutes vos notifications."
+                            } else {
+                                "Toutes les commandes et alertes sont à jour."
+                            },
+                            fontSize = 12.5.sp,
+                            color = colors.inkMuted,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -293,10 +377,11 @@ fun NotificationBottomSheet(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 440.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .heightIn(max = 460.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 4.dp)
                 ) {
-                    items(notifications, key = { it.id }) { notif ->
+                    items(displayedNotifications, key = { it.id }) { notif ->
                         SwipeableNotificationCard(
                             notif = notif,
                             onMarkAsRead = {
@@ -308,6 +393,112 @@ fun NotificationBottomSheet(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationFilterBar(
+    selected: NotificationFilter,
+    totalCount: Int,
+    unreadCount: Int,
+    onSelect: (NotificationFilter) -> Unit
+) {
+    val colors = MaterialTheme.klinUpColors
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = colors.chipBg,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(42.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            FilterTabItem(
+                label = "Toutes",
+                count = totalCount,
+                selected = selected == NotificationFilter.ALL,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelect(NotificationFilter.ALL) }
+            )
+            FilterTabItem(
+                label = "Non lues",
+                count = unreadCount,
+                selected = selected == NotificationFilter.UNREAD,
+                highlightCount = unreadCount > 0,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelect(NotificationFilter.UNREAD) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterTabItem(
+    label: String,
+    count: Int,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    highlightCount: Boolean = false,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.klinUpColors
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) colors.cardBg else Color.Transparent,
+        animationSpec = tween(160),
+        label = "notif_tab_bg"
+    )
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = containerColor,
+        border = if (selected) BorderStroke(1.dp, colors.border) else null,
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(10.dp))
+            .bouncyClickable(pressedScale = 0.98f, role = Role.Tab, onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                fontSize = 12.5.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) colors.inkPrimary else colors.inkMuted
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(
+                        when {
+                            highlightCount && selected -> colors.brandBlue
+                            highlightCount -> colors.softBlueBg
+                            selected -> colors.chipBg
+                            else -> colors.border.copy(alpha = 0.6f)
+                        }
+                    )
+                    .padding(horizontal = 6.dp, vertical = 1.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "$count",
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        highlightCount && selected -> Color.White
+                        highlightCount -> colors.brandText
+                        selected -> colors.inkPrimary
+                        else -> colors.inkMuted
+                    }
+                )
             }
         }
     }
@@ -327,7 +518,6 @@ private fun SwipeableNotificationCard(
             if (!notif.isRead && targetValue != SwipeToDismissBoxValue.Settled) {
                 onMarkAsRead()
             }
-            // Toujours retourner false pour conserver la notification visible dans la liste
             false
         }
     )
@@ -355,7 +545,7 @@ private fun SwipeableNotificationCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(26.dp))
+                    .clip(RoundedCornerShape(20.dp))
                     .background(bgColor)
                     .padding(horizontal = 20.dp),
                 contentAlignment = alignment
@@ -397,31 +587,31 @@ private fun NotificationRowCard(
     val colors = MaterialTheme.klinUpColors
     val (categoryLabel, accentColor, badgeBg, iconRes) = when (notif.category) {
         NotificationCategory.LATE -> Quadruple(
-            "Retard",
+            "RETARD",
             colors.redText,
             colors.softRedBg,
             R.drawable.ic_tabler_clock_exclamation
         )
         NotificationCategory.VALIDATION -> Quadruple(
-            "Validation",
+            "VALIDATION",
             colors.amberText,
             colors.softAmberBg,
             R.drawable.ic_tabler_clipboard_check
         )
         NotificationCategory.READY -> Quadruple(
-            "Prête",
+            "PRÊTE",
             colors.greenText,
             colors.softGreenBg,
             R.drawable.ic_tabler_circle_check
         )
         NotificationCategory.NEW_ORDER -> Quadruple(
-            "Commande",
+            "COMMANDE",
             colors.brandText,
             colors.softBlueBg,
             R.drawable.ic_tabler_shopping_bag_plus
         )
         NotificationCategory.INFO -> Quadruple(
-            "Info",
+            "INFO",
             colors.skyText,
             colors.softSkyBg,
             R.drawable.ic_tabler_gift
@@ -429,119 +619,178 @@ private fun NotificationRowCard(
     }
 
     val cardBg = if (notif.isRead) colors.cardSubtleBg else colors.cardBg
-    val borderColor = if (notif.isRead) colors.border else accentColor.copy(alpha = 0.35f)
+    val borderColor = if (notif.isRead) colors.border else accentColor.copy(alpha = 0.28f)
 
     Surface(
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(20.dp),
         color = cardBg,
         border = BorderStroke(1.dp, borderColor),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(20.dp))
             .bouncyClickable(pressedScale = 0.985f, role = Role.Button, onClick = onClick)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .alpha(if (notif.isRead) 0.78f else 1f)
-                .padding(14.dp),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .height(IntrinsicSize.Min)
+                .alpha(if (notif.isRead) 0.76f else 1f)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(badgeBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(22.dp)
+            // Barre verticale d'accentuation pour les notifications non lues
+            if (!notif.isRead) {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 5.dp, top = 12.dp, bottom = 12.dp)
+                        .width(3.5.dp)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(accentColor)
                 )
             }
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(
+                        start = if (notif.isRead) 14.dp else 10.dp,
+                        end = 14.dp,
+                        top = 13.dp,
+                        bottom = 13.dp
+                    ),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Médaillon icône squircle avec bordure teintée
+                Surface(
+                    shape = RoundedCornerShape(13.dp),
+                    color = badgeBg,
+                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.16f)),
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(999.dp),
-                            color = badgeBg
-                        ) {
-                            Text(
-                                text = categoryLabel,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = accentColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                        if (!notif.isRead) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(accentColor)
-                            )
-                        } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Icon(
-                                    imageVector = TablerIcons.Checks,
-                                    contentDescription = "Lue",
-                                    tint = colors.inkMuted,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Text(
-                                    text = "Lue",
-                                    fontSize = 10.sp,
-                                    color = colors.inkMuted,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-
-                    if (!notif.timestampIso.isNullOrBlank()) {
-                        Text(
-                            text = KlinUpRepository.formatOrderDate(notif.timestampIso),
-                            fontSize = 10.5.sp,
-                            color = colors.inkMuted
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
 
-                Text(
-                    text = notif.title,
-                    fontSize = 13.5.sp,
-                    fontWeight = if (notif.isRead) FontWeight.SemiBold else FontWeight.Bold,
-                    color = colors.inkPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Ligne supérieure : Catégorie + Pastille non lue + Heure
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = categoryLabel,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 0.6.sp,
+                                color = accentColor
+                            )
+                            if (!notif.isRead) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(accentColor)
+                                )
+                            }
+                        }
 
-                Text(
-                    text = notif.message,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    color = if (notif.isRead) colors.inkMuted else colors.inkSecondary,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
+                        if (!notif.timestampIso.isNullOrBlank()) {
+                            Text(
+                                text = KlinUpRepository.formatOrderDate(notif.timestampIso),
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = colors.inkMuted
+                            )
+                        }
+                    }
+
+                    // Titre principal
+                    Text(
+                        text = notif.title,
+                        fontSize = 14.sp,
+                        fontWeight = if (notif.isRead) FontWeight.SemiBold else FontWeight.Bold,
+                        color = colors.inkPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp
+                    )
+
+                    // Corps du message
+                    Text(
+                        text = notif.message,
+                        fontSize = 12.5.sp,
+                        lineHeight = 17.sp,
+                        color = if (notif.isRead) colors.inkMuted else colors.inkSecondary,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    // Pied de carte discret : statut lu / accès commande
+                    if (notif.isRead || !notif.orderId.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (notif.isRead) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = TablerIcons.Checks,
+                                        contentDescription = "Lue",
+                                        tint = colors.inkMuted,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = "Lue",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = colors.inkMuted
+                                    )
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.width(1.dp))
+                            }
+
+                            if (!notif.orderId.isNullOrBlank()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = "Voir la commande",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (notif.isRead) colors.inkMuted else accentColor
+                                    )
+                                    Icon(
+                                        imageVector = TablerIcons.ChevronRight,
+                                        contentDescription = null,
+                                        tint = if (notif.isRead) colors.inkMuted else accentColor,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
