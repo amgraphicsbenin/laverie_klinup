@@ -230,12 +230,20 @@ fun ProfileScreen(onLogout: () -> Unit) {
     var isDownloadingUpdate by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableIntStateOf(0) }
     var updateDownloadError by remember { mutableStateOf<String?>(null) }
+    var pendingInstallApk by remember { mutableStateOf<File?>(null) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 permRefreshTick++
+                val apk = pendingInstallApk
+                if (apk != null && apk.exists()) {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()) {
+                        pendingInstallApk = null
+                        AppUpdateManager.installApk(context, apk)
+                    }
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -1216,15 +1224,21 @@ fun ProfileScreen(onLogout: () -> Unit) {
                         downloadProgress = 0
                         updateDownloadError = null
                         scope.launch {
-                            val res = AppUpdateManager.downloadAndInstallUpdate { pct ->
+                            val res = AppUpdateManager.downloadApk(context, info.apkUrl) { pct ->
                                 downloadProgress = pct
                             }
                             isDownloadingUpdate = false
-                            res.onSuccess {
-                                availableUpdate = null
-                                updateStatusMessage = "Mise à jour lancée"
+                            res.onSuccess { file ->
+                                val launched = AppUpdateManager.installApk(context, file)
+                                if (launched) {
+                                    availableUpdate = null
+                                    updateStatusMessage = "Installation lancée"
+                                } else {
+                                    pendingInstallApk = file
+                                    updateDownloadError = "Autorisez l'installation d'applications pour finaliser la mise à jour."
+                                }
                             }.onFailure { err ->
-                                updateDownloadError = err.message ?: "Échec de la mise à jour."
+                                updateDownloadError = err.message ?: "Échec du téléchargement de la mise à jour."
                             }
                         }
                     }

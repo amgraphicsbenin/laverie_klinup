@@ -98,7 +98,6 @@ fun AppNavigation() {
     val currentUser by KlinUpRepository.currentUser.collectAsState()
     val isSessionLocked by SecurityManager.isSessionLocked.collectAsState()
     val pendingOrderId by KlinUpNotificationManager.pendingNavigationOrderId.collectAsState()
-    val overlayAlert by KlinUpNotificationManager.latestOverlayAlert.collectAsState()
     val initialDestination = remember {
         if (KlinUpRepository.currentUser.value != null && !SecurityManager.isSessionLocked.value) {
             Screen.Accueil.route
@@ -113,14 +112,6 @@ fun AppNavigation() {
         if (!targetId.isNullOrBlank() && currentUser != null && !isSessionLocked) {
             KlinUpNotificationManager.consumePendingNavigationOrderId()
             navController.navigate(Screen.OrderDetail.createRoute(targetId))
-        }
-    }
-
-    // Fermeture automatique de la bannière de superposition in-app après 4.5s
-    LaunchedEffect(overlayAlert?.id) {
-        if (overlayAlert != null) {
-            delay(4500L)
-            KlinUpNotificationManager.dismissOverlayAlert()
         }
     }
 
@@ -273,177 +264,6 @@ fun AppNavigation() {
                 RevenueDetailScreen(
                     onBack = { navController.popBackStack() }
                 )
-            }
-        }
-
-        // Bannière de superposition in-app pour les nouvelles notifications
-        AnimatedVisibility(
-            visible = overlayAlert != null && currentUser != null && !isSessionLocked,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp)
-                .padding(horizontal = 16.dp),
-            enter = slideInVertically(
-                animationSpec = tween(durationMillis = 300, easing = NavMotion.EmphasizedDecelerate),
-                initialOffsetY = { -it }
-            ) + fadeIn(tween(220)),
-            exit = slideOutVertically(
-                animationSpec = tween(durationMillis = 220, easing = NavMotion.EmphasizedAccelerate),
-                targetOffsetY = { -it }
-            ) + fadeOut(tween(180))
-        ) {
-            overlayAlert?.let { alert ->
-                val colors = MaterialTheme.klinUpColors
-                val (accentColor, categoryIcon, categoryLabel) = when (alert.category) {
-                    NotificationCategory.NEW_ORDER -> Triple(
-                        Color(0xFF0D2FE8),
-                        TablerIcons.ShoppingBagPlus,
-                        "Nouvelle commande"
-                    )
-                    NotificationCategory.READY -> Triple(
-                        Color(0xFF16A34A),
-                        TablerIcons.CircleCheck,
-                        "Commande prête"
-                    )
-                    NotificationCategory.LATE -> Triple(
-                        Color(0xFFDC2626),
-                        TablerIcons.ClockExclamation,
-                        "Retard / Urgent"
-                    )
-                    NotificationCategory.VALIDATION -> Triple(
-                        Color(0xFFD97706),
-                        TablerIcons.ShieldCheck,
-                        "Validation"
-                    )
-                    NotificationCategory.INFO -> Triple(
-                        Color(0xFF0284C7),
-                        TablerIcons.InfoCircle,
-                        "Information"
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = colors.cardBg,
-                    shadowElevation = 14.dp,
-                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(22.dp))
-                        .bouncyClickable(pressedScale = 0.98f, role = Role.Button) {
-                            KlinUpNotificationManager.markAsRead(alert.id)
-                            KlinUpNotificationManager.dismissOverlayAlert()
-                            if (!alert.orderId.isNullOrBlank()) {
-                                navController.navigate(Screen.OrderDetail.createRoute(alert.orderId))
-                            }
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.Top,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(accentColor.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = categoryIcon,
-                                contentDescription = null,
-                                tint = accentColor,
-                                modifier = Modifier.size(21.dp)
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(999.dp),
-                                        color = accentColor.copy(alpha = 0.12f)
-                                    ) {
-                                        Text(
-                                            text = categoryLabel,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = accentColor,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = "À l'instant",
-                                        fontSize = 10.sp,
-                                        color = colors.inkMuted,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(colors.altPageBg)
-                                        .bouncyClickable(pressedScale = 0.9f, role = Role.Button) {
-                                            KlinUpNotificationManager.dismissOverlayAlert()
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = TablerIcons.X,
-                                        contentDescription = "Fermer",
-                                        tint = colors.inkMuted,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = alert.title,
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.inkPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-
-                            if (alert.message.isNotBlank()) {
-                                Text(
-                                    text = alert.message,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp,
-                                    color = colors.inkSecondary,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            if (!alert.orderId.isNullOrBlank()) {
-                                Text(
-                                    text = "Appuyer pour ouvrir la commande →",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = accentColor,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
 

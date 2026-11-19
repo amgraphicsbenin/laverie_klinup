@@ -32,12 +32,14 @@ jobs:
     name: Build Android Native APK (${{ github.ref_name }})
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 10
 
       - name: Resolve Target Environment
         id: resolve-env
@@ -86,12 +88,20 @@ jobs:
           BUILD_NUMBER=${{ github.run_number }}
           ENV_LABEL="${{ env.APP_ENV }}"
           APK_FILE_NAME="klinup-${ENV_LABEL}-v${VERSION_NAME}-b${BUILD_NUMBER}.apk"
+          COMMIT_NOTES=$(git log -n 5 --pretty=format:"• %s (%h)")
           
           echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
           echo "BUILD_NUMBER=${BUILD_NUMBER}" >> $GITHUB_ENV
           echo "APK_NAME=${APK_FILE_NAME}" >> $GITHUB_ENV
+          {
+            echo "COMMIT_NOTES<<EOF"
+            echo "${COMMIT_NOTES}"
+            echo "EOF"
+          } >> $GITHUB_ENV
           
           echo "🏗️ Building KLIN UP [${ENV_LABEL}] v${VERSION_NAME} (Build #${BUILD_NUMBER})"
+          echo "📝 Commits récents :"
+          echo "${COMMIT_NOTES}"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -137,20 +147,40 @@ jobs:
           groups: testers
           file: android-app/app/build/outputs/apk/release/app-release.apk
           releaseNotes: |
-            🚀 KLIN UP (${{ env.APP_ENV }}) - Android Native (Kotlin & Jetpack Compose)
-            Version: ${{ env.VERSION_NAME }} (Build #${{ env.BUILD_NUMBER }})
-            Environnement: ${{ env.APP_ENV }}
-            Branche: ${{ github.ref_name }}
-            Commit: ${{ github.sha }}
+            🚀 KLIN UP (${{ env.APP_ENV }}) - v${{ env.VERSION_NAME }} (Build #${{ env.BUILD_NUMBER }})
+            Branche : ${{ github.ref_name }}
 
-      - name: Publish OTA Update Manifest to Firebase Storage & Firestore
-        if: ${{ env.HAS_FIREBASE == 'true' }}
-        continue-on-error: true
+            Modifications incluses :
+            ${{ env.COMMIT_NOTES }}
+
+      - name: Publish In-App OTA Update Release
         env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          node scripts/publish-android-update.mjs \
-            --env="${{ env.APP_ENV }}" \
-            --versionCode="${{ env.BUILD_NUMBER }}" \
-            --versionName="${{ env.VERSION_NAME }}" \
-            --notes="Mise à jour (${{ env.APP_ENV }}) - Build #${{ env.BUILD_NUMBER }}"
+          TAG="ota-${{ env.APP_ENV }}"
+          APK_PATH="android-app/app/build/outputs/apk/release/app-release.apk"
+          export APK_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/app-release.apk"
+
+          node -e '
+            const fs = require("fs");
+            const manifest = {
+              versionCode: Number(process.env.BUILD_NUMBER),
+              versionName: process.env.VERSION_NAME,
+              apkUrl: process.env.APK_URL,
+              releaseNotes: process.env.COMMIT_NOTES || "",
+              mandatory: false
+            };
+            fs.writeFileSync("latest.json", JSON.stringify(manifest, null, 2));
+          '
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" \
+              --title "Pressing Pro (${{ env.APP_ENV }}) v${{ env.VERSION_NAME }} (#${{ env.BUILD_NUMBER }})" \
+              --notes "${COMMIT_NOTES}"
+            gh release upload "${TAG}" "${APK_PATH}" latest.json --clobber
+          else
+            gh release create "${TAG}" "${APK_PATH}" latest.json \
+              --title "Pressing Pro (${{ env.APP_ENV }}) v${{ env.VERSION_NAME }} (#${{ env.BUILD_NUMBER }})" \
+              --notes "${COMMIT_NOTES}" \
+              --prerelease
+          fi
