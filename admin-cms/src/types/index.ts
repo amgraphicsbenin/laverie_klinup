@@ -298,6 +298,7 @@ export interface MemoryStore {
   expenses?: Expense[];
   delivery_zones?: DeliveryZone[];
   pickup_zones?: PickupZone[];
+  order_tracking_sessions?: any[];
   support_tickets?: SupportTicket[];
   current_user: Staff | null;
   pin_reset_requests: PinResetRequest[];

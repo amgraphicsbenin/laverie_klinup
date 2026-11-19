@@ -299,7 +299,8 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
     } else {
         0.0
     }
-    val deliveryFee = deliveryCalc?.fee ?: 0.0
+    val isFreeDeliverySub = isSubscriptionPayment && KlinUpRepository.isCustomerFreeDeliverySubscription(selectedCustomer)
+    val deliveryFee = if (isFreeDeliverySub) 0.0 else (deliveryCalc?.fee ?: 0.0)
     val pickupFee = pickupCalc?.fee ?: 0.0
     val grossTotal = effectiveItemsTotal + expressFee + deliveryFee + pickupFee
     val reductionAmount = reductionText.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0
@@ -1547,17 +1548,19 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                                 )
                             }
 
-                            SummaryLine(
-                                label = if (homeDelivery && deliveryCalc != null) {
-                                    "Frais de livraison (${deliveryCalc.distanceKm} km)"
-                                } else {
-                                    "Frais de livraison"
-                                },
-                                value = if (deliveryFee > 0.0) "+ ${KlinUpRepository.formatFcfa(deliveryFee)}" else KlinUpRepository.formatFcfa(0.0),
-                                labelColor = InkSecondary,
-                                valueColor = if (deliveryFee > 0.0) BrandText else InkMuted,
-                                bold = false
-                            )
+                            if (!isFreeDeliverySub) {
+                                SummaryLine(
+                                    label = if (homeDelivery && deliveryCalc != null) {
+                                        "Frais de livraison (${deliveryCalc.distanceKm} km)"
+                                    } else {
+                                        "Frais de livraison"
+                                    },
+                                    value = if (deliveryFee > 0.0) "+ ${KlinUpRepository.formatFcfa(deliveryFee)}" else KlinUpRepository.formatFcfa(0.0),
+                                    labelColor = InkSecondary,
+                                    valueColor = if (deliveryFee > 0.0) BrandText else InkMuted,
+                                    bold = false
+                                )
+                            }
 
                             if (homePickup || pickupFee > 0.0) {
                                 SummaryLine(
@@ -1710,7 +1713,8 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                                         deliveryFee = deliveryFee,
                                         pickupFee = pickupFee,
                                         expressFee = expressFee,
-                                        homeDelivery = homeDelivery
+                                        homeDelivery = homeDelivery,
+                                        homePickup = homePickup
                                     )
                                     isSubmitting = false
                                     if (res.isSuccess) {

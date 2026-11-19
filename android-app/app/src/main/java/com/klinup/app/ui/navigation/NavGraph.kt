@@ -234,7 +234,10 @@ fun AppNavigation() {
                 val orderId = backStackEntry.arguments?.getString("orderId") ?: ""
                 OrderDetailScreen(
                     orderId = orderId,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onCustomerClick = { customerId ->
+                        navController.navigate(Screen.CustomerDetail.createRoute(customerId))
+                    }
                 )
             }
             composable(

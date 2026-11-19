@@ -8,8 +8,11 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.klinup.app.data.local.KlinUpNotificationManager
+import com.klinup.app.data.local.NetworkMonitor
+import com.klinup.app.ui.components.LiveTrackingDialog
 import com.klinup.app.ui.components.LocalBottomBarPadding
 import com.klinup.app.ui.components.NotificationBottomSheet
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -50,6 +53,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.ChevronRight
@@ -65,10 +69,14 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.ShoppingBasket
 import androidx.compose.material.icons.outlined.WorkspacePremium
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -223,6 +231,7 @@ private data class ActiveOrderItem(
 )
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     userName: String = "User name",
@@ -581,6 +590,17 @@ fun DashboardScreen(
 
     val avatarVersion by AppPreferences.avatarVersion.collectAsState()
     val hideAmounts by AppPreferences.hideAmounts.collectAsState()
+    val isOnline by NetworkMonitor.isOnline.collectAsState()
+    val trackingSessions by KlinUpRepository.trackingSessions.collectAsState()
+    var showLiveTrackingDialog by remember { mutableStateOf(false) }
+    var isManualRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullToRefreshState()
+
+    LaunchedEffect(isOnline) {
+        if (isOnline && (storeOrders.isEmpty() || customers.isEmpty())) {
+            KlinUpRepository.refreshAll()
+        }
+    }
     val onToggleAmounts = {
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         AppPreferences.toggleHideAmounts()
@@ -606,6 +626,12 @@ fun DashboardScreen(
             userName = displayUserName,
             avatar = avatar,
             unreadCount = unreadNotifCount,
+            isOnline = isOnline,
+            liveTrackingCount = trackingSessions.size,
+            onLiveTrackingClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                showLiveTrackingDialog = true
+            },
             onProfileClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onProfileClick()
@@ -626,11 +652,35 @@ fun DashboardScreen(
                 )
         )
 
-        LazyColumn(
-            state = mainListState,
+        PullToRefreshBox(
+            isRefreshing = isManualRefreshing,
+            onRefresh = {
+                if (!isManualRefreshing) {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    isManualRefreshing = true
+                    scope.launch {
+                        KlinUpRepository.refreshAll(userInitiated = true)
+                        isManualRefreshing = false
+                    }
+                }
+            },
+            state = pullRefreshState,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullRefreshState,
+                    isRefreshing = isManualRefreshing,
+                    containerColor = CardWhite,
+                    color = BrandBlue,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            },
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+        ) {
+        LazyColumn(
+            state = mainListState,
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 top = 10.dp,
                 bottom = 28.dp + LocalBottomBarPadding.current
@@ -792,26 +842,70 @@ fun DashboardScreen(
 
             if (displayedActiveOrders.isEmpty()) {
                 item(key = "empty_active_orders", contentType = "empty_state") {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                            .clip(RoundedCornerShape(26.dp))
-                            .bouncyClickable(role = Role.Button, onClick = onNavigateToCreate),
-                        shape = RoundedCornerShape(26.dp),
-                        color = CardWhite,
-                        border = BorderStroke(1.dp, CardBorder)
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(24.dp),
-                            contentAlignment = Alignment.Center
+                    if (!isOnline && allActiveOrders.isEmpty()) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
+                                .clip(RoundedCornerShape(26.dp))
+                                .bouncyClickable(role = Role.Button) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    scope.launch { KlinUpRepository.refreshAll(userInitiated = true) }
+                                },
+                            shape = RoundedCornerShape(26.dp),
+                            color = MaterialTheme.klinUpColors.softRedBg,
+                            border = BorderStroke(1.dp, MaterialTheme.klinUpColors.softRedBorder)
                         ) {
-                            Text(
-                                text = "Aucune commande active — Créer une commande",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = InkMuted
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 22.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.WifiOff,
+                                    contentDescription = "Hors-ligne",
+                                    tint = MaterialTheme.klinUpColors.redText,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Text(
+                                    text = "Connexion internet indisponible",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.klinUpColors.redText
+                                )
+                                Text(
+                                    text = "Impossible de charger les commandes en cours hors ligne. Vérifiez votre connexion puis touchez pour réessayer.",
+                                    fontSize = 12.sp,
+                                    color = InkSecondary,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    lineHeight = 17.sp
+                                )
+                            }
+                        }
+                    } else {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
+                                .clip(RoundedCornerShape(26.dp))
+                                .bouncyClickable(role = Role.Button, onClick = onNavigateToCreate),
+                            shape = RoundedCornerShape(26.dp),
+                            color = CardWhite,
+                            border = BorderStroke(1.dp, CardBorder)
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Aucune commande active — Créer une commande",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = InkMuted
+                                )
+                            }
                         }
                     }
                 }
@@ -876,6 +970,7 @@ fun DashboardScreen(
                 }
             }
         }
+        }
     }
 
     if (showNotificationSheet) {
@@ -906,6 +1001,12 @@ fun DashboardScreen(
             onDismiss = { showNotificationSheet = false }
         )
     }
+
+    if (showLiveTrackingDialog) {
+        LiveTrackingDialog(
+            onDismiss = { showLiveTrackingDialog = false }
+        )
+    }
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
@@ -914,6 +1015,9 @@ private fun DashboardHeader(
     userName: String,
     avatar: ImageBitmap?,
     unreadCount: Int,
+    isOnline: Boolean = true,
+    liveTrackingCount: Int = 0,
+    onLiveTrackingClick: () -> Unit = {},
     onProfileClick: () -> Unit,
     onNotificationClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -966,30 +1070,63 @@ private fun DashboardHeader(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .clickable(role = Role.Button, onClick = onNotificationClick)
-                .semantics { contentDescription = "Ouvrir les notifications" },
-            contentAlignment = Alignment.Center
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box {
-                Icon(
-                    imageVector = TablerIcons.Bell,
-                    contentDescription = null,
-                    tint = InkPrimary,
-                    modifier = Modifier.size(25.dp)
-                )
-                if (unreadCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .size(9.dp)
-                            .clip(CircleShape)
-                            .background(BrandBlue)
-                            .align(Alignment.TopEnd)
-                            .offset(x = 1.dp, y = (-1).dp)
+            AnimatedVisibility(visible = !isOnline) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.klinUpColors.softRedBg,
+                    border = BorderStroke(1.dp, MaterialTheme.klinUpColors.softRedBorder)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.WifiOff,
+                            contentDescription = "Hors-ligne",
+                            tint = MaterialTheme.klinUpColors.redText,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = "Hors ligne",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.klinUpColors.redText,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .clickable(role = Role.Button, onClick = onNotificationClick)
+                    .semantics { contentDescription = "Ouvrir les notifications" },
+                contentAlignment = Alignment.Center
+            ) {
+                Box {
+                    Icon(
+                        imageVector = TablerIcons.Bell,
+                        contentDescription = null,
+                        tint = InkPrimary,
+                        modifier = Modifier.size(25.dp)
                     )
+                    if (unreadCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .size(9.dp)
+                                .clip(CircleShape)
+                                .background(BrandBlue)
+                                .align(Alignment.TopEnd)
+                                .offset(x = 1.dp, y = (-1).dp)
+                        )
+                    }
                 }
             }
         }

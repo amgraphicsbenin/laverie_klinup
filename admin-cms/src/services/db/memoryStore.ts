@@ -25,6 +25,7 @@ export const memoryDb: MemoryStore = {
   expenses: [],
   delivery_zones: [],
   pickup_zones: [],
+  order_tracking_sessions: [],
   support_tickets: [],
   current_user: null,
   pin_reset_requests: [],

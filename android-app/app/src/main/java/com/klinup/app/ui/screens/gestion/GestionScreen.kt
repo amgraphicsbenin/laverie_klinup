@@ -4,6 +4,10 @@ import com.klinup.app.ui.components.TablerIcons
 
 import com.klinup.app.ui.components.CustomerProfileFormCard
 import com.klinup.app.ui.components.LocalBottomBarPadding
+import androidx.compose.material.icons.rounded.WifiOff
+import com.klinup.app.data.local.NetworkMonitor
+import com.klinup.app.ui.components.CustomerDeliveryAddressDialog
+import com.klinup.app.ui.components.LiveTrackingDialog
 import com.klinup.app.ui.components.OrderInvoiceDialog
 import com.klinup.app.ui.components.OrderPaymentSettlementDialog
 import androidx.compose.animation.AnimatedVisibility
@@ -190,6 +194,7 @@ fun GestionScreen(
     val selectedStoreId by KlinUpRepository.selectedStoreId.collectAsState()
     val currentUser by KlinUpRepository.currentUser.collectAsState()
     val isLoading by KlinUpRepository.isLoading.collectAsState()
+    val isOnline by NetworkMonitor.isOnline.collectAsState()
 
     val canManageCustomers = currentUser?.canManageCustomersMobile ?: true
     val canManageExpenses = currentUser?.canManageExpensesMobile ?: true
@@ -233,6 +238,9 @@ fun GestionScreen(
     var deleteExpenseTarget by remember { mutableStateOf<Expense?>(null) }
 
     var invoiceOrder by remember { mutableStateOf<Order?>(null) }
+    var liveTrackOrderId by remember { mutableStateOf<String?>(null) }
+    var addressPromptTarget by remember { mutableStateOf<Pair<Order, Customer>?>(null) }
+    val activeTrackingOrderIds by KlinUpRepository.activeTrackingOrderIds.collectAsState()
     var cancelOrderTarget by remember { mutableStateOf<Order?>(null) }
     var paymentPromptTarget by remember { mutableStateOf<Pair<Order, String>?>(null) }
     var isSettlingPayment by remember { mutableStateOf(false) }
@@ -244,6 +252,12 @@ fun GestionScreen(
     val storeOrders = remember(orders, selectedStoreId) {
         if (selectedStoreId == "all" || selectedStoreId == "GLOBAL") orders
         else orders.filter { it.storeId == selectedStoreId }
+    }
+    val ordersCountByCustomer = remember(storeOrders) {
+        storeOrders.asSequence()
+            .filter { it.statut != "annule" && !it.customerId.isNullOrBlank() }
+            .groupingBy { it.customerId!! }
+            .eachCount()
     }
 
     val activeOrdersList = remember(storeOrders) {
@@ -623,14 +637,58 @@ fun GestionScreen(
 
                 if (displayedOrders.isEmpty()) {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = if (isLoading) "Chargement des commandes..." else "Aucune commande correspondante",
-                            fontSize = 14.sp,
-                            color = InkMuted
-                        )
+                        if (!isOnline && storeOrders.isEmpty()) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(24.dp),
+                                color = MaterialTheme.klinUpColors.softRedBg,
+                                border = BorderStroke(1.dp, MaterialTheme.klinUpColors.softRedBorder)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(22.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.WifiOff,
+                                        contentDescription = "Hors-ligne",
+                                        tint = CancelRed,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Text(
+                                        text = "Connexion internet indisponible",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CancelRed
+                                    )
+                                    Text(
+                                        text = "Impossible de charger les commandes en cours hors ligne. Vérifiez votre connexion Wi-Fi ou données mobiles puis réessayez.",
+                                        fontSize = 12.5.sp,
+                                        color = InkSecondary,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        lineHeight = 18.sp
+                                    )
+                                    Button(
+                                        onClick = { scope.launch { KlinUpRepository.refreshAll(userInitiated = true) } },
+                                        shape = RoundedCornerShape(50),
+                                        colors = ButtonDefaults.buttonColors(containerColor = BrandBlue)
+                                    ) {
+                                        Text("Réessayer", color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = if (isLoading) "Chargement des commandes..." else "Aucune commande correspondante",
+                                fontSize = 14.sp,
+                                color = InkMuted
+                            )
+                        }
                     }
                 } else {
                     LazyColumn(
@@ -664,6 +722,7 @@ fun GestionScreen(
                                         order = order,
                                         clientName = clientName,
                                         isUpdating = updatingOrderId == order.id,
+                                        hasActiveTracking = order.id in activeTrackingOrderIds,
                                         onCardClick = {
                                             if (!isClosing) {
                                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -671,9 +730,20 @@ fun GestionScreen(
                                             }
                                         },
                                         onInvoiceClick = { if (!isClosing) invoiceOrder = order },
+                                        onTrackClick = { if (!isClosing) liveTrackOrderId = order.id },
                                         onCancelClick = { if (!isClosing) cancelOrderTarget = order },
                                         onPrimaryActionClick = { nextStatus ->
                                             if (isClosing) return@GestionOrderCard
+                                            val orderCustomer = order.customerId?.let { customerMap[it] }
+                                            if (nextStatus == "a_livrer" && !KlinUpRepository.hasConfiguredDeliveryAddress(orderCustomer)) {
+                                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                if (orderCustomer != null) {
+                                                    addressPromptTarget = order to orderCustomer
+                                                } else {
+                                                    NetworkMonitor.showToast("Aucun compte client associé à cette commande.")
+                                                }
+                                                return@GestionOrderCard
+                                            }
                                             if (KlinUpRepository.requiresRemainingPayment(order, nextStatus)) {
                                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                 paymentPromptTarget = order to nextStatus
@@ -868,7 +938,7 @@ fun GestionScreen(
                             key = { it.id },
                             contentType = { "gestion_customer_card" }
                         ) { customer ->
-                            val ordersCount = storeOrders.count { it.customerId == customer.id && it.statut != "annule" }
+                            val ordersCount = ordersCountByCustomer[customer.id] ?: 0
                             GestionCustomerCard(
                                 customer = customer,
                                 ordersCount = ordersCount,
@@ -1393,6 +1463,37 @@ fun GestionScreen(
         )
     }
 
+    // ── Live Tracking Modal ───────────────────────────────────────────────────
+    liveTrackOrderId?.let { targetOrderId ->
+        LiveTrackingDialog(
+            initialOrderId = targetOrderId,
+            onDismiss = { liveTrackOrderId = null }
+        )
+    }
+
+    // ── Customer Delivery Address Requirement Dialog ──────────────────────────
+    addressPromptTarget?.let { (targetOrder, targetCustomer) ->
+        CustomerDeliveryAddressDialog(
+            customer = targetCustomer,
+            onDismiss = { addressPromptTarget = null },
+            onSavedAndContinue = {
+                addressPromptTarget = null
+                if (KlinUpRepository.requiresRemainingPayment(targetOrder, "a_livrer")) {
+                    paymentPromptTarget = targetOrder to "a_livrer"
+                } else {
+                    scope.launch {
+                        updatingOrderId = targetOrder.id
+                        val res = KlinUpRepository.updateOrderStatus(targetOrder.id, "a_livrer")
+                        updatingOrderId = null
+                        if (res.isSuccess) {
+                            KlinUpRepository.notifyOrderReadyIfApplicable(context, targetOrder, "a_livrer")
+                        }
+                    }
+                }
+            }
+        )
+    }
+
     // ── Payment Settlement Dialog ─────────────────────────────────────────────
     paymentPromptTarget?.let { (targetOrder, targetStatus) ->
         OrderPaymentSettlementDialog(
@@ -1426,6 +1527,10 @@ fun GestionScreen(
                         } else {
                             KlinUpRepository.notifyOrderReadyIfApplicable(context, targetOrder, targetStatus)
                         }
+                    } else {
+                        NetworkMonitor.showToast(
+                            res.exceptionOrNull()?.message ?: "Impossible d'enregistrer le règlement."
+                        )
                     }
                 }
             }
@@ -1556,8 +1661,10 @@ private fun GestionOrderCard(
     order: Order,
     clientName: String,
     isUpdating: Boolean,
+    hasActiveTracking: Boolean = false,
     onCardClick: () -> Unit,
     onInvoiceClick: () -> Unit,
+    onTrackClick: () -> Unit = {},
     onCancelClick: () -> Unit,
     onPrimaryActionClick: (String) -> Unit
 ) {
@@ -1847,6 +1954,36 @@ private fun GestionOrderCard(
                             fontWeight = FontWeight.Bold,
                             color = BrandText
                         )
+                    }
+                }
+
+                if (KlinUpRepository.canShowLiveTrackingButton(order)) {
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(role = Role.Button, onClick = onTrackClick),
+                        shape = RoundedCornerShape(12.dp),
+                        color = colors.softGreenBg,
+                        border = BorderStroke(1.dp, Color(0xFF16A34A).copy(alpha = 0.45f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = TablerIcons.TruckDelivery,
+                                contentDescription = null,
+                                tint = Color(0xFF15803D),
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = "Suivi GPS",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF15803D)
+                            )
+                        }
                     }
                 }
 

@@ -5,6 +5,8 @@ import com.klinup.app.ui.components.TablerIcons
 import com.klinup.app.ui.screens.gestion.InProgressStatusIcon
 import com.klinup.app.ui.screens.gestion.OrderClosingSuccessOverlay
 import kotlinx.coroutines.delay
+import com.klinup.app.ui.components.CustomerDeliveryAddressDialog
+import com.klinup.app.ui.components.LiveTrackingDialog
 import com.klinup.app.ui.components.OrderInvoiceDialog
 import com.klinup.app.ui.components.OrderPaymentSettlementDialog
 import androidx.compose.foundation.BorderStroke
@@ -103,7 +105,8 @@ private val GreenPaid: Color     @Composable get() = MaterialTheme.klinUpColors.
 @Composable
 fun OrderDetailScreen(
     orderId: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onCustomerClick: (String) -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -124,7 +127,11 @@ fun OrderDetailScreen(
     var isUpdating by remember { mutableStateOf(false) }
     var showCancelDialog by remember { mutableStateOf(false) }
     var showInvoiceDialog by remember { mutableStateOf(false) }
+    var showLiveTrackingDialog by remember { mutableStateOf(false) }
+    var showAddressPromptDialog by remember { mutableStateOf(false) }
     var showClosingSuccess by remember { mutableStateOf(false) }
+    val activeTrackingOrderIds by KlinUpRepository.activeTrackingOrderIds.collectAsState()
+    val hasActiveTracking = orderId in activeTrackingOrderIds
     var paymentPromptStatus by remember { mutableStateOf<String?>(null) }
     var isSettlingPayment by remember { mutableStateOf(false) }
 
@@ -292,6 +299,17 @@ fun OrderDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .clickable(
+                                    enabled = customer != null,
+                                    role = Role.Button
+                                ) {
+                                    customer?.id?.let { cid ->
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onCustomerClick(cid)
+                                    }
+                                },
                             shape = RoundedCornerShape(999.dp),
                             color = appColors.softBlueBg
                         ) {
@@ -314,6 +332,14 @@ fun OrderDetailScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                                if (customer != null) {
+                                    Icon(
+                                        imageVector = TablerIcons.ChevronRight,
+                                        contentDescription = "Voir la fiche client",
+                                        tint = BrandText,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
                             }
                         }
 
@@ -699,7 +725,7 @@ fun OrderDetailScreen(
                     }
                 }
 
-                val triggerStatusChange: (String) -> Unit = { targetStatus ->
+                val proceedStatusChange: (String) -> Unit = { targetStatus ->
                     if (KlinUpRepository.requiresRemainingPayment(order, targetStatus)) {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         paymentPromptStatus = targetStatus
@@ -724,6 +750,19 @@ fun OrderDetailScreen(
                                 KlinUpRepository.notifyOrderReadyIfApplicable(context, order, targetStatus)
                             }
                         }
+                    }
+                }
+
+                val triggerStatusChange: (String) -> Unit = { targetStatus ->
+                    if (targetStatus == "a_livrer" && !KlinUpRepository.hasConfiguredDeliveryAddress(customer)) {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        if (customer != null) {
+                            showAddressPromptDialog = true
+                        } else {
+                            com.klinup.app.data.local.NetworkMonitor.showToast("Aucun compte client associé à cette commande.")
+                        }
+                    } else {
+                        proceedStatusChange(targetStatus)
                     }
                 }
 
@@ -891,6 +930,42 @@ fun OrderDetailScreen(
                             }
                         }
                     }
+
+                    if (KlinUpRepository.canShowLiveTrackingButton(order)) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .clickable(role = Role.Button) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showLiveTrackingDialog = true
+                                },
+                            shape = RoundedCornerShape(999.dp),
+                            color = appColors.softGreenBg,
+                            border = BorderStroke(1.dp, Color(0xFF16A34A).copy(alpha = 0.45f))
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = TablerIcons.MapPin,
+                                    contentDescription = "Suivi GPS",
+                                    tint = Color(0xFF15803D),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Suivi GPS en direct",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF15803D)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         } else {
@@ -934,6 +1009,43 @@ fun OrderDetailScreen(
                         )
                     }
                 }
+                val canTrackOrder = KlinUpRepository.canShowLiveTrackingButton(order)
+                if (canTrackOrder) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickable(role = Role.Button) {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showLiveTrackingDialog = true
+                            },
+                        shape = RoundedCornerShape(999.dp),
+                        color = appColors.softGreenBg,
+                        border = BorderStroke(1.dp, Color(0xFF16A34A).copy(alpha = 0.45f))
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = TablerIcons.MapPin,
+                                contentDescription = "Suivi GPS",
+                                tint = Color(0xFF15803D),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Suivi GPS en direct",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF15803D)
+                            )
+                        }
+                    }
+                }
             }
         }
         }
@@ -946,6 +1058,35 @@ fun OrderDetailScreen(
                     .padding(20.dp)
             )
         }
+    }
+
+    if (showLiveTrackingDialog) {
+        LiveTrackingDialog(
+            initialOrderId = order.id,
+            onDismiss = { showLiveTrackingDialog = false }
+        )
+    }
+
+    if (showAddressPromptDialog && customer != null) {
+        CustomerDeliveryAddressDialog(
+            customer = customer,
+            onDismiss = { showAddressPromptDialog = false },
+            onSavedAndContinue = {
+                showAddressPromptDialog = false
+                if (KlinUpRepository.requiresRemainingPayment(order, "a_livrer")) {
+                    paymentPromptStatus = "a_livrer"
+                } else {
+                    isUpdating = true
+                    scope.launch {
+                        val res = KlinUpRepository.updateOrderStatus(order.id, "a_livrer")
+                        isUpdating = false
+                        if (res.isSuccess) {
+                            KlinUpRepository.notifyOrderReadyIfApplicable(context, order, "a_livrer")
+                        }
+                    }
+                }
+            }
+        )
     }
 
     paymentPromptStatus?.let { targetStatus ->
@@ -976,6 +1117,10 @@ fun OrderDetailScreen(
                         } else {
                             KlinUpRepository.notifyOrderReadyIfApplicable(context, order, targetStatus)
                         }
+                    } else {
+                        com.klinup.app.data.local.NetworkMonitor.showToast(
+                            res.exceptionOrNull()?.message ?: "Impossible d'enregistrer le règlement."
+                        )
                     }
                 }
             }

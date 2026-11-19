@@ -1929,6 +1929,13 @@ function App() {
                 <span className="sidebar-nav-label">Gestion Commandes</span>
               </li>
 
+              <li className={`sidebar-nav-item${adminMenu === 'live_tracking' ? ' active' : ''}`}
+                onClick={() => selectMenu('live_tracking')}
+                data-tooltip="Suivi Live">
+                <div className="sidebar-nav-icon"><MIcon name="local_shipping" size={19} /></div>
+                <span className="sidebar-nav-label">Suivi Live</span>
+              </li>
+
               <li className={`sidebar-nav-item${adminMenu === 'crm_management' ? ' active' : ''}`}
                 onClick={() => selectMenu('crm_management')}
                 data-tooltip="Clients CRM">
@@ -2153,6 +2160,7 @@ function App() {
               {!hasAdminAccess && "Accès non autorisé"}
               {hasAdminAccess && adminMenu === 'dashboard' && "Tableau de Bord"}
               {hasAdminAccess && adminMenu === 'orders_management' && "Gestion des Commandes"}
+              {hasAdminAccess && adminMenu === 'live_tracking' && "Suivi Live Livreurs"}
               {hasAdminAccess && adminMenu === 'crm_management' && "Clients CRM"}
               {hasAdminAccess && adminMenu === 'catalog' && "Catalogue Tarifs"}
               {hasAdminAccess && adminMenu === 'expenses' && "Dépenses de la Laverie"}
@@ -2174,6 +2182,7 @@ function App() {
               {!hasAdminAccess && "Cet espace est restreint aux administrateurs."}
               {hasAdminAccess && adminMenu === 'dashboard' && "Suivi des indicateurs clés et productivité de la laverie."}
               {hasAdminAccess && adminMenu === 'orders_management' && "Enregistrement, suivi d'atelier et facturation des commandes."}
+              {hasAdminAccess && adminMenu === 'live_tracking' && "Localisation GPS en temps réel des livreurs (dépôts laverie et livraisons clients)."}
               {hasAdminAccess && adminMenu === 'crm_management' && "Fiches clients, encours financiers et fidélité."}
               {hasAdminAccess && adminMenu === 'catalog' && "Gestion de la grille de prix de traitement de laverie B2B."}
               {hasAdminAccess && adminMenu === 'laundry_points' && "Gestion des différents points de vente, boutiques et ateliers de laverie."}

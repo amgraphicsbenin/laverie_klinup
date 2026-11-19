@@ -130,6 +130,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation(libs.play.services.location)
 
     // Ktor & Supabase Kotlin SDK
     implementation(libs.ktor.client.android)

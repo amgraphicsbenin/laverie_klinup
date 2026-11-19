@@ -410,6 +410,19 @@ export async function loadAuthenticatedBusinessData(): Promise<void> {
     }
 
     try {
+      const { data: trkData, error: trkErr } = await supabase
+        .from('order_tracking_sessions')
+        .select('*')
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false });
+      if (!trkErr && trkData) {
+        memoryDb.order_tracking_sessions = trkData;
+      }
+    } catch (e) {
+      // Ignorer si la table n'existe pas encore
+    }
+
+    try {
       const { data: rData, error: rErr } = await supabase.from('roles').select('*').order('created_at', { ascending: true });
       if (!rErr) {
         memoryDb.roles = (rData || []).map((r: any) => ({
@@ -707,7 +720,7 @@ export function setupRealtime(): void {
     try { supabase.removeChannel(activeRealtimeChannel); } catch (e) { }
   }
 
-  const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores', 'roles', 'reward_point_adjustments', 'expenses'];
+  const tables = ['staff', 'customers', 'orders', 'activity_logs', 'catalog', 'pin_reset_requests', 'stores', 'roles', 'reward_point_adjustments', 'expenses', 'order_tracking_sessions'];
   let channel = supabase.channel('admin_global_realtime');
 
   tables.forEach(table => {
@@ -723,6 +736,10 @@ export function setupRealtime(): void {
       else if (table === 'pin_reset_requests') targetList = memoryDb.pin_reset_requests;
       else if (table === 'stores') targetList = memoryDb.stores;
       else if (table === 'roles') targetList = memoryDb.roles;
+      else if (table === 'order_tracking_sessions') {
+        if (!memoryDb.order_tracking_sessions) memoryDb.order_tracking_sessions = [];
+        targetList = memoryDb.order_tracking_sessions;
+      }
       else if (table === 'reward_point_adjustments') {
         if (!memoryDb.reward_point_adjustments) memoryDb.reward_point_adjustments = [];
         targetList = memoryDb.reward_point_adjustments;

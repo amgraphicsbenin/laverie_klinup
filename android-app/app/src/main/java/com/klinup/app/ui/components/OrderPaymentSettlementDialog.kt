@@ -56,18 +56,25 @@ fun OrderPaymentSettlementDialog(
     onConfirm: (amountPaid: Double, paymentMethod: String, momoRef: String?, momoOperator: String?) -> Unit
 ) {
     val colors = MaterialTheme.klinUpColors
-    val remaining = (order.prixTotal - order.avancePayee).coerceAtLeast(0.0)
-    var amountText by remember(order.id) { mutableStateOf(remaining.roundToInt().toString()) }
-    var paymentMethod by remember(order.id) { mutableStateOf("especes") }
-    var momoOperator by remember(order.id) { mutableStateOf("MTN") }
-    var momoRef by remember(order.id) { mutableStateOf("") }
-    var errorMessage by remember(order.id) { mutableStateOf<String?>(null) }
+    val isSubscriptionOrder = order.isSubscriptionOrder || order.modeReglement.equals("abonnement", ignoreCase = true)
+    val baseRemaining = if (isSubscriptionOrder) 0.0 else (order.prixTotal - order.avancePayee).coerceAtLeast(0.0)
+    val isDeliveryFeeRequired = KlinUpRepository.requiresDeliveryFeeOnCompletion(order, targetStatus)
+    val suggestedDeliveryFee = if (isDeliveryFeeRequired) KlinUpRepository.suggestedDeliveryFeeForOrder(order) else 0.0
+    val totalRequired = baseRemaining + suggestedDeliveryFee
 
-    val actionTitle = when (targetStatus) {
-        "a_recuperer" -> "Règlement avant retrait sur place"
-        "a_livrer" -> "Règlement pour mise en livraison"
-        "en_cours_livraison" -> "Règlement avant départ livraison"
-        "restitue" -> "Règlement du solde à la remise"
+    var amountText by remember(order.id, targetStatus) { mutableStateOf(totalRequired.roundToInt().toString()) }
+    var paymentMethod by remember(order.id, targetStatus) { mutableStateOf("especes") }
+    var momoOperator by remember(order.id, targetStatus) { mutableStateOf("MTN") }
+    var momoRef by remember(order.id, targetStatus) { mutableStateOf("") }
+    var errorMessage by remember(order.id, targetStatus) { mutableStateOf<String?>(null) }
+
+    val actionTitle = when {
+        isDeliveryFeeRequired && baseRemaining > 0.0 -> "Règlement solde & frais de livraison"
+        isDeliveryFeeRequired -> "Paiement des frais de livraison"
+        targetStatus == "a_recuperer" -> "Règlement avant retrait sur place"
+        targetStatus == "a_livrer" -> "Règlement pour mise en livraison"
+        targetStatus == "en_cours_livraison" -> "Règlement avant départ livraison"
+        targetStatus == "restitue" -> "Règlement du solde à la remise"
         else -> "Règlement du reste à payer"
     }
 
@@ -117,12 +124,31 @@ fun OrderPaymentSettlementDialog(
                             Text("Déjà payé :", fontSize = 12.sp, color = colors.inkSecondary)
                             Text(KlinUpRepository.formatFcfa(order.avancePayee), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.inkPrimary)
                         }
+                        if (isDeliveryFeeRequired) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Frais de livraison (à régler) :", fontSize = 12.sp, color = colors.inkSecondary)
+                                Text(
+                                    text = if (suggestedDeliveryFee > 0.0) KlinUpRepository.formatFcfa(suggestedDeliveryFee) else "À saisir (> 0 F)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.amberText
+                                )
+                            }
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Reste à payer :", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.amberText)
-                            Text(KlinUpRepository.formatFcfa(remaining), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = colors.amberText)
+                            Text(
+                                text = if (isDeliveryFeeRequired) "Total à encaisser :" else "Reste à payer :",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.amberText
+                            )
+                            Text(KlinUpRepository.formatFcfa(totalRequired), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = colors.amberText)
                         }
                     }
                 }
@@ -243,8 +269,12 @@ fun OrderPaymentSettlementDialog(
                         errorMessage = "Veuillez saisir le montant encaissé."
                         return@Button
                     }
-                    if (paidVal < remaining) {
-                        errorMessage = "Le règlement complet de ${KlinUpRepository.formatFcfa(remaining)} est requis."
+                    if (paidVal < baseRemaining) {
+                        errorMessage = "Le règlement complet de ${KlinUpRepository.formatFcfa(baseRemaining)} est requis."
+                        return@Button
+                    }
+                    if (isDeliveryFeeRequired && paidVal <= baseRemaining) {
+                        errorMessage = "Veuillez inclure les frais de livraison (> 0 FCFA)."
                         return@Button
                     }
                     if (paymentMethod == "mobile_money") {

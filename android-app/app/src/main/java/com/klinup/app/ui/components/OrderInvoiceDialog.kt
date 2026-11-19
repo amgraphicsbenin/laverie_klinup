@@ -332,7 +332,7 @@ fun OrderInvoiceDialog(
                                 if (isExpress) {
                                     InvoiceAmountRow("Majoration Express :", "Inclus", Color(0xFFD97706), true)
                                 }
-                                if (order.fraisLivraison > 0.0) {
+                                if (order.fraisLivraison > 0.0 && !KlinUpRepository.hasFreeDeliverySubscription(order)) {
                                     InvoiceAmountRow("Frais de livraison :", "+${KlinUpRepository.formatFcfa(order.fraisLivraison)}", Color(0xFF2563EB), true)
                                 }
 
@@ -564,7 +564,7 @@ fun printOrderInvoice(
             <div style="margin-top:12px;">
               <div class="row"><span>Total Brut :</span><strong>${itemsSum.roundToInt()} FCFA</strong></div>
               ${if (order.niveauUrgence.equals("Express", true)) """<div class="row" style="color:#d97706;"><span>Majoration Express :</span><strong>Inclus</strong></div>""" else ""}
-              ${if (order.fraisLivraison > 0.0) """<div class="row" style="color:#2563eb;"><span>Frais de livraison :</span><strong>+${order.fraisLivraison.roundToInt()} FCFA</strong></div>""" else ""}
+              ${if (order.fraisLivraison > 0.0 && !KlinUpRepository.hasFreeDeliverySubscription(order)) """<div class="row" style="color:#2563eb;"><span>Frais de livraison :</span><strong>+${order.fraisLivraison.roundToInt()} FCFA</strong></div>""" else ""}
               <div class="net"><span>Net à payer :</span><span>${if (order.isSubscriptionOrder) "0 FCFA (Abonnement)" else "${netPrice.roundToInt()} FCFA"}</span></div>
               ${if (!order.isSubscriptionOrder) """
                 <div class="row" style="color:#002cf7;"><span>Acompte Payé :</span><strong>${paidAmount.roundToInt()} FCFA</strong></div>

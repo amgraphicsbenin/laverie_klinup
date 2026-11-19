@@ -18,7 +18,8 @@ data class SubscriptionDetails(
     @SerialName("vetements_utilises") val vetementsUtilises: Int? = null,
     @SerialName("vetements_inclus") val vetementsInclus: Int? = null,
     @SerialName("used_clothes") val usedClothes: Int? = null,
-    @SerialName("total_clothes") val totalClothes: Int? = null
+    @SerialName("total_clothes") val totalClothes: Int? = null,
+    @SerialName("livraison_gratuite") val livraisonGratuite: Boolean = false
 )
 
 @Serializable
@@ -45,6 +46,8 @@ data class Order(
     @SerialName("store_id") val storeId: String? = null,
     @SerialName("frais_livraison") val fraisLivraison: Double = 0.0,
     @SerialName("livraison_domicile") val livraisonDomicile: Boolean = false,
+    @SerialName("frais_recuperation") val fraisRecuperation: Double = 0.0,
+    @SerialName("with_pickup") val withPickup: Boolean = false,
     @SerialName("deleted_at") val deletedAt: String? = null
 ) {
     val displayNumber: String

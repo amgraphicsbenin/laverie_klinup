@@ -167,6 +167,22 @@ object AppPreferences {
         _avatarVersion.value++
     }
 
+    private fun offlineCacheFile(userId: String): File = File(filesDir, "offline_cache_$userId.json")
+
+    fun saveOfflineCache(userId: String, jsonPayload: String) {
+        if (userId.isBlank() || !::filesDir.isInitialized) return
+        runCatching {
+            offlineCacheFile(userId).writeText(jsonPayload)
+        }
+    }
+
+    fun loadOfflineCache(userId: String): String? {
+        if (userId.isBlank() || !::filesDir.isInitialized) return null
+        val f = offlineCacheFile(userId)
+        if (!f.exists()) return null
+        return runCatching { f.readText() }.getOrNull()
+    }
+
     private fun compressAvatarBytes(rawBytes: ByteArray): ByteArray? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, bounds)

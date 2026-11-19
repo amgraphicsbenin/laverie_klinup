@@ -14,6 +14,8 @@ data class CatalogItem(
     @SerialName("store_id") val storeId: String? = null,
     @SerialName("nombre_vetements") val nombreVetements: Int? = null,
     @SerialName("duree_jours") val dureeJours: Int? = null,
+    @SerialName("ramassage_gratuit") val ramassageGratuit: Boolean = false,
+    @SerialName("livraison_gratuite") val livraisonGratuite: Boolean = false,
     @SerialName("is_active") val isActive: Boolean? = true,
     val statut: String? = null
 )

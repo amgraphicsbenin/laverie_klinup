@@ -65,47 +65,41 @@ object NavMotion {
         val toTab = tabIndex(to)
 
         return when {
-            // Peer bottom-bar tab switch: subtle directional shared-axis slide + fade
+            // Peer bottom-bar tab switch: ultra-snappy 160ms directional slide + fade
             fromTab >= 0 && toTab >= 0 -> {
                 val direction = if (toTab >= fromTab) 1 else -1
                 slideInHorizontally(
-                    animationSpec = tween(durationMillis = 260, easing = EmphasizedDecelerate),
-                    initialOffsetX = { fullWidth -> direction * (fullWidth * 0.14f).roundToInt() }
+                    animationSpec = tween(durationMillis = 160, easing = EmphasizedDecelerate),
+                    initialOffsetX = { fullWidth -> direction * (fullWidth * 0.06f).roundToInt() }
                 ) + fadeIn(
-                    animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 140, easing = LinearOutSlowInEasing)
                 )
             }
-            // Entering a detail screen: crisp native push from right + subtle lift scale
+            // Entering a detail screen: crisp 200ms native push from right (no heavy double-scale)
             isDetailRoute(to) -> {
                 slideInHorizontally(
-                    animationSpec = tween(durationMillis = 320, easing = EmphasizedDecelerate),
-                    initialOffsetX = { fullWidth -> (fullWidth * 0.28f).roundToInt() }
-                ) + scaleIn(
-                    initialScale = 0.96f,
-                    animationSpec = tween(durationMillis = 320, easing = EmphasizedDecelerate)
+                    animationSpec = tween(durationMillis = 200, easing = EmphasizedDecelerate),
+                    initialOffsetX = { fullWidth -> (fullWidth * 0.22f).roundToInt() }
                 ) + fadeIn(
-                    animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 160, easing = LinearOutSlowInEasing)
                 )
             }
             // Login -> Home reveal
             from == Screen.Login.route -> {
                 scaleIn(
-                    initialScale = 0.94f,
-                    animationSpec = tween(durationMillis = 360, easing = EmphasizedDecelerate)
+                    initialScale = 0.96f,
+                    animationSpec = tween(durationMillis = 220, easing = EmphasizedDecelerate)
                 ) + fadeIn(
-                    animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing)
                 )
             }
             // Returning to Login (logout)
             to == Screen.Login.route -> {
-                scaleIn(
-                    initialScale = 1.04f,
-                    animationSpec = tween(durationMillis = 300, easing = EmphasizedDecelerate)
-                ) + fadeIn(
-                    animationSpec = tween(durationMillis = 260, easing = LinearOutSlowInEasing)
+                fadeIn(
+                    animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing)
                 )
             }
-            else -> fadeIn(tween(240, easing = EmphasizedDecelerate))
+            else -> fadeIn(tween(160, easing = EmphasizedDecelerate))
         }
     }
 
@@ -121,37 +115,28 @@ object NavMotion {
             fromTab >= 0 && toTab >= 0 -> {
                 val direction = if (toTab >= fromTab) 1 else -1
                 slideOutHorizontally(
-                    animationSpec = tween(durationMillis = 260, easing = EmphasizedAccelerate),
-                    targetOffsetX = { fullWidth -> -direction * (fullWidth * 0.10f).roundToInt() }
+                    animationSpec = tween(durationMillis = 160, easing = EmphasizedAccelerate),
+                    targetOffsetX = { fullWidth -> -direction * (fullWidth * 0.05f).roundToInt() }
                 ) + fadeOut(
-                    animationSpec = tween(durationMillis = 220, delayMillis = 40)
+                    animationSpec = tween(durationMillis = 130)
                 )
             }
-            // Parent recedes gently when pushing a detail route
+            // Parent recedes smoothly when pushing a detail route
             isDetailRoute(to) -> {
                 slideOutHorizontally(
-                    animationSpec = tween(durationMillis = 300, easing = EmphasizedDecelerate),
-                    targetOffsetX = { fullWidth -> -(fullWidth * 0.10f).roundToInt() }
-                ) + scaleOut(
-                    targetScale = 0.96f,
-                    animationSpec = tween(durationMillis = 300, easing = EmphasizedDecelerate)
+                    animationSpec = tween(durationMillis = 190, easing = EmphasizedDecelerate),
+                    targetOffsetX = { fullWidth -> -(fullWidth * 0.08f).roundToInt() }
                 ) + fadeOut(
-                    animationSpec = tween(durationMillis = 240, delayMillis = 40)
+                    animationSpec = tween(durationMillis = 160)
                 )
             }
             from == Screen.Login.route -> {
-                scaleOut(
-                    targetScale = 1.04f,
-                    animationSpec = tween(durationMillis = 280, easing = EmphasizedAccelerate)
-                ) + fadeOut(tween(durationMillis = 220, delayMillis = 40))
+                fadeOut(tween(durationMillis = 160))
             }
             to == Screen.Login.route -> {
-                scaleOut(
-                    targetScale = 0.94f,
-                    animationSpec = tween(durationMillis = 260, easing = EmphasizedAccelerate)
-                ) + fadeOut(tween(durationMillis = 220, delayMillis = 40))
+                fadeOut(tween(durationMillis = 160))
             }
-            else -> fadeOut(tween(durationMillis = 220, delayMillis = 40))
+            else -> fadeOut(tween(durationMillis = 150))
         }
     }
 
@@ -166,17 +151,14 @@ object NavMotion {
         return when {
             isDetailRoute(from) -> {
                 slideInHorizontally(
-                    animationSpec = tween(durationMillis = 300, easing = EmphasizedDecelerate),
-                    initialOffsetX = { fullWidth -> -(fullWidth * 0.10f).roundToInt() }
-                ) + scaleIn(
-                    initialScale = 0.96f,
-                    animationSpec = tween(durationMillis = 300, easing = EmphasizedDecelerate)
+                    animationSpec = tween(durationMillis = 190, easing = EmphasizedDecelerate),
+                    initialOffsetX = { fullWidth -> -(fullWidth * 0.08f).roundToInt() }
                 ) + fadeIn(
-                    animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 150, easing = LinearOutSlowInEasing)
                 )
             }
             fromTab >= 0 && toTab >= 0 -> enterTransition(scope)
-            else -> fadeIn(tween(240, easing = EmphasizedDecelerate))
+            else -> fadeIn(tween(160, easing = EmphasizedDecelerate))
         }
     }
 
@@ -191,17 +173,14 @@ object NavMotion {
         return when {
             isDetailRoute(from) -> {
                 slideOutHorizontally(
-                    animationSpec = tween(durationMillis = 260, easing = EmphasizedAccelerate),
-                    targetOffsetX = { fullWidth -> (fullWidth * 0.30f).roundToInt() }
-                ) + scaleOut(
-                    targetScale = 0.96f,
-                    animationSpec = tween(durationMillis = 260, easing = EmphasizedAccelerate)
+                    animationSpec = tween(durationMillis = 180, easing = EmphasizedAccelerate),
+                    targetOffsetX = { fullWidth -> (fullWidth * 0.24f).roundToInt() }
                 ) + fadeOut(
-                    animationSpec = tween(durationMillis = 220, delayMillis = 40)
+                    animationSpec = tween(durationMillis = 150)
                 )
             }
             fromTab >= 0 && toTab >= 0 -> exitTransition(scope)
-            else -> fadeOut(tween(durationMillis = 220, delayMillis = 40))
+            else -> fadeOut(tween(durationMillis = 150))
         }
     }
 }

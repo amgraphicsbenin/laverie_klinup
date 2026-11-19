@@ -5,6 +5,7 @@ import OrderFormModal from '../features/orders/components/OrderFormModal';
 import SubscriptionPaymentModal from './SubscriptionPaymentModal';
 import ValidationsTab from '../features/validations/components/ValidationsTab';
 import ExpensesTab from '../features/expenses/components/ExpensesTab';
+import { LiveTrackingTab } from '../features/tracking/components/LiveTrackingTab';
 
 const ModalPortal = ({ children }) => {
   if (typeof document === 'undefined') return children;
@@ -133,6 +134,14 @@ export default function AdminView({ activeTab, onManageStaff }) {
 
   // Flow de Livraison / Paiement Final
   const [showDeliveryPaymentModal, setShowDeliveryPaymentModal] = useState(false);
+  const [liveTrackOrderId, setLiveTrackOrderId] = useState(null);
+  const [deliveryAddressPrompt, setDeliveryAddressPrompt] = useState(null); // { order, nextStatus, customer }
+  const [addrModalAdresse, setAddrModalAdresse] = useState('');
+  const [addrModalQuartier, setAddrModalQuartier] = useState('');
+  const [addrModalVille, setAddrModalVille] = useState('Cotonou');
+  const [addrModalLat, setAddrModalLat] = useState('');
+  const [addrModalLng, setAddrModalLng] = useState('');
+  const [addrModalSaving, setAddrModalSaving] = useState(false);
   const [delivOrder, setDelivOrder] = useState(null);
   const [delivPaymentMethod, setDelivPaymentMethod] = useState('especes');
   const [delivAmountPaid, setDelivAmountPaid] = useState('');
@@ -2231,14 +2240,34 @@ export default function AdminView({ activeTab, onManageStaff }) {
     }
   };
 
+  const requiresDeliveryFeeOnCompletion = (order, finalStatus) => {
+    if (!order || finalStatus !== 'restitue') return false;
+    if (!['a_livrer', 'en_cours_livraison'].includes(order.statut)) return false;
+    if (db.hasFreeDeliverySubscription(order)) return false;
+    return !order.livraison_domicile && !order.with_delivery && Number(order.frais_livraison || 0) <= 0;
+  };
+
+  const getSuggestedDeliveryFee = (order) => {
+    if (!order) return 0;
+    const customer = customers.find(c => c.id === order.customer_id);
+    const res = db.calculateDeliveryFee(
+      order.store_id || selectedStoreId || '',
+      customer?.coordonnees_livraison || null,
+      customer?.latitude ?? null,
+      customer?.longitude ?? null
+    );
+    return Number(res?.fee || 0);
+  };
+
   const handleStartDelivery = async (order, finalStatus = 'restitue') => {
     setDelivFinalStatus(finalStatus);
     const total = Number(order.prix_total || order.total || 0);
     const avance = Number(order.avance_payee || order.avance || 0);
     const remainingToPay = Math.max(0, total - avance);
     const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
+    const deliveryFeeRequired = requiresDeliveryFeeOnCompletion(order, finalStatus);
 
-    if (remainingToPay <= 0 || isSubscriptionOrder) {
+    if (!deliveryFeeRequired && (remainingToPay <= 0 || isSubscriptionOrder)) {
       if (await confirm(`Confirmer le passage de la commande ${order.identifiant_unique_marquage} vers le statut "${getOrderStatusLabel(finalStatus)}"?`)) {
         try {
           await db.updateOrderStatus(order.id, finalStatus);
@@ -2262,9 +2291,11 @@ export default function AdminView({ activeTab, onManageStaff }) {
         }
       }
     } else {
+      const baseRemaining = isSubscriptionOrder ? 0 : remainingToPay;
+      const suggestedFee = deliveryFeeRequired ? getSuggestedDeliveryFee(order) : 0;
       setDelivOrder(order);
       setDelivPaymentMethod('especes');
-      setDelivAmountPaid(remainingToPay.toString());
+      setDelivAmountPaid((baseRemaining + suggestedFee).toString());
       setShowDeliveryPaymentModal(true);
     }
   };
@@ -2272,6 +2303,26 @@ export default function AdminView({ activeTab, onManageStaff }) {
   const handleConfirmDelivery = async (e) => {
     e.preventDefault();
     if (!delivOrder) return;
+
+    const paidVal = Number(delivAmountPaid || 0);
+    const isSubscriptionOrder = !!delivOrder.is_subscription_order || delivOrder.mode_reglement === 'abonnement' || delivOrder.pay_with_subscription;
+    const baseRemaining = isSubscriptionOrder
+      ? 0
+      : Math.max(0, Number(delivOrder.prix_total || delivOrder.total || 0) - Number(delivOrder.avance_payee || delivOrder.avance || 0));
+    const deliveryFeeRequired = requiresDeliveryFeeOnCompletion(delivOrder, delivFinalStatus);
+
+    if (paidVal <= 0) {
+      alert("Veuillez saisir le montant encaissé.");
+      return;
+    }
+    if (paidVal < baseRemaining) {
+      alert(`Le règlement complet de ${baseRemaining} FCFA est requis.`);
+      return;
+    }
+    if (deliveryFeeRequired && paidVal <= baseRemaining) {
+      alert("Veuillez inclure les frais de livraison (> 0 FCFA) avant de terminer la livraison.");
+      return;
+    }
 
     if (delivPaymentMethod === 'mobile_money') {
       const ref = momoRefNumber.trim();
@@ -2349,9 +2400,89 @@ export default function AdminView({ activeTab, onManageStaff }) {
     }
   };
 
-  const handleStatusChange = async (orderId, nextStatus) => {
+  const getCustomerResolvedCoords = (customer) => {
+    if (!customer) return null;
+    let lat = customer.latitude != null ? Number(customer.latitude) : null;
+    let lng = customer.longitude != null ? Number(customer.longitude) : null;
+    if ((lat == null || lng == null || isNaN(lat) || isNaN(lng)) && customer.coordonnees_livraison) {
+      const parts = String(customer.coordonnees_livraison).split(',');
+      if (parts.length >= 2) {
+        const pLat = parseFloat(parts[0]);
+        const pLng = parseFloat(parts[1]);
+        if (!isNaN(pLat) && !isNaN(pLng)) {
+          lat = pLat;
+          lng = pLng;
+        }
+      }
+    }
+    if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return null;
+    return { lat, lng };
+  };
+
+  const hasConfiguredDeliveryAddress = (customer) => {
+    return !!getCustomerResolvedCoords(customer);
+  };
+
+  const openDeliveryAddressPrompt = (order, nextStatus, customer) => {
+    const resolved = getCustomerResolvedCoords(customer);
+    setAddrModalAdresse(customer?.adresse || '');
+    setAddrModalQuartier(customer?.quartier || '');
+    setAddrModalVille(customer?.ville || 'Cotonou');
+    setAddrModalLat(resolved ? String(resolved.lat) : '');
+    setAddrModalLng(resolved ? String(resolved.lng) : '');
+    setDeliveryAddressPrompt({ order, nextStatus, customer });
+  };
+
+  const handleSaveDeliveryAddressPrompt = async (e) => {
+    e.preventDefault();
+    if (!deliveryAddressPrompt?.customer) return;
+    const cleanAddr = addrModalAdresse.trim();
+    const lat = parseFloat(String(addrModalLat).replace(',', '.').trim());
+    const lng = parseFloat(String(addrModalLng).replace(',', '.').trim());
+    if (!cleanAddr) {
+      alert("Veuillez saisir l'adresse de livraison du client.");
+      return;
+    }
+    if (isNaN(lat) || isNaN(lng)) {
+      alert("Veuillez définir les coordonnées GPS (Latitude et Longitude) du client.");
+      return;
+    }
+    setAddrModalSaving(true);
+    try {
+      await db.updateCustomer(deliveryAddressPrompt.customer.id, {
+        adresse: cleanAddr,
+        quartier: addrModalQuartier.trim() || undefined,
+        ville: addrModalVille.trim() || 'Cotonou',
+        latitude: lat,
+        longitude: lng,
+        coordonnees_livraison: `${lat},${lng}`
+      });
+      refreshAdminData();
+      const { order, nextStatus } = deliveryAddressPrompt;
+      setDeliveryAddressPrompt(null);
+      await handleStatusChange(order.id, nextStatus, true);
+    } catch (err) {
+      alert("Erreur lors de l'enregistrement de l'adresse : " + err.message);
+    } finally {
+      setAddrModalSaving(false);
+    }
+  };
+
+  const handleStatusChange = async (orderId, nextStatus, skipAddressCheck = false) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
+
+    if (nextStatus === 'a_livrer' && !skipAddressCheck) {
+      const orderCustomer = customers.find(c => c.id === order.customer_id);
+      if (!hasConfiguredDeliveryAddress(orderCustomer)) {
+        if (!orderCustomer) {
+          alert("Aucun compte client associé à cette commande pour configurer l'adresse de livraison.");
+          return;
+        }
+        openDeliveryAddressPrompt(order, nextStatus, orderCustomer);
+        return;
+      }
+    }
 
     const total = Number(order.prix_total || order.total || 0);
     const avance = Number(order.avance_payee || order.avance || 0);
@@ -2359,8 +2490,9 @@ export default function AdminView({ activeTab, onManageStaff }) {
     const isSubscriptionOrder = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || order.pay_with_subscription;
 
     const requiresLavageOrBeyond = ['en_cours_lavage', 'en_cours_repassage', 'pret', 'a_livrer', 'a_recuperer', 'en_cours_livraison', 'restitue'].includes(nextStatus);
+    const deliveryFeeRequired = requiresDeliveryFeeOnCompletion(order, nextStatus);
 
-    if (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder) {
+    if (deliveryFeeRequired || (requiresLavageOrBeyond && remainingToPay > 0 && !isSubscriptionOrder)) {
       handleStartDelivery(order, nextStatus);
       return;
     }
@@ -2571,6 +2703,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           setHistoryFilterStatus={setHistoryFilterStatus}
           getOrderStatusLabel={getOrderStatusLabel}
           setCreatedOrder={setCreatedOrder}
+          onTrackOrder={(order) => setLiveTrackOrderId(String(order.id))}
         />
       )}
 
@@ -2609,6 +2742,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
           serviceLabels={serviceLabels}
           getOrderStatusLabel={getOrderStatusLabel}
           setCreatedOrder={setCreatedOrder}
+          onTrackOrder={(order) => setLiveTrackOrderId(String(order.id))}
         />
       )}
 
@@ -2762,6 +2896,165 @@ export default function AdminView({ activeTab, onManageStaff }) {
          ======================================================== */}
       {activeTab === 'expenses' && (
         <ExpensesTab currentUser={currentUser} stores={stores} />
+      )}
+
+      {activeTab === 'live_tracking' && (
+        <LiveTrackingTab
+          orders={orders}
+          stores={stores}
+          activeStoreId={selectedStoreId}
+        />
+      )}
+
+      {deliveryAddressPrompt && (
+        <ModalPortal>
+          <div className="modal-backdrop" style={{ zIndex: 2550, padding: '1rem' }} onClick={() => !addrModalSaving && setDeliveryAddressPrompt(null)}>
+            <div className="modal-content" style={{ maxWidth: '480px', padding: '1.5rem' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Fiche client • Adresse de livraison requise</h3>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {deliveryAddressPrompt.customer?.prenom} {deliveryAddressPrompt.customer?.nom} ({deliveryAddressPrompt.customer?.telephone})
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !addrModalSaving && setDeliveryAddressPrompt(null)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-muted)' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div style={{ fontSize: '0.8rem', padding: '0.65rem 0.8rem', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.35)', color: '#b45309', marginBottom: '1rem' }}>
+                Veuillez définir l'adresse et la position GPS du client pour passer la commande à « Prêt pour livraison » et tracer l'itinéraire.
+              </div>
+
+              <form onSubmit={handleSaveDeliveryAddressPrompt} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label>Adresse de livraison / Repère *</label>
+                  <input
+                    type="text"
+                    className="input-control"
+                    required
+                    value={addrModalAdresse}
+                    onChange={(e) => setAddrModalAdresse(e.target.value)}
+                    placeholder="Ex: Rue des Palmiers Carré 140..."
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                  <div className="form-group">
+                    <label>Quartier</label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      value={addrModalQuartier}
+                      onChange={(e) => setAddrModalQuartier(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Ville</label>
+                    <input
+                      type="text"
+                      className="input-control"
+                      value={addrModalVille}
+                      onChange={(e) => setAddrModalVille(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                  <div className="form-group">
+                    <label>Latitude *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input-control"
+                      required
+                      value={addrModalLat}
+                      onChange={(e) => setAddrModalLat(e.target.value)}
+                      placeholder="6.3703"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Longitude *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input-control"
+                      required
+                      value={addrModalLng}
+                      onChange={(e) => setAddrModalLng(e.target.value)}
+                      placeholder="2.3912"
+                    />
+                  </div>
+                </div>
+
+                {typeof navigator !== 'undefined' && navigator.geolocation && (
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => {
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          setAddrModalLat(pos.coords.latitude.toFixed(6));
+                          setAddrModalLng(pos.coords.longitude.toFixed(6));
+                        },
+                        () => alert("Impossible de récupérer votre position GPS.")
+                      );
+                    }}
+                  >
+                    Capturer ma position GPS actuelle
+                  </button>
+                )}
+
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem' }}>
+                  <button type="submit" className="btn btn-primary" disabled={addrModalSaving} style={{ flex: 1 }}>
+                    {addrModalSaving ? 'Enregistrement...' : 'Enregistrer & Continuer'}
+                  </button>
+                  <button type="button" className="btn btn-outline" disabled={addrModalSaving} onClick={() => setDeliveryAddressPrompt(null)}>
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {liveTrackOrderId && (
+        <ModalPortal>
+          <div className="modal-backdrop" style={{ zIndex: 2500, padding: '1.25rem' }} onClick={() => setLiveTrackOrderId(null)}>
+            <div
+              className="modal-content"
+              style={{
+                width: '94vw',
+                maxWidth: '1120px',
+                height: '88vh',
+                maxHeight: '860px',
+                padding: 0,
+                overflow: 'hidden',
+                borderRadius: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.24)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <LiveTrackingTab
+                orders={orders}
+                stores={stores}
+                customers={customers}
+                staff={staff}
+                activeStoreId={selectedStoreId}
+                initialOrderId={liveTrackOrderId}
+                isModal
+                onClose={() => setLiveTrackOrderId(null)}
+              />
+            </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================
@@ -4273,15 +4566,30 @@ export default function AdminView({ activeTab, onManageStaff }) {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '10px' }}>
-                <div>Code: <strong>{delivOrder.identifiant_unique_marquage}</strong></div>
-                <div>Prix Total: <strong>{delivOrder.prix_total} F</strong></div>
-                <div>Acompte déjà payé: <strong style={{ color: 'var(--success)' }}>{delivOrder.avance_payee} F</strong></div>
-                <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span>Reste à payer:</span>
-                  <strong style={{ color: 'var(--accent)' }}>{delivOrder.prix_total - delivOrder.avance_payee} FCFA</strong>
-                </div>
-              </div>
+              {(() => {
+                const isSub = !!delivOrder.is_subscription_order || delivOrder.mode_reglement === 'abonnement' || delivOrder.pay_with_subscription;
+                const baseRemaining = isSub ? 0 : Math.max(0, Number(delivOrder.prix_total || delivOrder.total || 0) - Number(delivOrder.avance_payee || delivOrder.avance || 0));
+                const deliveryFeeRequired = requiresDeliveryFeeOnCompletion(delivOrder, delivFinalStatus);
+                const suggestedFee = deliveryFeeRequired ? getSuggestedDeliveryFee(delivOrder) : 0;
+                const totalToCollect = baseRemaining + suggestedFee;
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', background: 'var(--bg-app)', padding: '0.75rem', borderRadius: '10px' }}>
+                    <div>Code: <strong>{delivOrder.identifiant_unique_marquage}</strong></div>
+                    <div>Prix Total: <strong>{delivOrder.prix_total} F</strong></div>
+                    <div>Acompte déjà payé: <strong style={{ color: 'var(--success)' }}>{delivOrder.avance_payee} F</strong></div>
+                    {deliveryFeeRequired && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--warning)' }}>
+                        <span>Frais de livraison (à régler):</span>
+                        <strong>{suggestedFee > 0 ? `${suggestedFee} F` : 'À saisir (> 0 F)'}</strong>
+                      </div>
+                    )}
+                    <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span>{deliveryFeeRequired ? 'Total à encaisser:' : 'Reste à payer:'}</span>
+                      <strong style={{ color: 'var(--accent)' }}>{totalToCollect} FCFA</strong>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <form onSubmit={handleConfirmDelivery} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div className="form-group">
@@ -4301,7 +4609,8 @@ export default function AdminView({ activeTab, onManageStaff }) {
                   <input
                     type="number"
                     className="input-control"
-                    max={delivOrder.prix_total - delivOrder.avance_payee}
+                    min={1}
+                    max={requiresDeliveryFeeOnCompletion(delivOrder, delivFinalStatus) ? undefined : Math.max(0, Number(delivOrder.prix_total || delivOrder.total || 0) - Number(delivOrder.avance_payee || delivOrder.avance || 0))}
                     required
                     value={delivAmountPaid}
                     onChange={(e) => setDelivAmountPaid(e.target.value)}
@@ -4599,7 +4908,7 @@ export default function AdminView({ activeTab, onManageStaff }) {
                           </div>
                         )}
 
-                        {fraisLivraison > 0 && (
+                        {fraisLivraison > 0 && !db.hasFreeDeliverySubscription(createdOrder) && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#2563eb' }}>
                             <span style={{ fontWeight: '600' }}>Frais de livraison :</span>
                             <span style={{ fontWeight: '700' }}>

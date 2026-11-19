@@ -114,7 +114,8 @@ export default function OrdersTab({
   historyFilterStatus = 'all',
   setHistoryFilterStatus,
   getOrderStatusLabel,
-  setCreatedOrder
+  setCreatedOrder,
+  onTrackOrder
 }) {
   // Local state
   const [expandedOrderId, setExpandedOrderId] = useState(null);
@@ -1204,7 +1205,7 @@ export default function OrdersTab({
                                       </div>
                                     )}
 
-                                    {Number(order.frais_livraison || 0) > 0 && (
+                                    {Number(order.frais_livraison || 0) > 0 && !db.hasFreeDeliverySubscription(order) && (
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#3b82f6' }}>
                                         <span style={{ whiteSpace: 'nowrap' }}>Frais de Livraison{order.distance_km ? ` (${order.distance_km} km)` : ''} :</span>
                                         <strong>+{Number(order.frais_livraison).toLocaleString()} FCFA</strong>
@@ -1424,6 +1425,31 @@ export default function OrdersTab({
                 if (setCreatedOrder) setCreatedOrder(order);
               }}
             />
+
+            {(() => {
+              const hasActiveTracking = (db.getTrackingSessions ? db.getTrackingSessions(true) : []).some(
+                (s) => String(s.order_id) === String(order.id)
+              );
+              const isDeliveryStarted = order.statut === 'en_cours_livraison';
+              const hasPickup = !!(order.with_pickup || Number(order.frais_recuperation || 0) > 0);
+              const isPreWash = ['en_attente_validation', 'attente', 'en_attente'].includes(order.statut);
+              const canTrack = isDeliveryStarted || (hasPickup && isPreWash);
+              if (!canTrack || !onTrackOrder) return null;
+              return (
+                <ActionMenuItem
+                  icon={Truck}
+                  iconColor="#16a34a"
+                  color="#15803d"
+                  isBold={hasActiveTracking || order.statut === 'en_cours_livraison'}
+                  label="Suivre en direct (GPS)"
+                  subtitle={hasActiveTracking ? "Position livreur en direct" : "Ouvrir la carte de suivi"}
+                  onClick={() => {
+                    setActiveActionDropdown(null);
+                    onTrackOrder(order);
+                  }}
+                />
+              );
+            })()}
 
             {/* Séparateur */}
             <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.35rem 0' }} />

@@ -1,15 +1,14 @@
-import { DEFAULT_ROLES } from './seeds.js';
-import { memoryDb, listeners, notifyListeners } from './memoryStore.ts';
-import { performMutation, saveSession, wipeSensitiveMemoryData } from './syncEngine.ts';
-import { supabase } from '../supabaseClient.js';
-import { Staff, Customer, Order, CatalogItem, ActivityLog, Store, Role, OrderStatus, RewardPointAdjustment } from '../../types/index.ts';
+import { ActivityLog, CatalogItem, Customer, Order, OrderStatus, RewardPointAdjustment, Staff, Store } from '../../types/index.ts';
 import {
-  saveAuthenticatedSession,
   clearAuthenticatedSession,
-  stripSensitiveUserFields,
+  generateSecureRandomPin,
   hashPinSha256,
-  generateSecureRandomPin
+  saveAuthenticatedSession,
+  stripSensitiveUserFields
 } from '../../utils/securityUtils.js';
+import { supabase } from '../supabaseClient.js';
+import { listeners, memoryDb, notifyListeners } from './memoryStore.ts';
+import { performMutation, saveSession, wipeSensitiveMemoryData } from './syncEngine.ts';
 
 function assertAuthenticated(): Staff {
   const u = memoryDb.current_user;
@@ -35,7 +34,7 @@ function assertSuperAdmin(): Staff {
   return u;
 }
 
-export { memoryDb, listeners, notifyListeners };
+export { listeners, memoryDb, notifyListeners };
 
 // ─── Order helpers ─────────────────────────────────────────────────────────
 
@@ -306,7 +305,7 @@ export const dbEngine = {
   savePickupZone: async (zone: any) => {
     const generateUUID = () => {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
       });
@@ -412,10 +411,10 @@ export const dbEngine = {
     if (sid === 'all') return [...memoryDb.staff];
     const targetStore = memoryDb.stores?.find(st => st.id === sid || st.code === sid);
     const storeCode = targetStore?.code;
-    return memoryDb.staff.filter(s => 
-      s.role === 'super_admin' || 
+    return memoryDb.staff.filter(s =>
+      s.role === 'super_admin' ||
       s.store_id === 'all' ||
-      s.store_id === sid || 
+      s.store_id === sid ||
       (storeCode && s.store_id === storeCode)
     );
   },
@@ -840,7 +839,7 @@ export const dbEngine = {
         is_active: true,
         statut: 'actif'
       };
-      await performMutation('upsert', 'catalog', reward.id, catalogItem).catch(() => {});
+      await performMutation('upsert', 'catalog', reward.id, catalogItem).catch(() => { });
     }
 
     memoryDb.rewards = updatedMemoryRewards;
@@ -1101,7 +1100,7 @@ export const dbEngine = {
     const currentStoreId = (customerData.store_id && customerData.store_id !== 'all' && customerData.store_id !== 'GLOBAL')
       ? customerData.store_id
       : (userStoreId ||
-         (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' && memoryDb.selected_store_id !== 'GLOBAL' ? memoryDb.selected_store_id : null));
+        (memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' && memoryDb.selected_store_id !== 'GLOBAL' ? memoryDb.selected_store_id : null));
 
     if (!currentStoreId || currentStoreId === 'all' || currentStoreId === 'GLOBAL') {
       throw new Error("Un point de laverie valide et non global est obligatoire pour créer un profil client.");
@@ -1201,7 +1200,7 @@ export const dbEngine = {
 
     const currentPts = customer.points_fidelite || 0;
     const newPts = Math.max(0, currentPts + pointsDelta);
-    
+
     await performMutation('update', 'customers', customerId, { points_fidelite: newPts });
     customer.points_fidelite = newPts;
 
@@ -1680,7 +1679,7 @@ export const dbEngine = {
     const currentStoreId = (orderData.store_id && orderData.store_id !== 'all' && orderData.store_id !== 'GLOBAL')
       ? orderData.store_id
       : ((memoryDb.selected_store_id && memoryDb.selected_store_id !== 'all' && memoryDb.selected_store_id !== 'GLOBAL' ? memoryDb.selected_store_id : null) ||
-         (currentUser && currentUser.store_id && currentUser.store_id !== 'all' && currentUser.store_id !== 'GLOBAL' ? currentUser.store_id : null));
+        (currentUser && currentUser.store_id && currentUser.store_id !== 'all' && currentUser.store_id !== 'GLOBAL' ? currentUser.store_id : null));
 
     if (!currentStoreId || currentStoreId === 'all' || currentStoreId === 'GLOBAL') {
       throw new Error("Un point de laverie valide et non global est obligatoire pour créer une commande.");
@@ -1697,7 +1696,7 @@ export const dbEngine = {
       discountPercent = Math.round((discountAmount / basePriceBeforeRemise) * 100);
     }
 
-    const deliveryFee = Number(orderData.frais_livraison || (orderData as any).delivery_fee || 0);
+    let deliveryFee = Number(orderData.frais_livraison || (orderData as any).delivery_fee || 0);
     const pickupFee = Number(orderData.frais_recuperation || (orderData as any).pickup_fee || 0);
     const itemsList = orderData.items || (orderData as any).articles || [];
     const totalClothes = itemsList.reduce((sum: number, it: any) => sum + Number(it.quantite || it.quantity || 1), 0);
@@ -1705,9 +1704,9 @@ export const dbEngine = {
     const customer = memoryDb.customers.find(c => c.id === orderData.customer_id);
     const isImmediateSub = !!(orderData as any).subscribe_plan_id;
     const isSubOrder = !!(orderData as any).pay_with_subscription ||
-                       orderData.mode_reglement === 'abonnement' ||
-                       !!(orderData as any).is_subscription_order ||
-                       isImmediateSub;
+      orderData.mode_reglement === 'abonnement' ||
+      !!(orderData as any).is_subscription_order ||
+      isImmediateSub;
 
     let calculatedTotal = 0;
     let subDetails: any = {
@@ -1727,7 +1726,11 @@ export const dbEngine = {
       sub.remaining_clothes = Math.max(0, prevRemaining - totalClothes);
       sub.clothes_washed = (Number(sub.clothes_washed || 0) + totalClothes);
 
-      // Seuls les frais de livraison / récupération sont dus en numéraire
+      // Seuls les frais de livraison / récupération sont dus en numéraire (sauf si livraison gratuite incluse)
+      const hasFreeDelivery = dbEngine.isCustomerFreeDeliverySubscription(customer);
+      if (hasFreeDelivery) {
+        deliveryFee = 0;
+      }
       calculatedTotal = deliveryFee + pickupFee;
       subDetails = {
         ...subDetails,
@@ -1735,11 +1738,16 @@ export const dbEngine = {
         total_clothes: sub.total_clothes,
         previous_balance: prevRemaining,
         new_balance: sub.remaining_clothes,
-        clothes_deducted: totalClothes
+        clothes_deducted: totalClothes,
+        livraison_gratuite: hasFreeDelivery
       };
     } else if (isImmediateSub) {
       // Nouvelle souscription immédiate
       const subscribedPlan = memoryDb.catalog.find(c => c.id === (orderData as any).subscribe_plan_id);
+      const hasFreeDelivery = !!(subscribedPlan as any)?.livraison_gratuite;
+      if (hasFreeDelivery) {
+        deliveryFee = 0;
+      }
       const planTotalClothes = Number(subscribedPlan?.nombre_vetements || 25);
       const newRemaining = Math.max(0, planTotalClothes - totalClothes);
       const newSub = {
@@ -1748,6 +1756,7 @@ export const dbEngine = {
         total_clothes: planTotalClothes,
         remaining_clothes: newRemaining,
         clothes_washed: totalClothes,
+        livraison_gratuite: hasFreeDelivery,
         subscribed_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + (Number(subscribedPlan?.duree_jours) || 30) * 86400000).toISOString()
       };
@@ -1762,10 +1771,12 @@ export const dbEngine = {
         previous_balance: planTotalClothes,
         new_balance: newRemaining,
         clothes_deducted: totalClothes,
+        livraison_gratuite: hasFreeDelivery,
         immediate_subscription: {
           id: subscribedPlan?.id,
           name: subscribedPlan?.article,
-          prix: subscribedPlan?.prix
+          prix: subscribedPlan?.prix,
+          livraison_gratuite: hasFreeDelivery
         }
       };
     } else {
@@ -1878,6 +1889,107 @@ export const dbEngine = {
     return newOrder;
   },
 
+  isCustomerFreeDeliverySubscription: (customer: any): boolean => {
+    const sub = customer?.active_subscription;
+    if (!sub) return false;
+    if (sub.livraison_gratuite) return true;
+    const plan = memoryDb.catalog.find(c =>
+      (sub.catalog_item_id && c.id === sub.catalog_item_id) ||
+      (sub.name && c.article?.toLowerCase() === String(sub.name).toLowerCase() && (c.categorie === 'abonnement' || c.service === 'abonnement'))
+    );
+    return !!(plan as any)?.livraison_gratuite;
+  },
+
+  hasFreeDeliverySubscription: (order: any): boolean => {
+    if (!order) return false;
+    const isSub = !!order.is_subscription_order || order.mode_reglement === 'abonnement' || !!order.pay_with_subscription;
+    if (!isSub) return false;
+    if (order.subscription_details?.livraison_gratuite || order.subscription_details?.immediate_subscription?.livraison_gratuite) {
+      return true;
+    }
+    const customer = memoryDb.customers.find(c => c.id === order.customer_id);
+    if (dbEngine.isCustomerFreeDeliverySubscription(customer)) return true;
+    const planName = order.subscription_details?.name || order.subscription_details?.plan_name;
+    if (planName) {
+      const plan = memoryDb.catalog.find(c =>
+        c.article?.toLowerCase() === String(planName).toLowerCase() && (c.categorie === 'abonnement' || c.service === 'abonnement')
+      );
+      if ((plan as any)?.livraison_gratuite) return true;
+    }
+    return false;
+  },
+
+  getTrackingSessions: (activeOnly: boolean = true) => {
+    const list = memoryDb.order_tracking_sessions || [];
+    const filtered = activeOnly ? list.filter((s: any) => s.is_active !== false) : [...list];
+    return filtered.map((s: any) => {
+      if (s.dest_latitude != null && s.dest_longitude != null) return s;
+      const order = memoryDb.orders.find((o: any) => String(o.id) === String(s.order_id));
+      const store = memoryDb.stores.find((st: any) => st.id === (s.store_id || order?.store_id)) || memoryDb.stores[0];
+      const customer = order?.customer_id ? memoryDb.customers.find((c: any) => c.id === order.customer_id) : null;
+      if (s.mission_type === 'depot_laverie') {
+        return {
+          ...s,
+          dest_latitude: store?.latitude ?? 6.3703,
+          dest_longitude: store?.longitude ?? 2.3912,
+          dest_label: s.dest_label || store?.nom || 'Point de laverie'
+        };
+      }
+      let lat = customer?.latitude != null ? Number(customer.latitude) : null;
+      let lng = customer?.longitude != null ? Number(customer.longitude) : null;
+      if ((lat == null || lng == null || isNaN(lat) || isNaN(lng)) && customer?.coordonnees_livraison) {
+        const parts = String(customer.coordonnees_livraison).split(',');
+        if (parts.length >= 2) {
+          const pLat = parseFloat(parts[0]);
+          const pLng = parseFloat(parts[1]);
+          if (!isNaN(pLat) && !isNaN(pLng)) { lat = pLat; lng = pLng; }
+        }
+      }
+      return {
+        ...s,
+        dest_latitude: lat,
+        dest_longitude: lng,
+        dest_label: s.dest_label || customer?.adresse || (customer ? `${customer.prenom || ''} ${customer.nom || ''}`.trim() : 'Adresse client')
+      };
+    });
+  },
+
+  refreshTrackingSessionsFromDb: async () => {
+    if (!supabase) return dbEngine.getTrackingSessions(true);
+    try {
+      const { data, error } = await supabase
+        .from('order_tracking_sessions')
+        .select('*')
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false });
+      if (!error && Array.isArray(data)) {
+        memoryDb.order_tracking_sessions = data;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Fallback silencieux
+    }
+    return dbEngine.getTrackingSessions(true);
+  },
+
+  stopTrackingSession: async (orderId: string) => {
+    const sOrderId = String(orderId);
+    const nowIso = new Date().toISOString();
+    memoryDb.order_tracking_sessions = (memoryDb.order_tracking_sessions || []).map((s: any) =>
+      String(s.order_id) === sOrderId ? { ...s, is_active: false, ended_at: nowIso, updated_at: nowIso } : s
+    );
+    notifyListeners();
+    try {
+      await performMutation('update', 'order_tracking_sessions', `trk_${sOrderId}`, {
+        is_active: false,
+        ended_at: nowIso,
+        updated_at: nowIso
+      });
+    } catch (e) {
+      // Silencieux si aucune session active
+    }
+  },
+
   deliverOrderWithPayment: async (
     orderId: string,
     amountPaid: number,
@@ -1896,6 +2008,23 @@ export const dbEngine = {
     const totalVal = Number(order.prix_total || 0);
     const avanceVal = Number(order.avance_payee || 0);
     const cleanAmountPaid = isNaN(Number(amountPaid)) ? Math.max(0, totalVal - avanceVal) : Math.max(0, Number(amountPaid));
+
+    const isSubscription = !!(order as any).is_subscription_order || order.mode_reglement === 'abonnement' || !!(order as any).pay_with_subscription;
+    const baseRemaining = isSubscription ? 0 : Math.max(0, totalVal - avanceVal);
+    const deliveryFeeRequired =
+      normalizedFinalStatus === 'restitue' &&
+      ['a_livrer', 'en_cours_livraison'].includes(order.statut) &&
+      !order.livraison_domicile &&
+      !(order as any).with_delivery &&
+      Number(order.frais_livraison || 0) <= 0 &&
+      !dbEngine.hasFreeDeliverySubscription(order);
+    const deliveryFeeAdded = deliveryFeeRequired ? Math.max(0, cleanAmountPaid - baseRemaining) : 0;
+
+    if (deliveryFeeRequired) {
+      order.prix_total = totalVal + deliveryFeeAdded;
+      order.frais_livraison = Number(order.frais_livraison || 0) + deliveryFeeAdded;
+      order.livraison_domicile = true;
+    }
 
     order.statut = normalizedFinalStatus;
     order.mode_reglement = paymentMethod || order.mode_reglement || 'especes';
@@ -1928,12 +2057,20 @@ export const dbEngine = {
     notifyListeners();
 
     try {
-      await performMutation('update', 'orders', orderId, {
+      const orderUpdatePayload: Record<string, any> = {
         statut: order.statut,
         mode_reglement: order.mode_reglement,
         avance_payee: order.avance_payee,
         solde_paid_at: order.solde_paid_at
-      });
+      };
+      if (deliveryFeeRequired) {
+        orderUpdatePayload.prix_total = order.prix_total;
+        orderUpdatePayload.frais_livraison = order.frais_livraison;
+      }
+      await performMutation('update', 'orders', orderId, orderUpdatePayload);
+      if (['restitue', 'annule', 'a_livrer', 'a_recuperer'].includes(order.statut)) {
+        dbEngine.stopTrackingSession(orderId);
+      }
       dbEngine.logAction('PAIEMENT_FINAL', `Livraison commande ${order.identifiant_unique_marquage || order.id}. Règlement solde: ${cleanAmountPaid} FCFA`);
     } catch (e) {
       console.warn('[DB] performMutation error on deliverOrderWithPayment:', e);
@@ -1949,12 +2086,15 @@ export const dbEngine = {
     const oldStatus = order.statut;
     const normalized = normalizeOrderStatus(newStatus);
     order.statut = normalized;
-    
+
     // Optimistic update
     notifyListeners();
 
     try {
       await performMutation('update', 'orders', sOrderId, { statut: normalized });
+      if (['en_cours_lavage', 'lavage_cours', 'en_cours_repassage', 'repassage_cours', 'pret', 'a_livrer', 'a_recuperer', 'restitue', 'annule'].includes(normalized)) {
+        dbEngine.stopTrackingSession(sOrderId);
+      }
       dbEngine.logAction('MISE_A_JOUR_STATUT', `Commande ${order.identifiant_unique_marquage || order.id} passée de '${oldStatus}' à '${normalized}'`);
     } catch (e) {
       order.statut = oldStatus;
@@ -2025,11 +2165,11 @@ export const dbEngine = {
 
     // Réconciliation abonnement : restituer le quota de vêtements si payé par abonnement
     const isSubOrder = (order as any).pay_with_subscription ||
-                       order.mode_reglement === 'abonnement' ||
-                       (order as any).is_subscription_order;
+      order.mode_reglement === 'abonnement' ||
+      (order as any).is_subscription_order;
     if (isSubOrder && (customer as any)?.active_subscription) {
       const clothesCount = Number(order.subscription_details?.clothes_deducted) ||
-                           (order.articles || order.items || []).reduce((sum: number, it: any) => sum + Number(it.quantite || it.quantity || 1), 0);
+        (order.articles || order.items || []).reduce((sum: number, it: any) => sum + Number(it.quantite || it.quantity || 1), 0);
       const sub = (customer as any).active_subscription;
       sub.remaining_clothes = Math.min(Number(sub.total_clothes || 0), Number(sub.remaining_clothes || 0) + clothesCount);
       sub.clothes_washed = Math.max(0, Number(sub.clothes_washed || 0) - clothesCount);
@@ -2146,8 +2286,8 @@ export const dbEngine = {
       }
     }
 
-    const effectiveStoreId = itemData.store_id !== undefined 
-      ? itemData.store_id 
+    const effectiveStoreId = itemData.store_id !== undefined
+      ? itemData.store_id
       : (memoryDb.selected_store_id !== 'all' && memoryDb.selected_store_id !== 'GLOBAL' ? memoryDb.selected_store_id : null);
 
     if (!effectiveStoreId || effectiveStoreId === 'all' || effectiveStoreId === 'GLOBAL') {
@@ -2274,7 +2414,7 @@ export const dbEngine = {
 
         // 2. Recherche par correspondance (store_id, service, nom d'article)
         if (!existing && options.updateExisting && itemData.article && itemData.service && itemData.store_id) {
-          existing = memoryDb.catalog.find(c => 
+          existing = memoryDb.catalog.find(c =>
             c.store_id === itemData.store_id &&
             c.service === itemData.service &&
             c.article?.trim().toLowerCase() === itemData.article?.trim().toLowerCase()
@@ -2440,6 +2580,7 @@ export const dbEngine = {
         total_clothes: clothesCount,
         remaining_clothes: clothesCount,
         duree_jours: dureeJours,
+        livraison_gratuite: !!(subPlan as any).livraison_gratuite,
         subscribed_at: now.toISOString(),
         expires_at: expires.toISOString(),
         end_date: expires.toISOString()

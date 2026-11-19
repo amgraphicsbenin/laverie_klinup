@@ -265,9 +265,50 @@ fun ProfileScreen(onLogout: () -> Unit) {
             NotificationManagerCompat.from(context).areNotificationsEnabled()
         }
     }
+    val locationFineGranted = remember(context, permRefreshTick) {
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+    val locationGranted = remember(context, permRefreshTick) {
+        locationFineGranted || ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+    val overlayGranted = remember(context, permRefreshTick) {
+        Settings.canDrawOverlays(context)
+    }
     val canInstallPackages = remember(context, permRefreshTick) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
             context.packageManager.canRequestPackageInstalls()
+    }
+    val openAppDetailsSettings: () -> Unit = {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.parse("package:${context.packageName}")
+        )
+        runCatching { context.startActivity(intent) }
+    }
+    var locationRequestHadRationale by remember { mutableStateOf(false) }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        permRefreshTick++
+        val granted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (!granted) {
+            val activity = context as? Activity
+            val nowRationale = activity != null &&
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    activity,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                )
+            if (!locationRequestHadRationale && !nowRationale) {
+                openAppDetailsSettings()
+            }
+        }
     }
     var notifRequestHadRationale by remember { mutableStateOf(false) }
     val openNotificationSettings: () -> Unit = {
@@ -532,12 +573,13 @@ fun ProfileScreen(onLogout: () -> Unit) {
                                     activeMenu = ProfileMenuPage.SECURITE
                                 }
                                 Divider(p)
-                                val permsSummary = buildList {
-                                    add(if (notificationsGranted) "Notifications actives" else "Notifications à activer")
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        add(if (canInstallPackages) "Mises à jour autorisées" else "Mises à jour à autoriser")
-                                    }
-                                }.joinToString(" • ")
+                                val permsGrantedCount = listOf(
+                                    notificationsGranted,
+                                    locationGranted,
+                                    overlayGranted,
+                                    canInstallPackages
+                                ).count { it }
+                                val permsSummary = "$permsGrantedCount/4 autorisations actives • GPS, Superposition, Notifications"
                                 ActionRow(
                                     TablerIcons.Key,
                                     BrandText,
@@ -1054,7 +1096,87 @@ fun ProfileScreen(onLogout: () -> Unit) {
                                         }
                                     }
 
-                                    // 2. Installation des mises à jour (REQUEST_INSTALL_PACKAGES)
+                                    // 2. Localisation GPS (ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION)
+                                    Divider(p)
+                                    PermissionStatusRow(
+                                        icon = TablerIcons.MapPin,
+                                        iconTint = if (locationGranted) Success else Warning,
+                                        title = "Localisation GPS",
+                                        subtitle = when {
+                                            locationFineGranted -> "Position GPS précise autorisée pour le suivi en direct"
+                                            locationGranted -> "Position approximative active (activez GPS précis)"
+                                            else -> "Appuyez pour autoriser le suivi GPS des livraisons"
+                                        },
+                                        badgeText = if (locationGranted) "Autorisée" else "À activer",
+                                        badgeBg = if (locationGranted) appColors.softGreenBg else appColors.softAmberBg,
+                                        badgeColor = if (locationGranted) Success else Warning,
+                                        p = p
+                                    ) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        if (!locationFineGranted) {
+                                            val activity = context as? Activity
+                                            locationRequestHadRationale = activity != null &&
+                                                ActivityCompat.shouldShowRequestPermissionRationale(
+                                                    activity,
+                                                    Manifest.permission.ACCESS_FINE_LOCATION
+                                                )
+                                            locationPermissionLauncher.launch(
+                                                arrayOf(
+                                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                                )
+                                            )
+                                        } else {
+                                            openAppDetailsSettings()
+                                        }
+                                    }
+
+                                    // 3. Superposition (SYSTEM_ALERT_WINDOW)
+                                    Divider(p)
+                                    PermissionStatusRow(
+                                        icon = TablerIcons.LayoutGrid,
+                                        iconTint = if (overlayGranted) Success else Warning,
+                                        title = "Superposition",
+                                        subtitle = if (overlayGranted) {
+                                            "Affichage par-dessus les apps autorisé pour un fonctionnement fluide"
+                                        } else {
+                                            "Autorisez la superposition pour un fonctionnement plus fluide de l'app"
+                                        },
+                                        badgeText = if (overlayGranted) "Autorisée" else "À activer",
+                                        badgeBg = if (overlayGranted) appColors.softGreenBg else appColors.softAmberBg,
+                                        badgeColor = if (overlayGranted) Success else Warning,
+                                        p = p
+                                    ) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        val intent = Intent(
+                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:${context.packageName}")
+                                        )
+                                        runCatching { context.startActivity(intent) }
+                                            .onFailure { openAppDetailsSettings() }
+                                    }
+
+                                    // 4. Service de suivi en arrière-plan (FOREGROUND_SERVICE_LOCATION)
+                                    Divider(p)
+                                    PermissionStatusRow(
+                                        icon = TablerIcons.TruckDelivery,
+                                        iconTint = if (locationGranted) Success else Warning,
+                                        title = "Suivi GPS en arrière-plan",
+                                        subtitle = if (locationGranted) {
+                                            "Actif pendant les courses de dépôt et de livraison"
+                                        } else {
+                                            "Nécessite la localisation GPS pour suivre les trajets en continu"
+                                        },
+                                        badgeText = if (locationGranted) "Prêt" else "GPS requis",
+                                        badgeBg = if (locationGranted) appColors.softGreenBg else appColors.softAmberBg,
+                                        badgeColor = if (locationGranted) Success else Warning,
+                                        p = p
+                                    ) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        openAppDetailsSettings()
+                                    }
+
+                                    // 5. Installation des mises à jour (REQUEST_INSTALL_PACKAGES)
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                         Divider(p)
                                         PermissionStatusRow(
@@ -1125,6 +1247,43 @@ fun ProfileScreen(onLogout: () -> Unit) {
                                                     runCatching { context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
                                                 }
                                         }
+                                    }
+
+                                    // 7. Accès Réseau & Internet (INTERNET / ACCESS_NETWORK_STATE)
+                                    Divider(p)
+                                    val netOnline by com.klinup.app.data.local.NetworkMonitor.isOnline.collectAsState()
+                                    PermissionStatusRow(
+                                        icon = TablerIcons.CloudUpload,
+                                        iconTint = if (netOnline) Success else Warning,
+                                        title = "Réseau & Synchronisation",
+                                        subtitle = if (netOnline) {
+                                            "Accès Internet actif pour la synchronisation temps réel"
+                                        } else {
+                                            "Appareil hors ligne — vérifiez votre connexion"
+                                        },
+                                        badgeText = if (netOnline) "Autorisée" else "Hors ligne",
+                                        badgeBg = if (netOnline) appColors.softGreenBg else appColors.softAmberBg,
+                                        badgeColor = if (netOnline) Success else Warning,
+                                        p = p
+                                    ) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        runCatching { context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) }
+                                    }
+
+                                    // 8. Vibration & Retour haptique (VIBRATE)
+                                    Divider(p)
+                                    PermissionStatusRow(
+                                        icon = TablerIcons.DeviceMobile,
+                                        iconTint = Success,
+                                        title = "Vibration & Retour haptique",
+                                        subtitle = "Retours tactiles et alertes sonores actifs",
+                                        badgeText = "Autorisée",
+                                        badgeBg = appColors.softGreenBg,
+                                        badgeColor = Success,
+                                        p = p
+                                    ) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        runCatching { context.startActivity(Intent(Settings.ACTION_SOUND_SETTINGS)) }
                                     }
                                 }
                             }

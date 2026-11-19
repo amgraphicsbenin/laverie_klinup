@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.klinup.app.BuildConfig
+import com.klinup.app.data.local.NetworkMonitor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -55,12 +56,17 @@ object AppUpdateManager {
 
     suspend fun checkForUpdate(): UpdateCheckResult = withContext(Dispatchers.IO) {
         try {
+            if (!NetworkMonitor.isOnline.value) {
+                return@withContext UpdateCheckResult.Error(
+                    "Connexion internet requise pour vérifier les mises à jour."
+                )
+            }
             val (code, json) = fetchJsonWithCode(manifestUrl)
             if (code == 404) {
                 return@withContext UpdateCheckResult.UpToDate
             }
             if (json == null) {
-                return@withContext UpdateCheckResult.Error("Impossible de vérifier les mises à jour (code $code).")
+                return@withContext UpdateCheckResult.Error("Impossible de vérifier les mises à jour pour le moment.")
             }
             val versionCode = json.optInt("versionCode", json.optInt("version_code", -1))
             val versionName = json.optString("versionName", json.optString("version_name", "")).trim()
@@ -85,7 +91,13 @@ object AppUpdateManager {
                 UpdateCheckResult.UpToDate
             }
         } catch (e: Exception) {
-            UpdateCheckResult.Error("Impossible de vérifier les mises à jour. Vérifiez votre connexion internet.")
+            UpdateCheckResult.Error(
+                NetworkMonitor.friendlyErrorMessage(
+                    e,
+                    actionHint = "vérifier les mises à jour",
+                    fallback = "Impossible de vérifier les mises à jour. Vérifiez votre connexion internet."
+                )
+            )
         }
     }
 

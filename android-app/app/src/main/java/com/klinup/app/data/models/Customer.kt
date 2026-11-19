@@ -13,7 +13,8 @@ data class ActiveSubscription(
     @SerialName("duree_jours") val dureeJours: Int? = null,
     @SerialName("subscribed_at") val subscribedAt: String? = null,
     @SerialName("expires_at") val expiresAt: String? = null,
-    @SerialName("end_date") val endDate: String? = null
+    @SerialName("end_date") val endDate: String? = null,
+    @SerialName("livraison_gratuite") val livraisonGratuite: Boolean = false
 )
 
 @Serializable
@@ -50,6 +51,13 @@ data class Customer(
                 val parts = raw.split(",")
                 val lat = parts.getOrNull(0)?.trim()?.toDoubleOrNull()
                 val lng = parts.getOrNull(1)?.trim()?.toDoubleOrNull()
+                if (lat != null && lng != null) return lat to lng
+            }
+            val addr = adresse.orEmpty()
+            val match = Regex("\\[GPS:(-?\\d+(?:\\.\\d+)?),\\s*(-?\\d+(?:\\.\\d+)?)\\]").find(addr)
+            if (match != null) {
+                val lat = match.groupValues[1].toDoubleOrNull()
+                val lng = match.groupValues[2].toDoubleOrNull()
                 if (lat != null && lng != null) return lat to lng
             }
             return null

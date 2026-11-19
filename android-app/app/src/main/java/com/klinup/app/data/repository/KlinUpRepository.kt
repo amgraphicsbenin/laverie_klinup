@@ -16,15 +16,18 @@ import io.ktor.http.isSuccess
 import com.klinup.app.data.local.AppNotification
 import com.klinup.app.data.local.AppPreferences
 import com.klinup.app.data.local.KlinUpNotificationManager
+import com.klinup.app.data.local.NetworkMonitor
 import com.klinup.app.data.local.NotificationCategory
 import com.klinup.app.data.local.PinVerificationResult
 import com.klinup.app.data.local.SecurityManager
+import com.klinup.app.data.location.DeliveryTrackingService
 import com.klinup.app.data.models.ActiveSubscription
 import com.klinup.app.data.models.CatalogItem
 import com.klinup.app.data.models.Customer
 import com.klinup.app.data.models.Expense
 import com.klinup.app.data.models.Order
 import com.klinup.app.data.models.OrderItem
+import com.klinup.app.data.models.OrderTrackingSession
 import com.klinup.app.data.models.RewardPointAdjustment
 import com.klinup.app.data.models.Store
 import com.klinup.app.data.models.SubscriptionDetails
@@ -57,6 +60,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.text.NumberFormat
@@ -94,6 +98,25 @@ private data class OrderPaymentPatch(
     @SerialName("mode_reglement") val modeReglement: String,
     @SerialName("avance_payee") val avancePayee: Double,
     @SerialName("solde_paid_at") val soldePaidAt: String
+)
+
+@Serializable
+private data class OrderDeliveryPaymentPatch(
+    val statut: String,
+    @SerialName("mode_reglement") val modeReglement: String,
+    @SerialName("avance_payee") val avancePayee: Double,
+    @SerialName("solde_paid_at") val soldePaidAt: String,
+    @SerialName("prix_total") val prixTotal: Double
+)
+
+@Serializable
+private data class OrderDeliveryPaymentWithFeePatch(
+    val statut: String,
+    @SerialName("mode_reglement") val modeReglement: String,
+    @SerialName("avance_payee") val avancePayee: Double,
+    @SerialName("solde_paid_at") val soldePaidAt: String,
+    @SerialName("prix_total") val prixTotal: Double,
+    @SerialName("frais_livraison") val fraisLivraison: Double
 )
 
 @Serializable
@@ -201,7 +224,9 @@ private data class NewOrderPayload(
     @SerialName("subscription_details") val subscriptionDetails: SubscriptionDetails? = null,
     @SerialName("created_by_id") val createdById: String? = null,
     @SerialName("created_by_name") val createdByName: String? = null,
-    @SerialName("store_id") val storeId: String? = null
+    @SerialName("store_id") val storeId: String? = null,
+    @SerialName("frais_recuperation") val fraisRecuperation: Double = 0.0,
+    @SerialName("with_pickup") val withPickup: Boolean = false
 )
 
 @Serializable
@@ -216,6 +241,15 @@ private data class SettingCatalogUpsert(
     val service: String = "system",
     val prix: Double,
     val categorie: String = "system"
+)
+
+@Serializable
+private data class OfflineCacheSnapshot(
+    val stores: List<Store> = emptyList(),
+    val orders: List<Order> = emptyList(),
+    val customers: List<Customer> = emptyList(),
+    val catalog: List<CatalogItem> = emptyList(),
+    val expenses: List<Expense> = emptyList()
 )
 
 @Serializable
@@ -311,11 +345,47 @@ object KlinUpRepository {
     private val _expenses = MutableStateFlow<List<Expense>>(emptyList())
     val expenses: StateFlow<List<Expense>> = _expenses.asStateFlow()
 
+    private val _trackingSessions = MutableStateFlow<List<OrderTrackingSession>>(emptyList())
+    val trackingSessions: StateFlow<List<OrderTrackingSession>> = _trackingSessions.asStateFlow()
+
+    private val _activeTrackingOrderIds = MutableStateFlow<Set<String>>(emptySet())
+    val activeTrackingOrderIds: StateFlow<Set<String>> = _activeTrackingOrderIds.asStateFlow()
+
+    @Volatile
+    private var lastTrackingRefreshAtMs: Long = 0L
+
+    private val _trackingTrails = MutableStateFlow<Map<String, List<Pair<Double, Double>>>>(emptyMap())
+    val trackingTrails: StateFlow<Map<String, List<Pair<Double, Double>>>> = _trackingTrails.asStateFlow()
+
+    private val _pendingTrackingPermissions = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val pendingTrackingPermissions: StateFlow<List<Pair<String, String>>> = _pendingTrackingPermissions.asStateFlow()
+
+    @Volatile private var appContext: Context? = null
+    private var trackingRealtimeJob: Job? = null
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
     private val _deliveryOrderIds = MutableStateFlow<Set<String>>(emptySet())
     fun hasDeliveryOption(order: Order): Boolean {
         return order.livraisonDomicile ||
             order.fraisLivraison > 0.0 ||
             _deliveryOrderIds.value.contains(order.id)
+    }
+
+    fun hasPickupOption(order: Order): Boolean {
+        return order.withPickup || order.fraisRecuperation > 0.0
+    }
+
+    fun canShowLiveTrackingButton(order: Order): Boolean {
+        if (order.statut == "en_cours_livraison") return true
+        val isPreWash = order.statut in setOf("en_attente_validation", "en_attente", "attente")
+        return isPreWash && hasPickupOption(order)
+    }
+
+    fun hasConfiguredDeliveryAddress(customer: Customer?): Boolean {
+        return customer?.resolvedLatLng != null
     }
 
     private val defaultZones = listOf(
@@ -355,6 +425,21 @@ object KlinUpRepository {
     private val backgroundScope = kotlinx.coroutines.CoroutineScope(
         kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
     )
+
+    init {
+        backgroundScope.launch {
+            var wasOnline = NetworkMonitor.isOnline.value
+            NetworkMonitor.isOnline.collect { online ->
+                if (online && (!wasOnline || (_orders.value.isEmpty() && _customers.value.isEmpty()))) {
+                    if (_currentUser.value != null && !SecurityManager.isSessionLocked.value) {
+                        kotlinx.coroutines.delay(350L)
+                        refreshAll()
+                    }
+                }
+                wasOnline = online
+            }
+        }
+    }
 
     private fun startMultiDeviceSessionWatcher(user: User, token: String, registerOnServer: Boolean) {
         sessionWatcherJob?.cancel()
@@ -470,6 +555,12 @@ object KlinUpRepository {
         activeLocalSessionToken = null
         sessionWatcherJob?.cancel()
         sessionWatcherJob = null
+        trackingRealtimeJob?.cancel()
+        trackingRealtimeJob = null
+        appContext?.let { DeliveryTrackingService.stopAll(it) }
+        _pendingTrackingPermissions.value = emptyList()
+        _trackingSessions.value = emptyList()
+        _trackingTrails.value = emptyMap()
         val deviceSuffix = remoteDeviceName?.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
         _multiDeviceLogoutNotice.value =
             "Votre compte vient d'être connecté sur un autre appareil$deviceSuffix. Vous avez été déconnecté de cet appareil."
@@ -527,6 +618,7 @@ object KlinUpRepository {
                 startMultiDeviceSessionWatcher(cleanUser, savedToken, registerOnServer = false)
             }
             syncUserAvatarAsync(cleanUser)
+            loadOfflineSnapshot(cleanUser.id)
             backgroundScope.launch { refreshAll() }
             return true
         }
@@ -581,7 +673,10 @@ object KlinUpRepository {
         if (cleanEmail.isEmpty() || !cleanEmail.contains("@") || cleanEmail.length > 120) {
             return Result.failure(IllegalArgumentException("Veuillez saisir une adresse email valide."))
         }
-        return runCatching {
+        return safeApiCatching(
+            actionHint = "vérifier votre compte",
+            fallback = "Impossible de vérifier votre compte. Veuillez réessayer."
+        ) {
             // 1. Priorité à la RPC SECURITY DEFINER (ne retourne jamais code_pin)
             val viaRpc = runCatching {
                 client.postgrest.rpc(
@@ -626,7 +721,10 @@ object KlinUpRepository {
     }
 
     suspend fun fetchStaffForLogin(): Result<List<User>> {
-        return runCatching {
+        return safeApiCatching(
+            actionHint = "charger la liste des comptes",
+            fallback = "Impossible de charger les comptes. Veuillez réessayer."
+        ) {
             val allStaff = client.from("staff")
                 .select()
                 .decodeList<User>()
@@ -721,7 +819,13 @@ object KlinUpRepository {
                 .firstOrNull { it.statut.equals("actif", ignoreCase = true) }
         }.getOrElse { err ->
             return Result.failure(
-                IllegalStateException("Impossible de vérifier l'identité : ${err.localizedMessage ?: "erreur réseau"}")
+                IllegalStateException(
+                    NetworkMonitor.friendlyErrorMessage(
+                        err,
+                        actionHint = "vérifier votre code PIN",
+                        fallback = "Impossible de vérifier votre identité. Veuillez réessayer."
+                    )
+                )
             )
         } ?: return Result.failure(IllegalStateException("Ce compte n'est plus actif."))
 
@@ -771,6 +875,7 @@ object KlinUpRepository {
         startMultiDeviceSessionWatcher(clean, newToken, registerOnServer = true)
         logSecurityEvent(clean, "LOGIN_SUCCESS", "Connexion mobile validée (${clean.role})")
         syncUserAvatarAsync(clean)
+        loadOfflineSnapshot(clean.id)
         backgroundScope.launch { refreshAll() }
     }
 
@@ -834,6 +939,25 @@ object KlinUpRepository {
         }
     }
 
+    suspend fun ensureStaffAvatarSynced(staffId: String?) {
+        val id = staffId?.trim().orEmpty()
+        if (id.isBlank()) return
+        if (AppPreferences.avatarFile(id).exists()) return
+        runCatching {
+            val remoteAvatar = client.from("staff")
+                .select(columns = Columns.list("id", "user_picture")) {
+                    filter { eq("id", id) }
+                }
+                .decodeList<User>()
+                .firstOrNull()
+                ?.avatar
+                ?.takeIf { it.isNotBlank() }
+            if (!remoteAvatar.isNullOrBlank()) {
+                AppPreferences.syncAvatarFromRemote(id, remoteAvatar)
+            }
+        }
+    }
+
     private fun pinFailureMessage(result: PinVerificationResult, serverRemaining: Int?): String {
         return when (result) {
             is PinVerificationResult.LockedOut ->
@@ -879,7 +1003,46 @@ object KlinUpRepository {
         return cleaned in scope
     }
 
-    suspend fun refreshAll() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    private fun loadOfflineSnapshot(userId: String) {
+        if (userId.isBlank()) return
+        runCatching {
+            val raw = AppPreferences.loadOfflineCache(userId) ?: return
+            val snap = SupabaseClientProvider.json.decodeFromString(OfflineCacheSnapshot.serializer(), raw)
+            if (_stores.value.isEmpty() && snap.stores.isNotEmpty()) _stores.value = snap.stores
+            if (_orders.value.isEmpty() && snap.orders.isNotEmpty()) _orders.value = snap.orders
+            if (_customers.value.isEmpty() && snap.customers.isNotEmpty()) _customers.value = snap.customers
+            if (_catalog.value.isEmpty() && snap.catalog.isNotEmpty()) _catalog.value = snap.catalog
+            if (_expenses.value.isEmpty() && snap.expenses.isNotEmpty()) _expenses.value = snap.expenses
+        }
+    }
+
+    private fun saveOfflineSnapshot(userId: String) {
+        if (userId.isBlank()) return
+        runCatching {
+            val snap = OfflineCacheSnapshot(
+                stores = _stores.value,
+                orders = _orders.value,
+                customers = _customers.value,
+                catalog = _catalog.value,
+                expenses = _expenses.value
+            )
+            val raw = SupabaseClientProvider.json.encodeToString(OfflineCacheSnapshot.serializer(), snap)
+            AppPreferences.saveOfflineCache(userId, raw)
+        }
+    }
+
+    suspend fun refreshAll(userInitiated: Boolean = false) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val currentUid = _currentUser.value?.id.orEmpty()
+        if (!NetworkMonitor.recheck()) {
+            loadOfflineSnapshot(currentUid)
+            val msg = "Connexion internet indisponible. Vérifiez votre réseau Wi-Fi ou données mobiles."
+            _errorMessage.value = msg
+            if (userInitiated) {
+                NetworkMonitor.showToast(msg)
+            }
+            _isLoading.value = false
+            return@withContext
+        }
         _isLoading.value = true
         _errorMessage.value = null
         try {
@@ -951,6 +1114,16 @@ object KlinUpRepository {
                             .decodeList<Expense>()
                     }.getOrDefault(emptyList())
                 }
+                val trackingDeferred = async {
+                    runCatching {
+                        client.from("order_tracking_sessions")
+                            .select {
+                                filter { eq("is_active", true) }
+                                order("updated_at", order = PostgrestOrder.DESCENDING)
+                            }
+                            .decodeList<OrderTrackingSession>()
+                    }.getOrDefault(emptyList())
+                }
 
                 val user = _currentUser.value
                 val loadedStores = storesDeferred.await()
@@ -974,6 +1147,10 @@ object KlinUpRepository {
                 _pickupZones.value = pickupZonesDeferred.await()
                 _rewardAdjustments.value = scopedRewardAdjustments
                 _expenses.value = scopedExpenses
+                _trackingSessions.value = trackingDeferred.await()
+                    .filter { matchesStoreScope(it.storeId, storeScope) }
+                ensureRealtimeTrackingWatcher()
+                saveOfflineSnapshot(user?.id.orEmpty())
                 KlinUpNotificationManager.syncFromOrders(
                     orders = _orders.value,
                     customers = _customers.value,
@@ -998,7 +1175,15 @@ object KlinUpRepository {
                 )
             }
         } catch (e: Exception) {
-            _errorMessage.value = e.message ?: "Erreur de synchronisation avec Supabase"
+            val msg = NetworkMonitor.friendlyErrorMessage(
+                e,
+                actionHint = "actualiser les données",
+                fallback = "Impossible de synchroniser les données. Veuillez réessayer."
+            )
+            _errorMessage.value = msg
+            if (userInitiated && NetworkMonitor.isNetworkFailure(e)) {
+                NetworkMonitor.showToast(msg)
+            }
         } finally {
             _isLoading.value = false
         }
@@ -1015,6 +1200,12 @@ object KlinUpRepository {
         activeLocalSessionToken = null
         sessionWatcherJob?.cancel()
         sessionWatcherJob = null
+        trackingRealtimeJob?.cancel()
+        trackingRealtimeJob = null
+        appContext?.let { DeliveryTrackingService.stopAll(it) }
+        _pendingTrackingPermissions.value = emptyList()
+        _trackingSessions.value = emptyList()
+        _trackingTrails.value = emptyMap()
         if (active != null) {
             logSecurityEvent(active, "LOGOUT", "Déconnexion volontaire (${active.fullName})")
         }
@@ -1030,7 +1221,10 @@ object KlinUpRepository {
     }
 
     suspend fun updateOrderStatus(orderId: String, newStatus: String, reason: String? = null): Result<Unit> {
-        return runCatching {
+        return safeApiCatching(
+            actionHint = "mettre à jour le statut de la commande",
+            fallback = "Impossible de mettre à jour la commande. Veuillez réessayer."
+        ) {
             val user = requireAuthenticatedUser()
             val currentStatus = _orders.value.firstOrNull { it.id == orderId }?.statut.orEmpty()
             if (!user.canPerformOrderTransition(currentStatus, newStatus)) {
@@ -1045,6 +1239,17 @@ object KlinUpRepository {
             _orders.value = _orders.value.map {
                 if (it.id == orderId) it.copy(statut = newStatus) else it
             }
+            val updatedOrder = _orders.value.firstOrNull { it.id == orderId }
+            when (newStatus) {
+                "en_cours_livraison" -> {
+                    if (updatedOrder != null) {
+                        startTrackingMission(updatedOrder, "livraison_client")
+                    }
+                }
+                "en_cours_lavage", "lavage_cours", "en_cours_repassage", "repassage_cours", "pret", "a_livrer", "a_recuperer", "restitue", "annule" -> {
+                    stopTrackingMission(orderId)
+                }
+            }
             if (!reason.isNullOrBlank()) {
                 val action = if (newStatus == "annule") "ANNULATION_COMMANDE" else "STATUT_COMMANDE"
                 logSecurityEvent(user, action, "Commande $orderId ($newStatus) — Motif : ${reason.trim()}")
@@ -1053,7 +1258,48 @@ object KlinUpRepository {
         }
     }
 
+    fun isCustomerFreeDeliverySubscription(customer: Customer?): Boolean {
+        val sub = customer?.activeSubscription ?: return false
+        if (sub.livraisonGratuite) return true
+        val catalogPlan = _catalog.value.firstOrNull { item ->
+            (sub.catalogItemId.isNotBlank() && item.id == sub.catalogItemId) ||
+                (sub.name.isNotBlank() && item.article.equals(sub.name, ignoreCase = true) &&
+                    (item.categorie.equals("abonnement", ignoreCase = true) || item.service.equals("abonnement", ignoreCase = true)))
+        }
+        return catalogPlan?.livraisonGratuite == true
+    }
+
+    fun hasFreeDeliverySubscription(order: Order): Boolean {
+        val isSub = order.isSubscriptionOrder || order.modeReglement.equals("abonnement", ignoreCase = true)
+        if (!isSub) return false
+        if (order.subscriptionDetails?.livraisonGratuite == true) return true
+        val customer = order.customerId?.let { cid -> _customers.value.firstOrNull { it.id == cid } }
+        if (isCustomerFreeDeliverySubscription(customer)) return true
+        val planName = order.subscriptionDetails?.planName
+        if (!planName.isNullOrBlank()) {
+            val matchedPlan = _catalog.value.firstOrNull { item ->
+                item.article.equals(planName, ignoreCase = true) &&
+                    (item.categorie.equals("abonnement", ignoreCase = true) || item.service.equals("abonnement", ignoreCase = true))
+            }
+            if (matchedPlan?.livraisonGratuite == true) return true
+        }
+        return false
+    }
+
+    fun requiresDeliveryFeeOnCompletion(order: Order, targetStatus: String): Boolean {
+        if (targetStatus != "restitue") return false
+        if (order.statut !in setOf("a_livrer", "en_cours_livraison")) return false
+        if (hasFreeDeliverySubscription(order)) return false
+        return !hasDeliveryOption(order)
+    }
+
+    fun suggestedDeliveryFeeForOrder(order: Order): Double {
+        val customer = order.customerId?.let { cid -> _customers.value.firstOrNull { it.id == cid } }
+        return calculateDeliveryFee(order.storeId, customer?.latitude, customer?.longitude).fee
+    }
+
     fun requiresRemainingPayment(order: Order, targetStatus: String): Boolean {
+        if (requiresDeliveryFeeOnCompletion(order, targetStatus)) return true
         if (targetStatus !in setOf("a_recuperer", "a_livrer", "en_cours_livraison", "restitue")) return false
         if (order.isSubscriptionOrder || order.modeReglement.equals("abonnement", ignoreCase = true)) return false
         val remaining = (order.prixTotal - order.avancePayee).coerceAtLeast(0.0)
@@ -1068,25 +1314,65 @@ object KlinUpRepository {
         momoReference: String? = null,
         momoOperator: String? = null
     ): Result<Unit> {
-        return runCatching {
+        return safeApiCatching(
+            actionHint = "enregistrer le règlement de la commande",
+            fallback = "Impossible d'enregistrer le règlement. Veuillez réessayer."
+        ) {
             val user = requireAuthenticatedUser()
             if (!user.canPerformOrderTransition(order.statut, targetStatus)) {
                 throw SecurityException("Action non autorisée pour votre rôle (${user.role}).")
             }
             val cleanAmountPaid = amountPaid.coerceAtLeast(0.0)
+            val isSubscription = order.isSubscriptionOrder || order.modeReglement.equals("abonnement", ignoreCase = true)
+            val orderRemaining = if (isSubscription) 0.0 else (order.prixTotal - order.avancePayee).coerceAtLeast(0.0)
+            val deliveryFeeRequired = requiresDeliveryFeeOnCompletion(order, targetStatus)
+            val deliveryFeeAdded = if (deliveryFeeRequired) (cleanAmountPaid - orderRemaining).coerceAtLeast(0.0) else 0.0
+            val updatedPrixTotal = order.prixTotal + deliveryFeeAdded
+            val updatedFraisLivraison = order.fraisLivraison + deliveryFeeAdded
+            val updatedLivraisonDomicile = order.livraisonDomicile || deliveryFeeRequired
+
             val newAvance = order.avancePayee + cleanAmountPaid
             val paidAtIso = Instant.now().toString()
             val resolvedMethod = if (paymentMethod == "mobile_money") "mobile_money" else "especes"
 
-            client.from("orders").update(
-                OrderPaymentPatch(
-                    statut = targetStatus,
-                    modeReglement = resolvedMethod,
-                    avancePayee = newAvance,
-                    soldePaidAt = paidAtIso
-                )
-            ) {
-                filter { eq("id", order.id) }
+            if (deliveryFeeRequired) {
+                runCatching {
+                    client.from("orders").update(
+                        OrderDeliveryPaymentWithFeePatch(
+                            statut = targetStatus,
+                            modeReglement = resolvedMethod,
+                            avancePayee = newAvance,
+                            soldePaidAt = paidAtIso,
+                            prixTotal = updatedPrixTotal,
+                            fraisLivraison = updatedFraisLivraison
+                        )
+                    ) {
+                        filter { eq("id", order.id) }
+                    }
+                }.getOrElse {
+                    client.from("orders").update(
+                        OrderDeliveryPaymentPatch(
+                            statut = targetStatus,
+                            modeReglement = resolvedMethod,
+                            avancePayee = newAvance,
+                            soldePaidAt = paidAtIso,
+                            prixTotal = updatedPrixTotal
+                        )
+                    ) {
+                        filter { eq("id", order.id) }
+                    }
+                }
+            } else {
+                client.from("orders").update(
+                    OrderPaymentPatch(
+                        statut = targetStatus,
+                        modeReglement = resolvedMethod,
+                        avancePayee = newAvance,
+                        soldePaidAt = paidAtIso
+                    )
+                ) {
+                    filter { eq("id", order.id) }
+                }
             }
 
             _orders.value = _orders.value.map {
@@ -1095,9 +1381,18 @@ object KlinUpRepository {
                         statut = targetStatus,
                         modeReglement = resolvedMethod,
                         avancePayee = newAvance,
-                        soldePaidAt = paidAtIso
+                        soldePaidAt = paidAtIso,
+                        prixTotal = updatedPrixTotal,
+                        fraisLivraison = updatedFraisLivraison,
+                        livraisonDomicile = updatedLivraisonDomicile
                     )
                 } else it
+            }
+            val updatedOrder = _orders.value.firstOrNull { it.id == order.id }
+            if (targetStatus == "en_cours_livraison" && updatedOrder != null) {
+                startTrackingMission(updatedOrder, "livraison_client")
+            } else if (targetStatus in setOf("restitue", "annule", "a_livrer", "a_recuperer")) {
+                stopTrackingMission(order.id)
             }
 
             val customer = order.customerId?.let { cid -> _customers.value.firstOrNull { it.id == cid } }
@@ -1143,9 +1438,13 @@ object KlinUpRepository {
         deliveryFee: Double = 0.0,
         pickupFee: Double = 0.0,
         expressFee: Double = 0.0,
-        homeDelivery: Boolean = false
+        homeDelivery: Boolean = false,
+        homePickup: Boolean = false
     ): Result<Pair<Order, Customer>> {
-        return runCatching {
+        return safeApiCatching(
+            actionHint = "créer la commande",
+            fallback = "Impossible de créer la commande. Veuillez réessayer."
+        ) {
             val user = requireAuthenticatedUser()
             if (!user.canCreateOrders) {
                 throw SecurityException("Vous n'avez pas l'autorisation de créer des commandes.")
@@ -1204,8 +1503,10 @@ object KlinUpRepository {
                 }
             }
 
+            val freeDeliverySub = isSubOrder && isCustomerFreeDeliverySubscription(resolvedCustomer)
+            val effectiveDeliveryFee = if (freeDeliverySub) 0.0 else deliveryFee.coerceAtLeast(0.0)
             val itemsTotal = if (isSubOrder) 0.0 else selectedItems.sumOf { it.prix * it.quantite }
-            val grossTotal = itemsTotal + expressFee.coerceAtLeast(0.0) + deliveryFee.coerceAtLeast(0.0) + pickupFee.coerceAtLeast(0.0)
+            val grossTotal = itemsTotal + expressFee.coerceAtLeast(0.0) + effectiveDeliveryFee + pickupFee.coerceAtLeast(0.0)
             val total = (grossTotal - reduction).coerceAtLeast(0.0)
             val effectiveAdvance = if (isSubOrder && total <= 0.0) 0.0 else avancePayee.coerceAtLeast(0.0)
             val subDetails = if (isSubOrder && activeSub != null) {
@@ -1214,7 +1515,8 @@ object KlinUpRepository {
                     vetementsUtilises = totalClothesCount,
                     vetementsInclus = activeSub.totalClothes,
                     usedClothes = totalClothesCount,
-                    totalClothes = activeSub.totalClothes
+                    totalClothes = activeSub.totalClothes,
+                    livraisonGratuite = freeDeliverySub
                 )
             } else null
 
@@ -1252,7 +1554,9 @@ object KlinUpRepository {
                 subscriptionDetails = subDetails,
                 createdById = user.id,
                 createdByName = user.fullName,
-                storeId = storeId
+                storeId = storeId,
+                fraisRecuperation = pickupFee.coerceAtLeast(0.0),
+                withPickup = homePickup || pickupFee > 0.0
             )
 
             var insertedOrderId = nextSeqId
@@ -1327,9 +1631,14 @@ object KlinUpRepository {
                 createdById = orderPayload.createdById,
                 createdByName = orderPayload.createdByName,
                 storeId = orderPayload.storeId,
-                fraisLivraison = deliveryFee,
-                livraisonDomicile = homeDelivery
+                fraisLivraison = effectiveDeliveryFee,
+                livraisonDomicile = homeDelivery,
+                fraisRecuperation = orderPayload.fraisRecuperation,
+                withPickup = orderPayload.withPickup
             )
+            if (user.role.equals("livreur", ignoreCase = true) && hasPickupOption(createdOrder)) {
+                startTrackingMission(createdOrder, "depot_laverie")
+            }
             createdOrder to resolvedCustomer
         }
     }
@@ -1499,7 +1808,10 @@ object KlinUpRepository {
         longitude: Double? = null,
         explicitStoreId: String? = null,
         subscriptionPlan: CatalogItem? = null
-    ): Result<Customer> = runCatching {
+    ): Result<Customer> = safeApiCatching(
+        actionHint = "créer le client",
+        fallback = "Impossible de créer le client. Veuillez réessayer."
+    ) {
         val current = requireAuthenticatedUser()
         val storeId = explicitStoreId?.takeIf { it.isNotBlank() && it != "all" && it != "GLOBAL" }
             ?: _selectedStoreId.value.takeIf { it != "all" && it != "GLOBAL" }
@@ -1566,7 +1878,10 @@ object KlinUpRepository {
         latitude: Double? = null,
         longitude: Double? = null,
         preferencesPliage: String
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> = safeApiCatching(
+        actionHint = "modifier la fiche client",
+        fallback = "Impossible de mettre à jour la fiche client. Veuillez réessayer."
+    ) {
         requireAuthenticatedUser()
         val cleanNom = nom.trim()
         val cleanPrenom = prenom.trim()
@@ -1622,7 +1937,10 @@ object KlinUpRepository {
         }
     }
 
-    suspend fun deleteCustomer(customerId: String, reason: String): Result<Unit> = runCatching {
+    suspend fun deleteCustomer(customerId: String, reason: String): Result<Unit> = safeApiCatching(
+        actionHint = "supprimer le client",
+        fallback = "Impossible de supprimer le client. Veuillez réessayer."
+    ) {
         val user = requireAuthenticatedUser()
         val cleanReason = reason.trim()
         if (cleanReason.isBlank()) {
@@ -1703,7 +2021,10 @@ object KlinUpRepository {
         customerId: String,
         pointsDelta: Int,
         reason: String? = null
-    ): Result<RewardPointAdjustment> = runCatching {
+    ): Result<RewardPointAdjustment> = safeApiCatching(
+        actionHint = "ajuster les points de fidélité",
+        fallback = "Impossible d'ajuster les points de fidélité. Veuillez réessayer."
+    ) {
         val user = requireAuthenticatedUser()
         val cleanReason = reason?.trim().orEmpty()
         if (cleanReason.isEmpty()) {
@@ -1774,7 +2095,10 @@ object KlinUpRepository {
         adjustmentId: String,
         approve: Boolean,
         rejectionReason: String? = null
-    ): Result<RewardPointAdjustment> = runCatching {
+    ): Result<RewardPointAdjustment> = safeApiCatching(
+        actionHint = "ajuster les points de fidélité",
+        fallback = "Impossible d'ajuster les points de fidélité. Veuillez réessayer."
+    ) {
         val user = requireAuthenticatedUser()
         if (!canValidateRewardAdjustments(user)) {
             throw SecurityException("Seuls le Super Administrateur et le Gestionnaire de laverie peuvent valider cet ajustement.")
@@ -1905,7 +2229,10 @@ object KlinUpRepository {
     suspend fun redeemCustomerReward(
         customerId: String,
         reward: RewardCatalogItem
-    ): Result<Int> = runCatching {
+    ): Result<Int> = safeApiCatching(
+        actionHint = "échanger la récompense",
+        fallback = "Impossible d'échanger la récompense. Veuillez réessayer."
+    ) {
         val user = requireAuthenticatedUser()
         val customer = _customers.value.firstOrNull { it.id == customerId }
             ?: throw IllegalStateException("Client introuvable")
@@ -1927,7 +2254,10 @@ object KlinUpRepository {
         newPoints
     }
 
-    suspend fun subscribeCustomer(customerId: String, plan: CatalogItem): Result<ActiveSubscription> = runCatching {
+    suspend fun subscribeCustomer(customerId: String, plan: CatalogItem): Result<ActiveSubscription> = safeApiCatching(
+        actionHint = "souscrire à l'abonnement",
+        fallback = "Impossible d'activer l'abonnement. Veuillez réessayer."
+    ) {
         val existingSub = _customers.value.firstOrNull { it.id == customerId }?.activeSubscription
         if (existingSub != null) {
             throw IllegalStateException("Ce client possède déjà un abonnement actif (${existingSub.name}). Résiliez-le avant d'en souscrire un nouveau.")
@@ -1949,7 +2279,8 @@ object KlinUpRepository {
             dureeJours = dureeJours,
             subscribedAt = now.toString(),
             expiresAt = expires.toString(),
-            endDate = expires.toString()
+            endDate = expires.toString(),
+            livraisonGratuite = plan.livraisonGratuite
         )
         client.from("customers").update(CustomerSubscriptionPatch(activeSubscription = activeSub)) {
             filter { eq("id", customerId) }
@@ -1960,7 +2291,10 @@ object KlinUpRepository {
         activeSub
     }
 
-    suspend fun unsubscribeCustomer(customerId: String): Result<Unit> = runCatching {
+    suspend fun unsubscribeCustomer(customerId: String): Result<Unit> = safeApiCatching(
+        actionHint = "résilier l'abonnement",
+        fallback = "Impossible de résilier l'abonnement. Veuillez réessayer."
+    ) {
         client.from("customers").update(CustomerSubscriptionPatch(activeSubscription = null)) {
             filter { eq("id", customerId) }
         }
@@ -2118,7 +2452,7 @@ object KlinUpRepository {
         _customers.value = _customers.value.map { c ->
             if (c.id == customerId) c.copy(latitude = lat, longitude = lng, coordonneesLivraison = coordStr) else c
         }
-        runCatching {
+        val directSaved = runCatching {
             client.from("customers").update(
                 mapOf(
                     "latitude" to lat.toString(),
@@ -2127,6 +2461,43 @@ object KlinUpRepository {
                 )
             ) {
                 filter { eq("id", customerId) }
+            }
+        }.isSuccess
+
+        if (!directSaved) {
+            val existingAddr = _customers.value.firstOrNull { it.id == customerId }?.adresse.orEmpty()
+                .replace(Regex("\\s*\\[GPS:[^\\]]+\\]"), "")
+                .trim()
+            val taggedAddr = if (existingAddr.isNotBlank()) "$existingAddr [GPS:$lat,$lng]" else "[GPS:$lat,$lng]"
+            runCatching {
+                client.from("customers").update(mapOf("adresse" to taggedAddr)) {
+                    filter { eq("id", customerId) }
+                }
+            }
+        }
+
+        // Mettre à jour aussi les sessions de suivi actives pour les commandes de ce client
+        val customerOrderIds = _orders.value.filter { it.customerId == customerId }.map { it.id }.toSet()
+        if (customerOrderIds.isNotEmpty()) {
+            _trackingSessions.value = _trackingSessions.value.map { s ->
+                if (s.orderId in customerOrderIds && s.missionType != "depot_laverie") {
+                    s.copy(destLatitude = lat, destLongitude = lng)
+                } else s
+            }
+            customerOrderIds.forEach { oid ->
+                runCatching {
+                    client.from("order_tracking_sessions").update(
+                        buildJsonObject {
+                            put("dest_latitude", lat)
+                            put("dest_longitude", lng)
+                        }
+                    ) {
+                        filter {
+                            eq("order_id", oid)
+                            eq("is_active", true)
+                        }
+                    }
+                }
             }
         }
     }
@@ -2211,7 +2582,10 @@ object KlinUpRepository {
         )
     }
 
-    suspend fun updateAdminSettings(settings: AdminSettings): Result<Unit> = runCatching {
+    suspend fun updateAdminSettings(settings: AdminSettings): Result<Unit> = safeApiCatching(
+        actionHint = "enregistrer les paramètres",
+        fallback = "Impossible d'enregistrer les paramètres. Veuillez réessayer."
+    ) {
         val rows = listOf(
             SettingCatalogUpsert("setting_normal_hours", "Délai Normal (heures)", prix = settings.normalHours.toDouble()),
             SettingCatalogUpsert("setting_express_hours", "Délai Express (heures)", prix = settings.expressHours.toDouble()),
@@ -2241,17 +2615,46 @@ object KlinUpRepository {
         }.getOrElse { iso.take(10) }
     }
 
-    private fun sanitizeApiError(err: Throwable, fallback: Throwable? = null): String {
-        val raw = err.message ?: fallback?.message ?: return "Erreur lors de l'enregistrement."
-        val firstLine = raw.lineSequence().firstOrNull()?.trim().orEmpty()
-        return when {
-            raw.contains("customers_telephone_key", ignoreCase = true) ||
-                raw.contains("duplicate key", ignoreCase = true) ->
-                "Un client avec ce numéro de téléphone existe déjà."
-            firstLine.isNotBlank() && !firstLine.startsWith("URL:", ignoreCase = true) ->
-                firstLine.take(180)
-            else -> "Erreur serveur lors de l'enregistrement. Veuillez réessayer."
+    private inline fun <T> safeApiCatching(
+        actionHint: String? = null,
+        fallback: String = "Une erreur est survenue. Veuillez réessayer.",
+        block: () -> T
+    ): Result<T> {
+        if (!NetworkMonitor.recheck()) {
+            val offlineMsg = NetworkMonitor.friendlyErrorMessage(null, actionHint, fallback)
+            NetworkMonitor.showToast(offlineMsg)
+            return Result.failure(IllegalStateException(offlineMsg))
         }
+        return try {
+            Result.success(block())
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            val msg = NetworkMonitor.friendlyErrorMessage(e, actionHint, fallback)
+            if (NetworkMonitor.isNetworkFailure(e)) {
+                NetworkMonitor.markOffline()
+                NetworkMonitor.showToast(msg)
+            }
+            Result.failure(IllegalStateException(msg))
+        }
+    }
+
+    private fun sanitizeApiError(err: Throwable, fallback: Throwable? = null): String {
+        val msg = NetworkMonitor.friendlyErrorMessage(
+            err,
+            actionHint = null,
+            fallback = ""
+        ).ifBlank {
+            NetworkMonitor.friendlyErrorMessage(
+                fallback,
+                actionHint = null,
+                fallback = "Impossible d'enregistrer l'opération. Veuillez réessayer."
+            )
+        }
+        if (NetworkMonitor.isNetworkFailure(err) || NetworkMonitor.isNetworkFailure(fallback)) {
+            NetworkMonitor.showToast(msg)
+        }
+        return msg
     }
 
     suspend fun createExpense(
@@ -2538,5 +2941,282 @@ object KlinUpRepository {
     fun parseInstant(iso: String?): Instant? {
         if (iso.isNullOrBlank()) return null
         return runCatching { Instant.parse(iso) }.getOrNull()
+    }
+
+    fun onLocationPermissionGranted() {
+        val ctx = appContext ?: return
+        val pending = _pendingTrackingPermissions.value
+        _pendingTrackingPermissions.value = emptyList()
+        pending.forEach { (orderId, missionType) ->
+            DeliveryTrackingService.startMission(ctx, orderId, missionType)
+        }
+    }
+
+    fun dismissPendingTrackingPermissions() {
+        _pendingTrackingPermissions.value = emptyList()
+    }
+
+    private fun ensureRealtimeTrackingWatcher() {
+        val user = _currentUser.value ?: return
+        if (trackingRealtimeJob?.isActive == true) return
+        trackingRealtimeJob = backgroundScope.launch {
+            launch {
+                runCatching {
+                    val channel = client.realtime.channel("tracking_live_${System.currentTimeMillis()}")
+                    val insertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                        table = "order_tracking_sessions"
+                    }
+                    val updateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                        table = "order_tracking_sessions"
+                    }
+                    channel.subscribe()
+                    launch {
+                        insertFlow.collect { refreshTrackingSessionsOnly() }
+                    }
+                    updateFlow.collect { refreshTrackingSessionsOnly() }
+                }
+            }
+            while (_currentUser.value?.id == user.id) {
+                delay(10_000L)
+                if (NetworkMonitor.isOnline.value) {
+                    refreshTrackingSessionsOnly()
+                }
+            }
+        }
+    }
+
+    suspend fun refreshTrackingSessionsOnly(force: Boolean = false) {
+        val nowMs = System.currentTimeMillis()
+        if (!force && nowMs - lastTrackingRefreshAtMs < 1500L) return
+        lastTrackingRefreshAtMs = nowMs
+        runCatching {
+            val user = _currentUser.value ?: return
+            val storeScope = resolveAssignedStoreScope(user, _stores.value)
+            val rows = client.from("order_tracking_sessions")
+                .select {
+                    filter { eq("is_active", true) }
+                    order("updated_at", order = PostgrestOrder.DESCENDING)
+                }
+                .decodeList<OrderTrackingSession>()
+                .filter { matchesStoreScope(it.storeId, storeScope) }
+                .map { enrichTrackingDestination(it) }
+            if (_trackingSessions.value != rows) {
+                _trackingSessions.value = rows
+            }
+            val activeIds = rows.asSequence().filter { it.isActive }.map { it.orderId }.toSet()
+            if (_activeTrackingOrderIds.value != activeIds) {
+                _activeTrackingOrderIds.value = activeIds
+            }
+            rows.forEach { s ->
+                val lat = s.latitude
+                val lng = s.longitude
+                if (lat != null && lng != null) {
+                    recordTrailPoint(s.orderId, lat, lng)
+                }
+                if (s.isActive && s.driverId == user.id && !DeliveryTrackingService.isTracking(s.orderId)) {
+                    val ctx = appContext
+                    if (ctx != null && DeliveryTrackingService.hasLocationPermission(ctx)) {
+                        DeliveryTrackingService.startMission(ctx, s.orderId, s.missionType)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun recordTrailPoint(orderId: String, lat: Double, lng: Double) {
+        val current = _trackingTrails.value[orderId].orEmpty()
+        val last = current.lastOrNull()
+        if (last != null) {
+            val distMeters = haversineKm(last.first, last.second, lat, lng) * 1000.0
+            if (distMeters < 1.5) return
+        }
+        val updated = (current + (lat to lng)).takeLast(500)
+        _trackingTrails.value = _trackingTrails.value + (orderId to updated)
+    }
+
+    private fun enrichTrackingDestination(s: OrderTrackingSession): OrderTrackingSession {
+        if (s.destLatitude != null && s.destLongitude != null) return s
+        val order = _orders.value.firstOrNull { it.id == s.orderId }
+        val store = _stores.value.firstOrNull { it.id == (s.storeId ?: order?.storeId) || it.code == (s.storeId ?: order?.storeId) }
+            ?: _stores.value.firstOrNull()
+        val customer = order?.customerId?.let { cid -> _customers.value.firstOrNull { it.id == cid } }
+        return if (s.missionType == "depot_laverie") {
+            s.copy(
+                destLatitude = store?.latitude ?: 6.3703,
+                destLongitude = store?.longitude ?: 2.3912,
+                destLabel = s.destLabel ?: store?.nom ?: "Point de laverie"
+            )
+        } else {
+            val latLng = customer?.resolvedLatLng
+            s.copy(
+                destLatitude = latLng?.first,
+                destLongitude = latLng?.second,
+                destLabel = s.destLabel ?: customer?.adresse?.takeIf { it.isNotBlank() } ?: customer?.fullName ?: "Adresse client"
+            )
+        }
+    }
+
+    suspend fun refreshTrackingRouteFromDatabase(orderId: String?): Result<OrderTrackingSession?> = safeApiCatching(
+        actionHint = "charger l'itinéraire de livraison",
+        fallback = "Impossible de récupérer l'itinéraire depuis le serveur."
+    ) {
+        val freshCustomers = runCatching {
+            client.from("customers").select().decodeList<Customer>().filter { it.deletedAt == null }
+        }.getOrNull()
+        if (freshCustomers != null) {
+            val user = _currentUser.value
+            val storeScope = resolveAssignedStoreScope(user, _stores.value)
+            val scopedOrderCustomerIds = _orders.value.mapNotNull { it.customerId }.toSet()
+            _customers.value = freshCustomers.filter { matchesStoreScope(it.storeId, storeScope) || it.id in scopedOrderCustomerIds }
+        }
+        refreshTrackingSessionsOnly()
+        var target = orderId?.let { oid -> _trackingSessions.value.firstOrNull { it.orderId == oid } }
+            ?: _trackingSessions.value.firstOrNull()
+
+        if (target != null && (target.destLatitude == null || target.destLongitude == null)) {
+            val order = _orders.value.firstOrNull { it.id == target.orderId }
+            val customer = order?.customerId?.let { cid -> _customers.value.firstOrNull { it.id == cid } }
+            val queryAddr = (target.destLabel ?: customer?.adresse)
+                ?.replace(Regex("\\s*\\[GPS:[^\\]]+\\]"), "")
+                ?.trim()
+                .orEmpty()
+            if (queryAddr.isNotBlank()) {
+                val geocoded = geocodeAddressNominatim(queryAddr)
+                if (geocoded != null) {
+                    val (gLat, gLng) = geocoded
+                    target = target.copy(destLatitude = gLat, destLongitude = gLng)
+                    _trackingSessions.value = _trackingSessions.value.map {
+                        if (it.orderId == target.orderId) target else it
+                    }
+                    if (customer != null) {
+                        updateCustomerLocation(customer.id, gLat, gLng)
+                    }
+                }
+            }
+        }
+        target
+    }
+
+    private fun geocodeAddressNominatim(address: String): Pair<Double, Double>? {
+        return runCatching {
+            val encoded = java.net.URLEncoder.encode("$address, Cotonou, Benin", "UTF-8")
+            val conn = (java.net.URL("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=$encoded")
+                .openConnection() as java.net.HttpURLConnection).apply {
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "KlinUpAndroid/1.0")
+                connectTimeout = 5000
+                readTimeout = 5000
+            }
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            conn.disconnect()
+            val arr = org.json.JSONArray(body)
+            if (arr.length() > 0) {
+                val obj = arr.getJSONObject(0)
+                val lat = obj.optString("lat").toDoubleOrNull()
+                val lng = obj.optString("lon").toDoubleOrNull()
+                if (lat != null && lng != null) lat to lng else null
+            } else null
+        }.getOrNull()
+    }
+
+    suspend fun startTrackingMission(order: Order, missionType: String) {
+        val user = _currentUser.value ?: return
+        val store = _stores.value.firstOrNull { it.id == order.storeId || it.code == order.storeId }
+            ?: _stores.value.firstOrNull()
+        val customer = order.customerId?.let { cid -> _customers.value.firstOrNull { it.id == cid } }
+
+        val (destLat, destLng, destLabel) = if (missionType == "depot_laverie") {
+            Triple(
+                store?.latitude ?: 6.3703,
+                store?.longitude ?: 2.3912,
+                store?.nom?.ifBlank { "Point de laverie" } ?: "Point de laverie"
+            )
+        } else {
+            val latLng = customer?.resolvedLatLng
+            Triple(
+                latLng?.first,
+                latLng?.second,
+                customer?.adresse?.takeIf { it.isNotBlank() } ?: customer?.fullName ?: "Adresse client"
+            )
+        }
+
+        val nowIso = Instant.now().toString()
+        val session = OrderTrackingSession(
+            id = "trk_${order.id}",
+            orderId = order.id,
+            driverId = user.id,
+            driverName = user.fullName,
+            storeId = order.storeId ?: store?.id,
+            missionType = missionType,
+            destLatitude = destLat,
+            destLongitude = destLng,
+            destLabel = destLabel,
+            isActive = true,
+            startedAt = nowIso,
+            endedAt = null,
+            updatedAt = nowIso
+        )
+
+        _trackingSessions.value = (_trackingSessions.value.filterNot { it.orderId == order.id } + session)
+
+        runCatching {
+            client.from("order_tracking_sessions").upsert(session) {
+                onConflict = "order_id"
+            }
+        }
+
+        val ctx = appContext ?: return
+        if (DeliveryTrackingService.hasLocationPermission(ctx)) {
+            DeliveryTrackingService.startMission(ctx, order.id, missionType)
+        } else {
+            _pendingTrackingPermissions.value =
+                (_pendingTrackingPermissions.value.filterNot { it.first == order.id } + (order.id to missionType))
+        }
+    }
+
+    suspend fun stopTrackingMission(orderId: String) {
+        appContext?.let { DeliveryTrackingService.stopMission(it, orderId) }
+        _pendingTrackingPermissions.value = _pendingTrackingPermissions.value.filterNot { it.first == orderId }
+        _trackingSessions.value = _trackingSessions.value.filterNot { it.orderId == orderId }
+        _trackingTrails.value = _trackingTrails.value - orderId
+        val nowIso = Instant.now().toString()
+        runCatching {
+            client.from("order_tracking_sessions").update(
+                buildJsonObject {
+                    put("is_active", false)
+                    put("ended_at", nowIso)
+                    put("updated_at", nowIso)
+                }
+            ) {
+                filter { eq("order_id", orderId) }
+            }
+        }
+    }
+
+    suspend fun pushLiveLocation(orderId: String, lat: Double, lng: Double, heading: Double, speed: Double) {
+        recordTrailPoint(orderId, lat, lng)
+        if (!NetworkMonitor.isOnline.value) return
+        val nowIso = Instant.now().toString()
+        _trackingSessions.value = _trackingSessions.value.map {
+            if (it.orderId == orderId) {
+                it.copy(latitude = lat, longitude = lng, heading = heading, speed = speed, updatedAt = nowIso)
+            } else it
+        }
+        runCatching {
+            client.from("order_tracking_sessions").update(
+                buildJsonObject {
+                    put("latitude", lat)
+                    put("longitude", lng)
+                    put("heading", heading)
+                    put("speed", speed)
+                    put("updated_at", nowIso)
+                }
+            ) {
+                filter {
+                    eq("order_id", orderId)
+                    eq("is_active", true)
+                }
+            }
+        }
     }
 }

@@ -239,10 +239,12 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
     try {
       const currentUser = db.getCurrentUser();
-      const deliveryCalc = withDelivery
+      const selectedImmediatePlan = isImmediateSub ? catalog.find(c => c.id === subscribePlanId) : null;
+      const hasFreeDeliverySub = isSubscriptionActive && (isImmediateSub ? !!selectedImmediatePlan?.livraison_gratuite : db.isCustomerFreeDeliverySubscription(activeCustomer));
+      const deliveryCalc = (withDelivery && !hasFreeDeliverySub)
         ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
         : { fee: 0, distanceKm: 0, zoneLabel: 'N/A' };
-      const deliveryFee = withDelivery ? (deliveryCalc.fee || 0) : 0;
+      const deliveryFee = (withDelivery && !hasFreeDeliverySub) ? (deliveryCalc.fee || 0) : 0;
 
       const pickupCalc = withPickup
         ? db.calculatePickupFee(selectedOrderStoreId || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
@@ -1125,11 +1127,13 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                 currentTotal = Math.round(currentTotal * (1 + expressMarkup / 100));
               }
 
+              const selectedImmediatePlanPreview = isImmediateSub ? catalog.find(c => c.id === subscribePlanId) : null;
+              const hasFreeDeliverySubPreview = isSubscriptionActive && (isImmediateSub ? !!selectedImmediatePlanPreview?.livraison_gratuite : db.isCustomerFreeDeliverySubscription(activeCustomer));
               const discountAmount = Math.min(Number(orderDiscount) || 0, currentTotal);
-              const deliveryCalcPreview = withDelivery
+              const deliveryCalcPreview = (withDelivery && !hasFreeDeliverySubPreview)
                 ? db.calculateDeliveryFee(selectedOrderStoreId || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
                 : { fee: 0, distanceKm: 0 };
-              const deliveryFeePreview = withDelivery ? (deliveryCalcPreview.fee || 0) : 0;
+              const deliveryFeePreview = (withDelivery && !hasFreeDeliverySubPreview) ? (deliveryCalcPreview.fee || 0) : 0;
 
               const pickupCalcPreview = withPickup
                 ? db.calculatePickupFee(selectedOrderStoreId || 'store_central', activeCustomer?.coordonnees_livraison, activeCustomer?.latitude, activeCustomer?.longitude)
@@ -1173,13 +1177,13 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                     </div>
                   )}
 
-                  {withDelivery && deliveryFeePreview > 0 && (
+                  {!hasFreeDeliverySubPreview && withDelivery && deliveryFeePreview > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 700 }}>Frais de Livraison ({deliveryCalcPreview.distanceKm} km)</span>
                       <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 700 }}>+{formatPrice(deliveryFeePreview)}</span>
                     </div>
                   )}
-                  {withDelivery && deliveryFeePreview === 0 && activeCustomer && !activeCustomer.coordonnees_livraison && (
+                  {!hasFreeDeliverySubPreview && withDelivery && deliveryFeePreview === 0 && activeCustomer && !activeCustomer.coordonnees_livraison && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>Livraison</span>
                       <span style={{ fontSize: '11px', color: '#f59e0b' }}>GPS client non renseigné</span>
