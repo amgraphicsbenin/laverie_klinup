@@ -7,6 +7,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,6 +29,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -124,6 +128,21 @@ fun MapLocationPickerDialog(
     var isMapReady by remember { mutableStateOf(false) }
     var mapError by remember { mutableStateOf<String?>(null) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var isFullScreen by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = isFullScreen) {
+        isFullScreen = false
+    }
+
+    LaunchedEffect(isFullScreen, isMapReady) {
+        if (isMapReady) {
+            delay(100L)
+            webViewRef?.evaluateJavascript(
+                "if (window.invalidateMapSize) window.invalidateMapSize();",
+                null
+            )
+        }
+    }
 
     var suggestions by remember { mutableStateOf<List<AddressSuggestion>>(emptyList()) }
     var isSearchingSuggestions by remember { mutableStateOf(false) }
@@ -198,12 +217,16 @@ fun MapLocationPickerDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .height(620.dp),
-            shape = RoundedCornerShape(26.dp),
+            modifier = if (isFullScreen) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier
+                    .fillMaxWidth(0.95f)
+                    .height(620.dp)
+            },
+            shape = if (isFullScreen) RoundedCornerShape(0.dp) else RoundedCornerShape(26.dp),
             color = CardWhite,
-            border = BorderStroke(1.dp, CardBorder)
+            border = if (isFullScreen) null else BorderStroke(1.dp, CardBorder)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header
@@ -304,8 +327,8 @@ fun MapLocationPickerDialog(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp)
-                        .clip(RoundedCornerShape(18.dp))
+                        .padding(horizontal = if (isFullScreen) 0.dp else 14.dp)
+                        .clip(RoundedCornerShape(if (isFullScreen) 0.dp else 18.dp))
                         .background(MaterialTheme.klinUpColors.altPageBg)
                 ) {
                     AndroidView(
@@ -389,6 +412,28 @@ fun MapLocationPickerDialog(
                                     color = InkSecondary
                                 )
                             }
+                        }
+                    }
+
+                    // Bouton de bascule plein écran en haut à droite de la carte
+                    Surface(
+                        onClick = { isFullScreen = !isFullScreen },
+                        shape = RoundedCornerShape(10.dp),
+                        color = CardWhite.copy(alpha = 0.94f),
+                        border = BorderStroke(1.dp, CardBorder),
+                        shadowElevation = 4.dp,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                            .size(38.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isFullScreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
+                                contentDescription = if (isFullScreen) "Quitter le plein écran" else "Vue plein écran",
+                                tint = InkPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
                     }
 
@@ -695,6 +740,10 @@ private fun buildAdminLeafletPickerHtml(
                   var pos = marker.getLatLng();
                   setPosition(pos.lat, pos.lng);
                 });
+
+                window.invalidateMapSize = function() {
+                  map.invalidateSize({ animate: true });
+                };
 
                 window.moveToLocation = function(latVal, lngVal, zoomLevel) {
                   map.setView([latVal, lngVal], zoomLevel || 16, { animate: true });
