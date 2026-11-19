@@ -315,21 +315,30 @@ fun ProfileScreen(onLogout: () -> Unit) {
         }
     }
 
-    // ── Photo de profil (stockée localement) ────────────────────────────────
+    // ── Photo de profil (synchronisée avec Supabase + cache local) ──────────
     val avatar by produceState<ImageBitmap?>(null, userId, avatarVersion) {
         value = if (userId.isBlank()) null else withContext(Dispatchers.IO) {
             val f = AppPreferences.avatarFile(userId)
             if (!f.exists()) null else runCatching {
-                val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                BitmapFactory.decodeFile(f.absolutePath, opts)?.asImageBitmap()
+                BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap()
             }.getOrNull()
         }
     }
+    val savePickedAvatar: (Uri?) -> Unit = { uri ->
+        if (uri != null && userId.isNotBlank()) {
+            scope.launch {
+                val dataUri = AppPreferences.saveAvatar(context, userId, uri)
+                if (dataUri != null) {
+                    KlinUpRepository.updateUserAvatar(userId, dataUri)
+                }
+            }
+        }
+    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
-        if (uri != null && userId.isNotBlank()) scope.launch { AppPreferences.saveAvatar(context, userId, uri) }
+        savePickedAvatar(uri)
     }
     val fallbackPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null && userId.isNotBlank()) scope.launch { AppPreferences.saveAvatar(context, userId, uri) }
+        savePickedAvatar(uri)
     }
     var showPhotoSheet by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
@@ -1108,7 +1117,7 @@ fun ProfileScreen(onLogout: () -> Unit) {
             onDismissRequest = { showPhotoSheet = false },
             containerColor = p.card,
             title = { Text("Photo de profil", color = p.ink, fontWeight = FontWeight.Bold) },
-            text = { Text("Choisissez une photo depuis votre galerie. Elle est enregistrée uniquement sur cet appareil.", color = p.muted) },
+            text = { Text("Choisissez une photo depuis votre galerie. Elle est synchronisée avec votre compte KLIN UP.", color = p.muted) },
             confirmButton = {
                 TextButton(onClick = {
                     showPhotoSheet = false
@@ -1121,7 +1130,11 @@ fun ProfileScreen(onLogout: () -> Unit) {
             },
             dismissButton = {
                 if (avatar != null) TextButton(onClick = {
-                    showPhotoSheet = false; AppPreferences.removeAvatar(userId)
+                    showPhotoSheet = false
+                    AppPreferences.removeAvatar(userId)
+                    if (userId.isNotBlank()) {
+                        scope.launch { KlinUpRepository.updateUserAvatar(userId, null) }
+                    }
                 }) { Text("Retirer", color = Danger) }
                 else TextButton(onClick = { showPhotoSheet = false }) { Text("Annuler", color = p.muted) }
             }

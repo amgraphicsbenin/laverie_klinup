@@ -39,11 +39,39 @@ android {
         buildConfigField("String", "SUPABASE_KEY", "\"sb_publishable_ZVFeOSNGPhFp1ZOGcV0aWQ_f7466uj9\"")
     }
 
+    signingConfigs {
+        val sharedTestKeystore = file("klinup-debug.keystore")
+        getByName("debug") {
+            if (sharedTestKeystore.exists()) {
+                storeFile = sharedTestKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+        create("release") {
+            val envKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+            val envKeystore = envKeystorePath?.let { file(it) }?.takeIf { it.exists() }
+            if (envKeystore != null) {
+                storeFile = envKeystore
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: ""
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: ""
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: ""
+            } else {
+                // Clé persistante partagée (identique en local et sur chaque run GitHub Actions)
+                // afin de permettre les mises à jour directes in-app sans désinstallation.
+                storeFile = sharedTestKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Build optimisé (non-debuggable) signé avec la clé de debug pour les tests locaux sur appareil
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

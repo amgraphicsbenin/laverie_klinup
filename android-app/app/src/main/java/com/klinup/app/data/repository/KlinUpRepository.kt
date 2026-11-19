@@ -14,6 +14,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import com.klinup.app.data.local.AppNotification
+import com.klinup.app.data.local.AppPreferences
 import com.klinup.app.data.local.KlinUpNotificationManager
 import com.klinup.app.data.local.NotificationCategory
 import com.klinup.app.data.local.PinVerificationResult
@@ -48,6 +49,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -511,6 +513,7 @@ object KlinUpRepository {
             if (!savedToken.isNullOrBlank()) {
                 startMultiDeviceSessionWatcher(cleanUser, savedToken, registerOnServer = false)
             }
+            syncUserAvatarAsync(cleanUser)
             backgroundScope.launch { refreshAll() }
             return true
         }
@@ -547,6 +550,7 @@ object KlinUpRepository {
             else -> "empreinte digitale"
         }
         logSecurityEvent(unlocked, "BIOMETRIC_UNLOCK", "Déverrouillage par $methodLabel (${unlocked.fullName})")
+        syncUserAvatarAsync(unlocked)
         if (_orders.value.isEmpty() || _customers.value.isEmpty() || _catalog.value.isEmpty()) {
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                 refreshAll()
@@ -738,7 +742,68 @@ object KlinUpRepository {
         SecurityManager.saveSessionToken(newToken)
         startMultiDeviceSessionWatcher(clean, newToken, registerOnServer = true)
         logSecurityEvent(clean, "LOGIN_SUCCESS", "Connexion mobile validée (${clean.role})")
+        syncUserAvatarAsync(clean)
         backgroundScope.launch { refreshAll() }
+    }
+
+    /**
+     * Synchronise la photo de profil de l'utilisateur dans Supabase (`staff.user_picture`)
+     * afin qu'elle soit automatiquement restaurée après réinstallation ou changement d'appareil.
+     */
+    suspend fun updateUserAvatar(userId: String, avatarDataUri: String?): Result<Unit> {
+        if (userId.isBlank()) return Result.failure(IllegalArgumentException("Identifiant utilisateur manquant."))
+        return runCatching {
+            val payload = buildJsonObject {
+                if (avatarDataUri.isNullOrBlank()) {
+                    put("user_picture", JsonNull)
+                } else {
+                    put("user_picture", avatarDataUri)
+                }
+            }
+            client.from("staff").update(payload) {
+                filter { eq("id", userId) }
+            }
+            val current = _currentUser.value
+            if (current != null && current.id == userId) {
+                val updated = current.copy(avatar = avatarDataUri)
+                _currentUser.value = updated
+                SecurityManager.saveAuthenticatedSession(updated)
+            }
+        }
+    }
+
+    private fun syncUserAvatarAsync(user: User) {
+        if (user.id.isBlank()) return
+        backgroundScope.launch {
+            runCatching {
+                val remoteAvatar = user.avatar?.takeIf { it.isNotBlank() } ?: runCatching {
+                    client.from("staff")
+                        .select(columns = Columns.list("id", "user_picture")) {
+                            filter { eq("id", user.id) }
+                        }
+                        .decodeList<User>()
+                        .firstOrNull()
+                        ?.avatar
+                        ?.takeIf { it.isNotBlank() }
+                }.getOrNull()
+
+                if (!remoteAvatar.isNullOrBlank()) {
+                    AppPreferences.syncAvatarFromRemote(user.id, remoteAvatar)
+                    val current = _currentUser.value
+                    if (current != null && current.id == user.id && current.avatar != remoteAvatar) {
+                        val updated = current.copy(avatar = remoteAvatar)
+                        _currentUser.value = updated
+                        SecurityManager.saveAuthenticatedSession(updated)
+                    }
+                } else {
+                    // Migration automatique d'une ancienne photo locale vers le compte Supabase
+                    val localDataUri = AppPreferences.encodeLocalAvatarAsDataUri(user.id)
+                    if (!localDataUri.isNullOrBlank()) {
+                        updateUserAvatar(user.id, localDataUri)
+                    }
+                }
+            }
+        }
     }
 
     private fun pinFailureMessage(result: PinVerificationResult, serverRemaining: Int?): String {

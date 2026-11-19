@@ -125,6 +125,24 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x android-app/gradlew
 
+      - name: Configure Release Signing Keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "${ANDROID_KEYSTORE_BASE64}" ]; then
+            echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android-app/app/release.keystore
+            echo "ANDROID_KEYSTORE_PATH=${GITHUB_WORKSPACE}/android-app/app/release.keystore" >> $GITHUB_ENV
+            echo "ANDROID_KEYSTORE_PASSWORD=${ANDROID_KEYSTORE_PASSWORD}" >> $GITHUB_ENV
+            echo "ANDROID_KEY_ALIAS=${ANDROID_KEY_ALIAS}" >> $GITHUB_ENV
+            echo "ANDROID_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}" >> $GITHUB_ENV
+            echo "🔐 Keystore de signature release configuré depuis les secrets GitHub."
+          else
+            echo "🔑 Utilisation de la clé persistante klinup-debug.keystore (signature stable entre builds)."
+          fi
+
       - name: Build Release APK
         working-directory: android-app
         run: ./gradlew assembleRelease --no-daemon --build-cache --parallel -x lint -x test
