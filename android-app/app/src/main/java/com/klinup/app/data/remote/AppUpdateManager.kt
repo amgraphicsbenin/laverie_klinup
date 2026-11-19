@@ -7,12 +7,22 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.klinup.app.BuildConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 data class AppUpdateInfo(
     val versionCode: Int,
@@ -79,44 +89,274 @@ object AppUpdateManager {
         }
     }
 
+    private const val IO_BUFFER_SIZE = 128 * 1024 // 128 Ko pour limiter les appels système
+    private const val MIN_PARALLEL_BYTES = 1L * 1024L * 1024L // 1 Mo
+    private const val LARGE_FILE_BYTES = 4L * 1024L * 1024L // 4 Mo
+    private const val CHUNKS_MEDIUM = 4
+    private const val CHUNKS_LARGE = 6
+    private const val MAX_CHUNK_RETRIES = 2
+
+    private data class DownloadProbe(
+        val finalUrl: String,
+        val totalBytes: Long,
+        val supportsRanges: Boolean
+    )
+
     suspend fun downloadApk(
         context: Context,
         apkUrl: String,
         onProgress: (Int) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
-        runCatching {
-            val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
-            val outFile = File(updatesDir, "klinup-update.apk")
+        val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
+        val outFile = File(updatesDir, "klinup-update.apk")
+        val tempFile = File(updatesDir, "klinup-update.apk.part")
+        try {
+            if (tempFile.exists()) tempFile.delete()
             if (outFile.exists()) outFile.delete()
 
-            val conn = openFollowingRedirects(apkUrl, connectTimeoutMs = 15_000, readTimeoutMs = 45_000)
-            try {
-                val code = conn.responseCode
-                if (code !in 200..299) {
-                    throw IllegalStateException("Téléchargement impossible (code $code).")
-                }
-                val totalBytes = conn.contentLengthLong
-                var downloaded = 0L
-                val buffer = ByteArray(8192)
+            val probe = try {
+                probeDownload(apkUrl)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
+            currentCoroutineContext().ensureActive()
 
-                conn.inputStream.use { input ->
-                    outFile.outputStream().use { output ->
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read <= 0) break
-                            output.write(buffer, 0, read)
-                            downloaded += read
-                            if (totalBytes > 0L) {
-                                val pct = ((downloaded * 100L) / totalBytes).toInt().coerceIn(0, 100)
-                                onProgress(pct)
+            val downloadedInParallel = if (
+                probe != null &&
+                probe.supportsRanges &&
+                probe.totalBytes >= MIN_PARALLEL_BYTES
+            ) {
+                try {
+                    downloadParallelChunks(
+                        finalUrl = probe.finalUrl,
+                        totalBytes = probe.totalBytes,
+                        tempFile = tempFile,
+                        onProgress = onProgress
+                    )
+                    true
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    if (tempFile.exists()) tempFile.delete()
+                    false
+                }
+            } else {
+                false
+            }
+
+            if (!downloadedInParallel) {
+                downloadSingleStream(
+                    url = probe?.finalUrl ?: apkUrl,
+                    tempFile = tempFile,
+                    onProgress = onProgress
+                )
+            }
+
+            currentCoroutineContext().ensureActive()
+            if (!tempFile.renameTo(outFile)) {
+                tempFile.copyTo(outFile, overwrite = true)
+                tempFile.delete()
+            }
+            onProgress(100)
+            Result.success(outFile)
+        } catch (e: CancellationException) {
+            if (tempFile.exists()) tempFile.delete()
+            throw e
+        } catch (e: Exception) {
+            if (tempFile.exists()) tempFile.delete()
+            Result.failure(e)
+        }
+    }
+
+    private fun probeDownload(apkUrl: String): DownloadProbe {
+        val (finalUrl, conn) = openFollowingRedirects(
+            urlString = apkUrl,
+            connectTimeoutMs = 10_000,
+            readTimeoutMs = 15_000,
+            extraHeaders = mapOf(
+                "Range" to "bytes=0-0",
+                "Accept-Encoding" to "identity"
+            )
+        )
+        return try {
+            val code = conn.responseCode
+            if (code == HttpURLConnection.HTTP_PARTIAL) {
+                val contentRange = conn.getHeaderField("Content-Range").orEmpty()
+                val total = Regex("""bytes\s+\d+-\d+/(\d+)""")
+                    .find(contentRange)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.toLongOrNull()
+                    ?: -1L
+                runCatching { conn.inputStream?.close() }
+                DownloadProbe(finalUrl = finalUrl, totalBytes = total, supportsRanges = total > 0L)
+            } else {
+                val total = conn.contentLengthLong
+                runCatching { conn.inputStream?.close() }
+                DownloadProbe(finalUrl = finalUrl, totalBytes = total, supportsRanges = false)
+            }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private suspend fun downloadParallelChunks(
+        finalUrl: String,
+        totalBytes: Long,
+        tempFile: File,
+        onProgress: (Int) -> Unit
+    ) = coroutineScope {
+        RandomAccessFile(tempFile, "rw").use { raf ->
+            raf.setLength(totalBytes)
+        }
+
+        val chunkCount = if (totalBytes >= LARGE_FILE_BYTES) CHUNKS_LARGE else CHUNKS_MEDIUM
+        val chunkSize = totalBytes / chunkCount
+        val totalDownloaded = AtomicLong(0L)
+        val lastReportedPct = AtomicInteger(-1)
+
+        val jobs = (0 until chunkCount).map { idx ->
+            val start = idx * chunkSize
+            val end = if (idx == chunkCount - 1) totalBytes - 1L else (start + chunkSize - 1L)
+            async(Dispatchers.IO) {
+                downloadChunkWithRetry(
+                    finalUrl = finalUrl,
+                    start = start,
+                    end = end,
+                    tempFile = tempFile,
+                    totalBytes = totalBytes,
+                    totalDownloaded = totalDownloaded,
+                    lastReportedPct = lastReportedPct,
+                    onProgress = onProgress
+                )
+            }
+        }
+        jobs.awaitAll()
+
+        if (totalDownloaded.get() != totalBytes || tempFile.length() != totalBytes) {
+            throw IllegalStateException("Téléchargement incomplet (${totalDownloaded.get()}/$totalBytes octets).")
+        }
+    }
+
+    private suspend fun downloadChunkWithRetry(
+        finalUrl: String,
+        start: Long,
+        end: Long,
+        tempFile: File,
+        totalBytes: Long,
+        totalDownloaded: AtomicLong,
+        lastReportedPct: AtomicInteger,
+        onProgress: (Int) -> Unit
+    ) {
+        var currentPos = start
+        var attempt = 0
+        val buffer = ByteArray(IO_BUFFER_SIZE)
+
+        while (currentPos <= end) {
+            currentCoroutineContext().ensureActive()
+            try {
+                val (_, conn) = openFollowingRedirects(
+                    urlString = finalUrl,
+                    connectTimeoutMs = 15_000,
+                    readTimeoutMs = 45_000,
+                    extraHeaders = mapOf(
+                        "Range" to "bytes=$currentPos-$end",
+                        "Accept-Encoding" to "identity",
+                        "Connection" to "keep-alive"
+                    )
+                )
+                try {
+                    val code = conn.responseCode
+                    if (code != HttpURLConnection.HTTP_PARTIAL) {
+                        throw IllegalStateException("Le serveur ne supporte pas le téléchargement parallèle (code $code).")
+                    }
+                    conn.inputStream.use { input ->
+                        RandomAccessFile(tempFile, "rw").use { raf ->
+                            raf.seek(currentPos)
+                            while (currentPos <= end) {
+                                currentCoroutineContext().ensureActive()
+                                val remaining = (end - currentPos + 1L).coerceAtMost(buffer.size.toLong()).toInt()
+                                val read = input.read(buffer, 0, remaining)
+                                if (read <= 0) break
+                                raf.write(buffer, 0, read)
+                                currentPos += read
+                                val done = totalDownloaded.addAndGet(read.toLong())
+                                emitMonotonicProgress(done, totalBytes, lastReportedPct, onProgress)
                             }
                         }
                     }
+                } finally {
+                    conn.disconnect()
                 }
-                onProgress(100)
-                outFile
-            } finally {
-                conn.disconnect()
+                if (currentPos <= end) {
+                    throw IllegalStateException("Flux interrompu prématurément sur le segment $start-$end.")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                attempt++
+                if (attempt > MAX_CHUNK_RETRIES) throw e
+            }
+        }
+    }
+
+    private suspend fun downloadSingleStream(
+        url: String,
+        tempFile: File,
+        onProgress: (Int) -> Unit
+    ) {
+        val (_, conn) = openFollowingRedirects(
+            urlString = url,
+            connectTimeoutMs = 15_000,
+            readTimeoutMs = 60_000,
+            extraHeaders = mapOf("Accept-Encoding" to "identity")
+        )
+        try {
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                throw IllegalStateException("Téléchargement impossible (code $code).")
+            }
+            val totalBytes = conn.contentLengthLong
+            var downloaded = 0L
+            val lastReportedPct = AtomicInteger(-1)
+            val buffer = ByteArray(IO_BUFFER_SIZE)
+
+            conn.inputStream.use { input ->
+                BufferedOutputStream(tempFile.outputStream(), IO_BUFFER_SIZE).use { output ->
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        if (totalBytes > 0L) {
+                            emitMonotonicProgress(downloaded, totalBytes, lastReportedPct, onProgress)
+                        }
+                    }
+                    output.flush()
+                }
+            }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun emitMonotonicProgress(
+        downloaded: Long,
+        totalBytes: Long,
+        lastReportedPct: AtomicInteger,
+        onProgress: (Int) -> Unit
+    ) {
+        if (totalBytes <= 0L) return
+        val pct = ((downloaded * 100L) / totalBytes).toInt().coerceIn(0, 99)
+        while (true) {
+            val prev = lastReportedPct.get()
+            if (pct <= prev) return
+            if (lastReportedPct.compareAndSet(prev, pct)) {
+                onProgress(pct)
+                return
             }
         }
     }
@@ -167,7 +407,7 @@ object AppUpdateManager {
     }
 
     private fun fetchJsonWithCode(urlString: String): Pair<Int, JSONObject?> {
-        val conn = openFollowingRedirects(urlString, connectTimeoutMs = 8_000, readTimeoutMs = 8_000)
+        val (_, conn) = openFollowingRedirects(urlString, connectTimeoutMs = 8_000, readTimeoutMs = 8_000)
         return try {
             val code = conn.responseCode
             if (code !in 200..299) return code to null
@@ -181,8 +421,9 @@ object AppUpdateManager {
     private fun openFollowingRedirects(
         urlString: String,
         connectTimeoutMs: Int,
-        readTimeoutMs: Int
-    ): HttpURLConnection {
+        readTimeoutMs: Int,
+        extraHeaders: Map<String, String> = emptyMap()
+    ): Pair<String, HttpURLConnection> {
         var currentUrl = urlString
         repeat(5) {
             val conn = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
@@ -192,21 +433,25 @@ object AppUpdateManager {
                 instanceFollowRedirects = false
                 setRequestProperty("User-Agent", "KlinUpAndroidApp/${BuildConfig.VERSION_NAME}")
                 setRequestProperty("Cache-Control", "no-cache")
+                extraHeaders.forEach { (k, v) -> setRequestProperty(k, v) }
             }
             val code = conn.responseCode
             if (code in setOf(301, 302, 303, 307, 308)) {
                 val location = conn.getHeaderField("Location")
                 conn.disconnect()
-                if (location.isNullOrBlank()) return conn
+                if (location.isNullOrBlank()) return currentUrl to conn
                 currentUrl = URL(URL(currentUrl), location).toString()
             } else {
-                return conn
+                return currentUrl to conn
             }
         }
-        return (URL(currentUrl).openConnection() as HttpURLConnection).apply {
+        val finalConn = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = connectTimeoutMs
             readTimeout = readTimeoutMs
+            setRequestProperty("User-Agent", "KlinUpAndroidApp/${BuildConfig.VERSION_NAME}")
+            extraHeaders.forEach { (k, v) -> setRequestProperty(k, v) }
         }
+        return currentUrl to finalConn
     }
 }

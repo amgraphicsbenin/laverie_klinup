@@ -138,7 +138,9 @@ import com.klinup.app.data.repository.KlinUpRepository
 import com.klinup.app.ui.components.NavMotion
 import com.klinup.app.ui.components.bouncyClickable
 import com.klinup.app.ui.theme.klinUpColors
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -232,6 +234,8 @@ fun ProfileScreen(onLogout: () -> Unit) {
     var downloadProgress by remember { mutableIntStateOf(0) }
     var updateDownloadError by remember { mutableStateOf<String?>(null) }
     var pendingInstallApk by remember { mutableStateOf<File?>(null) }
+    var downloadJob by remember { mutableStateOf<Job?>(null) }
+    var showCancelDownloadDialog by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -1160,7 +1164,9 @@ fun ProfileScreen(onLogout: () -> Unit) {
     availableUpdate?.let { info ->
         AlertDialog(
             onDismissRequest = {
-                if (!isDownloadingUpdate && !info.mandatory) {
+                if (isDownloadingUpdate) {
+                    showCancelDownloadDialog = true
+                } else if (!info.mandatory) {
                     availableUpdate = null
                     updateDownloadError = null
                 }
@@ -1224,22 +1230,32 @@ fun ProfileScreen(onLogout: () -> Unit) {
                         isDownloadingUpdate = true
                         downloadProgress = 0
                         updateDownloadError = null
-                        scope.launch {
-                            val res = AppUpdateManager.downloadApk(context, info.apkUrl) { pct ->
-                                downloadProgress = pct
-                            }
-                            isDownloadingUpdate = false
-                            res.onSuccess { file ->
-                                val launched = AppUpdateManager.installApk(context, file)
-                                if (launched) {
-                                    availableUpdate = null
-                                    updateStatusMessage = "Installation lancée"
-                                } else {
-                                    pendingInstallApk = file
-                                    updateDownloadError = "Autorisez l'installation d'applications pour finaliser la mise à jour."
+                        showCancelDownloadDialog = false
+                        downloadJob = scope.launch {
+                            try {
+                                val res = AppUpdateManager.downloadApk(context, info.apkUrl) { pct ->
+                                    downloadProgress = pct
                                 }
-                            }.onFailure { err ->
-                                updateDownloadError = err.message ?: "Échec du téléchargement de la mise à jour."
+                                isDownloadingUpdate = false
+                                showCancelDownloadDialog = false
+                                downloadJob = null
+                                res.onSuccess { file ->
+                                    val launched = AppUpdateManager.installApk(context, file)
+                                    if (launched) {
+                                        availableUpdate = null
+                                        updateStatusMessage = "Installation lancée"
+                                    } else {
+                                        pendingInstallApk = file
+                                        updateDownloadError = "Autorisez l'installation d'applications pour finaliser la mise à jour."
+                                    }
+                                }.onFailure { err ->
+                                    updateDownloadError = err.message ?: "Échec du téléchargement de la mise à jour."
+                                }
+                            } catch (_: CancellationException) {
+                                isDownloadingUpdate = false
+                                downloadProgress = 0
+                                showCancelDownloadDialog = false
+                                downloadJob = null
                             }
                         }
                     }
@@ -1251,16 +1267,71 @@ fun ProfileScreen(onLogout: () -> Unit) {
                     )
                 }
             },
-            dismissButton = if (!info.mandatory && !isDownloadingUpdate) {
-                {
-                    TextButton(onClick = {
-                        availableUpdate = null
-                        updateDownloadError = null
-                    }) {
-                        Text("Plus tard", color = p.muted)
+            dismissButton = when {
+                isDownloadingUpdate -> {
+                    {
+                        TextButton(onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showCancelDownloadDialog = true
+                        }) {
+                            Text("Annuler", color = Danger, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
-            } else null
+                !info.mandatory -> {
+                    {
+                        TextButton(onClick = {
+                            availableUpdate = null
+                            updateDownloadError = null
+                        }) {
+                            Text("Plus tard", color = p.muted)
+                        }
+                    }
+                }
+                else -> null
+            }
+        )
+    }
+    if (showCancelDownloadDialog && isDownloadingUpdate) {
+        AlertDialog(
+            onDismissRequest = { showCancelDownloadDialog = false },
+            containerColor = p.card,
+            title = {
+                Text(
+                    text = "Annuler le téléchargement ?",
+                    color = p.ink,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Le téléchargement de la mise à jour est en cours ($downloadProgress%). Voulez-vous vraiment l'annuler ?",
+                    color = p.muted
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    downloadJob?.cancel()
+                    downloadJob = null
+                    isDownloadingUpdate = false
+                    downloadProgress = 0
+                    showCancelDownloadDialog = false
+                    updateDownloadError = null
+                    availableUpdate = null
+                    updateStatusMessage = "Téléchargement annulé"
+                }) {
+                    Text("Oui, annuler", color = Danger, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showCancelDownloadDialog = false
+                }) {
+                    Text("Continuer", color = BrandText, fontWeight = FontWeight.Bold)
+                }
+            }
         )
     }
     if (showLogoutDialog) {
