@@ -2419,6 +2419,9 @@ export const dbEngine = {
   subscribeCustomer: async (customerId: string, catalogItemId: string): Promise<Customer | undefined> => {
     const customer = memoryDb.customers.find(c => c.id === customerId);
     const subPlan = memoryDb.catalog.find(c => c.id === catalogItemId && (c.service === 'abonnement' || c.categorie === 'abonnement'));
+    if (customer && (customer as any).active_subscription) {
+      throw new Error(`Ce client possède déjà un abonnement actif (${(customer as any).active_subscription.name}). Résiliez-le avant d'en souscrire un nouveau.`);
+    }
     if (customer && subPlan) {
       let clothesCount = (subPlan as any).nombre_vetements || 25;
       if (!(subPlan as any).nombre_vetements) {

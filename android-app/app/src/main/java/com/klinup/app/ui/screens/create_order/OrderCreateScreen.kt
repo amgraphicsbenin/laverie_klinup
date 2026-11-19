@@ -5,6 +5,7 @@ import com.klinup.app.ui.components.TablerIcons
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.alpha
 import com.klinup.app.ui.components.CustomerProfileFormCard
 import com.klinup.app.ui.components.LocalBottomBarPadding
 import androidx.compose.runtime.LaunchedEffect
@@ -52,6 +53,7 @@ import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -160,6 +162,7 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
     var momoOperator by remember { mutableStateOf("MTN") }
     var paymentDropdownExpanded by remember { mutableStateOf(false) }
     var suggestedSubPlan by remember { mutableStateOf<CatalogItem?>(null) }
+    var pendingSubPaymentPlan by remember { mutableStateOf<CatalogItem?>(null) }
     var isSubscribingInline by remember { mutableStateOf(false) }
     var inlineSubFeedback by remember { mutableStateOf<String?>(null) }
 
@@ -283,6 +286,13 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
     }
 
     val isSubscriptionPayment = paymentOption.key == "abonnement"
+    LaunchedEffect(isSubscriptionPayment) {
+        if (isSubscriptionPayment) {
+            advanceText = "0"
+            reductionText = "0"
+            urgency = "Normal"
+        }
+    }
     val effectiveItemsTotal = if (isSubscriptionPayment) 0.0 else itemsTotal
     val expressFee = if (urgency == "Express" && !isSubscriptionPayment) {
         kotlin.math.round(itemsTotal * (appSettings.expressMarkup / 100.0))
@@ -939,10 +949,15 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                                     val isExpress = urgency == "Express"
                                     Surface(
                                         onClick = {
-                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            urgency = "Express"
+                                            if (!isSubscriptionPayment) {
+                                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                urgency = "Express"
+                                            }
                                         },
-                                        modifier = Modifier.weight(1f),
+                                        enabled = !isSubscriptionPayment,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .alpha(if (isSubscriptionPayment) 0.45f else 1f),
                                         shape = RoundedCornerShape(50),
                                         color = if (isExpress) BrandBlue else CardWhite,
                                         border = if (isExpress) null else BorderStroke(1.dp, InnerBorder)
@@ -1072,20 +1087,25 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
-                                        text = "Avance (FCFA)",
+                                        text = if (isSubscriptionPayment) "Avance (Bloqué)" else "Avance (FCFA)",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = InkSecondary
+                                        color = if (isSubscriptionPayment) InkMuted else InkSecondary
                                     )
                                     OutlinedTextField(
-                                        value = advanceText,
-                                        onValueChange = { advanceText = it.filter { ch -> ch.isDigit() } },
+                                        value = if (isSubscriptionPayment) "0" else advanceText,
+                                        onValueChange = { if (!isSubscriptionPayment) advanceText = it.filter { ch -> ch.isDigit() } },
+                                        enabled = !isSubscriptionPayment,
+                                        readOnly = isSubscriptionPayment,
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         shape = RoundedCornerShape(16.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
                                             unfocusedBorderColor = InnerBorder,
-                                            focusedBorderColor = BrandBlue
+                                            focusedBorderColor = BrandBlue,
+                                            disabledContainerColor = SegmentedBg,
+                                            disabledBorderColor = CardBorder,
+                                            disabledTextColor = InkMuted
                                         ),
                                         modifier = Modifier.fillMaxWidth()
                                     )
@@ -1183,9 +1203,13 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                                 } else if (activeSub != null) {
                                     val hasEnough = activeSub.remainingClothes >= totalCount
                                     val afterCount = (activeSub.remainingClothes - totalCount).coerceAtLeast(0)
+                                    val totalQuota = activeSub.totalClothes.coerceAtLeast(1)
+                                    val remainingRatio = (activeSub.remainingClothes.toFloat() / totalQuota).coerceIn(0f, 1f)
+                                    val afterRatio = (afterCount.toFloat() / totalQuota).coerceIn(0f, 1f)
+                                    val accentColor = if (hasEnough) colors.skyText else colors.redText
                                     Surface(
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(14.dp),
+                                        shape = RoundedCornerShape(16.dp),
                                         color = if (hasEnough) colors.softSkyBg else colors.softRedBg,
                                         border = BorderStroke(
                                             1.dp,
@@ -1193,37 +1217,146 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                                         )
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            modifier = Modifier.padding(14.dp),
+                                            verticalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
+                                                Row(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(30.dp)
+                                                            .clip(RoundedCornerShape(9.dp))
+                                                            .background(accentColor.copy(alpha = 0.14f)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = TablerIcons.Award,
+                                                            contentDescription = null,
+                                                            tint = accentColor,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+                                                    Text(
+                                                        text = activeSub.name.ifBlank { "Abonnement actif" },
+                                                        fontSize = 13.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = InkPrimary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+
+                                                Surface(
+                                                    shape = RoundedCornerShape(999.dp),
+                                                    color = CardWhite,
+                                                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f))
+                                                ) {
+                                                    Text(
+                                                        text = "${activeSub.remainingClothes} / ${activeSub.totalClothes}",
+                                                        fontSize = 11.5.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = accentColor,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            // Barre de progression avec aperçu de la déduction
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(6.dp)
+                                                    .clip(RoundedCornerShape(999.dp))
+                                                    .background(CardWhite.copy(alpha = 0.75f))
+                                            ) {
+                                                if (remainingRatio > 0f) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth(remainingRatio)
+                                                            .height(6.dp)
+                                                            .clip(RoundedCornerShape(999.dp))
+                                                            .background(accentColor.copy(alpha = 0.28f))
+                                                    )
+                                                }
+                                                if (hasEnough && afterRatio > 0f) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth(afterRatio)
+                                                            .height(6.dp)
+                                                            .clip(RoundedCornerShape(999.dp))
+                                                            .background(accentColor)
+                                                    )
+                                                }
+                                            }
+
+                                            if (hasEnough) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Surface(
+                                                        modifier = Modifier.weight(1f),
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        color = CardWhite.copy(alpha = 0.85f)
+                                                    ) {
+                                                        Column(
+                                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "À déduire",
+                                                                fontSize = 10.5.sp,
+                                                                color = InkMuted
+                                                            )
+                                                            Text(
+                                                                text = "-$totalCount vêtement(s)",
+                                                                fontSize = 12.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = BrandText
+                                                            )
+                                                        }
+                                                    }
+                                                    Surface(
+                                                        modifier = Modifier.weight(1f),
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        color = CardWhite.copy(alpha = 0.85f)
+                                                    ) {
+                                                        Column(
+                                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "Reste après",
+                                                                fontSize = 10.5.sp,
+                                                                color = InkMuted
+                                                            )
+                                                            Text(
+                                                                text = "$afterCount vêtement(s)",
+                                                                fontSize = 12.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = GreenSuccess
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            } else {
                                                 Text(
-                                                    text = "Abonnement : ${activeSub.name}",
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = InkPrimary
-                                                )
-                                                Text(
-                                                    text = "${activeSub.remainingClothes} / ${activeSub.totalClothes} restants",
+                                                    text = "Solde insuffisant : $totalCount vêtement(s) demandé(s) pour ${activeSub.remainingClothes} restant(s).",
                                                     fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (hasEnough) colors.skyText else colors.redText
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = colors.redText
                                                 )
                                             }
-                                            Text(
-                                                text = if (hasEnough) {
-                                                    "-$totalCount vêtement(s) déduit(s) • Solde après commande : $afterCount vêtement(s)"
-                                                } else {
-                                                    "Solde insuffisant : $totalCount vêtement(s) demandé(s) pour ${activeSub.remainingClothes} restant(s)."
-                                                },
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = if (hasEnough) InkSecondary else colors.redText
-                                            )
                                         }
                                     }
                                 } else {
@@ -1296,19 +1429,8 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                                                     onClick = {
                                                         val planToSubscribe = suggestedSubPlan ?: subscriptionPlans.firstOrNull()
                                                         if (planToSubscribe == null || isSubscribingInline) return@Button
-                                                        isSubscribingInline = true
                                                         inlineSubFeedback = null
-                                                        scope.launch {
-                                                            val subRes = KlinUpRepository.subscribeCustomer(cust.id, planToSubscribe)
-                                                            isSubscribingInline = false
-                                                            subRes.onSuccess { newSub ->
-                                                                selectedCustomer = cust.copy(activeSubscription = newSub)
-                                                                suggestedSubPlan = null
-                                                                inlineSubFeedback = "Abonnement ${newSub.name} activé (${newSub.remainingClothes} vêtements) !"
-                                                            }.onFailure { err ->
-                                                                inlineSubFeedback = err.message ?: "Erreur lors de la souscription."
-                                                            }
-                                                        }
+                                                        pendingSubPaymentPlan = planToSubscribe
                                                     },
                                                     enabled = !isSubscribingInline && (suggestedSubPlan != null || subscriptionPlans.isNotEmpty()),
                                                     shape = RoundedCornerShape(50),
@@ -1351,20 +1473,25 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                             // Réduction (Montant FCFA)
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    text = "Réduction (Montant FCFA)",
+                                    text = if (isSubscriptionPayment) "Réduction (Bloqué — Abonnement)" else "Réduction (Montant FCFA)",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = InkSecondary
+                                    color = if (isSubscriptionPayment) InkMuted else InkSecondary
                                 )
                                 OutlinedTextField(
-                                    value = reductionText,
-                                    onValueChange = { reductionText = it.filter { ch -> ch.isDigit() } },
+                                    value = if (isSubscriptionPayment) "0" else reductionText,
+                                    onValueChange = { if (!isSubscriptionPayment) reductionText = it.filter { ch -> ch.isDigit() } },
+                                    enabled = !isSubscriptionPayment,
+                                    readOnly = isSubscriptionPayment,
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         unfocusedBorderColor = InnerBorder,
-                                        focusedBorderColor = BrandBlue
+                                        focusedBorderColor = BrandBlue,
+                                        disabledContainerColor = SegmentedBg,
+                                        disabledBorderColor = CardBorder,
+                                        disabledTextColor = InkMuted
                                     ),
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -1641,6 +1768,37 @@ fun OrderCreateScreen(onOrderCreated: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+
+    // ── Subscription Payment Confirmation Dialog (identical to settlement modal) ─
+    pendingSubPaymentPlan?.let { planToPay ->
+        val targetCust = selectedCustomer
+        if (targetCust != null) {
+            com.klinup.app.ui.components.SubscriptionPaymentDialog(
+                planName = planToPay.article,
+                planPrice = planToPay.prix,
+                customerName = targetCust.fullName,
+                isSubmitting = isSubscribingInline,
+                onDismiss = { if (!isSubscribingInline) pendingSubPaymentPlan = null },
+                onConfirm = { _, _, _, _ ->
+                    isSubscribingInline = true
+                    inlineSubFeedback = null
+                    scope.launch {
+                        val subRes = KlinUpRepository.subscribeCustomer(targetCust.id, planToPay)
+                        isSubscribingInline = false
+                        subRes.onSuccess { newSub ->
+                            selectedCustomer = targetCust.copy(activeSubscription = newSub)
+                            suggestedSubPlan = null
+                            pendingSubPaymentPlan = null
+                            inlineSubFeedback = null
+                        }.onFailure { err ->
+                            inlineSubFeedback = err.message ?: "Erreur lors de la souscription."
+                            pendingSubPaymentPlan = null
+                        }
+                    }
+                }
+            )
         }
     }
 

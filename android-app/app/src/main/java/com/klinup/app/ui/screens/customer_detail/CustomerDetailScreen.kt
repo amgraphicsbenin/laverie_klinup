@@ -133,6 +133,7 @@ fun CustomerDetailScreen(
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var selectedPlan by remember { mutableStateOf<CatalogItem?>(null) }
     var planDropdownExpanded by remember { mutableStateOf(false) }
+    var pendingSubscriptionPaymentPlan by remember { mutableStateOf<CatalogItem?>(null) }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
@@ -915,11 +916,16 @@ fun CustomerDetailScreen(
                                         color = InkSecondary
                                     )
                                     TextButton(
+                                        enabled = !isBusy,
                                         onClick = {
                                             isBusy = true
                                             scope.launch {
                                                 val res = KlinUpRepository.unsubscribeCustomer(customer.id)
                                                 isBusy = false
+                                                if (res.isSuccess) {
+                                                    selectedPlan = null
+                                                    planDropdownExpanded = false
+                                                }
                                                 feedbackMessage = if (res.isSuccess) "Abonnement résilié." else res.exceptionOrNull()?.message
                                             }
                                         },
@@ -930,108 +936,125 @@ fun CustomerDetailScreen(
                                 }
                             }
                         }
-                    }
 
-                    // Formula selector dropdown
-                    Box(modifier = Modifier.fillMaxWidth()) {
                         Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable { planDropdownExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
-                            color = CardWhite,
-                            border = BorderStroke(1.dp, appColors.innerBorder)
+                            color = appColors.softAmberBg,
+                            border = BorderStroke(1.dp, appColors.amberText.copy(alpha = 0.3f))
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = selectedPlan?.let {
-                                        "${it.article} • ${KlinUpRepository.formatFcfa(it.prix)}"
-                                    } ?: "-- Choisir une formule --",
-                                    fontSize = 14.sp,
-                                    color = if (selectedPlan != null) InkPrimary else InkSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
                                 Icon(
-                                    imageVector = TablerIcons.ChevronDown,
+                                    imageVector = TablerIcons.Lock,
                                     contentDescription = null,
-                                    tint = InkSecondary
+                                    tint = appColors.amberText,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Souscription bloquée : résiliez d'abord l'abonnement en cours pour en souscrire un nouveau.",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = InkSecondary,
+                                    lineHeight = 16.sp
                                 )
                             }
                         }
-
-                        KlinUpDropdownMenu(
-                            expanded = planDropdownExpanded,
-                            onDismissRequest = { planDropdownExpanded = false }
-                        ) {
-                            if (subscriptionPlans.isEmpty()) {
-                                KlinUpDropdownItem(
-                                    text = "Aucune formule disponible",
-                                    selected = false,
-                                    onClick = { planDropdownExpanded = false }
-                                )
-                            } else {
-                                subscriptionPlans.forEach { plan ->
-                                    KlinUpDropdownItem(
-                                        text = "${plan.article} (${KlinUpRepository.formatFcfa(plan.prix)})",
-                                        selected = selectedPlan?.id == plan.id,
-                                        onClick = {
-                                            selectedPlan = plan
-                                            planDropdownExpanded = false
-                                        }
+                    } else {
+                        // Formula selector dropdown
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { planDropdownExpanded = true },
+                                shape = RoundedCornerShape(14.dp),
+                                color = CardWhite,
+                                border = BorderStroke(1.dp, appColors.innerBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = selectedPlan?.let {
+                                            "${it.article} • ${KlinUpRepository.formatFcfa(it.prix)}"
+                                        } ?: "-- Choisir une formule --",
+                                        fontSize = 14.sp,
+                                        color = if (selectedPlan != null) InkPrimary else InkSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = TablerIcons.ChevronDown,
+                                        contentDescription = null,
+                                        tint = InkSecondary
                                     )
                                 }
                             }
-                        }
-                    }
 
-                    Button(
-                        onClick = {
-                            val plan = selectedPlan ?: return@Button
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            isBusy = true
-                            scope.launch {
-                                val res = KlinUpRepository.subscribeCustomer(customer.id, plan)
-                                isBusy = false
-                                feedbackMessage = if (res.isSuccess) {
-                                    selectedPlan = null
-                                    "Abonnement ${plan.article} activé."
+                            KlinUpDropdownMenu(
+                                expanded = planDropdownExpanded,
+                                onDismissRequest = { planDropdownExpanded = false }
+                            ) {
+                                if (subscriptionPlans.isEmpty()) {
+                                    KlinUpDropdownItem(
+                                        text = "Aucune formule disponible",
+                                        selected = false,
+                                        onClick = { planDropdownExpanded = false }
+                                    )
                                 } else {
-                                    res.exceptionOrNull()?.message ?: "Erreur lors de la souscription"
+                                    subscriptionPlans.forEach { plan ->
+                                        KlinUpDropdownItem(
+                                            text = "${plan.article} (${KlinUpRepository.formatFcfa(plan.prix)})",
+                                            selected = selectedPlan?.id == plan.id,
+                                            onClick = {
+                                                selectedPlan = plan
+                                                planDropdownExpanded = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
-                        },
-                        enabled = !isBusy && selectedPlan != null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = BrandBlue,
-                            disabledContainerColor = BrandBlue.copy(alpha = 0.55f)
-                        )
-                    ) {
-                        if (isBusy) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
+                        }
+
+                        Button(
+                            onClick = {
+                                val plan = selectedPlan ?: return@Button
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                pendingSubscriptionPaymentPlan = plan
+                            },
+                            enabled = !isBusy && selectedPlan != null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            shape = RoundedCornerShape(50),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = BrandBlue,
+                                disabledContainerColor = BrandBlue.copy(alpha = 0.55f)
                             )
-                        } else {
-                            Text(
-                                text = "Souscrire",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                        ) {
+                            if (isBusy) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = "Souscrire",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -1039,6 +1062,31 @@ fun CustomerDetailScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
         }
+    }
+
+    // ── Subscription Payment Confirmation Dialog ─────────────────
+    pendingSubscriptionPaymentPlan?.let { planToPay ->
+        com.klinup.app.ui.components.SubscriptionPaymentDialog(
+            planName = planToPay.article,
+            planPrice = planToPay.prix,
+            customerName = customer.fullName,
+            isSubmitting = isBusy,
+            onDismiss = { if (!isBusy) pendingSubscriptionPaymentPlan = null },
+            onConfirm = { _, _, _, _ ->
+                isBusy = true
+                scope.launch {
+                    val res = KlinUpRepository.subscribeCustomer(customer.id, planToPay)
+                    isBusy = false
+                    pendingSubscriptionPaymentPlan = null
+                    feedbackMessage = if (res.isSuccess) {
+                        selectedPlan = null
+                        "Abonnement ${planToPay.article} payé et activé."
+                    } else {
+                        res.exceptionOrNull()?.message ?: "Erreur lors de la souscription"
+                    }
+                }
+            }
+        )
     }
 
     // ── Delete Confirmation Dialog ───────────────────────────────

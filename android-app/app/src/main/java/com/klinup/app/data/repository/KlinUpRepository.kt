@@ -1928,6 +1928,10 @@ object KlinUpRepository {
     }
 
     suspend fun subscribeCustomer(customerId: String, plan: CatalogItem): Result<ActiveSubscription> = runCatching {
+        val existingSub = _customers.value.firstOrNull { it.id == customerId }?.activeSubscription
+        if (existingSub != null) {
+            throw IllegalStateException("Ce client possède déjà un abonnement actif (${existingSub.name}). Résiliez-le avant d'en souscrire un nouveau.")
+        }
         val clothesCount = plan.nombreVetements ?: when {
             plan.article.contains("Premium", ignoreCase = true) -> 50
             plan.article.contains("Prestige", ignoreCase = true) -> 100

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { db } from '../services/db';
 import OrderFormModal from '../features/orders/components/OrderFormModal';
+import SubscriptionPaymentModal from './SubscriptionPaymentModal';
 import ValidationsTab from '../features/validations/components/ValidationsTab';
 import ExpensesTab from '../features/expenses/components/ExpensesTab';
 
@@ -267,23 +268,46 @@ export default function AdminView({ activeTab, onManageStaff }) {
     alert("Paramètres système enregistrés et synchronisés en temps réel !");
   };
 
+  const [pendingCrmSubPayment, setPendingCrmSubPayment] = useState(null);
+  const [isSubscribingCrm, setIsSubscribingCrm] = useState(false);
+
   const handleSubscribeCrm = async (customerId, catalogItemId) => {
     if (!catalogItemId) {
       alert("Veuillez sélectionner un forfait d'abonnement.");
       return;
     }
+    const targetCust = (db.getCustomers() || []).find(c => c.id === customerId);
+    if (targetCust?.active_subscription) {
+      alert("Ce client possède déjà un abonnement actif. Résiliez-le d'abord avant d'en souscrire un nouveau.");
+      return;
+    }
+    const plan = (db.getCatalog() || []).find(c => c.id === catalogItemId);
+    if (!plan) {
+      alert("Forfait d'abonnement introuvable.");
+      return;
+    }
+    setPendingCrmSubPayment({ customer: targetCust, plan });
+  };
+
+  const handleConfirmCrmSubPayment = async () => {
+    if (!pendingCrmSubPayment || isSubscribingCrm) return;
+    const { customer, plan } = pendingCrmSubPayment;
+    setIsSubscribingCrm(true);
     try {
-      const updated = await db.subscribeCustomer(customerId, catalogItemId);
+      const updated = await db.subscribeCustomer(customer.id, plan.id);
       if (updated) {
         refreshAdminData();
         const updatedCustomers = db.getCustomers();
-        const updatedCust = updatedCustomers.find(c => c.id === customerId);
+        const updatedCust = updatedCustomers.find(c => c.id === customer.id);
         setSelectedCrmCustomer(updatedCust);
         setSelectedCrmSubId('');
-        alert(`Abonnement souscrit avec succès pour ${updatedCust ? `${updatedCust.prenom} ${updatedCust.nom}` : 'le client'} !`);
+        setPendingCrmSubPayment(null);
+        alert(`Abonnement ${plan.article} payé et activé pour ${updatedCust ? `${updatedCust.prenom} ${updatedCust.nom}` : 'le client'} !`);
       }
     } catch (err) {
       alert("Erreur lors de la souscription à l'abonnement : " + (err.message || err));
+    } finally {
+      setIsSubscribingCrm(false);
     }
   };
 
@@ -4894,6 +4918,19 @@ export default function AdminView({ activeTab, onManageStaff }) {
               </div>
             </div>
           </div>
+        </ModalPortal>
+      )}
+
+      {pendingCrmSubPayment && (
+        <ModalPortal>
+          <SubscriptionPaymentModal
+            isOpen={!!pendingCrmSubPayment}
+            plan={pendingCrmSubPayment.plan}
+            customerName={pendingCrmSubPayment.customer ? `${pendingCrmSubPayment.customer.prenom || ''} ${pendingCrmSubPayment.customer.nom || ''}`.trim() : ''}
+            isSubmitting={isSubscribingCrm}
+            onClose={() => !isSubscribingCrm && setPendingCrmSubPayment(null)}
+            onConfirm={handleConfirmCrmSubPayment}
+          />
         </ModalPortal>
       )}
 

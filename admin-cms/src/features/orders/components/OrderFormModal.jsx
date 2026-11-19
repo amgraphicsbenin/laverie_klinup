@@ -2,6 +2,7 @@ import { Check, Plus, Search, Smartphone, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import MomoOperatorSelector from '../../../components/MomoOperatorSelector';
+import SubscriptionPaymentModal from '../../../components/SubscriptionPaymentModal';
 import StatefulButton from '../../../components/ui/StatefulButton';
 import { db } from '../../../services/db';
 
@@ -37,6 +38,8 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
 
   const [payWithSubscription, setPayWithSubscription] = useState(false);
   const [subscribePlanId, setSubscribePlanId] = useState('');
+  const [pendingSubPaymentPlan, setPendingSubPaymentPlan] = useState(null);
+  const [isSubscribingInline, setIsSubscribingInline] = useState(false);
   const [withDelivery, setWithDelivery] = useState(false);
   const [withPickup, setWithPickup] = useState(false);
 
@@ -190,6 +193,17 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
     }
 
     const totalClothes = getTotalClothesCount();
+    if (orderPaymentMethod === 'abonnement' && !activeCustomer?.active_subscription && !subscribePlanId) {
+      alert("Ce client ne possède pas d'abonnement actif. Veuillez d'abord lui souscrire et régler un forfait d'abonnement ou changer de mode de règlement.");
+      return;
+    }
+    if (subscribePlanId && activeCustomer && !activeCustomer.active_subscription) {
+      const planToPay = catalog.find(c => c.id === subscribePlanId && (c.categorie === 'abonnement' || c.service === 'abonnement'));
+      if (planToPay) {
+        setPendingSubPaymentPlan(planToPay);
+        return;
+      }
+    }
     if (payWithSubscription && !subscribePlanId && activeCustomer && activeCustomer.active_subscription) {
       const remaining = activeCustomer.active_subscription.remaining_clothes;
       if (remaining < totalClothes) {
@@ -477,14 +491,34 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                       </div>
                     )}
 
-                    {/* Menu de renouvellement / changement */}
-                    <div style={{ marginTop: '8px' }}>
-                      <label style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>
-                        Renouveler / Changer d'abonnement :
-                      </label>
+                    {/* Abonnement actif : nouvelle souscription bloquée sans résiliation */}
+                    <div style={{
+                      marginTop: '8px',
+                      padding: '8px 10px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                      border: '1px solid rgba(245, 158, 11, 0.25)',
+                      fontSize: '11.5px',
+                      color: '#b45309',
+                      fontWeight: 600
+                    }}>
+                      Souscription d'un autre forfait bloquée : résiliez d'abord l'abonnement en cours depuis la fiche client.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    backgroundColor: 'rgba(0, 44, 247, 0.04)',
+                    border: '1.5px solid rgba(0, 44, 247, 0.1)',
+                    borderRadius: '16px',
+                    padding: '12px'
+                  }}>
+                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '6px', display: 'block' }}>
+                      Souscrire immédiatement à un abonnement (paiement requis avant commande) :
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <select
                         style={{
-                          width: '100%',
+                          flex: 1,
                           height: '42px',
                           backgroundColor: '#ffffff',
                           border: '1.5px solid #e2e8f0',
@@ -501,57 +535,44 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                           setSubscribePlanId(val);
                           if (val) {
                             setPayWithSubscription(true);
+                            setOrderPaymentMethod('abonnement');
+                            setOrderAvance('0');
+                            setOrderDiscount('0');
+                            setOrderUrgency('Normal');
                           } else {
-                            setPayWithSubscription(!!activeCustomer.active_subscription);
+                            setPayWithSubscription(false);
                           }
                         }}
                       >
-                        <option value="">-- Conserver l'abonnement en cours --</option>
-                        {catalog.filter(c => c.categorie === 'abonnement' && c.is_active !== false && c.statut !== 'inactif').map(p => (
+                        <option value="">-- Pas d'abonnement --</option>
+                        {catalog.filter(c => (c.categorie === 'abonnement' || c.service === 'abonnement') && c.is_active !== false && c.statut !== 'inactif').map(p => (
                           <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString('fr-FR')} F)</option>
                         ))}
                       </select>
+                      {subscribePlanId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const planToPay = catalog.find(c => c.id === subscribePlanId);
+                            if (planToPay) setPendingSubPaymentPlan(planToPay);
+                          }}
+                          style={{
+                            height: '42px',
+                            padding: '0 14px',
+                            borderRadius: '12px',
+                            backgroundColor: '#0000FF',
+                            color: '#ffffff',
+                            border: 'none',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Régler & Activer
+                        </button>
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div style={{
-                    backgroundColor: 'rgba(0, 44, 247, 0.04)',
-                    border: '1.5px solid rgba(0, 44, 247, 0.1)',
-                    borderRadius: '16px',
-                    padding: '12px'
-                  }}>
-                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '6px', display: 'block' }}>
-                      Souscrire immédiatement à un abonnement :
-                    </label>
-                    <select
-                      style={{
-                        width: '100%',
-                        height: '42px',
-                        backgroundColor: '#ffffff',
-                        border: '1.5px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '0 12px',
-                        fontSize: '13px',
-                        color: '#09090b',
-                        fontWeight: 500,
-                        outline: 'none'
-                      }}
-                      value={subscribePlanId}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSubscribePlanId(val);
-                        if (val) {
-                          setPayWithSubscription(true);
-                        } else {
-                          setPayWithSubscription(false);
-                        }
-                      }}
-                    >
-                      <option value="">-- Pas d'abonnement --</option>
-                      {catalog.filter(c => c.categorie === 'abonnement' && c.is_active !== false && c.statut !== 'inactif').map(p => (
-                        <option key={p.id} value={p.id}>{p.article} ({p.prix.toLocaleString('fr-FR')} F)</option>
-                      ))}
-                    </select>
                   </div>
                 )}
               </div>
@@ -953,11 +974,24 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
-                  value={orderPaymentMethod}
-                  onChange={(e) => setOrderPaymentMethod(e.target.value)}
+                  value={isSubscriptionMode ? 'abonnement' : orderPaymentMethod}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setOrderPaymentMethod(val);
+                    if (val === 'abonnement') {
+                      setPayWithSubscription(true);
+                      setOrderAvance('0');
+                      setOrderDiscount('0');
+                      setOrderUrgency('Normal');
+                    } else {
+                      setPayWithSubscription(false);
+                      setSubscribePlanId('');
+                    }
+                  }}
                 >
                   <option value="Espèce">Espèce</option>
                   <option value="Mobile Money">Mobile Money</option>
+                  <option value="abonnement">Abonnement</option>
                 </select>
               </div>
 
@@ -1306,6 +1340,32 @@ export default function OrderFormModal({ visible, onClose, onShowSuccess, refres
           </div>
         </div>
       </div>
+
+      {pendingSubPaymentPlan && activeCustomer && (
+        <SubscriptionPaymentModal
+          isOpen={!!pendingSubPaymentPlan}
+          plan={pendingSubPaymentPlan}
+          customerName={`${activeCustomer.prenom || ''} ${activeCustomer.nom || ''}`.trim() || activeCustomer.telephone}
+          isSubmitting={isSubscribingInline}
+          onClose={() => !isSubscribingInline && setPendingSubPaymentPlan(null)}
+          onConfirm={async () => {
+            if (isSubscribingInline) return;
+            setIsSubscribingInline(true);
+            try {
+              await db.subscribeCustomer(activeCustomer.id, pendingSubPaymentPlan.id);
+              if (refreshAdminData) refreshAdminData();
+              setSubscribePlanId('');
+              setPayWithSubscription(true);
+              setOrderPaymentMethod('abonnement');
+              setPendingSubPaymentPlan(null);
+            } catch (err) {
+              alert('Erreur lors de la souscription : ' + (err.message || err));
+            } finally {
+              setIsSubscribingInline(false);
+            }
+          }}
+        />
+      )}
     </ModalPortal>
   );
 }

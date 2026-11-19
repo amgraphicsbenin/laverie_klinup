@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { db } from '../../../services/db';
 import {
   ShoppingBag,
@@ -980,39 +981,23 @@ export default function OrdersTab({
                           </div>
                         </td>
 
-                        {/* 4. Point de Laverie (Store) */}
+                        {/* 4. Point de Laverie (Store) — lecture seule */}
                         <td style={{ padding: '0.75rem 0.85rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                          <select
-                            value={(() => {
-                              const match = stores.find(s => s.id === order.store_id || s.code === order.store_id);
-                              return match ? match.id : (stores[0]?.id || order.store_id || '');
-                            })()}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={async (e) => {
-                              e.stopPropagation();
-                              const newSid = e.target.value;
-                              if (db.updateOrderStore) {
-                                await db.updateOrderStore(order.id, newSid);
-                              }
-                            }}
+                          <span
                             style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
                               fontSize: '0.72rem',
                               fontWeight: 700,
                               color: 'var(--primary)',
                               background: 'rgba(59, 130, 246, 0.08)',
                               border: '1px solid rgba(59, 130, 246, 0.25)',
                               borderRadius: '7px',
-                              padding: '0.22rem 0.45rem',
-                              cursor: 'pointer',
-                              outline: 'none'
+                              padding: '0.24rem 0.55rem'
                             }}
                           >
-                            {stores.map(st => (
-                              <option key={st.id} value={st.id}>
-                                {st.nom} ({st.code})
-                              </option>
-                            ))}
-                          </select>
+                            {currentStore ? `${currentStore.nom} (${currentStore.code})` : (order.store_id || '—')}
+                          </span>
                         </td>
 
                         {/* 5. Articles & Prestations */}
@@ -1393,7 +1378,7 @@ export default function OrdersTab({
         const clientName = customer ? `${customer.prenom} ${customer.nom}` : (order.client_name || 'Client B2B');
         const clientPhone = customer ? customer.telephone : (order.client_telephone || '-');
 
-        return (
+        const menuNode = (
           <div
             ref={dropdownRef}
             style={{
@@ -1639,6 +1624,8 @@ export default function OrdersTab({
             )}
           </div>
         );
+
+        return typeof document !== 'undefined' ? createPortal(menuNode, document.body) : menuNode;
       })()}
     </div>
   );
