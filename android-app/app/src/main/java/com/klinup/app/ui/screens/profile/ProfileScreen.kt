@@ -4,11 +4,10 @@ import com.klinup.app.ui.components.TablerIcons
 
 import com.klinup.app.ui.components.LocalBottomBarPadding
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -16,6 +15,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -260,18 +261,39 @@ fun ProfileScreen(onLogout: () -> Unit) {
             NotificationManagerCompat.from(context).areNotificationsEnabled()
         }
     }
-    val hasNetworkConnection = remember(context, permRefreshTick) {
-        runCatching {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            val net = cm?.activeNetwork ?: return@runCatching false
-            val caps = cm.getNetworkCapabilities(net) ?: return@runCatching false
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        }.getOrDefault(true)
+    val canInstallPackages = remember(context, permRefreshTick) {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+            context.packageManager.canRequestPackageInstalls()
+    }
+    var notifRequestHadRationale by remember { mutableStateOf(false) }
+    val openNotificationSettings: () -> Unit = {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            }
+        } else {
+            Intent("android.settings.APP_NOTIFICATION_SETTINGS").apply {
+                putExtra("app_package", context.packageName)
+                putExtra("app_uid", context.applicationInfo.uid)
+            }
+        }
+        runCatching { context.startActivity(intent) }
     }
     val notifPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) {
+    ) { granted ->
         permRefreshTick++
+        if (!granted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val activity = context as? Activity
+            val nowRationale = activity != null &&
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    activity,
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            if (!notifRequestHadRationale && !nowRationale) {
+                openNotificationSettings()
+            }
+        }
     }
 
     val userId = user?.id.orEmpty()
@@ -474,11 +496,17 @@ fun ProfileScreen(onLogout: () -> Unit) {
                                     activeMenu = ProfileMenuPage.SECURITE
                                 }
                                 Divider(p)
+                                val permsSummary = buildList {
+                                    add(if (notificationsGranted) "Notifications actives" else "Notifications à activer")
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        add(if (canInstallPackages) "Mises à jour autorisées" else "Mises à jour à autoriser")
+                                    }
+                                }.joinToString(" • ")
                                 ActionRow(
                                     TablerIcons.Key,
                                     BrandText,
                                     "Autorisations de l'appareil",
-                                    if (notificationsGranted) "Notifications actives • Gérer les accès" else "Notifications désactivées • Gérer les accès",
+                                    permsSummary,
                                     p
                                 ) {
                                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -958,135 +986,108 @@ fun ProfileScreen(onLogout: () -> Unit) {
                     ProfileMenuPage.AUTORISATIONS -> {
                         item(key = "permissions") {
                             val appColors = MaterialTheme.klinUpColors
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Card(p) {
-                                    Column {
-                                        // 1. Notifications
-                                        PermissionStatusRow(
-                                            icon = TablerIcons.Bell,
-                                            iconTint = if (notificationsGranted) Success else Warning,
-                                            title = "Notifications",
-                                            subtitle = if (notificationsGranted) {
-                                                "Alertes commandes en temps réel autorisées"
-                                            } else {
-                                                "Appuyez pour autoriser les alertes sur cet appareil"
-                                            },
-                                            badgeText = if (notificationsGranted) "Autorisée" else "À activer",
-                                            badgeBg = if (notificationsGranted) appColors.softGreenBg else appColors.softAmberBg,
-                                            badgeColor = if (notificationsGranted) Success else Warning,
-                                            p = p
-                                        ) {
-                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            if (!notificationsGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                                notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                            } else {
-                                                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                                }
-                                                runCatching { context.startActivity(intent) }
-                                            }
-                                        }
-                                        Divider(p)
-
-                                        // 2. Biométrie (Empreinte & Reconnaissance faciale)
-                                        val anyBiometricEnabled = (biometricEnabled && fingerprintAvailable) ||
-                                            (faceUnlockEnabled && faceUnlockAvailable)
-                                        val availableModesLabel = when {
-                                            fingerprintAvailable && faceUnlockAvailable -> "Empreinte & reconnaissance faciale prêtes"
-                                            faceUnlockAvailable -> "Reconnaissance faciale prête"
-                                            fingerprintAvailable -> "Capteur d'empreinte prêt"
-                                            else -> "Aucune biométrie enregistrée dans Android"
-                                        }
-                                        PermissionStatusRow(
-                                            icon = if (faceUnlockAvailable && !fingerprintAvailable) TablerIcons.FaceId else TablerIcons.Fingerprint,
-                                            iconTint = if (biometricAvailable) BrandText else p.muted,
-                                            title = "Biométrie (Empreinte / Facial)",
-                                            subtitle = if (biometricAvailable) {
-                                                if (anyBiometricEnabled) "Active pour le déverrouillage rapide" else "$availableModesLabel (configurable dans Sécurité)"
-                                            } else {
-                                                availableModesLabel
-                                            },
-                                            badgeText = if (biometricAvailable) "Prête" else "Non configurée",
-                                            badgeBg = if (biometricAvailable) appColors.softGreenBg else p.chip,
-                                            badgeColor = if (biometricAvailable) Success else p.muted,
-                                            p = p
-                                        ) {
-                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            runCatching {
-                                                context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
-                                            }
-                                        }
-                                        Divider(p)
-
-                                        // 3. Fichiers & Médias (Photo Picker / Document Picker)
-                                        PermissionStatusRow(
-                                            icon = TablerIcons.Photo,
-                                            iconTint = BrandText,
-                                            title = "Photos & Documents (PDF)",
-                                            subtitle = "Accès ponctuel via le sélecteur sécurisé Android (factures & avatar)",
-                                            badgeText = "Sécurisé",
-                                            badgeBg = appColors.softBlueBg,
-                                            badgeColor = BrandText,
-                                            p = p
-                                        ) {
-                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                                data = Uri.fromParts("package", context.packageName, null)
-                                            }
-                                            runCatching { context.startActivity(intent) }
-                                        }
-                                        Divider(p)
-
-                                        // 4. Réseau & Synchronisation
-                                        PermissionStatusRow(
-                                            icon = TablerIcons.Refresh,
-                                            iconTint = if (hasNetworkConnection) Success else Danger,
-                                            title = "Accès Internet & Temps réel",
-                                            subtitle = if (hasNetworkConnection) {
-                                                "Connexion active avec le serveur KLIN UP"
-                                            } else {
-                                                "Hors ligne — vérifiez votre connexion"
-                                            },
-                                            badgeText = if (hasNetworkConnection) "Connecté" else "Hors ligne",
-                                            badgeBg = if (hasNetworkConnection) appColors.softGreenBg else appColors.softRedBg,
-                                            badgeColor = if (hasNetworkConnection) Success else Danger,
-                                            p = p
-                                        ) {
-                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            runCatching {
-                                                context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS))
-                                            }
+                            Card(p) {
+                                Column {
+                                    // 1. Notifications (POST_NOTIFICATIONS)
+                                    PermissionStatusRow(
+                                        icon = TablerIcons.Bell,
+                                        iconTint = if (notificationsGranted) Success else Warning,
+                                        title = "Notifications",
+                                        subtitle = if (notificationsGranted) {
+                                            "Alertes commandes en temps réel autorisées"
+                                        } else {
+                                            "Appuyez pour autoriser les alertes sur cet appareil"
+                                        },
+                                        badgeText = if (notificationsGranted) "Autorisée" else "À activer",
+                                        badgeBg = if (notificationsGranted) appColors.softGreenBg else appColors.softAmberBg,
+                                        badgeColor = if (notificationsGranted) Success else Warning,
+                                        p = p
+                                    ) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        if (!notificationsGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            val activity = context as? Activity
+                                            notifRequestHadRationale = activity != null &&
+                                                ActivityCompat.shouldShowRequestPermissionRationale(
+                                                    activity,
+                                                    Manifest.permission.POST_NOTIFICATIONS
+                                                )
+                                            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        } else {
+                                            openNotificationSettings()
                                         }
                                     }
-                                }
 
-                                Surface(
-                                    shape = RoundedCornerShape(26.dp),
-                                    color = Brand,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(26.dp))
-                                        .bouncyClickable(role = Role.Button) {
+                                    // 2. Installation des mises à jour (REQUEST_INSTALL_PACKAGES)
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        Divider(p)
+                                        PermissionStatusRow(
+                                            icon = TablerIcons.Package,
+                                            iconTint = if (canInstallPackages) Success else Warning,
+                                            title = "Installation des mises à jour",
+                                            subtitle = if (canInstallPackages) {
+                                                "Installation directe des mises à jour autorisée"
+                                            } else {
+                                                "Appuyez pour autoriser l'installation des mises à jour"
+                                            },
+                                            badgeText = if (canInstallPackages) "Autorisée" else "À activer",
+                                            badgeBg = if (canInstallPackages) appColors.softGreenBg else appColors.softAmberBg,
+                                            badgeColor = if (canInstallPackages) Success else Warning,
+                                            p = p
+                                        ) {
                                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                                data = Uri.fromParts("package", context.packageName, null)
-                                            }
+                                            val intent = Intent(
+                                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                                Uri.parse("package:${context.packageName}")
+                                            )
                                             runCatching { context.startActivity(intent) }
                                         }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(vertical = 15.dp, horizontal = 16.dp),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
+                                    }
+
+                                    // 3. Biométrie (Empreinte & Reconnaissance faciale)
+                                    Divider(p)
+                                    val anyBiometricEnabled = (biometricEnabled && fingerprintAvailable) ||
+                                        (faceUnlockEnabled && faceUnlockAvailable)
+                                    val availableModesLabel = when {
+                                        fingerprintAvailable && faceUnlockAvailable -> "Empreinte & reconnaissance faciale prêtes"
+                                        faceUnlockAvailable -> "Reconnaissance faciale prête"
+                                        fingerprintAvailable -> "Capteur d'empreinte prêt"
+                                        else -> "Appuyez pour configurer votre biométrie sur l'appareil"
+                                    }
+                                    PermissionStatusRow(
+                                        icon = if (faceUnlockAvailable && !fingerprintAvailable) TablerIcons.FaceId else TablerIcons.Fingerprint,
+                                        iconTint = if (biometricAvailable) BrandText else p.muted,
+                                        title = "Biométrie (Empreinte / Facial)",
+                                        subtitle = if (biometricAvailable) {
+                                            if (anyBiometricEnabled) "Active pour le déverrouillage rapide" else "$availableModesLabel (gérer dans Sécurité)"
+                                        } else {
+                                            availableModesLabel
+                                        },
+                                        badgeText = if (biometricAvailable) "Prête" else "À configurer",
+                                        badgeBg = if (biometricAvailable) appColors.softGreenBg else appColors.softAmberBg,
+                                        badgeColor = if (biometricAvailable) Success else Warning,
+                                        p = p
                                     ) {
-                                        Icon(TablerIcons.ExternalLink, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(
-                                            text = "Paramètres système de l'application",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        if (biometricAvailable) {
+                                            activeMenu = ProfileMenuPage.SECURITE
+                                        } else {
+                                            val enrollIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                                Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
+                                                    putExtra(
+                                                        Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                                                        BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                                                            BiometricManager.Authenticators.BIOMETRIC_WEAK
+                                                    )
+                                                }
+                                            } else {
+                                                @Suppress("DEPRECATION")
+                                                Intent(Settings.ACTION_FINGERPRINT_ENROLL)
+                                            }
+                                            runCatching { context.startActivity(enrollIntent) }
+                                                .onFailure {
+                                                    runCatching { context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
+                                                }
+                                        }
                                     }
                                 }
                             }
