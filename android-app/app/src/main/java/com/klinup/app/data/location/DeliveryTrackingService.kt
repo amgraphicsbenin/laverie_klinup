@@ -151,12 +151,17 @@ class DeliveryTrackingService : Service() {
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            runCatching { nm.deleteNotificationChannel("klinup_live_tracking") }
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Suivi de course en direct",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Partage GPS en direct pendant les dépôts et livraisons KLIN UP"
+                description = "Partage GPS silencieux pendant les dépôts et livraisons KLIN UP"
+                setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
             }
             nm.createNotificationChannel(channel)
         }
@@ -178,9 +183,13 @@ class DeliveryTrackingService : Service() {
             "$missionCount courses suivies en direct"
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification_klinup)
             .setContentTitle("KLIN UP • Suivi GPS actif")
             .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setSilent(true)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(pendingOpen)
@@ -196,7 +205,7 @@ class DeliveryTrackingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
-        private const val CHANNEL_ID = "klinup_live_tracking"
+        private const val CHANNEL_ID = "klinup_live_tracking_silent_v2"
         private const val NOTIFICATION_ID = 4201
         private const val ACTION_ADD_MISSION = "com.klinup.app.tracking.ADD"
         private const val ACTION_REMOVE_MISSION = "com.klinup.app.tracking.REMOVE"

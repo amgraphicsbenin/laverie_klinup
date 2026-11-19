@@ -280,6 +280,10 @@ fun ProfileScreen(onLogout: () -> Unit) {
     val overlayGranted = remember(context, permRefreshTick) {
         Settings.canDrawOverlays(context)
     }
+    val backgroundUnrestricted = remember(context, permRefreshTick) {
+        val pm = context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+        pm?.isIgnoringBatteryOptimizations(context.packageName) == true
+    }
     val canInstallPackages = remember(context, permRefreshTick) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
             context.packageManager.canRequestPackageInstalls()
@@ -577,9 +581,10 @@ fun ProfileScreen(onLogout: () -> Unit) {
                                     notificationsGranted,
                                     locationGranted,
                                     overlayGranted,
+                                    backgroundUnrestricted,
                                     canInstallPackages
                                 ).count { it }
-                                val permsSummary = "$permsGrantedCount/4 autorisations actives • GPS, Superposition, Notifications"
+                                val permsSummary = "$permsGrantedCount/5 autorisations actives • GPS, Arrière-plan, Superposition"
                                 ActionRow(
                                     TablerIcons.Key,
                                     BrandText,
@@ -1156,7 +1161,42 @@ fun ProfileScreen(onLogout: () -> Unit) {
                                             .onFailure { openAppDetailsSettings() }
                                     }
 
-                                    // 4. Service de suivi en arrière-plan (FOREGROUND_SERVICE_LOCATION)
+                                    // 4. Fonctionnement en arrière-plan (REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                    Divider(p)
+                                    PermissionStatusRow(
+                                        icon = TablerIcons.Bolt,
+                                        iconTint = if (backgroundUnrestricted) Success else Warning,
+                                        title = "Fonctionnement en arrière-plan",
+                                        subtitle = if (backgroundUnrestricted) {
+                                            "Exécution sans restriction autorisée pour un suivi continu et fluide"
+                                        } else {
+                                            "Appuyez pour autoriser le fonctionnement sans restriction en arrière-plan"
+                                        },
+                                        badgeText = if (backgroundUnrestricted) "Autorisée" else "À activer",
+                                        badgeBg = if (backgroundUnrestricted) appColors.softGreenBg else appColors.softAmberBg,
+                                        badgeColor = if (backgroundUnrestricted) Success else Warning,
+                                        p = p
+                                    ) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        if (!backgroundUnrestricted) {
+                                            val intent = Intent(
+                                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                                Uri.parse("package:${context.packageName}")
+                                            )
+                                            runCatching { context.startActivity(intent) }
+                                                .onFailure {
+                                                    runCatching {
+                                                        context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                                    }.onFailure { openAppDetailsSettings() }
+                                                }
+                                        } else {
+                                            runCatching {
+                                                context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                            }.onFailure { openAppDetailsSettings() }
+                                        }
+                                    }
+
+                                    // 5. Service de suivi en arrière-plan (FOREGROUND_SERVICE_LOCATION)
                                     Divider(p)
                                     PermissionStatusRow(
                                         icon = TablerIcons.TruckDelivery,
