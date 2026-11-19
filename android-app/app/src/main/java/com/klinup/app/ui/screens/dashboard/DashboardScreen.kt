@@ -328,10 +328,40 @@ fun DashboardScreen(
         }
     }
 
-    val averageBasketText = remember(nonCancelledIndexed) {
+    val (averageBasketText, averageBasketBars, averageBasketSubtitle) = remember(nonCancelledIndexed, today) {
         val avg = if (nonCancelledIndexed.isEmpty()) 0.0
         else nonCancelledIndexed.sumOf { it.order.prixTotal } / nonCancelledIndexed.size
-        KlinUpRepository.formatFcfa(avg)
+
+        val dailyAvgs = (6 downTo 0).map { offset ->
+            val targetDate = today.minusDays(offset.toLong())
+            val dayOrders = nonCancelledIndexed.filter { it.createdDate == targetDate }
+            if (dayOrders.isEmpty()) 0.0 else dayOrders.sumOf { it.order.prixTotal } / dayOrders.size
+        }
+
+        val hasRecentDays = dailyAvgs.any { it > 0.0 }
+        val rawValues = if (hasRecentDays) {
+            dailyAvgs
+        } else {
+            val recentOrders = nonCancelledIndexed
+                .sortedBy { it.createdZoned?.toInstant()?.toEpochMilli() ?: 0L }
+                .takeLast(7)
+                .map { it.order.prixTotal }
+            if (recentOrders.isEmpty()) List(7) { 0.0 }
+            else List((7 - recentOrders.size).coerceAtLeast(0)) { 0.0 } + recentOrders
+        }
+
+        val maxVal = rawValues.maxOrNull()?.takeIf { it > 0.0 } ?: 1.0
+        val normalized = rawValues.map { v ->
+            if (v <= 0.0) 0f else (v / maxVal).toFloat().coerceIn(0.18f, 1f)
+        }
+        val subtitleLabel = if (hasRecentDays) {
+            "7 derniers jours • Par cmd"
+        } else if (nonCancelledIndexed.isNotEmpty()) {
+            "Dernières cmd • Par cmd"
+        } else {
+            "Par commande"
+        }
+        Triple(KlinUpRepository.formatFcfa(avg), normalized, subtitleLabel)
     }
 
     val (collectedAmountText, collectionRatePct, remainingBalanceLabel) = remember(nonCancelledIndexed) {
@@ -630,7 +660,8 @@ fun DashboardScreen(
                     item(key = "panier_moyen", contentType = "kpi_card") {
                         AverageBasketKpiCard(
                             amount = AppPreferences.maskAmount(averageBasketText, hideAmounts),
-                            subtitle = "Par commande",
+                            subtitle = averageBasketSubtitle,
+                            barRatios = averageBasketBars,
                             hideAmounts = hideAmounts,
                             onToggleHideAmounts = onToggleAmounts,
                             onClick = {
@@ -1091,6 +1122,7 @@ private fun MonthlyRevenueKpiCard(
 private fun AverageBasketKpiCard(
     amount: String,
     subtitle: String,
+    barRatios: List<Float>,
     hideAmounts: Boolean,
     onToggleHideAmounts: () -> Unit,
     onClick: () -> Unit
@@ -1141,39 +1173,40 @@ private fun AverageBasketKpiCard(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val maxRatio = barRatios.maxOrNull() ?: 0f
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(34.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(22.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MiniBarLight)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(34.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MiniBarViolet)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(22.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MiniBarLight)
-                    )
+                    barRatios.forEachIndexed { idx, ratio ->
+                        val isPeakOrToday = (ratio > 0f && (ratio == maxRatio || idx == barRatios.lastIndex))
+                        val barHeight = if (ratio <= 0f) 5.dp else (7f + ratio * 27f).dp
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(barHeight)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    when {
+                                        ratio <= 0f -> Color.White.copy(alpha = 0.20f)
+                                        isPeakOrToday -> Color.White
+                                        else -> Color.White.copy(alpha = 0.48f)
+                                    }
+                                )
+                        )
+                    }
                 }
 
                 Text(
                     text = subtitle,
                     color = Color.White.copy(alpha = 0.85f),
                     fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
