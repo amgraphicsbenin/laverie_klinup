@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -76,6 +77,11 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.biometric:biometric:1.1.0")
+
+    // Mise à jour OTA (App Distribution SDK)
+    implementation("com.google.firebase:firebase-appdistribution-api-ktx:16.0.0-beta14")
+    implementation("com.google.firebase:firebase-appdistribution:16.0.0-beta14")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
     // Ktor & Supabase Kotlin SDK
     implementation(libs.ktor.client.android)
