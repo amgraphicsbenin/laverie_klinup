@@ -256,43 +256,25 @@ fun SplashScreen(
             }
         }
 
-        // Titre central "Pressing Pro" sous le ruban
+        // Signature marque en pied d'écran : Logo blanc agrandi au-dessus de Pressing Pro
         Column(
             modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .padding(top = 240.dp)
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 38.dp)
                 .graphicsLayer {
                     alpha = textAlpha
                     translationY = textOffsetY
                 },
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Pressing Pro",
-                fontSize = 33.sp,
-                fontWeight = FontWeight.Normal,
-                letterSpacing = 0.6.sp,
-                color = Color.White
-            )
-        }
-
-        // Signature marque en pied d'écran : Logo blanc mis en évidence + Pressing Pro
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(bottom = 36.dp)
-                .graphicsLayer { alpha = textAlpha },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.klinup_logo_brand),
                 contentDescription = "Logo Pressing Pro",
                 contentScale = ContentScale.Fit,
                 colorFilter = ColorFilter.tint(Color.White),
-                modifier = Modifier.size(34.dp)
+                modifier = Modifier.size(48.dp)
             )
             Text(
                 text = "Pressing Pro",
