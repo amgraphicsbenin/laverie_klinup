@@ -116,7 +116,7 @@ fun AppNavigation() {
     }
 
     // Verrouillage automatique (Auto-Lock) ou expiration de session : retour immédiat à l'écran PIN
-    LaunchedEffect(currentUser, isSessionLocked) {
+    LaunchedEffect(currentUser, isSessionLocked, currentRoute) {
         if ((currentUser == null || isSessionLocked) &&
             currentRoute != null &&
             currentRoute != Screen.Login.route &&

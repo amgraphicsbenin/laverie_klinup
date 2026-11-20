@@ -19,7 +19,11 @@ data class SubscriptionDetails(
     @SerialName("vetements_inclus") val vetementsInclus: Int? = null,
     @SerialName("used_clothes") val usedClothes: Int? = null,
     @SerialName("total_clothes") val totalClothes: Int? = null,
-    @SerialName("livraison_gratuite") val livraisonGratuite: Boolean = false
+    @SerialName("livraison_gratuite") val livraisonGratuite: Boolean = false,
+    @SerialName("frais_recuperation") val fraisRecuperation: Double? = null,
+    @SerialName("with_pickup") val withPickup: Boolean? = null,
+    @SerialName("frais_livraison") val fraisLivraison: Double? = null,
+    @SerialName("livraison_domicile") val livraisonDomicile: Boolean? = null
 )
 
 @Serializable

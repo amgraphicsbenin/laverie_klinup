@@ -63,7 +63,7 @@ object SecurityManager {
     const val MAX_PIN_ATTEMPTS = 5
     private const val COOLDOWN_4TH_ATTEMPT_MS = 30_000L          // 30 secondes au 4e échec
     private const val LOCKOUT_DURATION_MS = 15 * 60_000L         // 15 minutes au 5e échec
-    private const val MAX_SESSION_TTL_MS = 12 * 60 * 60_000L     // 12 heures (amplitude de service max)
+    private const val MAX_SESSION_TTL_MS = 30L * 24L * 60L * 60_000L // 30 jours (évite toute perte après veille prolongée)
 
     private lateinit var prefs: SharedPreferences
     private var appContext: Context? = null
@@ -506,6 +506,7 @@ object SecurityManager {
                 return true
             }
         }
+        putEncrypted(KEY_SESSION_ISSUED_AT, now.toString())
         return _isSessionLocked.value
     }
 

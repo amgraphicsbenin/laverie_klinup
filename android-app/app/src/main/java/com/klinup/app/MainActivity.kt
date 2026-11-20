@@ -119,15 +119,23 @@ class MainActivity : FragmentActivity() {
     override fun onStart() {
         super.onStart()
         NetworkMonitor.recheck()
+        if (KlinUpRepository.currentUser.value == null && !SecurityManager.isSessionLocked.value) {
+            KlinUpRepository.restoreSessionIfAvailable()
+        }
         val currentUser = KlinUpRepository.currentUser.value
         if (currentUser != null && SecurityManager.checkAndApplyAutoLock(currentUser)) {
             KlinUpRepository.lockCurrentSession()
+        } else if (KlinUpRepository.currentUser.value != null && !SecurityManager.isSessionLocked.value) {
+            KlinUpRepository.refreshOnResume()
         }
     }
 
     override fun onResume() {
         super.onResume()
         NetworkMonitor.recheck()
+        if (KlinUpRepository.currentUser.value != null && !SecurityManager.isSessionLocked.value) {
+            KlinUpRepository.refreshOnResume()
+        }
     }
 
     override fun onStop() {

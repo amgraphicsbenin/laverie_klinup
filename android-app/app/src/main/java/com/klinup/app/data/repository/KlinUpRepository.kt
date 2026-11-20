@@ -224,9 +224,7 @@ private data class NewOrderPayload(
     @SerialName("subscription_details") val subscriptionDetails: SubscriptionDetails? = null,
     @SerialName("created_by_id") val createdById: String? = null,
     @SerialName("created_by_name") val createdByName: String? = null,
-    @SerialName("store_id") val storeId: String? = null,
-    @SerialName("frais_recuperation") val fraisRecuperation: Double = 0.0,
-    @SerialName("with_pickup") val withPickup: Boolean = false
+    @SerialName("store_id") val storeId: String? = null
 )
 
 @Serializable
@@ -371,11 +369,16 @@ object KlinUpRepository {
     fun hasDeliveryOption(order: Order): Boolean {
         return order.livraisonDomicile ||
             order.fraisLivraison > 0.0 ||
+            order.subscriptionDetails?.livraisonDomicile == true ||
+            (order.subscriptionDetails?.fraisLivraison ?: 0.0) > 0.0 ||
             _deliveryOrderIds.value.contains(order.id)
     }
 
     fun hasPickupOption(order: Order): Boolean {
-        return order.withPickup || order.fraisRecuperation > 0.0
+        return order.withPickup ||
+            order.fraisRecuperation > 0.0 ||
+            order.subscriptionDetails?.withPickup == true ||
+            (order.subscriptionDetails?.fraisRecuperation ?: 0.0) > 0.0
     }
 
     fun canShowLiveTrackingButton(order: Order): Boolean {
@@ -628,6 +631,30 @@ object KlinUpRepository {
         return false
     }
 
+    @Volatile
+    private var lastResumeRefreshAtMs: Long = 0L
+
+    /**
+     * Appelé au retour au premier plan (onStart/onResume) après une veille ou mise en arrière-plan :
+     * recharge le cache local si la mémoire a été purgée puis resynchronise immédiatement Supabase.
+     */
+    fun refreshOnResume() {
+        val user = _currentUser.value ?: return
+        if (SecurityManager.isSessionLocked.value) return
+        val dataEmpty = _orders.value.isEmpty() || _customers.value.isEmpty() || _catalog.value.isEmpty()
+        if (dataEmpty) {
+            loadOfflineSnapshot(user.id)
+        }
+        val nowMs = System.currentTimeMillis()
+        if (dataEmpty || nowMs - lastResumeRefreshAtMs >= 15_000L) {
+            lastResumeRefreshAtMs = nowMs
+            backgroundScope.launch {
+                refreshAll()
+            }
+        }
+        ensureRealtimeTrackingWatcher()
+    }
+
     /**
      * Verrouille immédiatement la session active et exige la saisie du code PIN à 6 chiffres.
      */
@@ -657,9 +684,10 @@ object KlinUpRepository {
         logSecurityEvent(unlocked, "BIOMETRIC_UNLOCK", "Déverrouillage par $methodLabel (${unlocked.fullName})")
         syncUserAvatarAsync(unlocked)
         if (_orders.value.isEmpty() || _customers.value.isEmpty() || _catalog.value.isEmpty()) {
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                refreshAll()
-            }
+            loadOfflineSnapshot(unlocked.id)
+        }
+        backgroundScope.launch {
+            refreshAll()
         }
         return Result.success(unlocked)
     }
@@ -1509,14 +1537,21 @@ object KlinUpRepository {
             val grossTotal = itemsTotal + expressFee.coerceAtLeast(0.0) + effectiveDeliveryFee + pickupFee.coerceAtLeast(0.0)
             val total = (grossTotal - reduction).coerceAtLeast(0.0)
             val effectiveAdvance = if (isSubOrder && total <= 0.0) 0.0 else avancePayee.coerceAtLeast(0.0)
-            val subDetails = if (isSubOrder && activeSub != null) {
+            val effectivePickupFee = pickupFee.coerceAtLeast(0.0)
+            val hasPickupFlag = homePickup || effectivePickupFee > 0.0
+            val hasDeliveryFlag = homeDelivery || effectiveDeliveryFee > 0.0
+            val subDetails = if ((isSubOrder && activeSub != null) || hasPickupFlag || hasDeliveryFlag) {
                 SubscriptionDetails(
-                    planName = activeSub.name,
-                    vetementsUtilises = totalClothesCount,
-                    vetementsInclus = activeSub.totalClothes,
-                    usedClothes = totalClothesCount,
-                    totalClothes = activeSub.totalClothes,
-                    livraisonGratuite = freeDeliverySub
+                    planName = if (isSubOrder) activeSub?.name else null,
+                    vetementsUtilises = if (isSubOrder) totalClothesCount else null,
+                    vetementsInclus = if (isSubOrder) activeSub?.totalClothes else null,
+                    usedClothes = if (isSubOrder) totalClothesCount else null,
+                    totalClothes = if (isSubOrder) activeSub?.totalClothes else null,
+                    livraisonGratuite = freeDeliverySub,
+                    fraisRecuperation = if (effectivePickupFee > 0.0) effectivePickupFee else null,
+                    withPickup = if (hasPickupFlag) true else null,
+                    fraisLivraison = if (effectiveDeliveryFee > 0.0) effectiveDeliveryFee else null,
+                    livraisonDomicile = if (hasDeliveryFlag) true else null
                 )
             } else null
 
@@ -1554,9 +1589,7 @@ object KlinUpRepository {
                 subscriptionDetails = subDetails,
                 createdById = user.id,
                 createdByName = user.fullName,
-                storeId = storeId,
-                fraisRecuperation = pickupFee.coerceAtLeast(0.0),
-                withPickup = homePickup || pickupFee > 0.0
+                storeId = storeId
             )
 
             var insertedOrderId = nextSeqId
@@ -1633,8 +1666,8 @@ object KlinUpRepository {
                 storeId = orderPayload.storeId,
                 fraisLivraison = effectiveDeliveryFee,
                 livraisonDomicile = homeDelivery,
-                fraisRecuperation = orderPayload.fraisRecuperation,
-                withPickup = orderPayload.withPickup
+                fraisRecuperation = effectivePickupFee,
+                withPickup = hasPickupFlag
             )
             if (user.role.equals("livreur", ignoreCase = true) && hasPickupOption(createdOrder)) {
                 startTrackingMission(createdOrder, "depot_laverie")
