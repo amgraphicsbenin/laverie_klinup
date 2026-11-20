@@ -208,6 +208,9 @@ fun GestionScreen(
 
     var activeTab by rememberSaveable { mutableStateOf(GestionTab.COMMANDES) }
     val pendingGestionTab by KlinUpRepository.pendingGestionTab.collectAsState()
+    LaunchedEffect(Unit) {
+        KlinUpRepository.ensureRealtimeOrdersWatcher()
+    }
     LaunchedEffect(allowedTabs) {
         if (allowedTabs.none { it.first == activeTab }) {
             activeTab = GestionTab.COMMANDES

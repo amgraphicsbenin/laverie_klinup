@@ -360,6 +360,8 @@ object KlinUpRepository {
 
     @Volatile private var appContext: Context? = null
     private var trackingRealtimeJob: Job? = null
+    private var ordersRealtimeJob: Job? = null
+    @Volatile private var lastOrdersRefreshAtMs: Long = 0L
 
     fun init(context: Context) {
         appContext = context.applicationContext
@@ -560,9 +562,12 @@ object KlinUpRepository {
         sessionWatcherJob = null
         trackingRealtimeJob?.cancel()
         trackingRealtimeJob = null
+        ordersRealtimeJob?.cancel()
+        ordersRealtimeJob = null
         appContext?.let { DeliveryTrackingService.stopAll(it) }
         _pendingTrackingPermissions.value = emptyList()
         _trackingSessions.value = emptyList()
+        _activeTrackingOrderIds.value = emptySet()
         _trackingTrails.value = emptyMap()
         val deviceSuffix = remoteDeviceName?.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
         _multiDeviceLogoutNotice.value =
@@ -653,6 +658,7 @@ object KlinUpRepository {
             }
         }
         ensureRealtimeTrackingWatcher()
+        ensureRealtimeOrdersWatcher()
     }
 
     /**
@@ -1177,7 +1183,13 @@ object KlinUpRepository {
                 _expenses.value = scopedExpenses
                 _trackingSessions.value = trackingDeferred.await()
                     .filter { matchesStoreScope(it.storeId, storeScope) }
+                _activeTrackingOrderIds.value = _trackingSessions.value
+                    .asSequence()
+                    .filter { it.isActive }
+                    .map { it.orderId }
+                    .toSet()
                 ensureRealtimeTrackingWatcher()
+                ensureRealtimeOrdersWatcher()
                 saveOfflineSnapshot(user?.id.orEmpty())
                 KlinUpNotificationManager.syncFromOrders(
                     orders = _orders.value,
@@ -1230,9 +1242,12 @@ object KlinUpRepository {
         sessionWatcherJob = null
         trackingRealtimeJob?.cancel()
         trackingRealtimeJob = null
+        ordersRealtimeJob?.cancel()
+        ordersRealtimeJob = null
         appContext?.let { DeliveryTrackingService.stopAll(it) }
         _pendingTrackingPermissions.value = emptyList()
         _trackingSessions.value = emptyList()
+        _activeTrackingOrderIds.value = emptySet()
         _trackingTrails.value = emptyMap()
         if (active != null) {
             logSecurityEvent(active, "LOGOUT", "Déconnexion volontaire (${active.fullName})")
@@ -2987,6 +3002,141 @@ object KlinUpRepository {
 
     fun dismissPendingTrackingPermissions() {
         _pendingTrackingPermissions.value = emptyList()
+    }
+
+    fun ensureRealtimeOrdersWatcher() {
+        val user = _currentUser.value ?: return
+        if (ordersRealtimeJob?.isActive == true) return
+        ordersRealtimeJob = backgroundScope.launch {
+            launch {
+                while (_currentUser.value?.id == user.id) {
+                    runCatching {
+                        val channel = client.realtime.channel("orders_live_${System.currentTimeMillis()}")
+                        val insertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                            table = "orders"
+                        }
+                        val updateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                            table = "orders"
+                        }
+                        val deleteFlow = channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+                            table = "orders"
+                        }
+                        channel.subscribe()
+                        coroutineScope {
+                            launch {
+                                insertFlow.collect { action ->
+                                    applyRealtimeOrderUpsert(action.record.toString())
+                                }
+                            }
+                            launch {
+                                updateFlow.collect { action ->
+                                    applyRealtimeOrderUpsert(action.record.toString())
+                                }
+                            }
+                            launch {
+                                deleteFlow.collect { action ->
+                                    val deletedId = runCatching {
+                                        action.oldRecord["id"]?.toString()?.trim('"')
+                                    }.getOrNull()
+                                    if (!deletedId.isNullOrBlank()) {
+                                        val updated = _orders.value.filterNot { it.id == deletedId }
+                                        if (updated.size != _orders.value.size) {
+                                            _orders.value = updated
+                                            saveOfflineSnapshot(_currentUser.value?.id.orEmpty())
+                                        }
+                                    } else {
+                                        refreshOrdersOnly()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Reconnexion automatique si le socket Realtime est coupé
+                    delay(5_000L)
+                }
+            }
+            // Filet de sécurité léger (15s) pour garantir la cohérence si le réseau a coupé brièvement
+            while (_currentUser.value?.id == user.id) {
+                delay(15_000L)
+                if (NetworkMonitor.isOnline.value && !SecurityManager.isSessionLocked.value) {
+                    refreshOrdersOnly()
+                }
+            }
+        }
+    }
+
+    private fun applyRealtimeOrderUpsert(rawJson: String) {
+        val user = _currentUser.value ?: return
+        val decoded = runCatching {
+            SupabaseClientProvider.json.decodeFromString<Order>(rawJson)
+        }.getOrNull()
+        if (decoded == null) {
+            backgroundScope.launch { refreshOrdersOnly(force = true) }
+            return
+        }
+        val storeScope = resolveAssignedStoreScope(user, _stores.value)
+        val inScope = decoded.deletedAt == null && matchesStoreScope(decoded.storeId, storeScope)
+        val current = _orders.value
+        val nextList = if (!inScope) {
+            current.filterNot { it.id == decoded.id }
+        } else {
+            val idx = current.indexOfFirst { it.id == decoded.id }
+            if (idx >= 0) {
+                current.toMutableList().apply { this[idx] = decoded }
+            } else {
+                listOf(decoded) + current
+            }
+        }
+        if (nextList != current) {
+            _orders.value = nextList
+            saveOfflineSnapshot(user.id)
+            KlinUpNotificationManager.syncFromOrders(
+                orders = nextList,
+                customers = _customers.value,
+                emitSystemNotifications = true
+            )
+            // Si la commande concerne un nouveau client pas encore en cache, charger les clients
+            val cid = decoded.customerId
+            if (inScope && !cid.isNullOrBlank() && _customers.value.none { it.id == cid }) {
+                backgroundScope.launch {
+                    runCatching {
+                        val loaded = client.from("customers")
+                            .select()
+                            .decodeList<Customer>()
+                            .filter { it.deletedAt == null }
+                        val orderCustomerIds = _orders.value.mapNotNull { it.customerId }.toSet()
+                        _customers.value = loaded.filter {
+                            matchesStoreScope(it.storeId, storeScope) || it.id in orderCustomerIds
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun refreshOrdersOnly(force: Boolean = false) {
+        val nowMs = System.currentTimeMillis()
+        if (!force && nowMs - lastOrdersRefreshAtMs < 2000L) return
+        lastOrdersRefreshAtMs = nowMs
+        runCatching {
+            val user = _currentUser.value ?: return
+            val storeScope = resolveAssignedStoreScope(user, _stores.value)
+            val rows = client.from("orders")
+                .select {
+                    order("created_at", order = PostgrestOrder.DESCENDING)
+                }
+                .decodeList<Order>()
+                .filter { it.deletedAt == null && matchesStoreScope(it.storeId, storeScope) }
+            if (_orders.value != rows) {
+                _orders.value = rows
+                saveOfflineSnapshot(user.id)
+                KlinUpNotificationManager.syncFromOrders(
+                    orders = rows,
+                    customers = _customers.value,
+                    emitSystemNotifications = true
+                )
+            }
+        }
     }
 
     private fun ensureRealtimeTrackingWatcher() {
